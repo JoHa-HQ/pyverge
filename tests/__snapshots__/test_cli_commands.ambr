@@ -1,0 +1,98 @@
+# serializer version: 1
+# name: TestCliDiff.test_diff_json
+  '''
+  {
+    "model_name": "User",
+    "from_version": "1.0.0",
+    "to_version": "2.0.0",
+    "added_fields": [
+      "age"
+    ],
+    "removed_fields": [],
+    "modified_fields": {},
+    "added_field_info": {
+      "age": {
+        "type": "int | None",
+        "required": false,
+        "default": null
+      }
+    },
+    "unchanged_fields": [
+      "name",
+      "email"
+    ]
+  }
+  
+  '''
+# ---
+# name: TestCliDiff.test_diff_markdown
+  '''
+  # User: 1.0.0 → 2.0.0
+  
+  ## Added Fields
+  
+  - `age: Union` (optional)
+  
+  ## Removed Fields
+  
+  None
+  
+  ## Modified Fields
+  
+  None
+  
+  
+  '''
+# ---
+# name: TestCliExport.test_export_json_schema
+  '''
+  ✓ Exported JSON Schema schemas to /tmp/pytest-of-uby/pytest-18/test_export_json_schema0/schemas/
+  
+  '''
+# ---
+# name: TestCliExport.test_export_typescript
+  '''
+  ✓ Exported TypeScript schemas to /tmp/pytest-of-uby/pytest-18/test_export_typescript0/ts/
+  
+  '''
+# ---
+# name: TestCliInfo.test_info
+  '''
+  Manager: default
+  
+  Registered Models:
+  
+    User
+      • v1.0.0
+      • v2.0.0
+  
+  Total: 1 models
+  
+  '''
+# ---
+# name: TestCliMigrate.test_migrate
+  '''
+  {
+    "name": "Alice",
+    "email": "alice@example.com",
+    "age": null
+  }
+  
+  '''
+# ---
+# name: TestCliValidate.test_validate_invalid
+  '''
+  ✗ Validation failed
+  
+  Validation errors:
+    • name: Field required
+    • email: Field required
+  
+  '''
+# ---
+# name: TestCliValidate.test_validate_valid
+  '''
+  ✓ Valid against User v1.0.0
+  
+  '''
+# ---
