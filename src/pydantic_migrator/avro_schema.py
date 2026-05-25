@@ -1,0 +1,825 @@
+"""Avro schema generation from Pydantic models."""
+
+import json
+import re
+from collections.abc import Mapping
+from datetime import date, datetime, time
+from decimal import Decimal
+from enum import Enum
+from pathlib import Path
+from typing import Annotated, Any, Final, Self, cast, get_args, get_origin
+from uuid import UUID
+
+from pydantic import BaseModel
+from pydantic.fields import FieldInfo
+
+from ._registry import Registry
+from ._schema_documents import AvroSchemaDocument
+from ._schema_generator import FieldSchema, SchemaGeneratorBase, TypeInfo
+from ._type_inspector import TypeInspector
+from .avro_types import (
+    AvroArraySchema,
+    AvroDefaultValue,
+    AvroEnumSchema,
+    AvroField,
+    AvroLogicalType,
+    AvroMapSchema,
+    AvroRecordSchema,
+    AvroSchema,
+    AvroType,
+    AvroUnion,
+    CachedAvroEnumSchema,
+)
+from .model_version import ModelVersion
+
+
+class AvroSchemaGenerator(SchemaGeneratorBase[AvroSchemaDocument]):
+    """Generates Apache Avro schemas from Pydantic models."""
+
+    AVRO_SYMBOL_REGEX: Final = re.compile("[A-Za-z_][A-Za-z0-9_]*")
+
+    _BASIC_TYPE_MAPPING: Mapping[type, str] = {
+        str: "string",
+        int: "int",
+        float: "double",
+        bool: "boolean",
+        bytes: "bytes",
+    }
+
+    _LOGICAL_TYPE_MAPPING: Mapping[type, AvroLogicalType] = {
+        datetime: {"type": "long", "logicalType": "timestamp-micros"},
+        date: {"type": "int", "logicalType": "date"},
+        time: {"type": "long", "logicalType": "time-micros"},
+        UUID: {"type": "string", "logicalType": "uuid"},
+        Decimal: {
+            "type": "bytes",
+            "logicalType": "decimal",
+            "precision": 10,
+            "scale": 2,
+        },
+    }
+
+    def __init__(
+        self: Self,
+        namespace: str = "com.example",
+        include_docs: bool = True,
+    ) -> None:
+        """Initialize the Avro schema generator.
+
+        Args:
+            namespace: Avro namespace for generated schemas (e.g.,
+                "com.mycompany.events").
+            include_docs: Whether to include field descriptions in schemas.
+        """
+        super().__init__(include_docs=include_docs)
+        self.namespace = namespace
+        self._generated_enum_schemas: dict[str, CachedAvroEnumSchema] = {}
+
+    def _reset_state(self) -> None:
+        """Reset internal state before generating a new schema."""
+        super()._reset_state()
+        self._generated_enum_schemas = {}
+
+    def generate_schema(
+        self: Self,
+        model: type[BaseModel],
+        name: str,
+        version: str | ModelVersion | None = None,
+        registry_name_map: dict[str, str] | None = None,
+    ) -> AvroSchemaDocument:
+        """Generate an Avro schema from a Pydantic model.
+
+        Args:
+            model: Pydantic model class.
+            name: Model name.
+            version: Optional namespace version. This is often the model
+                version.
+            registry_name_map: Optional mapping of class names to registry names.
+
+        Returns:
+            Avro schema document.
+        """
+        self._reset_state()
+
+        self._register_model_name(model.__name__, name)
+        self._current_model_class_name = model.__name__
+        self._current_model_schema_name = name
+        self._types_seen.add(model.__name__)
+
+        full_namespace = self.namespace
+        if version:
+            version_str = str(version).replace(".", "_")
+            full_namespace = f"{self.namespace}.v{version_str}"
+
+        if TypeInspector.is_root_model(model):
+            return self._generate_root_model_schema(model, name, full_namespace)
+
+        self._collect_nested_models(model)
+        for nested_class_name in self._nested_models:
+            if nested_class_name != model.__name__:
+                self._register_model_name(nested_class_name, nested_class_name)
+
+        schema: AvroRecordSchema = {
+            "type": "record",
+            "name": name,
+            "namespace": full_namespace,
+            "fields": [],
+        }
+
+        if self.include_docs and model.__doc__:
+            schema["doc"] = model.__doc__.strip()
+
+        for field_name, field_info in model.model_fields.items():
+            field_schema = self._generate_field_schema(field_name, field_info, model)
+            schema["fields"].append(field_schema)
+
+        return AvroSchemaDocument(
+            main=schema,
+            namespace=full_namespace,
+            enums={k: v["schema"] for k, v in self._generated_enum_schemas.items()},
+        )
+
+    def _generate_root_model_schema(  # noqa: C901, PLR0912
+        self: Self,
+        model: type[BaseModel],
+        name: str,
+        namespace: str,
+    ) -> AvroSchemaDocument:
+        """Generate Avro schema for a RootModel.
+
+        For RootModels, we generate a schema for the root type directly rather than
+        creating a record with a 'root' field.
+
+        Args:
+            model: RootModel class.
+            name: Schema name.
+            namespace: Avro namespace.
+
+        Returns:
+            Avro schema document.
+        """
+        root_annotation = TypeInspector.get_root_annotation(model)
+
+        actual_type = root_annotation
+        origin = get_origin(root_annotation)
+        if origin is Annotated:
+            args = get_args(root_annotation)
+            if args:
+                actual_type = args[0]
+
+        if TypeInspector.is_base_model(actual_type):
+            self._collect_nested_models(model)
+        else:
+            union_origin = get_origin(actual_type)
+            if TypeInspector.is_union_type(union_origin):
+                union_args = get_args(actual_type)
+                for arg in union_args:
+                    if arg is not type(None) and TypeInspector.is_base_model(arg):
+                        temp_nested = TypeInspector.collect_nested_models(
+                            arg, self._types_seen
+                        )
+                        self._nested_models.update(temp_nested)
+                        self._register_nested_model(arg)
+
+        for nested_class_name in list(self._nested_models.keys()):
+            if nested_class_name != model.__name__:
+                self._register_model_name(nested_class_name, nested_class_name)
+
+        type_info = self._convert_type(actual_type)
+        root_type = type_info.type_representation
+
+        if isinstance(root_type, dict) and root_type.get("type") in ("array", "map"):
+            # For array and map types, we need to wrap them in a record
+            # because Avro requires top-level schemas to be named types
+            schema: AvroRecordSchema = {
+                "type": "record",
+                "name": name,
+                "namespace": namespace,
+                "fields": [
+                    {
+                        "name": "root",
+                        "type": cast("AvroType", root_type),
+                    }
+                ],
+            }
+
+            if self.include_docs and model.__doc__:
+                schema["doc"] = model.__doc__.strip()
+
+            main_schema: AvroRecordSchema = schema
+        elif isinstance(root_type, dict) and root_type.get("type") == "record":
+            main_schema = root_type.copy()  # type: ignore
+            main_schema["name"] = name
+            main_schema["namespace"] = namespace
+
+            if self.include_docs and model.__doc__ and "doc" not in main_schema:
+                main_schema["doc"] = model.__doc__.strip()
+        else:
+            schema = {
+                "type": "record",
+                "name": name,
+                "namespace": namespace,
+                "fields": [
+                    {
+                        "name": "root",
+                        "type": cast("AvroType", root_type),
+                    }
+                ],
+            }
+
+            if self.include_docs and model.__doc__:
+                schema["doc"] = model.__doc__.strip()
+
+            main_schema = schema
+
+        return AvroSchemaDocument(
+            main=main_schema,
+            namespace=namespace,
+            enums={k: v["schema"] for k, v in self._generated_enum_schemas.items()},
+        )
+
+    def _get_field_name(self: Self, field_name: str, field_info: FieldInfo) -> str:
+        """Get the schema field name, considering aliases.
+
+        For Avro, prefer serialization_alias over alias, as it's explicitly for
+        serialization purposes.
+
+        Args:
+            field_name: Original Python field name.
+            field_info: Pydantic field info.
+
+        Returns:
+            Field name to use in schema.
+        """
+        if field_info.serialization_alias:
+            return field_info.serialization_alias
+        if field_info.alias:
+            return field_info.alias
+        return field_name
+
+    def _generate_field_schema(
+        self: Self,
+        field_name: str,
+        field_info: FieldInfo,
+        model: type[BaseModel],
+    ) -> AvroField:
+        """Generate Avro schema for a single field.
+
+        Args:
+            field_name: Name of the field.
+            field_info: Pydantic field info.
+            model: Parent model class.
+
+        Returns:
+            Avro field schema.
+        """
+        field_schema = self._build_field_schema(field_name, field_info, model)
+        return self._format_avro_field(field_schema)
+
+    def _format_avro_field(self: Self, field_schema: FieldSchema) -> AvroField:
+        """Format intermediate field schema as Avro field.
+
+        Args:
+            field_schema: Intermediate field representation.
+
+        Returns:
+            Avro field schema.
+        """
+        avro_field: AvroField = {"name": field_schema.name, "type": "string"}
+        avro_type = field_schema.type_info.type_representation
+
+        if self.include_docs and field_schema.description:
+            avro_field["doc"] = field_schema.description
+
+        if field_schema.aliases:
+            avro_field["aliases"] = field_schema.aliases
+
+        if field_schema.context.is_optional:
+            if isinstance(avro_type, list):
+                avro_type = [t for t in avro_type if t != "null"]
+                avro_type.insert(0, "null")
+            else:
+                avro_type = ["null", avro_type]
+
+            if field_schema.context.default_value is not None:
+                avro_field["default"] = self._convert_default_value(
+                    field_schema.context.default_value
+                )
+            else:
+                avro_field["default"] = None
+        elif field_schema.context.has_default:
+            if field_schema.context.default_value is not None:
+                avro_field["default"] = self._convert_default_value(
+                    field_schema.context.default_value
+                )
+
+        avro_field["type"] = avro_type
+        return avro_field
+
+    def _convert_type(  # noqa: PLR0911, PLR0912, C901
+        self: Self,
+        python_type: Any,
+        field_info: FieldInfo | None = None,
+    ) -> TypeInfo:
+        """Convert Python type annotation to Avro type.
+
+        Args:
+            python_type: Python type annotation.
+            field_info: Optional field info for constraint checking.
+
+        Returns:
+            TypeInfo containing Avro type specification (string, list, or dict).
+        """
+        if python_type is None:
+            return TypeInfo(type_representation="null")
+
+        if python_type in self._BASIC_TYPE_MAPPING:
+            if python_type is int and field_info:
+                return TypeInfo(type_representation=self._optimize_int_type(field_info))
+            return TypeInfo(type_representation=self._BASIC_TYPE_MAPPING[python_type])
+
+        if python_type in self._LOGICAL_TYPE_MAPPING:
+            return TypeInfo(
+                type_representation=self._LOGICAL_TYPE_MAPPING[python_type].copy()
+            )
+
+        if TypeInspector.is_enum(python_type):
+            enum_result = self._convert_enum(python_type)
+            return TypeInfo(type_representation=enum_result)
+
+        if python_type is list:
+            return self._convert_bare_list()
+
+        if python_type is dict:
+            return self._convert_bare_dict()
+
+        origin = get_origin(python_type)
+        if origin is not None:
+            args = get_args(python_type)
+
+            if TypeInspector.is_union_type(origin):
+                union_result = self._convert_union(args)
+                return TypeInfo(type_representation=union_result)
+
+            if TypeInspector.is_list_like(origin):
+                return self._convert_list_type(args)
+
+            if TypeInspector.is_dict_like(origin, python_type):
+                return self._convert_dict_type(args)
+
+            if origin is tuple:
+                tuple_result = self._convert_tuple(python_type)
+                return TypeInfo(type_representation=tuple_result, is_repeated=True)
+
+        if TypeInspector.is_base_model(python_type):
+            record_result = self._generate_nested_record_schema(python_type)
+            return TypeInfo(type_representation=record_result)
+
+        return self._convert_fallback_type(python_type)
+
+    def _convert_bare_list(self: Self) -> TypeInfo:
+        """Convert bare list type to Avro array.
+
+        Returns:
+            TypeInfo with array schema.
+        """
+        arr_schema: AvroArraySchema = {"type": "array", "items": "string"}
+        return TypeInfo(type_representation=arr_schema, is_repeated=True)
+
+    def _convert_bare_dict(self: Self) -> TypeInfo:
+        """Convert bare dict type to Avro map.
+
+        Returns:
+            TypeInfo with map schema.
+        """
+        map_schema: AvroMapSchema = {"type": "map", "values": "string"}
+        return TypeInfo(type_representation=map_schema)
+
+    def _convert_list_type(self: Self, args: tuple[Any, ...]) -> TypeInfo:
+        """Convert list[T] type to Avro array.
+
+        Args:
+            args: Generic type arguments.
+
+        Returns:
+            TypeInfo with array schema.
+        """
+        item_type_info = (
+            self._convert_type(args[0])
+            if args
+            else TypeInfo(type_representation="string")
+        )
+        item_type = item_type_info.type_representation
+        array_schema: AvroArraySchema = {"type": "array", "items": item_type}
+        return TypeInfo(type_representation=array_schema, is_repeated=True)
+
+    def _convert_dict_type(self: Self, args: tuple[Any, ...]) -> TypeInfo:
+        """Convert dict[K, V] type to Avro map.
+
+        Args:
+            args: Generic type arguments.
+
+        Returns:
+            TypeInfo with map schema.
+        """
+        value_type_info = (
+            self._convert_type(args[1])
+            if len(args) > 1
+            else TypeInfo(type_representation="string")
+        )
+        value_type = value_type_info.type_representation
+        map_schema: AvroMapSchema = {"type": "map", "values": value_type}
+        return TypeInfo(type_representation=map_schema)
+
+    def _convert_fallback_type(self: Self, python_type: Any) -> TypeInfo:
+        """Fallback type conversion based on string representation.
+
+        Args:
+            python_type: Python type that didn't match known patterns.
+
+        Returns:
+            TypeInfo with best-guess type.
+        """
+        type_str = str(python_type).lower()
+        if "str" in type_str:
+            return TypeInfo(type_representation="string")
+        if "int" in type_str:
+            return TypeInfo(type_representation="int")
+        if "float" in type_str:
+            return TypeInfo(type_representation="double")
+        if "bool" in type_str:
+            return TypeInfo(type_representation="boolean")
+        if "bytes" in type_str:
+            return TypeInfo(type_representation="bytes")
+        return TypeInfo(type_representation="string")
+
+    def _optimize_int_type(self: Self, field_info: FieldInfo) -> str:
+        """Choose between int (32-bit) and long (64-bit) based on constraints.
+
+        Args:
+            field_info: Field info with potential constraints.
+
+        Returns:
+            "int" or "long"
+        """
+        constraints = TypeInspector.get_numeric_constraints(field_info)
+        if constraints["ge"] is not None and constraints["ge"] < -(2**31):
+            return "long"
+        if constraints["gt"] is not None and constraints["gt"] + 1 < -(2**31):
+            return "long"
+        if constraints["le"] is not None and constraints["le"] > (2**31 - 1):
+            return "long"
+        if constraints["lt"] is not None and constraints["lt"] - 1 > (2**31 - 1):
+            return "long"
+
+        return "int"
+
+    def _convert_enum(self: Self, enum_class: type[Enum]) -> AvroEnumSchema | str:
+        """Convert Python Enum to Avro enum type.
+
+        Args:
+            enum_class: Python Enum class.
+
+        Returns:
+            Avro enum schema.
+        """
+        enum_name = enum_class.__name__
+
+        self._register_enum(enum_class)
+
+        if enum_name in self._generated_enum_schemas:
+            return self._generated_enum_schemas[enum_name]["namespace_ref"]
+
+        symbols = []
+        for member in enum_class:
+            value = str(member.value)
+            if not re.fullmatch(self.AVRO_SYMBOL_REGEX, value):
+                raise ValueError(
+                    f"Unable to convert enum '{enum_class.__name__}' to Avro. "
+                    "Every symbol must match the regular expression "
+                    f"'[A-Za-z_][A-Za-z0-9_]*'. Got '{value}'"
+                )
+            symbols.append(value)
+
+        enum_namespace = self._get_enum_namespace(enum_name)
+
+        enum_schema: AvroEnumSchema = {
+            "type": "enum",
+            "name": enum_name,
+            "namespace": enum_namespace,
+            "symbols": symbols,
+        }
+
+        namespace_ref = f"{enum_namespace}.{enum_name}"
+        self._generated_enum_schemas[enum_name] = {
+            "schema": enum_schema,
+            "namespace_ref": namespace_ref,
+        }
+
+        return enum_schema
+
+    def _get_enum_namespace(self: Self, module: str) -> str:
+        """Convert Python module to Avro namespace.
+
+        Args:
+            module: Python module name.
+
+        Returns:
+            Avro-compatible namespace.
+        """
+        if module in ("__main__", "builtins", None):
+            return self.namespace
+
+        return f"{self.namespace}.{module}"
+
+    def _convert_union(self: Self, args: tuple[Any, ...]) -> AvroUnion:
+        """Convert Union type to Avro union.
+
+        Args:
+            args: Union type arguments.
+
+        Returns:
+            List of Avro types (strings for primitives, dicts for complex types).
+        """
+        avro_types: AvroUnion = []
+
+        for arg in args:
+            if arg is type(None):
+                avro_types.append("null")
+            else:
+                type_info = self._convert_type(arg)
+                avro_type = type_info.type_representation
+                if isinstance(avro_type, list):
+                    avro_types.extend(avro_type)
+                else:
+                    avro_types.append(avro_type)
+
+        seen: set[str] = set()
+        unique_types: AvroUnion = []
+        for t in avro_types:
+            t_str = str(t) if not isinstance(t, dict) else json.dumps(t, sort_keys=True)
+            if t_str not in seen:
+                seen.add(t_str)
+                unique_types.append(t)
+
+        return unique_types
+
+    def _convert_tuple(self: Self, python_type: Any) -> AvroArraySchema:
+        """Convert tuple type to Avro array with union of item types.
+
+        Avro doesn't have a true tuple type (fixed-length with heterogeneous types),
+        so we convert to an array with a union of all possible item types.
+
+        Args:
+            python_type: Tuple annotation.
+
+        Returns:
+            Avro array schema with union items.
+        """
+        element_types = TypeInspector.get_tuple_element_types(python_type)
+
+        if not element_types:
+            return {"type": "array", "items": "string"}
+
+        item_types: list[str | AvroSchema] = []
+        type_strs: set[str] = set()
+
+        for arg in element_types:
+            type_info = self._convert_type(arg)
+            avro_type = type_info.type_representation
+            if isinstance(avro_type, list):
+                for t in avro_type:
+                    t_str = (
+                        str(t)
+                        if not isinstance(t, dict)
+                        else json.dumps(t, sort_keys=True)
+                    )
+                    if t_str not in type_strs:
+                        type_strs.add(t_str)
+                        item_types.append(t)
+            else:
+                t_str = (
+                    str(avro_type)
+                    if not isinstance(avro_type, dict)
+                    else json.dumps(avro_type, sort_keys=True)
+                )
+                if t_str not in type_strs:
+                    type_strs.add(t_str)
+                    item_types.append(avro_type)
+
+        if len(item_types) == 1:
+            return {
+                "type": "array",
+                "items": item_types[0],
+            }
+
+        return {"type": "array", "items": item_types}
+
+    def _generate_nested_record_schema(
+        self: Self, model: type[BaseModel]
+    ) -> AvroRecordSchema | str:
+        """Generate Avro schema for a nested Pydantic model.
+
+        If the type has been seen before, return a reference to avoid
+        infinite recursion and schema duplication.
+
+        Args:
+            model: Nested Pydantic model class.
+
+        Returns:
+            Avro record schema or type name reference.
+        """
+        type_name = model.__name__
+        self._register_nested_model(model)
+
+        if type_name in self._types_seen:
+            if type_name == self._current_model_class_name:
+                return self._get_model_schema_name(type_name)
+            return self._get_model_schema_name(type_name)
+
+        self._types_seen.add(type_name)
+
+        schema_name = self._get_model_schema_name(type_name)
+        schema: AvroRecordSchema = {
+            "type": "record",
+            "name": schema_name,
+            "fields": [],
+        }
+
+        if self.include_docs and model.__doc__:
+            schema["doc"] = model.__doc__.strip()
+
+        for field_name, field_info in model.model_fields.items():
+            field_schema = self._generate_field_schema(field_name, field_info, model)
+            schema["fields"].append(field_schema)
+
+        return schema
+
+    def _convert_default_value(self: Self, value: Any) -> AvroDefaultValue:  # noqa: PLR0911, C901, PLR0912
+        """Convert Python default value to Avro-compatible format.
+
+        Args:
+            value: Python default value.
+
+        Returns:
+            Avro-compatible default value.
+        """
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (str, int, float)):
+            return value
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="ignore")
+        if isinstance(value, list):
+            return [self._convert_default_value(item) for item in value]
+        if isinstance(value, dict):
+            return {k: self._convert_default_value(v) for k, v in value.items()}
+        if isinstance(value, Enum):
+            return str(value.value)
+        if isinstance(value, BaseModel):
+            return value.model_dump(mode="json")
+        if isinstance(value, datetime):
+            # timestamp-micros: microseconds since epoch
+            return int(value.timestamp() * 1_000_000)
+        if isinstance(value, date):
+            # date: days since epoch
+            epoch = date(1970, 1, 1)
+            return (value - epoch).days
+        if isinstance(value, time):
+            # time-micros: microseconds since midnight
+            return (
+                value.hour * 3600 + value.minute * 60 + value.second
+            ) * 1_000_000 + value.microsecond
+        if isinstance(value, UUID):
+            return str(value)
+        if isinstance(value, Decimal):
+            return float(value)
+
+        return str(value)
+
+
+class AvroExporter:
+    """Export Pydantic models to Avro schema files.
+
+    This class provides methods to export individual schemas or all schemas from a model
+    _registry to .avsc (Avro Schema) files.
+    """
+
+    def __init__(
+        self: Self,
+        registry: Registry,
+        namespace: str = "com.example",
+        include_docs: bool = True,
+    ) -> None:
+        """Initialize the Avro exporter.
+
+        Args:
+            registry: Model registry instance.
+            namespace: Avro namespace for schemas.
+            include_docs: Whether to include documentation.
+        """
+        self._registry = registry
+        self.generator = AvroSchemaGenerator(
+            namespace=namespace,
+            include_docs=include_docs,
+        )
+
+    def export_schema(
+        self: Self,
+        name: str,
+        version: str | ModelVersion,
+        output_path: str | Path | None = None,
+        versioned_namespace: bool = False,
+    ) -> AvroRecordSchema:
+        """Export a single model version as an Avro schema.
+
+        Args:
+            name: Model name.
+            version: Model version.
+            output_path: Optional file path to save schema.
+            versioned_namespace: Include model version in namespace. Default False.
+
+        Returns:
+            Avro record schema.
+
+        Example:
+            ```python
+            exporter = AvroExporter(manager._registry, namespace="com.myapp")
+
+            # Export and save
+            schema = exporter.export_schema("User", "1.0.0", "schemas/user_v1.avsc")
+
+            # Or just get the schema
+            schema = exporter.export_schema("User", "1.0.0", versioned_namespace=True)
+            print(json.dumps(schema, indent=2))
+            ```
+        """
+        model = self._registry.get_model(name, version)
+        document = (
+            self.generator.generate_schema(model, name, version)
+            if versioned_namespace
+            else self.generator.generate_schema(model, name)
+        )
+
+        if output_path:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(document.to_string())
+
+        return document.main
+
+    def export_all_schemas(
+        self: Self,
+        output_dir: str | Path,
+        indent: int = 2,
+        versioned_namespace: bool = False,
+    ) -> dict[str, dict[str, AvroRecordSchema]]:
+        """Export all registered models as Avro schemas.
+
+        Args:
+            output_dir: Directory to save schema files.
+            indent: JSON indentation level.
+            versioned_namespace: Include model version in namespace. Default False.
+
+        Returns:
+            Dictionary mapping model names to version to schema.
+
+        Example:
+            ```python
+            exporter = AvroExporter(manager._registry, namespace="com.myapp")
+            schemas = exporter.export_all_schemas("schemas/avro/")
+
+            # Creates files like:
+            # schemas/avro/User_v1_0_0.avsc
+            # schemas/avro/User_v2_0_0.avsc
+            # schemas/avro/Order_v1_0_0.avsc
+            ```
+        """
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        all_schemas: dict[str, dict[str, AvroRecordSchema]] = {}
+
+        for model_name in self._registry.list_models():
+            all_schemas[model_name] = {}
+            versions = self._registry.get_versions(model_name)
+
+            for version in versions:
+                model = self._registry.get_model(model_name, version)
+                document = (
+                    self.generator.generate_schema(model, model_name, version)
+                    if versioned_namespace
+                    else self.generator.generate_schema(model, model_name)
+                )
+
+                version_str = str(version).replace(".", "_")
+                filename = f"{model_name}_v{version_str}.avsc"
+                filepath = output_dir / filename
+
+                filepath.write_text(document.to_string(indent=indent))
+
+                all_schemas[model_name][str(version)] = document.main
+
+        return all_schemas
