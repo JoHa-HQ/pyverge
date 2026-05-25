@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "python-semantic-release>=10.5",
+  "pytest>=8.3",
   "ruff>=0.9",
   "toml-sort>=0.24",
   "ty>=0.0.1a5",
@@ -53,6 +54,9 @@ tag = ""
 target-version = "py311"
 line-length = 88
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "PL", "UP", "RUF"]
 
@@ -67,3 +71,8 @@ default_templates = {release_heading = "## [{version}] - {datetime}"}
 
 [tool.semantic_release.remote]
 type = "github"
+
+[dependency-groups]
+dev = [
+    "syrupy>=5.2.0",
+]
