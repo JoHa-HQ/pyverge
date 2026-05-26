@@ -285,7 +285,8 @@ def _auto_locate_managers(start_dir: Path) -> dict[str, ManagerConfig]:
             continue
 
     raise ConfigError(
-        "No pydantic-migrator configuration found. Create a pyproject.toml or migrator.toml, "
+        "No pydantic-migrator configuration found."
+        " Create a pyproject.toml or migrator.toml, "
         "or define __manager__ in models.py"
     )
 

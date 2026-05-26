@@ -344,7 +344,7 @@ class SchemaManager:
                 return [process_value(item) for item in value]
             return value
 
-        return process_value(schema)  # type: ignore[return-value]
+        return cast(JsonSchema, process_value(schema))
 
     def _get_remaining_defs(
         self: Self,
