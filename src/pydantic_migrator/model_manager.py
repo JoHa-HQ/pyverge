@@ -795,7 +795,8 @@ class ModelManager:
         for test_case_input in test_cases:
             if isinstance(test_case_input, tuple):
                 test_case = MigrationTestCase(
-                    source=test_case_input[0], target=test_case_input[1]  # ty:ignore[invalid-argument-type]
+                    source=test_case_input[0],
+                    target=test_case_input[1],  # ty:ignore[invalid-argument-type]
                 )
             else:
                 test_case = test_case_input
