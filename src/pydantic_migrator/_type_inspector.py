@@ -237,7 +237,7 @@ class TypeInspector:
         return nested_models
 
     @staticmethod
-    def _collect_from_type(  # noqa: C901
+    def _collect_from_type(
         python_type: Any, nested_models: dict[str, type[BaseModel]], seen: set[str]
     ) -> None:
         """Helper to recursively collect BaseModel types from a type annotation.

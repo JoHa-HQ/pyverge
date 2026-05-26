@@ -139,7 +139,7 @@ class AvroSchemaGenerator(SchemaGeneratorBase[AvroSchemaDocument]):
             enums={k: v["schema"] for k, v in self._generated_enum_schemas.items()},
         )
 
-    def _generate_root_model_schema(  # noqa: C901, PLR0912
+    def _generate_root_model_schema(  # noqa: PLR0912
         self: Self,
         model: type[BaseModel],
         name: str,
@@ -316,7 +316,7 @@ class AvroSchemaGenerator(SchemaGeneratorBase[AvroSchemaDocument]):
         avro_field["type"] = avro_type
         return avro_field
 
-    def _convert_type(  # noqa: PLR0911, PLR0912, C901
+    def _convert_type(  # noqa: PLR0911, PLR0912
         self: Self,
         python_type: Any,
         field_info: FieldInfo | None = None,
@@ -655,7 +655,7 @@ class AvroSchemaGenerator(SchemaGeneratorBase[AvroSchemaDocument]):
 
         return schema
 
-    def _convert_default_value(self: Self, value: Any) -> AvroDefaultValue:  # noqa: PLR0911, C901, PLR0912
+    def _convert_default_value(self: Self, value: Any) -> AvroDefaultValue:  # noqa: PLR0911, PLR0912
         """Convert Python default value to Avro-compatible format.
 
         Args:

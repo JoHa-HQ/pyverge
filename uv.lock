@@ -1080,13 +1080,9 @@ dev = [
     { name = "pytest" },
     { name = "python-semantic-release" },
     { name = "ruff" },
+    { name = "syrupy" },
     { name = "toml-sort" },
     { name = "ty" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "syrupy" },
 ]
 
 [package.metadata]
@@ -1101,14 +1097,12 @@ requires-dist = [
     { name = "python-semantic-release", marker = "extra == 'dev'", specifier = ">=10.5" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.9" },
+    { name = "syrupy", marker = "extra == 'dev'", specifier = ">=5.2.0" },
     { name = "toml-sort", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.1a5" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.21" },
 ]
 provides-extras = ["cli", "dev"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "syrupy", specifier = ">=5.2.0" }]
 
 [[package]]
 name = "pygments"
