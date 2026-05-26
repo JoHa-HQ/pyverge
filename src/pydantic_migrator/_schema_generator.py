@@ -447,7 +447,7 @@ class SchemaGeneratorBase(ABC, Generic[SchemaType]):
             if arg is not type(None) and arg is not Ellipsis:
                 self._collect_deps_from_type(arg, deps)
 
-    def _topological_sort_nested_models(  # noqa: C901
+    def _topological_sort_nested_models(
         self: Self,
         nested_models: dict[str, type[BaseModel]],
         root_name: str,

@@ -2,6 +2,11 @@
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = [
+  "syrupy>=5.2.0"
+]
+
 [project]
 name = "pydantic-migrator"
 dynamic = ["version"]
@@ -50,12 +55,12 @@ source = "vcs"
 [tool.hatch.version.vcs]
 tag = ""
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 88
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "PL", "UP", "RUF"]
@@ -71,8 +76,3 @@ default_templates = {release_heading = "## [{version}] - {datetime}"}
 
 [tool.semantic_release.remote]
 type = "github"
-
-[dependency-groups]
-dev = [
-    "syrupy>=5.2.0",
-]

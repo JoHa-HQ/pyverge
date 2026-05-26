@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from pydantic_migrator.cli.config import (
     ConfigError,
-    ManagerConfig,
     list_available_managers,
-    load_manager,
     locate_config,
 )
 
@@ -28,13 +25,17 @@ class TestParseManagerSpec:
         assert managers["default"].attribute == "manager"
 
     def test_module_with_attribute(self, tmp_path: Path) -> None:
-        cfg = _write_config(tmp_path, '[pydantic-migrator]\nmanager = "models:my_mgr"\n')
+        cfg = _write_config(
+            tmp_path, '[pydantic-migrator]\nmanager = "models:my_mgr"\n'
+        )
         managers = locate_config(cfg)
         assert managers["default"].module_path == "models"
         assert managers["default"].attribute == "my_mgr"
 
     def test_dotted_module(self, tmp_path: Path) -> None:
-        cfg = _write_config(tmp_path, '[pydantic-migrator]\nmanager = "api.v1.models"\n')
+        cfg = _write_config(
+            tmp_path, '[pydantic-migrator]\nmanager = "api.v1.models"\n'
+        )
         managers = locate_config(cfg)
         assert managers["default"].module_path == "api.v1.models"
 
@@ -83,7 +84,7 @@ manager = "models"
         assert managers["default"].module_path == "models"
 
     def test_no_section_falls_through(self, tmp_path: Path, snapshot) -> None:
-        """If pyproject.toml exists but has no [tool.pydantic-migrator], it should fall through."""
+        """pyproject.toml without [tool.pydantic-migrator] falls through."""
         (tmp_path / "pyproject.toml").write_text('[project]\nname = "test"\n')
         # Should not raise — falls through to next option
         with pytest.raises(ConfigError) as exc_info:

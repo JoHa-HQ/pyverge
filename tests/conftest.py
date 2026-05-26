@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Literal
 
 import pytest
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from pydantic_migrator import ModelManager
 
 
-class Role(str, Enum):
+class Role(StrEnum):
     ADMIN = "admin"
     USER = "user"
     GUEST = "guest"

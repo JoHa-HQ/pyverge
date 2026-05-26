@@ -173,7 +173,9 @@ def managers(
         if not available:
             typer.echo("No managers configured\n")
             typer.echo("Configuration can be added to:")
-            typer.echo('  1. pyproject.toml: [tool.pydantic-migrator] manager = "models"')
+            typer.echo(
+                '  1. pyproject.toml: [tool.pydantic-migrator] manager = "models"'
+            )
             typer.echo('  2. migrator.toml: [pydantic-migrator] manager = "models"')
             typer.echo("  3. Auto-discovery: Define __manager__ in models.py")
             return
@@ -269,7 +271,7 @@ def diff(  # noqa: PLR0913
 
 
 @app.command()
-def export(  # noqa: PLR0913, C901
+def export(  # noqa: PLR0913
     format: Annotated[
         str,
         typer.Option(..., "--format", "-f", help="Export format"),

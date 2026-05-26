@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import tempfile
-from enum import Enum
 from pathlib import Path
+from typing import Any, ClassVar
 
 import pytest
 
@@ -15,7 +15,13 @@ from pydantic_migrator import (
     ModelVersion,
 )
 from pydantic_migrator.exceptions import MigrationError
-from tests.conftest import Role, UserV2, UserV3
+from tests.conftest import Role, UserV2
+
+V1_USER_DATA: dict[str, Any] = {
+    "name": "Alice",
+    "email": "alice@example.com",
+    "role": "admin",
+}
 
 
 class TrackingHook(MigrationHook):
@@ -78,7 +84,7 @@ class TestValidation:
 
 
 class TestMigration:
-    V1_DATA = {"name": "Alice", "email": "alice@example.com", "role": "admin"}
+    V1_DATA: ClassVar[dict[str, Any]] = V1_USER_DATA
 
     def test_single_migration(self, manager: ModelManager) -> None:
         migrated = manager.migrate(self.V1_DATA, "User", "1.0.0", "3.0.0")
@@ -99,7 +105,7 @@ class TestMigration:
             {"name": "Carol", "email": "carol@x.com", "role": "guest"},
         ]
         results = manager.migrate_batch(batch_in, "User", "1.0.0", "3.0.0")
-        assert len(results) == 2
+        assert len(results) == len(batch_in)
         assert all(r.status == "active" for r in results)
 
     def test_streaming_batch_migration(self, manager: ModelManager) -> None:
@@ -110,11 +116,11 @@ class TestMigration:
         stream_results = list(
             manager.migrate_batch_streaming(batch_in, "User", "1.0.0", "3.0.0")
         )
-        assert len(stream_results) == 2
+        assert len(stream_results) == len(batch_in)
 
 
 class TestMigrationHooks:
-    V1_DATA = {"name": "Alice", "email": "alice@example.com", "role": "admin"}
+    V1_DATA: ClassVar[dict[str, Any]] = V1_USER_DATA
 
     def test_tracking_hook(self, manager: ModelManager) -> None:
         hook = TrackingHook()
@@ -127,24 +133,31 @@ class TestMigrationHooks:
     def test_metrics_hook(self, manager: ModelManager) -> None:
         metrics = MetricsHook()
         manager.add_hook(metrics)
-        manager.migrate(self.V1_DATA, "User", "1.0.0", "3.0.0")
-        # Second call needs valid v2 data (has address fields)
-        v2_data = {
-            "name": "Bob",
-            "email": "bob@x.com",
-            "age": None,
-            "role": "user",
-            "address": {"street": "Main St", "city": "London"},
-        }
-        manager.migrate(v2_data, "User", "2.0.0", "3.0.0")
-        assert metrics.total_count == 2
+        migrations = [
+            (self.V1_DATA, "1.0.0", "3.0.0"),
+            # Second call needs valid v2 data (has address fields)
+            (
+                {
+                    "name": "Bob",
+                    "email": "bob@x.com",
+                    "age": None,
+                    "role": "user",
+                    "address": {"street": "Main St", "city": "London"},
+                },
+                "2.0.0",
+                "3.0.0",
+            ),
+        ]
+        for data, from_version, to_version in migrations:
+            manager.migrate(data, "User", from_version, to_version)
+        assert metrics.total_count == len(migrations)
         assert metrics.error_count == 0
         assert metrics.success_rate == 1.0
         manager.clear_hooks()
 
 
 class TestMigrationTesting:
-    V1_DATA = {"name": "Alice", "email": "alice@example.com", "role": "admin"}
+    V1_DATA: ClassVar[dict[str, Any]] = V1_USER_DATA
 
     def test_migration_test_cases(self, manager: ModelManager) -> None:
         test_cases = [
