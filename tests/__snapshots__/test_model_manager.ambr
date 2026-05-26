@@ -1,5 +1,9 @@
 # serializer version: 1
-# name: TestModelDiff.test_diff_markdown
+# name: test_avro_export
+  dict({
+  })
+# ---
+# name: test_diff_markdown
   '''
   # User: 1.0.0 → 2.0.0
   
@@ -22,11 +26,7 @@
   
   '''
 # ---
-# name: TestSchemaExport.test_avro_export
-  dict({
-  })
-# ---
-# name: TestSchemaExport.test_dump_schemas
+# name: test_dump_schemas
   dict({
     'Address_v1_0_0.json': '''
       {
@@ -327,7 +327,7 @@
     ''',
   })
 # ---
-# name: TestSchemaExport.test_proto_export
+# name: test_proto_export
   dict({
     'Address_v1_0_0.proto': '''
       syntax = "proto3";
@@ -431,7 +431,7 @@
     ''',
   })
 # ---
-# name: TestSchemaExport.test_typescript_export
+# name: test_typescript_export
   dict({
     'Address.v1.0.0.ts': '''
       export interface Address {
