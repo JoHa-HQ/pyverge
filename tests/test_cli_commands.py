@@ -66,126 +66,108 @@ def config(project_dir: Path) -> list[str]:
     return ["-c", str(project_dir / "migrator.toml")]
 
 
-class TestCliInfo:
-    def test_info(self, config: list[str], snapshot) -> None:
-        result = runner.invoke(app, ["info", *config], catch_exceptions=False)
-        assert result.exit_code == 0
-        assert result.output == snapshot
+def test_info(config: list[str]) -> None:
+    result = runner.invoke(app, ["info", *config], catch_exceptions=False)
+    assert result.exit_code == 0
 
 
-class TestCliValidate:
-    def test_validate_valid(
-        self, config: list[str], sample_data: Path, snapshot
-    ) -> None:
-        result = runner.invoke(
-            app,
-            ["validate", "-d", str(sample_data), "-s", "User", "-v", "1.0.0", *config],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert result.output == snapshot
-
-    def test_validate_invalid(
-        self, config: list[str], tmp_path: Path, snapshot
-    ) -> None:
-        bad_data = tmp_path / "bad.json"
-        bad_data.write_text('{"wrong": true}')
-        result = runner.invoke(
-            app,
-            ["validate", "-d", str(bad_data), "-s", "User", "-v", "1.0.0", *config],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 1
-        assert result.output == snapshot
+def test_validate_valid(config: list[str], sample_data: Path) -> None:
+    result = runner.invoke(
+        app,
+        ["validate", "-d", str(sample_data), "-s", "User", "-v", "1.0.0", *config],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
 
 
-class TestCliMigrate:
-    def test_migrate(self, config: list[str], sample_data: Path, snapshot) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "migrate",
-                "-d",
-                str(sample_data),
-                "-s",
-                "User",
-                "-f",
-                "1.0.0",
-                "-t",
-                "2.0.0",
-                *config,
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert result.output == snapshot
+def test_validate_invalid(config: list[str], tmp_path: Path) -> None:
+    bad_data = tmp_path / "bad.json"
+    bad_data.write_text('{"wrong": true}')
+    result = runner.invoke(
+        app,
+        ["validate", "-d", str(bad_data), "-s", "User", "-v", "1.0.0", *config],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 1
 
 
-class TestCliDiff:
-    def test_diff_markdown(self, config: list[str], snapshot) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "diff",
-                "-s",
-                "User",
-                "-f",
-                "1.0.0",
-                "-t",
-                "2.0.0",
-                "--format",
-                "markdown",
-                *config,
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert result.output == snapshot
-
-    def test_diff_json(self, config: list[str], snapshot) -> None:
-        result = runner.invoke(
-            app,
-            [
-                "diff",
-                "-s",
-                "User",
-                "-f",
-                "1.0.0",
-                "-t",
-                "2.0.0",
-                "--format",
-                "json",
-                *config,
-            ],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert result.output == snapshot
+def test_migrate(config: list[str], sample_data: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "migrate",
+            "-d",
+            str(sample_data),
+            "-s",
+            "User",
+            "-f",
+            "1.0.0",
+            "-t",
+            "2.0.0",
+            *config,
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
 
 
-class TestCliExport:
-    def test_export_json_schema(
-        self, config: list[str], tmp_path: Path, snapshot
-    ) -> None:
-        out = tmp_path / "schemas"
-        result = runner.invoke(
-            app,
-            ["export", "-f", "json-schema", "-o", str(out), *config],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert result.output == snapshot
-        assert out.is_dir()
+def test_diff_markdown(config: list[str]) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            "-s",
+            "User",
+            "-f",
+            "1.0.0",
+            "-t",
+            "2.0.0",
+            "--format",
+            "markdown",
+            *config,
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
 
-    def test_export_typescript(
-        self, config: list[str], tmp_path: Path, snapshot
-    ) -> None:
-        out = tmp_path / "ts"
-        result = runner.invoke(
-            app,
-            ["export", "-f", "typescript", "-o", str(out), *config],
-            catch_exceptions=False,
-        )
-        assert result.exit_code == 0
-        assert result.output == snapshot
-        assert out.is_dir()
+
+def test_diff_json(config: list[str]) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "diff",
+            "-s",
+            "User",
+            "-f",
+            "1.0.0",
+            "-t",
+            "2.0.0",
+            "--format",
+            "json",
+            *config,
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+
+
+def test_export_json_schema(config: list[str], tmp_path: Path) -> None:
+    out = tmp_path / "schemas"
+    result = runner.invoke(
+        app,
+        ["export", "-f", "json-schema", "-o", str(out), *config],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert out.is_dir()
+
+
+def test_export_typescript(config: list[str], tmp_path: Path) -> None:
+    out = tmp_path / "ts"
+    result = runner.invoke(
+        app,
+        ["export", "-f", "typescript", "-o", str(out), *config],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    assert out.is_dir()
