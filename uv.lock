@@ -1066,7 +1066,6 @@ dependencies = [
     { name = "pydantic", extra = ["email", "timezone"] },
     { name = "pydantic-extra-types", extra = ["phonenumbers"] },
     { name = "semver" },
-    { name = "typing-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -1086,6 +1085,7 @@ dev = [
     { name = "syrupy" },
     { name = "toml-sort" },
     { name = "ty" },
+    { name = "typing-extensions" },
 ]
 
 [package.metadata]
@@ -1106,7 +1106,7 @@ requires-dist = [
     { name = "toml-sort", marker = "extra == 'dev'", specifier = ">=0.24" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.1a5" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.21" },
-    { name = "typing-extensions", specifier = ">=4.15.0" },
+    { name = "typing-extensions", marker = "extra == 'dev'", specifier = ">=4.15.0" },
 ]
 provides-extras = ["cli", "dev"]
 
