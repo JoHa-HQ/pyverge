@@ -1,4 +1,0 @@
-# serializer version: 1
-# name: TestLocateConfigPyprojectToml.test_no_section_falls_through
-  'No pydantic-migrator configuration found. Create a pyproject.toml or migrator.toml, or define __manager__ in models.py'
-# ---
