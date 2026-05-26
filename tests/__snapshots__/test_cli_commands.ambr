@@ -18,8 +18,8 @@
       }
     },
     "unchanged_fields": [
-      "email",
-      "name"
+      "name",
+      "email"
     ]
   }
   
@@ -46,13 +46,13 @@
 # ---
 # name: TestCliExport.test_export_json_schema
   '''
-  ✓ Exported JSON Schema schemas to /tmp/pytest-of-uby/pytest-24/test_export_json_schema0/schemas/
+  ✓ Exported JSON Schema schemas to /tmp/pytest-of-uby/pytest-25/test_export_json_schema0/schemas/
   
   '''
 # ---
 # name: TestCliExport.test_export_typescript
   '''
-  ✓ Exported TypeScript schemas to /tmp/pytest-of-uby/pytest-24/test_export_typescript0/ts/
+  ✓ Exported TypeScript schemas to /tmp/pytest-of-uby/pytest-25/test_export_typescript0/ts/
   
   '''
 # ---

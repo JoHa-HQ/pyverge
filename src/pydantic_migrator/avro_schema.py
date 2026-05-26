@@ -208,7 +208,7 @@ class AvroSchemaGenerator(SchemaGeneratorBase[AvroSchemaDocument]):
 
             main_schema: AvroRecordSchema = schema
         elif isinstance(root_type, dict) and root_type.get("type") == "record":
-            main_schema = root_type.copy()  # type: ignore
+            main_schema = root_type.copy()
             main_schema["name"] = name
             main_schema["namespace"] = namespace
 
@@ -233,7 +233,7 @@ class AvroSchemaGenerator(SchemaGeneratorBase[AvroSchemaDocument]):
             main_schema = schema
 
         return AvroSchemaDocument(
-            main=main_schema,
+            main=main_schema,  # ty:ignore[invalid-argument-type]
             namespace=namespace,
             enums={k: v["schema"] for k, v in self._generated_enum_schemas.items()},
         )

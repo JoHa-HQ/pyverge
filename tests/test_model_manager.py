@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -14,7 +15,7 @@ from pydantic_migrator import (
     ModelVersion,
 )
 from pydantic_migrator.exceptions import MigrationError
-from tests.conftest import Role, UserV2
+from tests.conftest import Role, UserV2, UserV3
 
 
 class TrackingHook(MigrationHook):
@@ -76,11 +77,14 @@ class TestValidation:
         assert manager.validate_data({"bad": True}, "User", "1.0.0") is False
 
     def test_single_migration(self, manager: ModelManager) -> None:
-        migrated = manager.migrate(
-            {"name": "Alice", "email": "alice@example.com", "role": "admin"},
-            "User",
-            "1.0.0",
-            "3.0.0",
+        migrated = cast(
+            UserV3,
+            manager.migrate(
+                {"name": "Alice", "email": "alice@example.com", "role": "admin"},
+                "User",
+                "1.0.0",
+                "3.0.0",
+            ),
         )
         assert migrated.name == "Alice"
         assert migrated.role == Role.ADMIN
@@ -104,7 +108,9 @@ class TestValidation:
             {"name": "Bob", "email": "bob@x.com", "role": "user"},
             {"name": "Carol", "email": "carol@x.com", "role": "guest"},
         ]
-        results = manager.migrate_batch(batch_in, "User", "1.0.0", "3.0.0")
+        results = cast(
+            list[UserV3], manager.migrate_batch(batch_in, "User", "1.0.0", "3.0.0")
+        )
         assert len(results) == 2  # noqa: PLR2004
         assert all(r.status == "active" for r in results)
 
@@ -162,9 +168,9 @@ def test_migration_test_cases(manager: ModelManager) -> None:
         MigrationTestCase(
             source={"name": "Alice", "email": "alice@example.com", "role": "admin"},
             description="v1->v3 migration completes without error",
-        )
+        ),
     ]
-    test_results = manager.test_migration("User", "1.0.0", "3.0.0", test_cases)
+    test_results = manager.test_migration("User", "1.0.0", "3.0.0", test_cases)  # type: ignore[invalid-argument-type]  # ty:ignore[invalid-argument-type]
     assert test_results.all_passed
 
 

@@ -612,7 +612,7 @@ class ModelManager:
                 )
                 for item in data_list
             ]
-            return [future.result() for future in futures]
+            return [future.result() for future in futures]  # ty:ignore[invalid-return-type]
 
     def migrate_batch_data(  # noqa: PLR0913
         self: Self,
@@ -795,7 +795,7 @@ class ModelManager:
         for test_case_input in test_cases:
             if isinstance(test_case_input, tuple):
                 test_case = MigrationTestCase(
-                    source=test_case_input[0], target=test_case_input[1]
+                    source=test_case_input[0], target=test_case_input[1]  # ty:ignore[invalid-argument-type]
                 )
             else:
                 test_case = test_case_input
