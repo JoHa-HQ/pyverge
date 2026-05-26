@@ -11,7 +11,9 @@ requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [
   "pydantic[email,timezone]>=2.11",
-  "pydantic-extra-types[phonenumbers]>=2.9"
+  "pydantic-extra-types[phonenumbers]>=2.9",
+  "semver>=3.0",
+  "typing-extensions>=4.15.0",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +27,8 @@ dev = [
   "commitizen>=4.16.2",
   "hatch>=1.16.5",
   "hatch-vcs>=0.5.0",
-  "syrupy>=5.2.0"
+  "syrupy>=5.2.0",
+  "pytest-stub>=1.1.0",
 ]
 cli = [
   "typer>=0.21",
