@@ -335,7 +335,7 @@ class ProtoSchemaGenerator(SchemaGeneratorBase[ProtoSchemaDocument]):
 
         return proto_field
 
-    def _convert_type(  # noqa: PLR0911, C901
+    def _convert_type(  # noqa: PLR0911
         self: Self,
         python_type: Any,
         field_info: FieldInfo | None = None,
@@ -665,7 +665,7 @@ class ProtoSchemaGenerator(SchemaGeneratorBase[ProtoSchemaDocument]):
             imports=sorted(self._required_imports),
         )
 
-    def _generate_root_model_schema(  # noqa: PLR0912, C901
+    def _generate_root_model_schema(  # noqa: PLR0912
         self: Self,
         model: type[BaseModel],
         name: str,

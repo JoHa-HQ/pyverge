@@ -142,7 +142,7 @@ class TypeScriptSchemaGenerator(SchemaGeneratorBase[TypeScriptModule]):
             imports=imports,
         )
 
-    def _generate_root_model_schema(  # noqa: PLR0912, C901
+    def _generate_root_model_schema(  # noqa: PLR0912
         self: Self,
         model: type[BaseModel],
         name: str,
@@ -507,7 +507,7 @@ class TypeScriptSchemaGenerator(SchemaGeneratorBase[TypeScriptModule]):
         """Check if model allows extra fields."""
         return model.model_config.get("extra") == "allow"
 
-    def _convert_type(  # noqa: PLR0911, PLR0912, C901
+    def _convert_type(  # noqa: PLR0911, PLR0912
         self: Self, python_type: Any, field_info: FieldInfo | None = None
     ) -> TypeInfo:
         """Convert Python type to TypeScript type."""
@@ -743,7 +743,7 @@ class TypeScriptSchemaGenerator(SchemaGeneratorBase[TypeScriptModule]):
             return "null"
         return str(arg)
 
-    def _convert_zod(  # noqa: PLR0911, PLR0912, C901
+    def _convert_zod(  # noqa: PLR0911, PLR0912
         self: Self, python_type: Any, field_info: FieldInfo | None
     ) -> str:
         """Convert Python type to Zod validator."""
