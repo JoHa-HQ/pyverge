@@ -24,7 +24,7 @@ repos:
         types: [python, pyi]
       - id: pytest
         name: pytest
-        entry: uv run pytest
+        entry: uv run pytest -vv --snapshot-update
         language: system
         pass_filenames: false
         stages: [pre-push]
