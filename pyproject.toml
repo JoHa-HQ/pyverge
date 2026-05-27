@@ -1,0 +1,77 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pydantic-migrator"
+dynamic = ["version"]
+description = "Schema evolution and migrations for Pydantic models"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+  "pydantic[email,timezone]>=2.11",
+  "pydantic-extra-types[phonenumbers]>=2.9",
+  "semver>=3.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "python-semantic-release>=10.5",
+  "pytest>=8.3",
+  "ruff>=0.9",
+  "toml-sort>=0.24",
+  "ty>=0.0.1a5",
+  "pre-commit>=4.0",
+  "commitizen>=4.16.2",
+  "hatch>=1.16.5",
+  "hatch-vcs>=0.5.0",
+  "syrupy>=5.2.0",
+  "pytest-stub>=1.1.0",
+  "typing-extensions>=4.15.0"
+]
+cli = [
+  "typer>=0.21",
+  "rich>=13"
+]
+
+[project.scripts]
+pydantic-migrator = "pydantic_migrator.cli.main:app"
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "$version"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/pydantic_migrator/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pydantic_migrator"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.vcs]
+tag = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "PL", "UP", "RUF"]
+
+[tool.semantic_release]
+branch = "main"
+commit_message = "chore(release): {version} [skip ci]"
+tag_format = "{version}"
+upload_to_vcs_release = true
+
+[tool.semantic_release.changelog]
+default_templates = {release_heading = "## [{version}] - {datetime}"}
+
+[tool.semantic_release.remote]
+type = "github"
