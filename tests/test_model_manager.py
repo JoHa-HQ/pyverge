@@ -194,30 +194,6 @@ def test_dump_schemas(manager: ModelManager, snapshot) -> None:
         assert files == snapshot
 
 
-def test_avro_export(manager: ModelManager, snapshot) -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        manager.dump_avro_schemas(tmp_path)
-        files = {f.name: f.read_text() for f in tmp_path.glob("*.json")}
-        assert files == snapshot
-
-
-def test_proto_export(manager: ModelManager, snapshot) -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        manager.dump_proto_schemas(tmp_path)
-        files = {f.name: f.read_text() for f in tmp_path.glob("*.proto")}
-        assert files == snapshot
-
-
-def test_typescript_export(manager: ModelManager, snapshot) -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp) / "ts"
-        manager.dump_typescript_schemas(tmp_path)
-        files = {f.name: f.read_text() for f in tmp_path.glob("*.ts")}
-        assert files == snapshot
-
-
 def test_has_path(manager: ModelManager) -> None:
     assert manager.has_migration_path("User", "1.0.0", "3.0.0")
 

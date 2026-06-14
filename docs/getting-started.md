@@ -44,5 +44,5 @@ migrated = manager.migrate(
 
 - Learn about [model registration](sdk/models.md)
 - Define [migrations](sdk/migrations.md)
-- [Export schemas](sdk/schemas.md) to Avro, Protobuf, TypeScript
+- [Export schemas](sdk/schemas.md) as JSON Schema
 - Use the [CLI](cli.md) for project bootstrapping

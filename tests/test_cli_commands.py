@@ -155,18 +155,7 @@ def test_export_json_schema(config: list[str], tmp_path: Path) -> None:
     out = tmp_path / "schemas"
     result = runner.invoke(
         app,
-        ["export", "-f", "json-schema", "-o", str(out), *config],
-        catch_exceptions=False,
-    )
-    assert result.exit_code == 0
-    assert out.is_dir()
-
-
-def test_export_typescript(config: list[str], tmp_path: Path) -> None:
-    out = tmp_path / "ts"
-    result = runner.invoke(
-        app,
-        ["export", "-f", "typescript", "-o", str(out), *config],
+        ["export", "-o", str(out), *config],
         catch_exceptions=False,
     )
     assert result.exit_code == 0
