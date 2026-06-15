@@ -2,7 +2,6 @@
 
 import types
 from collections.abc import Mapping
-from enum import Enum
 from typing import Any, Union, get_args, get_origin
 
 from pydantic import BaseModel, RootModel
@@ -12,8 +11,8 @@ from pydantic.fields import FieldInfo
 class TypeInspector:
     """Utilities for inspecting and analyzing Python type annotations.
 
-    This class provides shared methods for type checking logic used across Avro,
-    Protocol Buffer, and TypeScript schema generators.
+    This class provides shared methods for type checking logic used by
+    SchemaGeneratorBase and core schema utilities.
     """
 
     @staticmethod
@@ -58,43 +57,6 @@ class TypeInspector:
         return False
 
     @staticmethod
-    def get_non_none_union_args(annotation: Any) -> list[Any]:
-        """Extract non-None types from a Union.
-
-        Args:
-            annotation: Type annotation, should be a Union type.
-
-        Returns:
-            List of type arguments excluding None.
-        """
-        origin = get_origin(annotation)
-        if not TypeInspector.is_union_type(origin):
-            return [annotation]
-
-        args = get_args(annotation)
-        return [arg for arg in args if arg is not type(None)]
-
-    @staticmethod
-    def is_union_requiring_oneof(annotation: Any) -> bool:
-        """Check if annotation is a union type that requires oneof (for Protobuf).
-
-        A union requires oneof representation if it has multiple non-None types.
-        Optional[T] (Union with single non-None type) does not require oneof.
-
-        Args:
-            annotation: Type annotation.
-
-        Returns:
-            True if this union requires oneof representation.
-        """
-        origin = get_origin(annotation)
-        if not TypeInspector.is_union_type(origin):
-            return False
-
-        non_none_args = TypeInspector.get_non_none_union_args(annotation)
-        return len(non_none_args) > 1
-
-    @staticmethod
     def is_list_like(origin: Any) -> bool:
         """Check if origin represents a list-like type.
 
@@ -113,49 +75,6 @@ class TypeInspector:
             return origin.__origin__ in (list, set, frozenset)
 
         return False
-
-    @staticmethod
-    def is_variable_length_tuple(annotation: Any) -> bool:
-        """Check if tuple uses ellipsis notation (variable length).
-
-        Args:
-            annotation: Type annotation.
-
-        Returns:
-            True if this is tuple[T, ...] (homogeneous, variable length).
-        """
-        origin = get_origin(annotation)
-        if origin is not tuple:
-            return False
-
-        args = get_args(annotation)
-        return len(args) == 2 and args[1] is Ellipsis  # noqa: PLR2004
-
-    @staticmethod
-    def get_tuple_element_types(annotation: Any) -> list[Any]:
-        """Extract element types from a tuple annotation.
-
-        For variable-length tuples (tuple[T, ...]), returns single element [T]. For
-        fixed tuples (tuple[A, B, C]), returns all elements [A, B, C].
-
-        Args:
-            annotation: Tuple type annotation.
-
-        Returns:
-            List of element types.
-        """
-        origin = get_origin(annotation)
-        if origin is not tuple:
-            return []
-
-        args = get_args(annotation)
-        if not args:
-            return []
-
-        if len(args) == 2 and args[1] is Ellipsis:  # noqa: PLR2004
-            return [args[0]]
-
-        return list(args)
 
     @staticmethod
     def is_dict_like(origin: Any, annotation: Any = None) -> bool:
@@ -177,18 +96,6 @@ class TypeInspector:
             return True
 
         return origin and isinstance(origin, type) and issubclass(origin, Mapping)
-
-    @staticmethod
-    def is_enum(python_type: Any) -> bool:
-        """Check if type is a Python Enum.
-
-        Args:
-            python_type: Type to check.
-
-        Returns:
-            True if this is an Enum subclass.
-        """
-        return isinstance(python_type, type) and issubclass(python_type, Enum)
 
     @staticmethod
     def is_base_model(python_type: Any) -> bool:
@@ -342,81 +249,6 @@ class TypeInspector:
                 constraints["max_length"] = constraint.max_length
 
         return constraints
-
-    @staticmethod
-    def can_fit_in_32bit_int(field_info: FieldInfo) -> bool:
-        """Determine if integer field constraints fit in 32-bit signed integer.
-
-        Checks if both minimum and maximum constraints (if present) are within
-        the range of a 32-bit signed integer: -2^31 to 2^31-1.
-
-        Args:
-            field_info: Pydantic field info with metadata.
-
-        Returns:
-            True if constraints guarantee the value fits in 32 bits.
-            False if constraints are too large or not present (err on safe side).
-        """
-        constraints = TypeInspector.get_numeric_constraints(field_info)
-
-        minimum = None
-        if constraints["ge"] is not None:
-            minimum = constraints["ge"]
-        elif constraints["gt"] is not None:
-            minimum = constraints["gt"] + 1
-
-        maximum = None
-        if constraints["le"] is not None:
-            maximum = constraints["le"]
-        elif constraints["lt"] is not None:
-            maximum = constraints["lt"] - 1
-
-        return (
-            minimum is not None
-            and minimum >= -(2**31)
-            and maximum is not None
-            and maximum <= (2**31 - 1)
-        )
-
-    @staticmethod
-    def is_unsigned_int(field_info: FieldInfo) -> bool:
-        """Determine if integer field constraints guarantee unsigned value.
-
-        Args:
-            field_info: Pydantic field info with metadata.
-
-        Returns:
-            True if constraints guarantee the value is non-negative (>= 0).
-        """
-        constraints = TypeInspector.get_numeric_constraints(field_info)
-        if constraints["ge"] is not None and constraints["ge"] >= 0:
-            return True
-        return constraints["gt"] is not None and constraints["gt"] >= -1
-
-    @staticmethod
-    def can_fit_in_32bit_uint(field_info: FieldInfo) -> bool:
-        """Determine if unsigned integer fits in 32-bit unsigned integer.
-
-        Checks if the maximum constraint (if present) is within 0 to 2^32-1.
-
-        Args:
-            field_info: Pydantic field info with metadata.
-
-        Returns:
-            True if constraints guarantee the value fits in 32-bit unsigned.
-        """
-        constraints = TypeInspector.get_numeric_constraints(field_info)
-
-        if not TypeInspector.is_unsigned_int(field_info):
-            return False
-
-        maximum = None
-        if constraints["le"] is not None:
-            maximum = constraints["le"]
-        elif constraints["lt"] is not None:
-            maximum = constraints["lt"] - 1
-
-        return maximum is not None and maximum <= (2**32 - 1)
 
     @staticmethod
     def is_root_model(model_class: type[BaseModel]) -> bool:

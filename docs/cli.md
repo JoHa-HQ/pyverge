@@ -68,12 +68,8 @@ pydantic-migrator diff -s User -f 1.0.0 -t 2.0.0 --format json
 
 ### `export`
 
-Export schemas to various formats:
+Export JSON Schema definitions:
 
 ```bash
-pydantic-migrator export -f json-schema -o ./schemas
-pydantic-migrator export -f avro -o ./avro
-pydantic-migrator export -f protobuf -o ./proto
-pydantic-migrator export -f typescript -o ./types --style interface
-pydantic-migrator export -f typescript -o ./schemas --style zod
+pydantic-migrator export -o ./schemas
 ```

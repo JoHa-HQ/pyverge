@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 import typer
 from pydantic import ValidationError
@@ -271,135 +271,26 @@ def diff(  # noqa: PLR0913
 
 
 @app.command()
-def export(  # noqa: PLR0913
-    format: Annotated[
-        str,
-        typer.Option(..., "--format", "-f", help="Export format"),
-    ],
+def export(
     output: Annotated[
         Path, typer.Option(..., "--output", "-o", help="Output directory")
     ],
-    style: Annotated[
-        Literal["interface", "type", "zod"],
-        typer.Option(
-            ...,
-            "--style",
-            "-s",
-            help="TypeScript output style. Only applies to TypeScript exports.",
-        ),
-    ] = "interface",
-    organization: Annotated[
-        Literal["flat", "major_version", "model"],
-        typer.Option(
-            ...,
-            "--organization",
-            help="Directory organization. Only applies to TypeScript exports.",
-        ),
-    ] = "flat",
-    barrel_exports: Annotated[
-        bool,
-        typer.Option(
-            ...,
-            "--barrel-exports/--no-barrel-exports",
-            help=(
-                "Generate index.ts barrel exports. Only applies to TypeScript exports "
-                "with non-flat organization."
-            ),
-        ),
-    ] = True,
     manager: ManagerOption = "default",
     config: ConfigOption = None,
 ) -> None:
-    """Export schemas to specified format.
+    """Export JSON Schema definitions.
 
-    Examples:
-        # Export TypeScript schemas with flat organization (default)
-        pydantic-migrator export -f typescript -o ./types
-
-        # Export TypeScript interfaces (default style)
-        pydantic-migrator export -f typescript -o ./types --style interface
-
-        # Export TypeScript type aliases
-        pydantic-migrator export -f typescript -o ./types --style type
-
-        # Export Zod schemas with runtime validation
-        pydantic-migrator export -f typescript -o ./schemas --style zod
-
-        # Export TypeScript organized by major version with barrel exports
-        pydantic-migrator export -f typescript -o ./types --organization major_version
-
-        # Export TypeScript organized by model
-        pydantic-migrator export -f typescript -o ./types --organization model
-
-        # Export without barrel exports
-        pydantic-migrator export -f typescript -o ./types --organization major_version --no-barrel-exports
-
-        # Export other formats (style and organization options ignored)
-        pydantic-migrator export -f avro -o ./avro
-        pydantic-migrator export -f protobuf -o ./proto
-        pydantic-migrator export -f json-schema -o ./schemas
-    """  # noqa: E501
-    format_map = {
-        "avro": ("dump_avro_schemas", "Avro"),
-        "protobuf": ("dump_proto_schemas", "Protocol Buffer"),
-        "typescript": ("dump_typescript_schemas", "TypeScript"),
-        "json-schema": ("dump_schemas", "JSON Schema"),
-    }
-
-    if format not in format_map:
-        typer.secho(f"Unknown format: {format}", fg=typer.colors.RED)
-        console.print(f"Supported formats: {', '.join(format_map.keys())}")
-        raise typer.Exit(1)
-
+    Example:
+        pydantic-migrator export -o ./schemas
+    """
     try:
         mgr = load_manager(manager, config)
         output.mkdir(parents=True, exist_ok=True)
-
-        method_name, display_name = format_map[format]
-        method = getattr(mgr, method_name)
-
-        if format == "typescript":
-            method(
-                output,
-                style=style,
-                organization=organization,
-                include_barrel_exports=barrel_exports,
-            )
-
-            style_info = f" ({style})" if style != "interface" else ""
-            org_info = ""
-            if organization != "flat":
-                org_info = f", {organization}"
-                if barrel_exports:
-                    org_info += " with barrel exports"
-
-            typer.secho(
-                f"✓ Exported {display_name}{style_info} schemas{org_info} to {output}/",
-                fg=typer.colors.GREEN,
-            )
-        else:
-            if style != "interface":
-                console.print(
-                    "[yellow]Note: --style is only supported for TypeScript "
-                    "exports[/yellow]"
-                )
-            if organization != "flat":
-                console.print(
-                    "[yellow]Note: --organization is only supported for TypeScript "
-                    "exports[/yellow]"
-                )
-            if not barrel_exports:
-                console.print(
-                    "[yellow]Note: --barrel-exports is only supported for TypeScript "
-                    "exports[/yellow]"
-                )
-
-            method(output)
-            typer.secho(
-                f"✓ Exported {display_name} schemas to {output}/",
-                fg=typer.colors.GREEN,
-            )
-
+        mgr.dump_schemas(output)
+        typer.secho(
+            f"✓ Exported JSON Schema schemas to {output}/",
+            fg=typer.colors.GREEN,
+        )
     except ConfigError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1) from e
