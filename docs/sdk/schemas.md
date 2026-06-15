@@ -1,10 +1,12 @@
 # Schema Export
 
-Generate external schema definitions from your versioned Pydantic models.
+Generate JSON Schema definitions from your versioned Pydantic models.
 
 ## JSON Schema
 
 ```python
+from pathlib import Path
+
 schemas = manager.get_all_schemas()
 # {"User": {"1.0.0": {...}, "2.0.0": {...}}, ...}
 
@@ -12,44 +14,24 @@ schemas = manager.get_all_schemas()
 manager.dump_schemas(Path("./schemas"))
 ```
 
-## Avro
+Get a schema for a specific version:
 
 ```python
-manager.dump_avro_schemas(Path("./avro"))
+schema = manager.get_schema("User", "1.0.0")
 ```
 
-Supports nested records, enums, unions, arrays, and maps.
-
-## Protocol Buffers
+Export with separate definition files for nested models:
 
 ```python
-manager.dump_proto_schemas(Path("./proto"))
+manager.dump_schemas(
+    Path("./schemas"),
+    separate_definitions=True,
+    ref_template="{model}_v{version}.json",
+)
 ```
 
-Generates `.proto` files with proper `message`, `enum`, and `oneof` definitions.
+## CLI
 
-## TypeScript
-
-```python
-# TypeScript interfaces (default)
-manager.dump_typescript_schemas(Path("./types"), style="interface")
-
-# Type aliases
-manager.dump_typescript_schemas(Path("./types"), style="type")
-
-# Zod runtime validation schemas
-manager.dump_typescript_schemas(Path("./schemas"), style="zod")
-```
-
-### Organization
-
-```python
-# Flat directory (default)
-manager.dump_typescript_schemas(Path("./types"))
-
-# Organized by major version
-manager.dump_typescript_schemas(Path("./types"), organization="major_version")
-
-# Organized by model
-manager.dump_typescript_schemas(Path("./types"), organization="model")
+```bash
+pydantic-migrator export -o ./schemas
 ```

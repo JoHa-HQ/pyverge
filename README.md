@@ -1,6 +1,6 @@
 # pydantic-migrator
 
-Schema evolution and migrations for Pydantic models. Version your models, define migrations between versions, validate/migrate data at runtime, and export schemas to Avro, Protobuf, TypeScript, and JSON Schema.
+Schema evolution and migrations for Pydantic models. Version your models, define migrations between versions, validate/migrate data at runtime, and export JSON Schema definitions.
 
 ## Installation
 
@@ -53,7 +53,7 @@ pydantic-migrator init          # Bootstrap a new project
 pydantic-migrator validate      # Validate data against a schema version
 pydantic-migrator migrate       # Migrate data between versions
 pydantic-migrator diff          # Show differences between versions
-pydantic-migrator export        # Export schemas (avro, protobuf, typescript, json-schema)
+pydantic-migrator export        # Export JSON Schema definitions
 pydantic-migrator info          # List registered models and versions
 ```
 
@@ -62,7 +62,7 @@ pydantic-migrator info          # List registered models and versions
 - **Versioned model registry** — decorator-based registration with semantic versions
 - **Step-wise migrations** — register functions between versions with auto-migration for nested models
 - **Batch operations** — streaming batch migrations for large datasets
-- **Multi-format schema export** — Avro, Protobuf, TypeScript (interface/type/zod), JSON Schema
+- **JSON Schema export** — generate and dump schemas from versioned models
 - **Model diffing** — breaking change detection, markdown/JSON output
 - **Migration hooks** — observability via before/after/error callbacks
 - **Migration testing** — input/expected-output test framework with pytest integration

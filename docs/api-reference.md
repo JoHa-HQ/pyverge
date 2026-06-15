@@ -9,12 +9,10 @@ Auto-generated API documentation will be available here using `mkdocstrings`.
 - `MigrationManager` — Migration execution engine
 - `ModelVersion` — Semantic version representation
 
-## Schema Generators
+## Schema Export
 
-- `SchemaManager` — JSON schema generation
-- `AvroSchemaGenerator` — Avro schema generation
-- `ProtoSchemaGenerator` — Protocol Buffer schema generation
-- `TypeScriptSchemaGenerator` — TypeScript schema generation
+- `SchemaManager` — JSON Schema generation and export
+- `SchemaConfig` — JSON Schema generation configuration
 
 ## Hooks
 
