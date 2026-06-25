@@ -28,6 +28,7 @@ from .types import (
     ModelData,
     NestedModelInfo,
 )
+from .versioned_model import VersionedModel
 
 __all__ = [
     "InvalidVersionError",
@@ -53,4 +54,5 @@ __all__ = [
     "SchemaManager",
     "VersionedModelError",
     "__version__",
+    "VersionedModel",
 ]

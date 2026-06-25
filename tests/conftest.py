@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
 import pytest
 from pydantic import BaseModel, Field
@@ -64,6 +64,48 @@ class UserV3(BaseModel):
     role: Role
     status: Literal["active", "inactive"] = "active"
     address: AddressV3
+
+
+class TypedUserV1(BaseModel):
+    """Minimal user v1 for generic / VersionedModel tests."""
+
+    name: str
+
+
+class TypedUserV2(BaseModel):
+    """Minimal user v2 for generic / VersionedModel tests."""
+
+    name: str
+    email: str
+
+
+TypedUserModel = TypedUserV1 | TypedUserV2
+
+
+class TypedDiscUserV1(BaseModel):
+    """Discriminated user v1 for generic typing tests."""
+
+    schema_version: Literal["1.0.0"] = "1.0.0"
+    name: str
+
+
+class TypedDiscUserV2(BaseModel):
+    """Discriminated user v2 for generic typing tests."""
+
+    schema_version: Literal["2.0.0"] = "2.0.0"
+    name: str
+    email: str
+
+
+TypedDiscUserModel = Annotated[
+    TypedDiscUserV1 | TypedDiscUserV2,
+    Field(discriminator="schema_version"),
+]
+
+
+@pytest.fixture
+def typed_manager() -> ModelManager[TypedUserModel]:
+    return ModelManager[TypedUserModel]()
 
 
 @pytest.fixture

@@ -30,6 +30,9 @@ ModelName: TypeAlias = str
 ModelMetadata: TypeAlias = tuple[ModelName, ModelVersion]
 VersionedModels: TypeAlias = dict[ModelVersion, type[BaseModel]]
 
+T = TypeVar("T", bound=BaseModel)
+V = TypeVar("V", bound=BaseModel)
+
 
 @dataclass
 class NestedModelInfo:

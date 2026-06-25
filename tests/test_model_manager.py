@@ -53,7 +53,7 @@ class TestRegistration:
         ]
 
     def test_get_latest(self, manager: ModelManager) -> None:
-        assert manager.get_latest("User").model_fields.keys() == {
+        assert manager.get_latest("User").cls.model_fields.keys() == {
             "name",
             "email",
             "age",
