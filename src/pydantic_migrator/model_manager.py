@@ -326,7 +326,7 @@ class ModelManager(Generic[T]):
 
         return decorator
 
-    def get(self: Self, name: str, version: str | ModelVersion) -> VersionedModel[T, V]:  # type: ignore[valid-type]
+    def get(self: Self, name: str, version: str | ModelVersion) -> VersionedModel[T, V]:
         """Get a versioned model container by name and version.
 
         Args:
@@ -338,7 +338,7 @@ class ModelManager(Generic[T]):
         """
         return self._get_versioned_model(name, version)  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
 
-    def get_latest(self: Self, name: str) -> VersionedModel[T, V]:  # type: ignore[valid-type]
+    def get_latest(self: Self, name: str) -> VersionedModel[T, V]:
         """Get the latest versioned model container by name.
 
         Args:
@@ -540,7 +540,7 @@ class ModelManager(Generic[T]):
             ```
         """
         try:
-            versioned = self.get(name, version)
+            versioned: VersionedModel[T, BaseModel] = self.get(name, version)
             versioned.cls.model_validate(data)
             return True
         except Exception:
@@ -565,7 +565,7 @@ class ModelManager(Generic[T]):
             Migrated BaseModel.
         """
         migrated_data = self.migrate_data(data, name, from_version, to_version)
-        versioned = self.get(name, to_version)
+        versioned: VersionedModel[T, BaseModel] = self.get(name, to_version)
         validation_data = self._prepare_data_for_validation(
             migrated_data, versioned.cls
         )
@@ -971,8 +971,8 @@ class ModelManager(Generic[T]):
             else to_version
         )
 
-        from_versioned = self.get(name, from_version)
-        to_versioned = self.get(name, to_version)
+        from_versioned: VersionedModel[T, BaseModel] = self.get(name, from_version)
+        to_versioned: VersionedModel[T, BaseModel] = self.get(name, to_version)
 
         return ModelDiff.from_models(
             name=name,
