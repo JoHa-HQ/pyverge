@@ -326,9 +326,7 @@ class ModelManager(Generic[T]):
 
         return decorator
 
-    def get(
-        self: Self, name: str, version: str | ModelVersion
-    ) -> VersionedModel[T, V]:  # type: ignore[valid-type]
+    def get(self: Self, name: str, version: str | ModelVersion) -> VersionedModel[T, V]:  # type: ignore[valid-type]
         """Get a versioned model container by name and version.
 
         Args:

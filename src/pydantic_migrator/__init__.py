@@ -52,7 +52,7 @@ __all__ = [
     "Registry",
     "SchemaConfig",
     "SchemaManager",
+    "VersionedModel",
     "VersionedModelError",
     "__version__",
-    "VersionedModel",
 ]
