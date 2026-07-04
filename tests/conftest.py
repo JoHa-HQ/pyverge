@@ -1,156 +1,121 @@
+"""Shared test fixtures.
+
+Imports model declarations from examples and exposes them as pytest fixtures.
+Each fixture name reflects the use case it is designed to exercise.
+"""
+
 from __future__ import annotations
 
-from enum import StrEnum
-from typing import Annotated, Literal
+from collections.abc import Callable
+from functools import partial
+from pathlib import Path
 
 import pytest
-from pydantic import BaseModel, Field
+from click.testing import Result
+from typer.testing import CliRunner
 
-from pydantic_migrator import ModelManager
+from pydantic_migrator import Coordinator, ModelManager
+from pydantic_migrator.cli.main import app
+from pydantic_migrator.models import ManagerSettings
 
-
-class Role(StrEnum):
-    ADMIN = "admin"
-    USER = "user"
-    GUEST = "guest"
-
-
-class AddressV1(BaseModel):
-    street: str
-    city: str
-
-
-class UserV1(BaseModel):
-    """Initial user model."""
-
-    name: str
-    email: str
-    role: Role
-
-
-class AddressV2(BaseModel):
-    """Address with optional country."""
-
-    street: str
-    city: str
-    country: str | None = None
-
-
-class UserV2(BaseModel):
-    """Added address and age."""
-
-    name: str
-    email: str
-    age: int | None = None
-    role: Role
-    address: AddressV1
-
-
-class AddressV3(BaseModel):
-    """Address with zip code."""
-
-    street: str
-    city: str
-    country: str | None = None
-    zip_code: str | None = None
-
-
-class UserV3(BaseModel):
-    """Added status and updated address."""
-
-    name: str
-    email: str
-    age: int = Field(default=0, ge=0)
-    role: Role
-    status: Literal["active", "inactive"] = "active"
-    address: AddressV3
-
-
-class TypedUserV1(BaseModel):
-    """Minimal user v1 for generic / VersionedModel tests."""
-
-    name: str
-
-
-class TypedUserV2(BaseModel):
-    """Minimal user v2 for generic / VersionedModel tests."""
-
-    name: str
-    email: str
-
-
-TypedUserModel = TypedUserV1 | TypedUserV2
-
-
-class TypedDiscUserV1(BaseModel):
-    """Discriminated user v1 for generic typing tests."""
-
-    schema_version: Literal["1.0.0"] = "1.0.0"
-    name: str
-
-
-class TypedDiscUserV2(BaseModel):
-    """Discriminated user v2 for generic typing tests."""
-
-    schema_version: Literal["2.0.0"] = "2.0.0"
-    name: str
-    email: str
-
-
-TypedDiscUserModel = Annotated[
-    TypedDiscUserV1 | TypedDiscUserV2,
-    Field(discriminator="schema_version"),
-]
+from .examples.coordination import (
+    IssueContainer,
+    IssueV1,
+    IssueV2,
+    ProjectContainer,
+    ProjectV1,
+    ProjectV2,
+    UserContainer,
+    UserV1,
+    UserV2,
+    migrate_issue,
+    migrate_project,
+    migrate_user,
+)
+from .examples.default import DefaultManager
+from .examples.eager import UserContainer as EagerUserContainer
+from .examples.eager import eager_manager
 
 
 @pytest.fixture
-def typed_manager() -> ModelManager[TypedUserModel]:
-    return ModelManager[TypedUserModel]()
+def runner() -> CliRunner:
+    return CliRunner()
 
 
 @pytest.fixture
-def manager() -> ModelManager:
-    mgr = ModelManager()
+def application(runner: CliRunner) -> Callable[..., Result]:
+    return partial(runner.invoke, app)
 
-    @mgr.model("Address", "1.0.0", backward_compatible=True)
-    class _AddrV1(AddressV1):
-        pass
 
-    @mgr.model("Address", "2.0.0", backward_compatible=True)
-    class _AddrV2(AddressV2):
-        pass
+@pytest.fixture
+def default_manager() -> DefaultManager:
+    return DefaultManager(ManagerSettings(version_property="version"))
 
-    @mgr.model("Address", "3.0.0")
-    class _AddrV3(AddressV3):
-        pass
 
-    @mgr.model("User", "1.0.0")
-    class _UserV1(UserV1):
-        pass
+@pytest.fixture
+def eager_manager_instance() -> ModelManager[EagerUserContainer]:
+    return eager_manager
 
-    @mgr.model("User", "2.0.0")
-    class _UserV2(UserV2):
-        pass
 
-    @mgr.model("User", "3.0.0")
-    class _UserV3(UserV3):
-        pass
+@pytest.fixture
+def coordinator() -> Coordinator:
+    """Coordinator with multiple model families from coordination.py."""
+    return Coordinator(
+        defaults={"version_property": "version"},
+        managers={
+            UserContainer: {
+                "versions": {
+                    "1.0.0": UserV1,
+                    "2.0.0": UserV2,
+                },
+                "migrations": {
+                    ("1.0.0", "2.0.0"): migrate_user,
+                },
+            },
+            ProjectContainer: {
+                "config": {"version_property": "schema_version"},
+                "versions": {
+                    "1.0.0": ProjectV1,
+                    "2.0.0": ProjectV2,
+                },
+                "migrations": {
+                    ("1.0.0", "2.0.0"): migrate_project,
+                },
+            },
+            IssueContainer: {
+                "versions": {
+                    "1.0.0": IssueV1,
+                    "2.0.0": IssueV2,
+                },
+                "migrations": {
+                    ("1.0.0", "2.0.0"): migrate_issue,
+                },
+            },
+        },
+    )
 
-    @mgr.migration("Address", "2.0.0", "3.0.0")
-    def address_add_zip(data):
-        return {**data, "zip_code": None}
 
-    @mgr.migration("User", "1.0.0", "2.0.0")
-    def user_v1_to_v2(data):
-        return {**data, "age": None, "address": {"street": "", "city": ""}}
+@pytest.fixture
+def project_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Use the pre-defined default.py example as the project source."""
+    cfg = tmp_path / "migrator.toml"
+    cfg.write_text(
+        '[pydantic-migrator]\nmanager = "tests.examples.default:DefaultManager"\n'
+    )
+    monkeypatch.syspath_prepend(str(tmp_path.parent.parent.parent))
+    return tmp_path
 
-    @mgr.migration("User", "2.0.0", "3.0.0")
-    def user_v2_to_v3(data):
-        return {
-            **data,
-            "age": data.get("age") or 0,
-            "status": "active",
-            "address": {**data.get("address", {}), "country": None, "zip_code": None},
-        }
 
-    return mgr
+@pytest.fixture
+def sample_data(project_dir: Path) -> Path:
+    """Create sample JSON data file with version field."""
+    data = project_dir / "data.json"
+    data.write_text(
+        '{"version": "1.0.0", "name": "Alice", "email": "alice@example.com", "role": "user"}'
+    )
+    return data
+
+
+@pytest.fixture
+def config(project_dir: Path) -> list[str]:
+    return ["-c", str(project_dir / "migrator.toml")]

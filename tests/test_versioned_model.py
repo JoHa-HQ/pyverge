@@ -1,17 +1,50 @@
+"""Tests for VersionedModel internals.
+
+Uses minimal inline models — not from examples — because these tests
+exercise VersionedModel internals (not the registration patterns).
+"""
+
 from __future__ import annotations
 
-from typing import ForwardRef, get_args
+from typing import Annotated, ForwardRef, Literal, get_args
+
+from pydantic import BaseModel, Field
 
 from pydantic_migrator import ModelManager, ModelVersion
 from pydantic_migrator.versioned_model import VersionedModel
-from tests.conftest import (
-    TypedDiscUserModel,
-    TypedDiscUserV1,
-    TypedDiscUserV2,
-    TypedUserModel,
-    TypedUserV1,
-    TypedUserV2,
-)
+
+# ============================================================================
+# Minimal models for VersionedModel internal tests
+# ============================================================================
+
+
+class TypedUserV1(BaseModel):
+    name: str
+
+
+class TypedUserV2(BaseModel):
+    name: str
+    email: str
+
+
+TypedUserModel = TypedUserV1 | TypedUserV2
+
+
+class TypedDiscUserV1(BaseModel):
+    schema_version: Literal["1.0.0"] = "1.0.0"
+    name: str
+
+
+class TypedDiscUserV2(BaseModel):
+    schema_version: Literal["2.0.0"] = "2.0.0"
+    name: str
+    email: str
+
+
+TypedDiscUserModel = Annotated[
+    TypedDiscUserV1 | TypedDiscUserV2,
+    Field(discriminator="schema_version"),
+]
 
 
 class FakeManager:
@@ -19,7 +52,7 @@ class FakeManager:
 
 
 def test_versioned_model_load() -> None:
-    vm = VersionedModel(FakeManager(), "User", "2.0.0", TypedUserV2)  # ty: ignore[invalid-argument-type]
+    vm = VersionedModel(FakeManager(), "User", "2.0.0", TypedUserV2)
 
     user = vm.load({"name": "Alice", "email": "a@b.com"})
 
@@ -30,33 +63,32 @@ def test_versioned_model_load() -> None:
     assert vm._container_type is None
 
 
-def test_versioned_model_runtime_types(
-    typed_manager: ModelManager[TypedUserModel],
-) -> None:
-    @typed_manager.register[TypedUserV2]("User", "2.0.0")
+def test_versioned_model_runtime_types() -> None:
+    manager = ModelManager[TypedUserModel]()
+
+    @manager.model[TypedUserV2]("User", "2.0.0")
     class _UserV2(TypedUserV2):
         pass
 
-    vm = typed_manager.get("User", "2.0.0")
+    vm = manager.get("User", "2.0.0")
 
     assert vm._container_type == TypedUserModel
     assert vm._versioned_type is _UserV2
     assert vm.cls is _UserV2
 
 
-def test_manager_orig_class_from_generic(
-    typed_manager: ModelManager[TypedUserModel],
-) -> None:
-    orig = getattr(typed_manager, "__orig_class__", None)
+def test_manager_orig_class_from_generic() -> None:
+    manager = ModelManager[TypedUserModel]()
+
+    orig = getattr(manager, "__orig_class__", None)
 
     assert orig is not None
     assert get_args(orig)[0] == TypedUserModel
 
 
-def test_container_type_with_generic(
-    typed_manager: ModelManager[TypedUserModel],
-) -> None:
-    assert typed_manager.container_type == TypedUserModel
+def test_container_type_with_generic() -> None:
+    manager = ModelManager[TypedUserModel]()
+    assert manager.container_type == TypedUserModel
 
 
 def test_forward_ref_manager_annotation() -> None:
@@ -69,78 +101,93 @@ def test_forward_ref_manager_annotation() -> None:
 
 def test_manager_container_type_without_generic() -> None:
     manager = ModelManager()
-
     assert manager.container_type is None
 
 
-def test_manager_version_map_starts_empty(
-    typed_manager: ModelManager[TypedUserModel],
-) -> None:
-    assert typed_manager._version_map == {}
+def test_manager_version_map_starts_empty() -> None:
+    manager = ModelManager[TypedUserModel]()
+    assert manager._version_map == {}
 
 
-def test_register_subscript(typed_manager: ModelManager[TypedUserModel]) -> None:
-    @typed_manager.register[TypedUserV2]("User", "2.0.0")
+def test_register_subscript() -> None:
+    manager = ModelManager[TypedUserModel]()
+
+    @manager.model[TypedUserV2]("User", "2.0.0")
     class _UserV2(TypedUserV2):
         pass
 
-    vm = typed_manager._version_map[("User", ModelVersion.parse("2.0.0"))]
+    vm = manager._version_map[("User", ModelVersion.parse("2.0.0"))]
 
     assert vm.cls is _UserV2
-    assert typed_manager.list_models() == ["User"]
+    assert manager.list_models() == ["User"]
     user = vm.load({"name": "Alice", "email": "a@b.com"})
     assert user.name == "Alice"
 
 
-def test_model_decorator_populates_version_map(
-    typed_manager: ModelManager[TypedUserModel],
-) -> None:
-    @typed_manager.model("User", "1.0.0")
+def test_model_decorator_populates_version_map() -> None:
+    manager = ModelManager[TypedUserModel]()
+
+    @manager.model("User", "1.0.0")
     class _UserV1(TypedUserV1):
         pass
 
-    vm = typed_manager.get("User", "1.0.0")
+    vm = manager.get("User", "1.0.0")
 
     assert vm.cls is _UserV1
     assert isinstance(vm, VersionedModel)
 
 
-def test_get_returns_versioned_model(
-    typed_manager: ModelManager[TypedUserModel],
-) -> None:
-    @typed_manager.register[TypedUserV2]("User", "2.0.0")
+def test_get_returns_versioned_model() -> None:
+    manager = ModelManager[TypedUserModel]()
+
+    @manager.model[TypedUserV2]("User", "2.0.0")
     class _UserV2(TypedUserV2):
         pass
 
-    vm = typed_manager.get("User", "2.0.0")
+    vm = manager.get("User", "2.0.0")
 
     assert vm.cls is _UserV2
     assert vm.load({"name": "Bob", "email": "bob@x.com"}).email == "bob@x.com"
 
 
-def test_get_latest_returns_versioned_model(manager: ModelManager) -> None:
+def test_get_latest_returns_versioned_model_inline() -> None:
+    manager = ModelManager()
+
+    @manager.model("User", "1.0.0")
+    class _UserV1(TypedUserV1):
+        pass
+
+    @manager.model("User", "2.0.0")
+    class _UserV2(TypedUserV2):
+        pass
+
     vm = manager.get_latest("User")
-
     assert isinstance(vm, VersionedModel)
-    assert "status" in vm.cls.model_fields
+    assert "email" in vm.cls.model_fields
 
 
-def test_backward_compat_get_returns_versioned_model(manager: ModelManager) -> None:
+def test_backward_compat_get_returns_versioned_model_inline() -> None:
+    manager = ModelManager()
+
+    @manager.model("User", "1.0.0")
+    class _UserV1(TypedUserV1):
+        pass
+
     vm = manager.get("User", "1.0.0")
 
     assert isinstance(vm, VersionedModel)
-    assert "role" in vm.cls.model_fields
+    assert vm.cls is _UserV1
     assert manager.container_type is None
 
 
 def test_discriminated_union_load() -> None:
     manager = ModelManager[TypedDiscUserModel]()
 
-    @manager.register[TypedDiscUserV1]("User", "1.0.0")
+    @manager.model[TypedDiscUserV1]("User", "1.0.0")
     class _UserV1(TypedDiscUserV1):
         pass
 
-    @manager.register[TypedDiscUserV2]("User", "2.0.0")
+    @manager.model[TypedDiscUserV2]("User", "2.0.0")
     class _UserV2(TypedDiscUserV2):
         pass
 
