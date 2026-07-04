@@ -28,17 +28,17 @@ class Role(StrEnum):
     GUEST = "guest"
 
 
-@DefaultManager.model(enable_ref=True)
+@DefaultManager.model()
 class UserV1(BaseModel):
     """Initial user model."""
 
     name: str
     email: str
     role: Role
-    version: str = Field(default="1.0.0", frozen=True)
+    version: Literal["1.0.0"]
 
 
-@DefaultManager.model()
+@DefaultManager.model(backward_compatible=True)
 class UserV2(BaseModel):
     """Added age field."""
 
@@ -46,7 +46,7 @@ class UserV2(BaseModel):
     email: str
     age: int | None = None
     role: Role
-    version: str = Field(default="2.0.0", frozen=True)
+    version: Literal["2.0.0"]
 
 
 @DefaultManager.model()
@@ -58,7 +58,7 @@ class UserV3(BaseModel):
     age: int = Field(default=0, ge=0)
     role: Role
     status: Literal["active", "inactive"] = "active"
-    version: str = Field(default="3.0.0", frozen=True)
+    version: Literal["3.0.0"]
 
 
 # Step 3: Create discriminated union

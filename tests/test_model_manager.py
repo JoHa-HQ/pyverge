@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from syrupy.assertion import SnapshotAssertion
 
 from pydantic_migrator.migration import ModelManager
@@ -12,7 +12,7 @@ from pydantic_migrator.migration.exceptions import MigrationError
 from pydantic_migrator.migration.hooks import MetricsHook, MigrationHook
 from pydantic_migrator.migration.versioning import ModelVersion
 from pydantic_migrator.models import ManagerSettings
-from pydantic_migrator.strategies import BatchMigrator
+from pydantic_migrator.strategies import BatchStrategy
 
 
 class TrackingHook(MigrationHook):
@@ -40,7 +40,8 @@ class TrackingHook(MigrationHook):
 
 class TestRegistration:
     def test_list_models(self, default_manager: ModelManager) -> None:
-        assert default_manager.list_models() == ["User"]
+        models = default_manager.list_models()
+        assert len(models) == 3
 
     def test_list_versions(self, default_manager: ModelManager) -> None:
         assert default_manager.list_versions() == [
@@ -91,7 +92,7 @@ class TestMigration:
                 "role": "guest",
             },
         ]
-        results = BatchMigrator(default_manager).migrate(batch_in, "1.0.0", "3.0.0")
+        results = BatchStrategy(default_manager).migrate(batch_in, "1.0.0", "3.0.0")
         assert len(results) == 2
 
 
@@ -103,13 +104,11 @@ class TestValidation:
             "email": "alice@example.com",
             "role": "admin",
         }
-        assert default_manager.validate_data(v1_data, "User", "1.0.0") is True
+        assert default_manager.validate_data(v1_data, "1.0.0") is True
 
     def test_invalid_data(self, default_manager: ModelManager) -> None:
         assert (
-            default_manager.validate_data(
-                {"version": "1.0.0", "bad": True}, "User", "1.0.0"
-            )
+            default_manager.validate_data({"version": "1.0.0", "bad": True}, "1.0.0")
             is False
         )
 
@@ -117,7 +116,7 @@ class TestValidation:
 class TestHooks:
     def test_tracking_hook(self, default_manager: ModelManager) -> None:
         hook = TrackingHook()
-        default_manager.add_hook(hook, ModelVersion.parse("2.0.0"))
+        default_manager.add_hook(hook, "1.0.0", "2.0.0")
         default_manager.migrate(
             {
                 "version": "1.0.0",
@@ -128,13 +127,14 @@ class TestHooks:
             "1.0.0",
             "2.0.0",
         )
-        assert "before:User:1.0.0->2.0.0" in hook.events
-        assert "after:User:1.0.0->2.0.0" in hook.events
-        default_manager.remove_hook(hook, ModelVersion.parse("2.0.0"))
+        assert "before:UserContainer:1.0.0->2.0.0" in hook.events
+        assert "after:UserContainer:1.0.0->2.0.0" in hook.events
+        default_manager.remove_hook(hook, "1.0.0", "2.0.0")
 
     def test_metrics_hook(self, default_manager: ModelManager) -> None:
         metrics = MetricsHook()
-        default_manager.add_hook(metrics, ModelVersion.parse("3.0.0"))
+        default_manager.add_hook(metrics, "1.0.0", "2.0.0")
+        default_manager.add_hook(metrics, "2.0.0", "3.0.0")
         default_manager.migrate(
             {
                 "version": "1.0.0",
@@ -153,7 +153,8 @@ class TestHooks:
             "role": "user",
         }
         default_manager.migrate(v2_data, "2.0.0", "3.0.0")
-        assert metrics.total_count == 2
+        # 3 before_migrate calls: 2 from 1->2 and 2->3 during first migrate, 1 from second
+        assert metrics.total_count == 3
         assert metrics.error_count == 0
         assert metrics.success_rate == 1.0
         default_manager.clear_hooks()
@@ -243,3 +244,53 @@ class TestIsolatedMigration:
         v2_data = {"version": "2.0.0", "name": "Bob", "email": "bob@test.com"}
         v3_result = manager.migrate(v2_data, "2.0.0", "3.0.0")
         assert v3_result.model_dump() == snapshot
+
+
+# ---------------------------------------------------------------------------
+# Version-field validation at registration time
+# ---------------------------------------------------------------------------
+
+
+class TestVersionFieldValidation:
+    """The ``model()`` decorator validates the version field exists, has a
+    default, and is frozen."""
+
+    def test_missing_version_field_raises(self) -> None:
+        mgr = ModelManager["C"](ManagerSettings(version_property="version"))
+
+        with pytest.raises(ValueError, match="does not have a version field"):
+
+            @mgr.model()
+            class _Bad(BaseModel):
+                name: str
+
+    def test_version_field_without_default_raises(self) -> None:
+        mgr = ModelManager["C"](ManagerSettings(version_property="version"))
+
+        with pytest.raises(ValueError, match="has no default and is not a Literal"):
+
+            @mgr.model()
+            class _Bad(BaseModel):
+                name: str
+                version: str
+
+    def test_unfrozen_version_field_raises(self) -> None:
+        mgr = ModelManager["C"](ManagerSettings(version_property="version"))
+
+        with pytest.raises(ValueError, match="must be frozen"):
+
+            @mgr.model()
+            class _Bad(BaseModel):
+                name: str
+                version: str = "1.0.0"
+
+    def test_custom_version_property_name(self) -> None:
+        mgr = ModelManager["C"](ManagerSettings(version_property="schema_version"))
+
+        @mgr.model()
+        class Ok(BaseModel):
+            name: str
+            schema_version: str = Field(default="2.1.0", frozen=True)
+
+        assert "schema_version" in Ok.model_fields
+        assert Ok.model_fields["schema_version"].default == "2.1.0"

@@ -12,9 +12,9 @@ from syrupy import SnapshotAssertion
 from pydantic_migrator.migration import ModelManager
 from pydantic_migrator.models import ManagerSettings
 from pydantic_migrator.strategies import (
-    BatchMigrator,
-    ParallelMigrator,
-    StreamingMigrator,
+    BatchStrategy,
+    ParallelStrategy,
+    StreamingStrategy,
 )
 
 
@@ -55,13 +55,13 @@ class TestBatchMigration:
             {"name": "Bob", "version": "1.0.0"},
         ]
 
-        results = BatchMigrator(default_manager).migrate(batch, "1.0.0", "2.0.0")
+        results = BatchStrategy(default_manager).migrate(batch, "1.0.0", "2.0.0")
         assert len(results) == 2
         assert results[0].email == "Alice@test.com"
         assert results[1].email == "Bob@test.com"
 
     def test_batch_empty_input(self, default_manager: ModelManager) -> None:
-        results = BatchMigrator(default_manager).migrate([], "1.0.0", "2.0.0")
+        results = BatchStrategy(default_manager).migrate([], "1.0.0", "2.0.0")
         assert results == []
 
     def test_batch_error_isolation(self, default_manager: ModelManager) -> None:
@@ -71,7 +71,7 @@ class TestBatchMigration:
             {"name": "AlsoGood", "version": "1.0.0"},
         ]
 
-        migrator = BatchMigrator(default_manager, stop_on_error=False)
+        migrator = BatchStrategy(default_manager, stop_on_error=False)
         results = migrator.migrate(batch, "1.0.0", "2.0.0")
 
         # Should get 2 successful results (skipped bad item)
@@ -88,7 +88,7 @@ class TestStreamingMigration:
         data = [{"name": f"User{i}", "version": "1.0.0"} for i in range(5)]
 
         results = list(
-            StreamingMigrator(default_manager, chunk_size=2).migrate(
+            StreamingStrategy(default_manager, chunk_size=2).migrate(
                 data, "1.0.0", "2.0.0"
             )
         )
@@ -97,14 +97,14 @@ class TestStreamingMigration:
 
     def test_streaming_empty_input(self, default_manager: ModelManager) -> None:
 
-        results = list(StreamingMigrator(default_manager).migrate([], "1.0.0", "2.0.0"))
+        results = list(StreamingStrategy(default_manager).migrate([], "1.0.0", "2.0.0"))
         assert results == []
 
     def test_streaming_smaller_than_chunk(self, default_manager: ModelManager) -> None:
         data = [{"name": "Single", "version": "1.0.0"}]
 
         results = list(
-            StreamingMigrator(default_manager, chunk_size=10).migrate(
+            StreamingStrategy(default_manager, chunk_size=10).migrate(
                 data, "1.0.0", "2.0.0"
             )
         )
@@ -120,7 +120,7 @@ class TestParallelMigration:
 
         data = [{"name": f"User{i}", "version": "1.0.0"} for i in range(4)]
 
-        results = ParallelMigrator(manager, max_workers=2).migrate(
+        results = ParallelStrategy(manager, max_workers=2).migrate(
             data, "1.0.0", "2.0.0"
         )
         assert len(results) == 4
