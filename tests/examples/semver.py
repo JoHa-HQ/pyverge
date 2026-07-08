@@ -15,11 +15,11 @@ from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
+from semver import Version
 
-from pydantic_migrator.migration import ModelManager
-from pydantic_migrator.models import ManagerSettings
+# from pydantic_migrator.migration import MigrationSettings, ModelManager
 
-DefaultManager = ModelManager["UserContainer", ManagerSettings()]
+# SemverManager = ModelManager[Version, MigrationSettings()]
 
 
 class Role(StrEnum):
@@ -28,7 +28,18 @@ class Role(StrEnum):
     GUEST = "guest"
 
 
-@DefaultManager.model()
+# @SemverManager.model()
+class UserV011Dev7(BaseModel):
+    """Added address and age."""
+
+    name: str
+    email: str
+    age: int | None = None
+    role: Role
+    version: Literal["0.1.1+dev.7"]
+
+
+# @SemverManager.model()
 class UserV1(BaseModel):
     """Initial user model."""
 
@@ -38,7 +49,28 @@ class UserV1(BaseModel):
     version: Literal["1.0.0"]
 
 
-@DefaultManager.model(backward_compatible=True)
+# @SemverManager.model(backward_compatible=True)
+class UserV123(BaseModel):
+    name: str
+    email: str
+    role: Role
+    last_name: str | None = None
+    version: Literal["1.2.3"]
+
+
+# @SemverManager.model()
+class UserV200Beta1(BaseModel):
+    """Beta release for 2.0.0."""
+
+    id: str
+    name: str
+    email: str
+    role: Role
+    beta_feature_enabled: bool = False
+    version: Literal["2.0.0-beta.1"]
+
+
+# @SemverManager.model(backward_compatible=True)
 class UserV2(BaseModel):
     """Added age field."""
 
@@ -49,7 +81,7 @@ class UserV2(BaseModel):
     version: Literal["2.0.0"]
 
 
-@DefaultManager.model()
+# @SemverManager.model()
 class UserV3(BaseModel):
     """Added status field."""
 
@@ -61,9 +93,8 @@ class UserV3(BaseModel):
     version: Literal["3.0.0"]
 
 
-# Step 3: Create discriminated union
 User = Annotated[
-    UserV1 | UserV2 | UserV3,
+    UserV011Dev7 | UserV1 | UserV123 | UserV200Beta1 | UserV2 | UserV3,
     Field(discriminator="version"),
 ]
 
@@ -72,14 +103,13 @@ class UserContainer(BaseModel):
     document: User
 
 
-# Step 5: Register migrations at class level
-@DefaultManager.migration("1.0.0", "2.0.0")
+# @SemverManager.migration(UserV1, UserV2)
 def migrate_v1_to_v2(data: dict) -> dict:
     data["age"] = None
     return data
 
 
-@DefaultManager.migration("2.0.0", "3.0.0")
+# @SemverManager.migration(UserV2, UserV3)
 def migrate_v2_to_v3(data: dict) -> dict:
     data["age"] = data.get("age", 0)
     data["status"] = "active"
