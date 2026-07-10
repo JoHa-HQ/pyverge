@@ -1,9 +1,11 @@
 """ModelManager class."""
 
+from __future__ import annotations
+
 from collections.abc import Callable, Iterable
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Generic, Self, cast, get_args
 
 from pydantic import BaseModel
 from pydantic.json_schema import GenerateJsonSchema
@@ -31,10 +33,49 @@ from .types import (
     ModelData,
     NestedModelInfo,
     SchemaTransformer,
+    T,
+    V,
 )
+from .versioned_model import VersionedModel
 
 
-class ModelManager:
+class RegisterProxy(Generic[T]):
+    """Subscriptable proxy for typed model registration.
+
+    Enables ``@manager.register[UserV2]("User", "2.0.0")`` syntax so type checkers
+    can infer the versioned model type ``V`` at registration time.
+    """
+
+    def __init__(self, manager: ModelManager[T]) -> None:
+        self._manager = manager
+
+    def __getitem__(
+        self, model_type: type[V]
+    ) -> Callable[
+        [str, str | ModelVersion],
+        Callable[[type[V]], type[V]],
+    ]:
+        _ = model_type
+
+        def with_name_and_version(
+            name: str,
+            version: str | ModelVersion,
+            enable_ref: bool = False,
+            backward_compatible: bool = False,
+        ) -> Callable[[type[V]], type[V]]:
+            def decorator(cls: type[V]) -> type[V]:
+                self._manager._registry.register(
+                    name, version, enable_ref, backward_compatible
+                )(cls)
+                self._manager._store_versioned_model(name, version, cls)
+                return cls
+
+            return decorator
+
+        return with_name_and_version
+
+
+class ModelManager(Generic[T]):
     """High-level interface for versioned model management and schema generation.
 
     ModelManager provides a unified API for managing schema evolution across different
@@ -139,6 +180,40 @@ class ModelManager:
         results.assert_all_passed()
         ```
 
+        **Typed registration** (static type inference):
+
+        ``get()`` and ``get_latest()`` return a :class:`VersionedModel` container.
+        Use ``.cls`` for the model class or ``.load(data)`` for a validated instance.
+
+        ```python
+        from typing import Annotated
+        from pydantic import BaseModel, Field
+        from pydantic_migrator import ModelManager, VersionedModel
+
+        manager: ModelManager["UserModel"] = ModelManager()
+
+        @manager.register[UserV1]("User", "1.0.0")
+        class UserV1(BaseModel):
+            schema_version: str = "1.0.0"
+            name: str
+
+        @manager.register[UserV2]("User", "2.0.0")
+        class UserV2(BaseModel):
+            schema_version: str = "2.0.0"
+            name: str
+            email: str
+
+        UserModel = Annotated[
+            UserV1 | UserV2,
+            Field(discriminator="schema_version"),
+        ]
+
+        user_v2: VersionedModel[UserModel, UserV2] = manager.get("User", "2.0.0")
+        user: UserV2 = user_v2.load(
+            {"schema_version": "2.0.0", "name": "Alice", "email": "a@b.com"}
+        )
+        ```
+
         **Schema Transformers**:
 
         ```python
@@ -172,6 +247,39 @@ class ModelManager:
         self._schema_manager = SchemaManager(
             self._registry, default_config=default_schema_config
         )
+        self._version_map: dict[tuple[str, ModelVersion], VersionedModel] = {}
+
+    @property
+    def container_type(self) -> type[T] | None:
+        orig = getattr(self, "__orig_class__", None)
+        return get_args(orig)[0] if orig else None
+
+    @property
+    def register(self) -> RegisterProxy[T]:
+        return RegisterProxy(self)
+
+    def _store_versioned_model(
+        self: Self,
+        name: str,
+        version: str | ModelVersion,
+        cls: type[BaseModel],
+    ) -> VersionedModel[T, BaseModel]:
+        ver = ModelVersion.parse(version) if isinstance(version, str) else version
+        versioned = VersionedModel(self, name, ver, cls)
+        self._version_map[(name, ver)] = versioned
+        return versioned
+
+    def _get_versioned_model(
+        self: Self,
+        name: str,
+        version: str | ModelVersion,
+    ) -> VersionedModel[T, BaseModel]:
+        ver = ModelVersion.parse(version) if isinstance(version, str) else version
+        key = (name, ver)
+        if key not in self._version_map:
+            cls = self._registry.get_model(name, version)
+            self._store_versioned_model(name, ver, cls)
+        return self._version_map[key]
 
     def model(
         self: Self,
@@ -207,30 +315,40 @@ class ModelManager:
                 city: City
             ```
         """
-        return self._registry.register(name, version, enable_ref, backward_compatible)
+        registry_decorator = self._registry.register(
+            name, version, enable_ref, backward_compatible
+        )
 
-    def get(self: Self, name: str, version: str | ModelVersion) -> type[BaseModel]:
-        """Get a model by name and version.
+        def decorator(cls: type[DecoratedBaseModel]) -> type[DecoratedBaseModel]:
+            registry_decorator(cls)
+            self._store_versioned_model(name, version, cls)
+            return cls
 
-        Args:
-            name: Name of the model.
-            version: Semantic version (returns latest if None).
+        return decorator
 
-        Returns:
-            Model class.
-        """
-        return self._registry.get_model(name, version)
-
-    def get_latest(self: Self, name: str) -> type[BaseModel]:
-        """Get the latest version of a model by name.
+    def get(self: Self, name: str, version: str | ModelVersion) -> VersionedModel[T, V]:
+        """Get a versioned model container by name and version.
 
         Args:
             name: Name of the model.
+            version: Semantic version.
 
         Returns:
-            Model class.
+            VersionedModel container for the specified version.
         """
-        return self._registry.get_latest(name)
+        return self._get_versioned_model(name, version)  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
+
+    def get_latest(self: Self, name: str) -> VersionedModel[T, V]:
+        """Get the latest versioned model container by name.
+
+        Args:
+            name: Name of the model.
+
+        Returns:
+            VersionedModel container for the latest version.
+        """
+        latest_version = max(self._registry.get_versions(name))
+        return self._get_versioned_model(name, latest_version)  # type: ignore[return-value]  # ty: ignore[invalid-return-type]
 
     def get_nested_models(
         self: Self,
@@ -422,8 +540,8 @@ class ModelManager:
             ```
         """
         try:
-            model = self.get(name, version)
-            model.model_validate(data)
+            versioned: VersionedModel[T, BaseModel] = self.get(name, version)
+            versioned.cls.model_validate(data)
             return True
         except Exception:
             return False
@@ -447,9 +565,11 @@ class ModelManager:
             Migrated BaseModel.
         """
         migrated_data = self.migrate_data(data, name, from_version, to_version)
-        target_model = self.get(name, to_version)
-        validation_data = self._prepare_data_for_validation(migrated_data, target_model)
-        return target_model.model_validate(validation_data)
+        versioned: VersionedModel[T, BaseModel] = self.get(name, to_version)
+        validation_data = self._prepare_data_for_validation(
+            migrated_data, versioned.cls
+        )
+        return versioned.cls.model_validate(validation_data)
 
     def migrate_as(
         self: Self,
@@ -791,7 +911,7 @@ class ModelManager:
         for test_case_input in test_cases:
             if isinstance(test_case_input, tuple):
                 test_case = MigrationTestCase(
-                    source=test_case_input[0],
+                    source=cast(ModelData, test_case_input[0]),
                     target=test_case_input[1],  # ty:ignore[invalid-argument-type]
                 )
             else:
@@ -851,13 +971,13 @@ class ModelManager:
             else to_version
         )
 
-        from_model = self.get(name, from_version)
-        to_model = self.get(name, to_version)
+        from_versioned: VersionedModel[T, BaseModel] = self.get(name, from_version)
+        to_versioned: VersionedModel[T, BaseModel] = self.get(name, to_version)
 
         return ModelDiff.from_models(
             name=name,
-            from_model=from_model,
-            to_model=to_model,
+            from_model=from_versioned.cls,
+            to_model=to_versioned.cls,
             from_version=from_ver_str,
             to_version=to_ver_str,
         )

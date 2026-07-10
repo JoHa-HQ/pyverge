@@ -75,7 +75,7 @@ def validate(
         typer.secho("✗ Validation failed", fg=typer.colors.RED)
 
         try:
-            mgr.get(schema, version).model_validate(data_dict)
+            mgr.get(schema, version).cls.model_validate(data_dict)
         except ValidationError as e:
             console.print("\n[red]Validation errors:[/red]")
             for error in e.errors():
