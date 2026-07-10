@@ -66,3 +66,4 @@ pydantic-migrator info          # List registered models and versions
 - **Model diffing** — breaking change detection, markdown/JSON output
 - **Migration hooks** — observability via before/after/error callbacks
 - **Migration testing** — input/expected-output test framework with pytest integration
+- **Typed model retrieval** — `get()` / `get_latest()` return `VersionedModel` with `.cls` and `.load()`; see [Models SDK docs](docs/sdk/models.md)
