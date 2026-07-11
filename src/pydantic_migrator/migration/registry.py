@@ -2,9 +2,9 @@
 
 import bisect
 from collections import defaultdict
-from functools import cached_property, lru_cache
-from itertools import chain
-from typing import Generic, Self, cast
+from functools import lru_cache
+from itertools import chain, pairwise
+from typing import ClassVar, Generic, Self, cast
 
 import pendulum
 from pydantic import BaseModel
@@ -35,6 +35,8 @@ from .types import (
 class Registry(Generic[VersionValue]):
     """Ordered storage for versioned models, migrations, and hooks."""
 
+    MIN_PREDICATES: ClassVar[int] = 2
+
     def __init__(self: Self, *, name: str | None = None) -> None:
         """Create a named registry.
 
@@ -49,9 +51,7 @@ class Registry(Generic[VersionValue]):
         self._migrations: MigrationMap = {}
         self._hooks: MigrationHookMap = defaultdict(list)
 
-    def __contains__(
-        self, index: LookupKey
-    ) -> bool:
+    def __contains__(self, index: LookupKey) -> bool:
         """Check whether a version, model, or migration path is registered.
 
         ``v in registry``
@@ -63,17 +63,23 @@ class Registry(Generic[VersionValue]):
 
         Returns:
             ``True`` if the lookup resolves to a registered entry.
-        """
+        """  # noqa: E501
 
         if isinstance(index, Version) or isinstance(index, pendulum.Date):
             query = ModelQuery[VersionValue](version_value=cast(VersionValue, index))
         elif isinstance(index, slice):
             if isinstance(index.start, Version) or isinstance(index, pendulum.Date):
-                query = MigrationQuery[VersionValue](version_range=(index.start, index.stop))
+                query = MigrationQuery[VersionValue](
+                    version_range=(index.start, index.stop)
+                )
             elif isinstance(index.start, BaseModel):
-                query = MigrationQuery[VersionValue](version_range=(index.start, index.stop))
+                query = MigrationQuery[VersionValue](
+                    version_range=(index.start, index.stop)
+                )
             else:
-                raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
+                raise RegistryError(
+                    self._name, f"Unsupported index type: {type(index)}"
+                )
         elif issubclass(index, BaseModel):
             query = ModelQuery[VersionValue](model_cls=cast(type[BaseModel], index))
         else:
@@ -96,13 +102,26 @@ class Registry(Generic[VersionValue]):
 
     def __getitem__(
         self, index: LookupKey
-    ) -> (
-        VersionedModelProtocol[VersionValue, VModel] | MigrationFunc
-    ):
-        """``registry[v]`` → model class; ``registry[v1:v2]`` → migration path exists."""
+    ) -> VersionedModelProtocol[VersionValue, VModel] | MigrationFunc:
+        """Lookup by version, model class, or slice.
+
+        ``registry[v]``
+            *v* is a version value — returns the :class:`VersionedModelProtocol`.
+        ``registry[M]``
+            *M* is a :class:`pydantic.BaseModel` subclass — returns the
+            :class:`VersionedModelProtocol` bound to that model.
+        ``registry[v1:v2]``
+            Slice of version values or model classes — returns the
+            :class:`MigrationFunc` for that step.
+
+        Returns:
+            The resolved entry, or raises :class:`RegistryError` on unknown formats.
+        """
         if isinstance(index, type):
             if isinstance(index, Version) or isinstance(index, pendulum.Date):
-                query = ModelQuery[VersionValue](version_value=cast(VersionValue, index))
+                query = ModelQuery[VersionValue](
+                    version_value=cast(VersionValue, index)
+                )
             elif issubclass(index, BaseModel):
                 query = ModelQuery[VersionValue](model_cls=cast(type[BaseModel], index))
             else:
@@ -111,14 +130,16 @@ class Registry(Generic[VersionValue]):
         elif isinstance(index, slice):
             if isinstance(index.start, Version) or isinstance(index, pendulum.Date):
                 query = MigrationQuery[VersionValue](
-                    version_range=(index.start, index.stop) # type: ignore[arg-type]
+                    version_range=(index.start, index.stop)  # type: ignore[arg-type]
                 )
             elif issubclass(index.start, BaseModel):
                 query = MigrationQuery[VersionValue](
-                    version_range=(index.start, index.stop) # type: ignore[arg-type]
+                    version_range=(index.start, index.stop)  # type: ignore[arg-type]
                 )
             else:
-                raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
+                raise RegistryError(
+                    self._name, f"Unsupported index type: {type(index)}"
+                )
             return cast(MigrationFunc, self.get_migration(query))
         raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
 
@@ -236,7 +257,9 @@ class Registry(Generic[VersionValue]):
                 return self._by_models[predicate]
         raise ModelNotFoundError(self._name, predicate)
 
-    def remove_model(self: Self, version: VersionedModelProtocol[VersionValue, VModel]) -> None:
+    def remove_model(
+        self: Self, version: VersionedModelProtocol[VersionValue, VModel]
+    ) -> None:
         """Remove a model version and clean up related migrations and flags."""
         idx = bisect.bisect_left(self._by_versions, version)
         if idx == len(self._by_versions) or self._by_versions[idx] != version:
@@ -249,7 +272,7 @@ class Registry(Generic[VersionValue]):
             raise RegistryError(
                 self._name,
                 f"Cannot remove version {version}: "
-                f"it is referenced by migrations: {pairs}"
+                f"it is referenced by migrations: {pairs}",
             )
 
         version = self._by_versions[idx]
@@ -281,7 +304,7 @@ class Registry(Generic[VersionValue]):
         if from_version not in self._by_versions or to_version not in self._by_versions:
             raise RegistryError(
                 self._name,
-                f"Versions {from_version} and {to_version} must be registered"
+                f"Versions {from_version} and {to_version} must be registered",
             )
         start = bisect.bisect_left(self._by_versions, from_version)
         stop = bisect.bisect_left(self._by_versions, to_version)
@@ -290,18 +313,19 @@ class Registry(Generic[VersionValue]):
             backward_compatible_query = all(
                 self.is_backward_compatible(
                     ModelQuery[VersionValue](version_value=v.version)
-                ) for v in intermediate
+                )
+                for v in intermediate
             )
             if not backward_compatible_query:
                 raise RegistryError(
                     self._name,
                     f"Versions {from_version} and {to_version} are not adjacent "
-                    "and intermediate versions are not all backward-compatible"
+                    "and intermediate versions are not all backward-compatible",
                 )
         if (from_version, to_version) in self._migrations:
             raise RegistryError(
                 self._name,
-                f"Migration from {from_version} to {to_version} is already registered"
+                f"Migration from {from_version} to {to_version} is already registered",
             )
 
         self._migrations[(from_version, to_version)] = func
@@ -325,15 +349,13 @@ class Registry(Generic[VersionValue]):
         if query.use_latest and len(predicates) == 1:
             predicates.append(self.latest.version)
 
-        if len(predicates) < 2:
+        if len(predicates) < self.MIN_PREDICATES:
             raise ValueError(
                 "At least two values required (or one with use_latest=True)"
             )
 
-        pairs = list(zip(predicates, predicates[1:]))
-
         results: list[MigrationFunc] = []
-        for from_raw, to_raw in pairs:
+        for from_raw, to_raw in pairwise(predicates):
             from_v = self._resolve_predicate(from_raw, query)
             to_v = self._resolve_predicate(to_raw, query)
             key = (from_v, to_v)
@@ -411,15 +433,15 @@ class Registry(Generic[VersionValue]):
     ) -> list[tuple[VersionedModelProtocol, VersionedModelProtocol]]:
         """Check whether a complete migration chain exists between two versions."""
         if from_version not in self._by_versions:
-            raise ModelNotFoundError(type(self), from_version, name=self._name)
+            raise ModelNotFoundError(self._name, from_version)
         if to_version not in self._by_versions:
-            raise ModelNotFoundError(type(self), to_version, name=self._name)
+            raise ModelNotFoundError(self._name, to_version)
 
         lo = bisect.bisect_left(self._by_versions, from_version)
         hi = bisect.bisect_left(self._by_versions, to_version)
         if lo >= hi:
             raise MigrationError(
-                type(self),
+                self._name,
                 from_version,
                 to_version,
                 "Left version must be older than right version",
@@ -439,7 +461,7 @@ class Registry(Generic[VersionValue]):
                 lo += 1
             else:
                 raise MigrationError(
-                    type(self),
+                    self._name,
                     current,
                     nxt,
                     f"No migration key is found ({current}, {nxt})",
@@ -452,7 +474,13 @@ class Registry(Generic[VersionValue]):
         from_version: VersionedModelProtocol,
         to_version: VersionedModelProtocol,
     ) -> None:
-        """Register a hook for a specific migration step ``(from_version, to_version)``."""
+        """Register a hook for a migration step.
+
+        Args:
+            hook: The hook instance to register.
+            from_version: Source version of the migration step.
+            to_version: Target version of the migration step.
+        """
         self._hooks[(from_version, to_version)].append(hook)
 
     def get_hook(
@@ -460,7 +488,16 @@ class Registry(Generic[VersionValue]):
         from_version: VersionedModelProtocol,
         to_version: VersionedModelProtocol,
     ) -> list[MigrationHookProtocol]:
-        """Return the list of hooks for ``(from, to)``."""
+        """Return hooks registered for a migration step.
+
+        Args:
+            from_version: Source version of the migration step.
+            to_version: Target version of the migration step.
+
+        Returns:
+            List of hooks for ``(from_version, to_version)``, or an empty
+            list if none are registered.
+        """
         return self._hooks.get((from_version, to_version), [])
 
     def remove_hook(
@@ -469,7 +506,17 @@ class Registry(Generic[VersionValue]):
         to_version: VersionedModelProtocol,
         hook: MigrationHookProtocol | None = None,
     ) -> None:
-        """Remove *hook* from ``(from, to)``, or all hooks for that key if *hook* is None."""
+        """Remove hooks for a migration step.
+
+        Args:
+            from_version: Source version of the migration step.
+            to_version: Target version of the migration step.
+            hook: A specific hook to remove. If ``None``, removes all hooks
+                for the ``(from_version, to_version)`` key.
+
+        Raises:
+            ValueError: If *hook* is given but not registered for this key.
+        """
         key = (from_version, to_version)
         if hook is None:
             del self._hooks[key]
@@ -483,7 +530,14 @@ class Registry(Generic[VersionValue]):
         from_version: VersionedModelProtocol | None = None,
         to_version: VersionedModelProtocol | None = None,
     ) -> None:
-        """Remove hooks: all if no args, otherwise just for ``(from, to)``."""
+        """Clear hooks from the registry.
+
+        Args:
+            from_version: If given, scope clearing to this source version.
+                If ``None``, clears all hooks globally.
+            to_version: Target version. Required when *from_version* is given.
+                If ``None``, defaults to the latest registered version.
+        """
         if from_version is None:
             self._hooks.clear()
         else:

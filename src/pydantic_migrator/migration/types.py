@@ -34,14 +34,12 @@ MigrationHookMap: TypeAlias = dict[MigrationKey, list["MigrationHookProtocol"]]
 MigrationDirectionStrategy: TypeAlias = Literal["any", "forward", "backward"]
 DirectionViolationStragey: TypeAlias = Literal["raise", "warn", "ignore"]
 VersionMissingStrategy: TypeAlias = Literal["raise", "warn", "ignore"]
-LookupKey: TypeAlias = (
-    VersionValue |
-    type[VModel] |
-    slice
-)
+LookupKey: TypeAlias = VersionValue | type[VModel] | slice
 
 VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
 VModel_co = TypeVar("VModel_co", bound=BaseModel, covariant=True)
+
+
 class VersionedModelProtocol(Protocol[VersionValue_co, VModel_co]):
     """Protocol for version types supporting comparison and serialization."""
 

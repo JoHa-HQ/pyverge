@@ -7,10 +7,9 @@ Date:   ``2024-06-01``, ``2025-03-15``
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import total_ordering
-from types import GenericAlias
-from typing import Generic, cast, get_args
+from typing import Generic, cast
 
 import pendulum
 from semver import Version
@@ -28,6 +27,7 @@ class VersionedModel(Generic[VersionValue, VModel]):
     Optionally carries the Pydantic model class so the registry can
     treat ``(version, model)`` as a single comparable unit.
     """
+
     _value: VersionValue
     _model_cls: type[VModel]
 
@@ -87,7 +87,7 @@ class VersionedModel(Generic[VersionValue, VModel]):
         return str(self._value)
 
     def __repr__(self) -> str:
-        return f"ModelVersion[{self.strategy.__name__}, {self.model.__name__}]({self._value})"
+        return f"ModelVersion[{self.strategy.__name__}, {self.model.__name__}]({self._value})"  # noqa: E501
 
 
 @total_ordering

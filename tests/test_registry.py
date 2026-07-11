@@ -28,8 +28,7 @@ class TestModel:
     def test_store_and_get(self, migration_settings: MigrationSettings) -> None:
         registry = Registry[Version](name="test_store_and_get")
         version = cast(
-            VersionedModel[Version, UserV1],
-            envelope_model(migration_settings, UserV1)
+            VersionedModel[Version, UserV1], envelope_model(migration_settings, UserV1)
         )
         registry.store_model(version)
         query = ModelQuery[Version](version_value=cast(Version, version.version))
@@ -56,7 +55,11 @@ class TestModel:
         "registry, models, latest",
         [
             (Registry[Version](), [UserV3, UserV1, UserV200Beta1], UserV3),
-            (Registry[Date](), [UserV20251231, UserV20260228, UserV20250310], UserV20260228),
+            (
+                Registry[Date](),
+                [UserV20251231, UserV20260228, UserV20250310],
+                UserV20260228,
+            ),
         ],
     )
     def test_latest(
@@ -68,7 +71,10 @@ class TestModel:
     ) -> None:
 
         for cls in models:
-            version = cast(VersionedModel[types.VersionValue, types.VModel_co], envelope_model(migration_settings, cls))
+            version = cast(
+                VersionedModel[types.VersionValue, types.VModel_co],
+                envelope_model(migration_settings, cls),
+            )
             registry.store_model(version)
 
         assert registry.latest.model == latest
@@ -85,7 +91,7 @@ class TestModel:
         migration_settings: MigrationSettings,
         query_factory: type[ModelQuery[types.VersionValue]],
         registry: Registry[types.VersionValue],
-        model: type[types.VModel_co]
+        model: type[types.VModel_co],
     ) -> None:
         version = cast(
             VersionedModel[types.VersionValue, types.VModel_co],
@@ -93,9 +99,7 @@ class TestModel:
         )
 
         with pytest.raises(ModelNotFoundError, match="not found"):
-            registry.get_model(
-                query_factory(version_value=version.version)
-            )
+            registry.get_model(query_factory(version_value=version.version))
 
     @pytest.mark.parametrize(
         "registry, query_factory, model",
@@ -172,10 +176,13 @@ class TestModel:
         with pytest.raises(RegistryError):
             _ = registry.latest
 
-    @pytest.mark.parametrize("registry, model", [
-        (Registry[Version](), UserV200Beta1),
-        (Registry[Date](), UserV20250310),
-    ])
+    @pytest.mark.parametrize(
+        "registry, model",
+        [
+            (Registry[Version](), UserV200Beta1),
+            (Registry[Date](), UserV20250310),
+        ],
+    )
     def test_store_duplicate_raises(
         self,
         migration_settings: MigrationSettings,
@@ -186,12 +193,16 @@ class TestModel:
         with pytest.raises(ModelAlreadyRegisteredError, match="already registered"):
             registry.store_model(envelope_model(migration_settings, model))
 
-    @pytest.mark.parametrize("registry, model, expected", [
-        (Registry[Version](), UserV1, False),
-        (Registry[Version](), UserV123, True),
-        (Registry[Date](), UserV20251231, True),
-    ])
-    def test_store_backward_compatible_model(self,
+    @pytest.mark.parametrize(
+        "registry, model, expected",
+        [
+            (Registry[Version](), UserV1, False),
+            (Registry[Version](), UserV123, True),
+            (Registry[Date](), UserV20251231, True),
+        ],
+    )
+    def test_store_backward_compatible_model(
+        self,
         migration_settings: MigrationSettings,
         registry: Registry[types.VersionValue],
         model: type[types.VModel],
@@ -199,18 +210,16 @@ class TestModel:
     ) -> None:
         version = cast(
             VersionedModel[types.VersionValue, types.VModel],
-            envelope_model(migration_settings, model)
+            envelope_model(migration_settings, model),
         )
-        registry.store_model(
-            version, backward_compatible=expected
-        )
+        registry.store_model(version, backward_compatible=expected)
 
-        assert registry.is_backward_compatible(
-            ModelQuery[Version](
-                version_value=cast(Version, version.version)
+        assert (
+            registry.is_backward_compatible(
+                ModelQuery[Version](version_value=cast(Version, version.version))
             )
-        ) is expected
-
+            is expected
+        )
 
     @pytest.mark.parametrize(
         "registry, model",
@@ -225,23 +234,29 @@ class TestModel:
         registry: Registry[types.VersionValue],
         model: type[types.VModel],
     ) -> None:
-        version = cast(VersionedModel[types.VersionValue, types.VModel], envelope_model(
-            migration_settings, model
-        ))
+        version = cast(
+            VersionedModel[types.VersionValue, types.VModel],
+            envelope_model(migration_settings, model),
+        )
         registry.store_model(version)
         assert version.version in registry
         registry.remove_model(version)
         assert version.version not in registry
 
-    def test_remove_nonexistent_raises(self, migration_settings: MigrationSettings) -> None:
+    def test_remove_nonexistent_raises(
+        self, migration_settings: MigrationSettings
+    ) -> None:
         registry = Registry[Version]()
         with pytest.raises(RegistryError, match="is not registered"):
             registry.remove_model(envelope_model(migration_settings, UserV1))
 
-    @pytest.mark.parametrize("registry, models", [
-        (Registry[Version](), [UserV1, UserV2]),
-        (Registry[Version](), [UserV20250310, UserV20251231]),
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            (Registry[Version](), [UserV1, UserV2]),
+            (Registry[Version](), [UserV20250310, UserV20251231]),
+        ],
+    )
     def test_remove_cleans_migrations(
         self,
         migration_settings: MigrationSettings,
@@ -255,47 +270,51 @@ class TestModel:
         def _noop(data: dict) -> dict:
             return data
 
-        registry.store_migration(
-            versions[0], versions[1], _noop
-        )
+        registry.store_migration(versions[0], versions[1], _noop)
 
         with pytest.raises(RegistryError, match="referenced by migrations"):
             registry.remove_model(versions[0])
 
-
     def test_remove_cleans_backward_compatible(
-        self,
-        migration_settings: MigrationSettings
+        self, migration_settings: MigrationSettings
     ) -> None:
         registry = Registry[Version]()
-        assert registry.is_backward_compatible(
-            ModelQuery[Version](
-                version_value=envelope_model(migration_settings, UserV1).version
+        assert (
+            registry.is_backward_compatible(
+                ModelQuery[Version](
+                    version_value=envelope_model(migration_settings, UserV1).version
+                )
             )
-        ) is False
+            is False
+        )
 
 
 class TestMigration:
-
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-        [Registry[Date](), [UserV20250310, UserV20251231]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+            [Registry[Date](), [UserV20250310, UserV20251231]],
+        ],
+    )
     def test_register_migration_with_missing_version(
         self,
         migration_settings: MigrationSettings,
         registry: Registry[types.VersionValue],
-        models: list[type[types.VModel]]
+        models: list[type[types.VModel]],
     ):
         versions = [envelope_model(migration_settings, m) for m in models]
         registry.store_model(versions[0])
         with pytest.raises(RegistryError):
-            registry.store_migration(*versions, lambda dict: print(hello))
+            registry.store_migration(*versions, print)
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-        [Registry[Date](), [UserV20250310, UserV20251231]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+            [Registry[Date](), [UserV20250310, UserV20251231]],
+        ],
+    )
     def test_store_and_get(
         self,
         migration_settings: MigrationSettings,
@@ -305,8 +324,9 @@ class TestMigration:
         versions = [
             cast(
                 VersionedModel[Version, types.VModel],
-                envelope_model(migration_settings, model)
-            ) for model in models
+                envelope_model(migration_settings, model),
+            )
+            for model in models
         ]
         for v in versions:
             registry.store_model(v)
@@ -314,15 +334,19 @@ class TestMigration:
         def _migrate(data: dict) -> dict:
             return data
 
-        query = MigrationQuery[Version](version_range=tuple(v.version for v in versions[:2]))
+        query = MigrationQuery[Version](
+            version_range=tuple(v.version for v in versions[:2])
+        )
         registry.store_migration(versions[0], versions[1], _migrate)
         assert registry.get_migration(query) is _migrate
 
-
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-        [Registry[Date](), [UserV20250310, UserV20251231]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+            [Registry[Date](), [UserV20250310, UserV20251231]],
+        ],
+    )
     def test_register_migration_dups(
         self,
         migration_settings: MigrationSettings,
@@ -340,10 +364,13 @@ class TestMigration:
         with pytest.raises(RegistryError, match="is already registered"):
             registry.store_migration(*versions, _migrate)
 
-
-    def test_get_nonexistent_raises(self, migration_settings: MigrationSettings) -> None:
+    def test_get_nonexistent_raises(
+        self, migration_settings: MigrationSettings
+    ) -> None:
         registry = Registry[Version]()
-        versioned = [envelope_model(migration_settings, m) for m in [UserV1, UserV2, UserV3]]
+        versioned = [
+            envelope_model(migration_settings, m) for m in [UserV1, UserV2, UserV3]
+        ]
         for v in versioned:
             registry.store_model(v)
 
@@ -353,16 +380,20 @@ class TestMigration:
             )
             registry.get_migration(query)
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2, UserV3]],
-        [Registry[Date](), [UserV20250310, UserV20251231, UserV20260228]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2, UserV3]],
+            [Registry[Date](), [UserV20250310, UserV20251231, UserV20260228]],
+        ],
+    )
     def test_multi_range_query(
         self,
         migration_settings: MigrationSettings,
         registry: Registry[types.VersionValue],
         models: list[type[types.VModel]],
     ) -> None:
+        TARGET_AMOUNT = 2
         versions = [envelope_model(migration_settings, m) for m in models]
         for v in versions:
             registry.store_model(v)
@@ -378,14 +409,17 @@ class TestMigration:
         )
         result = registry.get_migration(query)
         assert isinstance(result, list)
-        assert len(result) == 2
+        assert len(result) == TARGET_AMOUNT
         assert result[0] is _migrate
         assert result[1] is _migrate
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-        [Registry[Date](), [UserV20250310, UserV20251231]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+            [Registry[Date](), [UserV20250310, UserV20251231]],
+        ],
+    )
     def test_use_latest(
         self,
         migration_settings: MigrationSettings,
@@ -407,9 +441,12 @@ class TestMigration:
         )
         assert registry.get_migration(query) is _migrate
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+        ],
+    )
     def test_model_based_query(
         self,
         migration_settings: MigrationSettings,
@@ -430,9 +467,12 @@ class TestMigration:
         )
         assert registry.get_migration(query) is _migrate
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV123, UserV2]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV123, UserV2]],
+        ],
+    )
     def test_non_adjacent_with_backward_compat(
         self,
         migration_settings: MigrationSettings,
@@ -453,16 +493,12 @@ class TestMigration:
         )
         assert registry.get_migration(query) is _migrate
 
-    @pytest.mark.parametrize("registry, models", [
+    @pytest.mark.parametrize(
+        "registry, models",
         [
-            Registry[Version](),
-            [
-                UserV1,
-                UserV123,
-                UserV2
-            ]
+            [Registry[Version](), [UserV1, UserV123, UserV2]],
         ],
-    ])
+    )
     def test_non_adjacent_without_backward_compat(
         self,
         migration_settings: MigrationSettings,
@@ -480,10 +516,13 @@ class TestMigration:
         with pytest.raises(RegistryError):
             registry.store_migration(versions[0], versions[2], _migrate)
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-        [Registry[Date](), [UserV20250310, UserV20251231]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+            [Registry[Date](), [UserV20250310, UserV20251231]],
+        ],
+    )
     def test_remove_migration(
         self,
         migration_settings: MigrationSettings,
@@ -508,10 +547,13 @@ class TestMigration:
 
 
 class TestHooks:
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-        [Registry[Date](), [UserV20250310, UserV20251231]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+            [Registry[Date](), [UserV20250310, UserV20251231]],
+        ],
+    )
     def test_add_and_get_hook(
         self,
         migration_settings: MigrationSettings,
@@ -526,9 +568,12 @@ class TestHooks:
         registry.add_hook(hook, versions[0], versions[1])
         assert registry.get_hook(versions[0], versions[1]) == [hook]
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+        ],
+    )
     def test_get_hook_empty(
         self,
         migration_settings: MigrationSettings,
@@ -541,9 +586,12 @@ class TestHooks:
 
         assert registry.get_hook(versions[0], versions[1]) == []
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+        ],
+    )
     def test_remove_single_hook(
         self,
         migration_settings: MigrationSettings,
@@ -559,9 +607,12 @@ class TestHooks:
         registry.remove_hook(versions[0], versions[1], hook)
         assert registry.get_hook(versions[0], versions[1]) == []
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+        ],
+    )
     def test_remove_all_hooks_for_key(
         self,
         migration_settings: MigrationSettings,
@@ -577,9 +628,12 @@ class TestHooks:
         registry.remove_hook(versions[0], versions[1])  # hook is None → remove all
         assert registry.get_hook(versions[0], versions[1]) == []
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+        ],
+    )
     def test_remove_nonexistent_hook_raises(
         self,
         migration_settings: MigrationSettings,
@@ -593,9 +647,12 @@ class TestHooks:
         with pytest.raises(ValueError, match="is not registered"):
             registry.remove_hook(versions[0], versions[1], MigrationHook())
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+        ],
+    )
     def test_clear_all_hooks(
         self,
         migration_settings: MigrationSettings,
@@ -611,9 +668,12 @@ class TestHooks:
         registry.clear_hooks()
         assert registry.get_hook(versions[0], versions[1]) == []
 
-    @pytest.mark.parametrize("registry, models", [
-        [Registry[Version](), [UserV1, UserV2]],
-    ])
+    @pytest.mark.parametrize(
+        "registry, models",
+        [
+            [Registry[Version](), [UserV1, UserV2]],
+        ],
+    )
     def test_clear_hooks_for_key(
         self,
         migration_settings: MigrationSettings,

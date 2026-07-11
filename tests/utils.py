@@ -1,8 +1,5 @@
 from typing import cast
 
-import pendulum
-from semver import Version
-
 from pydantic_migrator.migration import (
     MigrationSettings,
     TypeInspector,

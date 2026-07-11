@@ -1,6 +1,6 @@
 """Exceptions."""
 
-from typing import Self, cast
+from typing import Self
 
 from pendulum import Date
 from pydantic import BaseModel
@@ -50,7 +50,9 @@ class ModelNotFoundError(RegistryError):
         if isinstance(lookup_key, Version) or isinstance(lookup_key, Date):
             msg = f"Model version '{lookup_key}' not found in '{registry_name}'"
         elif issubclass(lookup_key, BaseModel):
-            msg = f"Model version '{lookup_key.__name__}' not found in '{registry_name}'"
+            msg = (
+                f"Model version '{lookup_key.__name__}' not found in '{registry_name}'"
+            )
         super().__init__(registry_name, msg)
 
 
@@ -142,7 +144,7 @@ class InvalidVersionError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        version: VersionValue_co,
+        version: VersionValue,
         reason: str | None = None,
     ) -> None:
         """Initializes InvalidVersionError."""
@@ -164,5 +166,5 @@ class MigrationMissingFieldError(VersionedModelError):
         field_name: str,
     ) -> None:
         self.field_name = field_name
-        msg = f"Required field '{field_name}' is missing in payload for {registry_name} - {version}"
+        msg = f"Required field '{field_name}' is missing in payload for {registry_name} - {version}"  # noqa: E501
         super().__init__(registry_name, version, msg)

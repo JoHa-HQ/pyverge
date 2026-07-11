@@ -28,7 +28,7 @@ class ModelQuery(Generic[VersionValue]):
         metadata={
             "doc": (
                 "Whether to use the latest version. "
-                "If the version or model value is not specified, the latest version will be used."
+                "If the version or model value is not specified, the latest version will be used."  # noqa: E501
             )
         },
     )
@@ -37,7 +37,7 @@ class ModelQuery(Generic[VersionValue]):
         if all((self.version_value is not None, self.model_cls is not None)):
             raise ValueError(
                 "Provide exactly one of version_value or model_cls."
-                f" Given two: version_value={self.version_value}, model_cls={self.model_cls}"
+                f" Given two: version_value={self.version_value}, model_cls={self.model_cls}"  # noqa: E501
             )
 
     @property
@@ -62,23 +62,19 @@ class MigrationQuery(Generic[VersionValue]):
     """
 
     version_range: tuple[VersionValue, ...] = field(
-        default=(),
-        metadata={"doc": "Range of versions to migrate between."}
+        default=(), metadata={"doc": "Range of versions to migrate between."}
     )
     model_range: tuple[type[BaseModel], ...] = field(
-        default=(),
-        metadata={"doc": "Range of model classes to migrate between."}
+        default=(), metadata={"doc": "Range of model classes to migrate between."}
     )
     use_latest: bool = field(
         default=False,
-        metadata={"doc": "Whether to use the latest registered version as the target."}
+        metadata={"doc": "Whether to use the latest registered version as the target."},
     )
 
     def __post_init__(self) -> None:
         if self.version_range and self.model_range:
-            raise ValueError(
-                "Provide either version_range or model_range, not both"
-            )
+            raise ValueError("Provide either version_range or model_range, not both")
 
     @property
     def predicate(self) -> tuple[VersionValue, ...] | tuple[type[BaseModel], ...]:

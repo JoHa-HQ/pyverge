@@ -17,7 +17,7 @@ Structure tree::
             │   ├── ContactV1 (v="1.0.0"): phone
             │   └── ContactV2 (v="2.0.0"): +email?, +preferred="phone"
             └── AddressV3 (v="3.0.0"): +region?  (backward → v2 via migrate_address_300_200)
-"""
+"""  # noqa: E501
 
 from typing import Annotated, Literal
 

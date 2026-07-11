@@ -1,17 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from functools import partial
-
 import pytest
-from click.testing import Result
 from typer.testing import CliRunner
 
-from pydantic_migrator import Coordinator
-from pydantic_migrator.cli.main import app
-from pydantic_migrator.migration import (
-    MigrationSettings,
-)
+from pydantic_migrator.migration import MigrationSettings
 
 # from tests.examples.nested_models import NestedModelManager
 # from tests.examples.semver import SemverManager
@@ -25,9 +17,9 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
-@pytest.fixture
-def application(runner: CliRunner) -> Callable[..., Result]:
-    return partial(runner.invoke, app)
+# @pytest.fixture
+# def application(runner: CliRunner) -> Callable[..., Result]:
+#     return partial(runner.invoke, app)
 
 
 @pytest.fixture
@@ -55,7 +47,7 @@ def migration_settings() -> MigrationSettings:
 #     return eager_manager
 
 
-@pytest.fixture
-def coordinator() -> Coordinator:  # pragma: no cover
-    """Coordinator with multiple model families — skipped due to coordination.py issues."""
-    return Coordinator()
+# @pytest.fixture
+# def coordinator() -> Coordinator:  # pragma: no cover
+#     """Coordinator with multiple model families"""
+#     return Coordinator()
