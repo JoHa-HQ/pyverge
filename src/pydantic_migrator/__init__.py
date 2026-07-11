@@ -1,58 +1,17 @@
 """pydantic-migrator - versioned Pydantic models and schemas with migrations."""
 
-from ._migration_manager import MigrationManager
-from ._registry import Registry
-from ._schema_manager import SchemaManager
+from . import migration
 from ._version import __version__
-from .exceptions import (
-    InvalidVersionError,
-    MigrationError,
-    ModelNotFoundError,
-    VersionedModelError,
-)
-from .migration_hooks import MetricsHook, MigrationHook
-from .migration_testing import (
-    MigrationTestCase,
-    MigrationTestCases,
-    MigrationTestResult,
-    MigrationTestResults,
-)
-from .model_diff import ModelDiff
-from .model_manager import ModelManager
-from .model_version import ModelVersion
-from .schema_config import SchemaConfig
-from .types import (
-    JsonSchema,
-    JsonSchemaMode,
-    MigrationFunc,
-    ModelData,
-    NestedModelInfo,
-)
-from .versioned_model import VersionedModel
+from .coordination import Coordinator
+from .models import SchemaConfig
+from .strategies import BatchStrategy, ParallelStrategy, StreamingStrategy
 
 __all__ = [
-    "InvalidVersionError",
-    "JsonSchema",
-    "JsonSchemaMode",
-    "MetricsHook",
-    "MigrationError",
-    "MigrationFunc",
-    "MigrationHook",
-    "MigrationManager",
-    "MigrationTestCase",
-    "MigrationTestCases",
-    "MigrationTestResult",
-    "MigrationTestResults",
-    "ModelData",
-    "ModelDiff",
-    "ModelManager",
-    "ModelNotFoundError",
-    "ModelVersion",
-    "NestedModelInfo",
-    "Registry",
+    "BatchStrategy",
+    "Coordinator",
+    "ParallelStrategy",
     "SchemaConfig",
-    "SchemaManager",
-    "VersionedModel",
-    "VersionedModelError",
+    "StreamingStrategy",
     "__version__",
+    "migration",
 ]
