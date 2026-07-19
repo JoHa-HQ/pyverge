@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from typing import Any, Self
 
-from .model_version import ModelVersion
+from .types import VersionedModelProtocol
 
 
 class MigrationHook:
@@ -23,8 +23,8 @@ class MigrationHook:
             def before_migrate(
                 self,
                 name: str,
-                from_version: ModelVersion,
-                to_version: ModelVersion,
+                from_version: VersionedModelProtocol,
+                to_version: VersionedModelProtocol,
                 data: Mapping[str, Any],
             ) -> None:
                 logger.info(f"Migrating {name} from {from_version} to {to_version}")
@@ -32,8 +32,8 @@ class MigrationHook:
             def after_migrate(
                 self,
                 name: str,
-                from_version: ModelVersion,
-                to_version: ModelVersion,
+                from_version: VersionedModelProtocol,
+                to_version: VersionedModelProtocol,
                 original_data: Mapping[str, Any],
                 migrated_data: Mapping[str, Any],
             ) -> None:
@@ -42,8 +42,8 @@ class MigrationHook:
             def on_error(
                 self,
                 name: str,
-                from_version: ModelVersion,
-                to_version: ModelVersion,
+                from_version: VersionedModelProtocol,
+                to_version: VersionedModelProtocol,
                 data: Mapping[str, Any],
                 error: Exception,
             ) -> None:
@@ -54,8 +54,8 @@ class MigrationHook:
     def before_migrate(
         self,
         name: str,
-        from_version: ModelVersion,
-        to_version: ModelVersion,
+        from_version: VersionedModelProtocol,
+        to_version: VersionedModelProtocol,
         data: Mapping[str, Any],
     ) -> None:
         """Called before migration starts.
@@ -73,8 +73,8 @@ class MigrationHook:
     def after_migrate(
         self,
         name: str,
-        from_version: ModelVersion,
-        to_version: ModelVersion,
+        from_version: VersionedModelProtocol,
+        to_version: VersionedModelProtocol,
         original_data: Mapping[str, Any],
         migrated_data: Mapping[str, Any],
     ) -> None:
@@ -94,8 +94,8 @@ class MigrationHook:
     def on_error(
         self,
         name: str,
-        from_version: ModelVersion,
-        to_version: ModelVersion,
+        from_version: VersionedModelProtocol,
+        to_version: VersionedModelProtocol,
         data: Mapping[str, Any],
         error: Exception,
     ) -> None:
@@ -140,8 +140,8 @@ class MetricsHook(MigrationHook):
     def before_migrate(
         self,
         name: str,
-        from_version: ModelVersion,
-        to_version: ModelVersion,
+        from_version: VersionedModelProtocol,
+        to_version: VersionedModelProtocol,
         data: Mapping[str, Any],
     ) -> None:
         """Track migration attempt."""
@@ -151,8 +151,8 @@ class MetricsHook(MigrationHook):
     def on_error(
         self,
         name: str,
-        from_version: ModelVersion,
-        to_version: ModelVersion,
+        from_version: VersionedModelProtocol,
+        to_version: VersionedModelProtocol,
         data: Mapping[str, Any],
         error: Exception,
     ) -> None:
