@@ -15,7 +15,6 @@ from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
-from semver import Version
 
 # from pydantic_migrator.migration import MigrationSettings, ModelManager
 

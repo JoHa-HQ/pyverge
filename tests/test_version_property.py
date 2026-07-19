@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 import operator
-import re
-from typing import Literal, cast
+from typing import Literal
 
 import pytest
 from pendulum import Date
 from pydantic import BaseModel
 from semver import Version
 
-from pydantic_migrator.migration import MigrationSettings, TypeInspector
-from pydantic_migrator.migration.types import VersionValue, VModel
-from pydantic_migrator.migration.versioning import ModelVersion
+from pydantic_migrator.migration import MigrationSettings, types
 from tests.examples.chronnological import (
     UserV20250101,
     UserV20251231,
@@ -19,15 +16,7 @@ from tests.examples.chronnological import (
     UserV20260301_120530300Z,
 )
 from tests.examples.semver import UserV011Dev7, UserV2, UserV123, UserV200Beta1
-
-
-def _parse_model(
-    migration_settings: MigrationSettings, cls: type[VModel]
-) -> ModelVersion[VersionValue]:
-    version = TypeInspector.get_literal_values(
-        cls.model_fields[migration_settings.version_property].annotation
-    )
-    return ModelVersion.parse(cast(str, version), cls)
+from tests.utils import envelope_model
 
 
 class TestParse:
@@ -43,10 +32,10 @@ class TestParse:
     def test_parse_semver(
         self,
         migration_settings: MigrationSettings,
-        model: type[VModel],
+        model: type[types.VModel_co],
         expected_str: str,
     ) -> None:
-        v = _parse_model(migration_settings, model)
+        v = envelope_model(migration_settings, model)
         assert str(v) == expected_str
 
     @pytest.mark.parametrize(
@@ -61,10 +50,10 @@ class TestParse:
     def test_parse_date(
         self,
         migration_settings: MigrationSettings,
-        model: type[VModel],
+        model: type[types.VModel_co],
         expected_str: str,
     ) -> None:
-        v = _parse_model(migration_settings, model)
+        v = envelope_model(migration_settings, model)
         assert str(v) == expected_str
 
     def test_invalid_semver_models(
@@ -80,7 +69,7 @@ class TestParse:
         for model in [InvalidBetaModel, InvalidAlphaModel]:
             with subtests.test(f"invalid-semver-version: {model.__name__}"):
                 with pytest.raises(ValueError):
-                    _parse_model(migration_settings, model)
+                    envelope_model(migration_settings, model)
 
     def test_invalid_date_models(
         self, subtests: pytest.Subtests, migration_settings: MigrationSettings
@@ -92,7 +81,7 @@ class TestParse:
         for model in [InvalidTimeModel]:
             with subtests.test(f"invalid-date-version: {model.__name__}"):
                 with pytest.raises(ValueError):
-                    _parse_model(migration_settings, model)
+                    envelope_model(migration_settings, model)
 
 
 class TestOperations:
@@ -111,14 +100,14 @@ class TestOperations:
     def test_version_operations(
         self,
         migration_settings: MigrationSettings,
-        left: type[VModel],
-        right: type[VModel],
+        left: type[types.VModel_co],
+        right: type[types.VModel_co],
         op: str,
     ) -> None:
         comp = getattr(operator, op)
         assert comp(
-            _parse_model(migration_settings, left),
-            _parse_model(migration_settings, right),
+            envelope_model(migration_settings, left),
+            envelope_model(migration_settings, right),
         )
 
     @pytest.mark.parametrize(
@@ -132,13 +121,13 @@ class TestOperations:
     def test_semver_vs_date(
         self,
         migration_settings: MigrationSettings,
-        left: type[VModel],
-        right: type[VModel],
+        left: type[types.VModel_co],
+        right: type[types.VModel_co],
         op: str,
     ) -> None:
         with pytest.raises(TypeError):
-            left_version = _parse_model(migration_settings, left)
-            right_version = _parse_model(migration_settings, right)
+            left_version = envelope_model(migration_settings, left)
+            right_version = envelope_model(migration_settings, right)
             comp = getattr(operator, op)
             comp(left_version, right_version)
 
@@ -158,12 +147,12 @@ class TestOperations:
     def test_sortable(
         self,
         migration_settings: MigrationSettings,
-        models: list[type[VModel]],
-        expected: list[type[VModel]],
+        models: list[type[types.VModel_co]],
+        expected: list[type[types.VModel_co]],
     ) -> None:
-        versions = [_parse_model(migration_settings, model) for model in models]
+        versions = [envelope_model(migration_settings, model) for model in models]
         expected_versions = [
-            _parse_model(migration_settings, model) for model in expected
+            envelope_model(migration_settings, model) for model in expected
         ]
         assert sorted(versions) == expected_versions
 
@@ -177,10 +166,10 @@ class TestOperations:
     def test_hashable(
         self,
         migration_settings: MigrationSettings,
-        models: list[type[VModel]],
+        models: list[type[types.VModel_co]],
         expected: int,
     ) -> None:
-        s = {_parse_model(migration_settings, model) for model in models}
+        s = {envelope_model(migration_settings, model) for model in models}
         assert len(s) == expected
 
 
@@ -188,20 +177,28 @@ class TestRepresentation:
     @pytest.mark.parametrize(
         ("model", "expected_str", "expected_repr"),
         [
-            (UserV123, "1.2.3", "ModelVersion[Version](1.2.3)"),
-            (UserV20251231, "2025-12-31", "ModelVersion[Date](2025-12-31)"),
-            (UserV200Beta1, "2.0.0-beta.1", "ModelVersion[Version](2.0.0-beta.1)"),
+            (UserV123, "1.2.3", "ModelVersion[Version, UserV123](1.2.3)"),
+            (
+                UserV20251231,
+                "2025-12-31",
+                "ModelVersion[Date, UserV20251231](2025-12-31)",
+            ),
+            (
+                UserV200Beta1,
+                "2.0.0-beta.1",
+                "ModelVersion[Version, UserV200Beta1](2.0.0-beta.1)",
+            ),
         ],
         ids=["semver", "date", "prerelease"],
     )
     def test_str_repr(
         self,
         migration_settings: MigrationSettings,
-        model: type[VModel],
+        model: type[types.VModel_co],
         expected_str: str,
         expected_repr: str,
     ) -> None:
-        v = _parse_model(migration_settings, model)
+        v = envelope_model(migration_settings, model)
         assert str(v) == expected_str
         assert repr(v) == expected_repr
 
@@ -213,8 +210,8 @@ class TestRepresentation:
     def test_print_strategy(
         self,
         migration_settings: MigrationSettings,
-        model: type[VModel],
+        model: type[types.VModel_co],
         expected_strategy: str,
     ) -> None:
-        v = _parse_model(migration_settings, model)
+        v = envelope_model(migration_settings, model)
         assert v.strategy == expected_strategy
