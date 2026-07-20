@@ -1,97 +1,42 @@
-from dataclasses import dataclass, field
-from typing import Generic, Literal, cast
+from __future__ import annotations
+
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .types import MigrationDirectionStrategy, VersionValue
-
-
-@dataclass(frozen=True, slots=True)
-class ModelQuery(Generic[VersionValue]):
-    """Encapsulates a lookup predicate for the registry.
-
-    Exactly one predicate must be provided:
-    - ``version_value``: match by version string (e.g., ``"1.2.3"``)
-    - ``model_cls``: match by Pydantic model class (e.g., ``UserV2``)
-    """
-
-    version_value: VersionValue | None = field(
-        default=None,
-        metadata={"doc": "A specific version value to match."},
-    )
-    model_cls: type[BaseModel] | None = field(
-        default=None,
-        metadata={"doc": "A specific Pydantic model class to match."},
-    )
-    use_latest: bool = field(
-        default=False,
-        metadata={
-            "doc": (
-                "Whether to use the latest version. "
-                "If the version or model value is not specified, the latest version will be used."  # noqa: E501
-            )
-        },
-    )
-
-    def __post_init__(self) -> None:
-        if all((self.version_value is not None, self.model_cls is not None)):
-            raise ValueError(
-                "Provide exactly one of version_value or model_cls."
-                f" Given two: version_value={self.version_value}, model_cls={self.model_cls}"  # noqa: E501
-            )
-
-    @property
-    def predicate(self) -> VersionValue | type[BaseModel] | None:
-        if self.version_value is not None:
-            return cast(VersionValue, self.version_value)
-        elif self.model_cls is not None:
-            return cast(type[BaseModel], self.model_cls)
-        elif self.use_latest:
-            return None
-        raise ValueError("Provide exactly one of version_value or model_cls.")
-
-
-@dataclass(frozen=True, slots=True)
-class MigrationQuery(Generic[VersionValue]):
-    """Encapsulates a migration lookup predicate.
-
-    Specify either *version_range* or *model_range*, not both.
-    Consecutive elements are paired: ``(a, b, c)`` → ``(a→b, b→c)``.
-    If *use_latest* is True and only one value given, the latest
-    registered version is used as the target.
-    """
-
-    version_range: tuple[VersionValue, ...] = field(
-        default=(), metadata={"doc": "Range of versions to migrate between."}
-    )
-    model_range: tuple[type[BaseModel], ...] = field(
-        default=(), metadata={"doc": "Range of model classes to migrate between."}
-    )
-    use_latest: bool = field(
-        default=False,
-        metadata={"doc": "Whether to use the latest registered version as the target."},
-    )
-
-    def __post_init__(self) -> None:
-        if self.version_range and self.model_range:
-            raise ValueError("Provide either version_range or model_range, not both")
-
-    @property
-    def predicate(self) -> tuple[VersionValue, ...] | tuple[type[BaseModel], ...]:
-        """Return the active range (version or model)."""
-        if self.version_range:
-            return self.version_range
-        return self.model_range
+from .types import MigrationDirectionStrategy
 
 
 class VersioningSettings(BaseModel):
+    kind_property: str = Field(
+        default="kind",
+        description="Field name that holds the model family identifier (e.g., 'Address').",
+    )
     version_property: str = Field(
         default="version",
         description="Field name that holds the version on every model class.",
     )
 
 
-class MigrationSettings(VersioningSettings):
+class DiscoverySettings(VersioningSettings):
+    """Configuration for payload discovery — used by the graph builder.
+
+    Controls what constitutes a versioned entry in the payload and
+    how deep the discovery walker should traverse.
+    """
+
+    max_migration_depth: int = Field(
+        default=-1,
+        ge=-1,
+        description=(
+            "Maximum nesting depth to discover. "
+            "-1 = unlimited. 0 = top-level only. "
+            "N = discover up to N levels deep."
+        ),
+    )
+
+
+class MigrationSettings(DiscoverySettings):
     """Configuration for migration behavior.
 
     Controls how the engine discovers version fields, which directions
@@ -113,10 +58,6 @@ class MigrationSettings(VersioningSettings):
 
     model_config = ConfigDict(extra="forbid")
 
-    version_property: str = Field(
-        default="version",
-        description="Field name that holds the version on every model class.",
-    )
     direction: MigrationDirectionStrategy = Field(
         default="any",
         description=(
@@ -159,12 +100,11 @@ class MigrationSettings(VersioningSettings):
             "Applies to either mode."
         ),
     )
-    max_migration_depth: int = Field(
-        default=-1,
-        ge=-1,
+    target_strategy: Literal["latest"] = Field(
+        default="latest",
         description=(
-            "Maximum nesting depth to migrate. "
-            "-1 = unlimited. 0 = top-level only. "
-            "N = migrate up to N levels deep."
+            "Convergence target for discovered entries. "
+            "'latest' — converge each entry to the highest "
+            "registered version for its model type."
         ),
     )
