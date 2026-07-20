@@ -197,7 +197,9 @@ class TestOperations:
         self,
         versioning_settings: VersioningSettings,
     ) -> None:
-        """Comparing VersionedModel with an unrelated type raises NotImplementedError."""
+        """
+        Comparing VersionedModel with an unrelated type raises NotImplementedError.
+        """
         v = envelope_model(versioning_settings, UserV123)
         for op, value, exception in [
             ("lt", "not-a-version", pytest.raises(NotImplementedError)),

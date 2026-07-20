@@ -1,16 +1,12 @@
 """Tests for Registry: model and migration registration."""
 
-import operator
-from typing import cast
 
 import pendulum
 import pytest
 import semver
 
 from pydantic_migrator.migration import (
-    MigrationError,
     MigrationHook,
-    MigrationQuery,
     MigrationSettings,
     ModelNotFoundError,
     ModelQuery,
@@ -590,9 +586,9 @@ class TestHooks:
             registry.remove_hook((versions[0], versions[1]), MigrationHook())
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "registry, models, expected_amount",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version](), [UserV1, UserV2], 2],
         ],
     )
     def test_clear_all_hooks(
@@ -600,6 +596,7 @@ class TestHooks:
         migration_settings: MigrationSettings,
         registry: Registry[types.VersionValue],
         models: list[type[types.VModel]],
+        expected_amount: int,
     ) -> None:
         versions = [envelope_model(migration_settings, m) for m in models]
         for v in versions:
@@ -608,7 +605,7 @@ class TestHooks:
         registry.store_migration((versions[0], versions[1]), print)
         registry.add_hook((versions[0], versions[1]), MigrationHook())
         registry.add_hook((versions[0], versions[1]), MigrationHook())
-        assert len(registry.get_hooks((versions[0], versions[1]))) == 2
+        assert len(registry.get_hooks((versions[0], versions[1]))) == expected_amount
         registry.clear_hooks((versions[0], versions[1]))
         with pytest.raises(RegistryError):
             registry.get_hooks((versions[0], versions[1]))
