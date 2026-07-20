@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Literal, Protocol, TypeAlias, TypeVar, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from .versioning import VersionSentinel
@@ -55,9 +63,13 @@ class Findable(Protocol[VersionValue_co]):
     directly — avoiding circular imports.
     """
 
-    def find_model(self, key: type[BaseModel] | VersionSentinel[VersionValue_co]) -> Versionable | None: ...
+    def find_model(
+        self, key: type[BaseModel] | VersionSentinel[VersionValue_co]
+    ) -> Versionable | None: ...
     def latest(self, kind: ModelKind) -> Versionable | None: ...
-    def find_migration(self, from_v: Versionable, to_v: Versionable) -> MigrationFunc: ...
+    def find_migration(
+        self, from_v: Versionable, to_v: Versionable
+    ) -> MigrationFunc: ...
 
 
 @runtime_checkable

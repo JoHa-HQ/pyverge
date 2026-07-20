@@ -70,28 +70,34 @@ class VersionedModel(Generic[VersionValue, VModel]):
 
     def __lt__(self, other: object) -> bool:
         if not isinstance(other, (VersionedModel, VersionSentinel)):
-            raise NotImplementedError(f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}")
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
         elif self.strategy != other.strategy:
             raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
         return (self._kind, self._value) < (other._kind, other._value)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, (VersionedModel, VersionSentinel)):
-            raise NotImplementedError(f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}")
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
         elif self.strategy != other.strategy:
             raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
         return (self._kind, self._value) == (other._kind, other._value)
 
     def __gt__(self, other: object) -> bool:
         if not isinstance(other, (VersionedModel, VersionSentinel)):
-            raise NotImplementedError(f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}")
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
         elif self.strategy != other.strategy:
             raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
         return (self._kind, self._value) > (other._kind, other._value)
 
@@ -127,28 +133,34 @@ class VersionSentinel(Generic[VersionValue]):
 
     def __lt__(self, other: object) -> bool:
         if not isinstance(other, (VersionedModel, VersionSentinel)):
-            raise NotImplementedError(f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}")
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
         elif self.strategy != other.strategy:
             raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
         return (self._kind, self._value) < (other._kind, other._value)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, (VersionedModel, VersionSentinel)):
-            raise NotImplementedError(f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}")
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
         elif self.strategy != other.strategy:
             raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
         return (self._kind, self._value) == (other._kind, other._value)
 
     def __gt__(self, other: object) -> bool:
         if not isinstance(other, (VersionedModel, VersionSentinel)):
-            raise NotImplementedError(f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}")
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
         elif self.strategy != other.strategy:
             raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
         return (self._kind, self._value) > (other._kind, other._value)
 

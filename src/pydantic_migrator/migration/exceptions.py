@@ -1,7 +1,8 @@
 """Exceptions."""
 
 from typing import Self
-from .types import MigrationKey, ModelVersionKey, VModel, VersionValue
+
+from .types import MigrationKey, ModelVersionKey, VersionValue, VModel
 
 
 class RegistryError(Exception):
@@ -42,10 +43,7 @@ class ModelNotFoundError(RegistryError):
     ) -> None:
         """Initializes ModelNotFoundError."""
         self.key = key
-        super().__init__(
-            registry_name,
-            f"Model not found: {key}"
-        )
+        super().__init__(registry_name, f"Model not found: {key}")
 
 
 class ModelAlreadyRegisteredError(RegistryError):

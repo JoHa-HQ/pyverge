@@ -193,10 +193,13 @@ class Registry(Generic[VersionValue]):
             raise RegistryError(self._name, f"Invalid key: {key}")
 
         if target is None:
-           raise ModelNotFoundError(self._name, key)
+            raise ModelNotFoundError(self._name, key)
 
         idx = bisect.bisect_left(self._backward_compatible, target)
-        return idx < len(self._backward_compatible) and self._backward_compatible[idx] == target
+        return (
+            idx < len(self._backward_compatible)
+            and self._backward_compatible[idx] == target
+        )
 
     def copy(self: Self, name: str | None = None) -> "Registry[VersionValue]":
         """Return an independent shallow copy."""
@@ -232,9 +235,9 @@ class Registry(Generic[VersionValue]):
     def _find_model(
         self: Self,
         key: (
-            type[BaseModel] |
-            Versionable[VersionValue, VModel] |
-            VersionSentinel[VersionValue]
+            type[BaseModel]
+            | Versionable[VersionValue, VModel]
+            | VersionSentinel[VersionValue]
         ),
     ) -> Versionable | None:
         """Find a registered model by class, versioned model, or sentinel."""
@@ -263,7 +266,7 @@ class Registry(Generic[VersionValue]):
         elif isinstance(key, tuple) and isinstance(key[0], str):
             sentinel = VersionSentinel[VersionValue](key[0], key[1])
             idx = bisect.bisect_left(self._by_versions, sentinel)
-            if (idx < len(self._by_versions)):
+            if idx < len(self._by_versions):
                 model = self._by_versions[idx]
             else:
                 model = None
@@ -320,7 +323,9 @@ class Registry(Generic[VersionValue]):
         key: (
             tuple[ModelVersionKey, ModelVersionKey]
             | tuple[type[BaseModel], type[BaseModel]]
-            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+            | tuple[
+                Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]
+            ]
         ),
         func: MigrationFunc,
     ) -> MigrationFunc:
@@ -332,7 +337,9 @@ class Registry(Generic[VersionValue]):
         Migrations between non-adjacent versions are allowed only when all
         intermediate versions are backward-compatible.
         """
-        if (isinstance(key[0], type) and issubclass(key[0], BaseModel)) or (isinstance(key[0], tuple) and issubclass(key[1], str)):
+        if (isinstance(key[0], type) and issubclass(key[0], BaseModel)) or (
+            isinstance(key[0], tuple) and issubclass(key[1], str)
+        ):
             migration_key = cast(MigrationKey, self._resolve_migration_pair(key))
         else:
             migration_key = cast(MigrationKey, key)
@@ -351,8 +358,10 @@ class Registry(Generic[VersionValue]):
         key: (
             tuple[ModelVersionKey, ModelVersionKey]
             | tuple[type[BaseModel], type[BaseModel]]
-            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
-        )
+            | tuple[
+                Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]
+            ]
+        ),
     ) -> MigrationFunc:
         """Return the migration for *key*, or raise :class:`MigrationError`.
 
@@ -362,14 +371,15 @@ class Registry(Generic[VersionValue]):
         if not isinstance(key[0], Versionable):
             migration_key = cast(
                 MigrationKey,
-                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+                tuple(self.get_model(part) for part in key),  # type: ignore[assignment]
             )
         else:
             migration_key = cast(MigrationKey, key)
 
         if migration_key not in self._migrations:
             raise MigrationNotFoundError(
-                self._name, migration_key,
+                self._name,
+                migration_key,
             )
         return self._migrations[migration_key]
 
@@ -378,7 +388,9 @@ class Registry(Generic[VersionValue]):
         key: (
             tuple[ModelVersionKey, ModelVersionKey]
             | tuple[type[BaseModel], type[BaseModel]]
-            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+            | tuple[
+                Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]
+            ]
         ),
     ) -> None:
         """Remove migration(s).
@@ -390,7 +402,7 @@ class Registry(Generic[VersionValue]):
         if not isinstance(key[0], Versionable):
             migration_key = cast(
                 MigrationKey,
-                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+                tuple(self.get_model(part) for part in key),  # type: ignore[assignment]
             )
         else:
             migration_key = cast(MigrationKey, key)
@@ -410,7 +422,9 @@ class Registry(Generic[VersionValue]):
         key: (
             tuple[ModelVersionKey, ModelVersionKey]
             | tuple[type[BaseModel], type[BaseModel]]
-            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+            | tuple[
+                Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]
+            ]
         ),
         hook: MigrationHookProtocol,
     ) -> None:
@@ -426,13 +440,15 @@ class Registry(Generic[VersionValue]):
         if not isinstance(key[0], Versionable):
             migration_key = cast(
                 MigrationKey,
-                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+                tuple(self.get_model(part) for part in key),  # type: ignore[assignment]
             )
         else:
             migration_key = cast(MigrationKey, key)
 
         if migration_key not in self._migrations:
-            raise RegistryError(self._name, f"No migration found for key {migration_key}")
+            raise RegistryError(
+                self._name, f"No migration found for key {migration_key}"
+            )
         self._hooks[migration_key].append(hook)
 
     def get_hooks(
@@ -440,7 +456,9 @@ class Registry(Generic[VersionValue]):
         key: (
             tuple[ModelVersionKey, ModelVersionKey]
             | tuple[type[BaseModel], type[BaseModel]]
-            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+            | tuple[
+                Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]
+            ]
         ),
     ) -> list[MigrationHookProtocol]:
         """Return hooks registered for a migration step.
@@ -457,7 +475,7 @@ class Registry(Generic[VersionValue]):
         if not isinstance(key[0], Versionable):
             migration_key = cast(
                 MigrationKey,
-                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+                tuple(self.get_model(part) for part in key),  # type: ignore[assignment]
             )
         else:
             migration_key = cast(MigrationKey, key)
@@ -471,7 +489,9 @@ class Registry(Generic[VersionValue]):
         key: (
             tuple[ModelVersionKey, ModelVersionKey]
             | tuple[type[BaseModel], type[BaseModel]]
-            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+            | tuple[
+                Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]
+            ]
         ),
         hook: MigrationHookProtocol | None = None,
     ) -> None:
@@ -490,13 +510,15 @@ class Registry(Generic[VersionValue]):
         if not isinstance(key[0], Versionable):
             migration_key = cast(
                 MigrationKey,
-                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+                tuple(self.get_model(part) for part in key),  # type: ignore[assignment]
             )
         else:
             migration_key = cast(MigrationKey, key)
 
         if migration_key not in self._hooks:
-            raise RegistryError(self._name, f"No hooks registered for migration {migration_key}")
+            raise RegistryError(
+                self._name, f"No hooks registered for migration {migration_key}"
+            )
 
         if hook is None:
             del self._hooks[migration_key]
@@ -510,7 +532,9 @@ class Registry(Generic[VersionValue]):
         key: (
             tuple[ModelVersionKey, ModelVersionKey]
             | tuple[type[BaseModel], type[BaseModel]]
-            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+            | tuple[
+                Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]
+            ]
             | None
         ) = None,
     ) -> None:
@@ -525,19 +549,21 @@ class Registry(Generic[VersionValue]):
         """
 
         if key is None:
-            [l.clear() for l in self._hooks.values()]
+            [hooks.clear() for hooks in self._hooks.values()]
             self._hooks.clear()
 
         if isinstance(key, tuple) and not isinstance(key[0], Versionable):
             migration_key = cast(
                 MigrationKey,
-                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+                tuple(self.get_model(part) for part in key),  # type: ignore[assignment]
             )
         else:
             migration_key = cast(MigrationKey, key)
 
         if migration_key not in self._hooks:
-            raise RegistryError(self._name, f"No hooks registered for migration {migration_key}")
+            raise RegistryError(
+                self._name, f"No hooks registered for migration {migration_key}"
+            )
 
         self._hooks[migration_key].clear()
         del self._hooks[migration_key]
