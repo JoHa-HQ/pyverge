@@ -3,39 +3,38 @@
 import bisect
 from collections import defaultdict
 from functools import lru_cache
-from itertools import chain, pairwise
-from typing import ClassVar, Generic, Self, cast
+from itertools import chain
+from typing import Generic, Self, cast
 
 import pendulum
 from pydantic import BaseModel
 from semver.version import Version
 
-from pydantic_migrator.migration.versioning import VersionSentinel
-
 from .exceptions import (
-    MigrationError,
+    MigrationAlreadyRegisteredError,
     MigrationNotFoundError,
     ModelAlreadyRegisteredError,
     ModelNotFoundError,
     RegistryError,
 )
-from .models import MigrationQuery, ModelQuery
 from .types import (
     LookupKey,
     MigrationFunc,
     MigrationHookMap,
     MigrationHookProtocol,
+    MigrationKey,
     MigrationMap,
-    VersionedModelProtocol,
+    ModelKind,
+    ModelVersionKey,
+    Versionable,
     VersionValue,
     VModel,
 )
+from .versioning import VersionSentinel
 
 
 class Registry(Generic[VersionValue]):
     """Ordered storage for versioned models, migrations, and hooks."""
-
-    MIN_PREDICATES: ClassVar[int] = 2
 
     def __init__(self: Self, *, name: str | None = None) -> None:
         """Create a named registry.
@@ -43,66 +42,53 @@ class Registry(Generic[VersionValue]):
         Internally maintains two lookup indexes:
         - ``_by_versions``: sorted list for O(log n) version-keyed bisect lookups.
         - ``_by_models``: inverted dict for O(1) model-class-keyed lookups.
+        - ``_by_kinds``: inverted dict for O(log n) kind-keyed lookups.
         """
         self._name = name or "registry"
-        self._by_versions: list[VersionedModelProtocol] = []
-        self._by_models: dict[type[BaseModel], VersionedModelProtocol] = {}
-        self._backward_compatible: list[VersionedModelProtocol] = []
+        self._by_versions: list[Versionable] = []
+        self._by_kinds: dict[ModelKind, list[Versionable]] = defaultdict(list)
+        self._by_models: dict[type[BaseModel], Versionable] = {}
+        self._backward_compatible: list[Versionable] = []
         self._migrations: MigrationMap = {}
         self._hooks: MigrationHookMap = defaultdict(list)
 
     def __contains__(self, index: LookupKey) -> bool:
         """Check whether a version, model, or migration path is registered.
 
-        ``v in registry``
-            *v* is a :class:`VersionValue` — checks model by version existence.
+        ``(kind, version) in registry``
+            Compound key — checks exact model by kind + version.
         ``M in registry``
-            *M* is a :class:`pydantic.BaseModel` subclass — checks model by model existence.
+            *M* is a :class:`pydantic.BaseModel` subclass — checks model by class.
+        ``(v1, v2) in registry``
+            Pair of :class:`Versionable` objects — checks single migration.
         ``v1:v2 in registry``
-            Slice of version values or model classes — checks migration path existence.
+            Slice of :class:`Versionable` objects — checks migration path.
 
         Returns:
             ``True`` if the lookup resolves to a registered entry.
-        """  # noqa: E501
+        """
 
-        if isinstance(index, Version) or isinstance(index, pendulum.Date):
-            query = ModelQuery[VersionValue](version_value=cast(VersionValue, index))
-        elif isinstance(index, slice):
-            if isinstance(index.start, Version) or isinstance(index, pendulum.Date):
-                query = MigrationQuery[VersionValue](
-                    version_range=(index.start, index.stop)
-                )
-            elif isinstance(index.start, BaseModel):
-                query = MigrationQuery[VersionValue](
-                    version_range=(index.start, index.stop)
-                )
-            else:
-                raise RegistryError(
-                    self._name, f"Unsupported index type: {type(index)}"
-                )
-        elif issubclass(index, BaseModel):
-            query = ModelQuery[VersionValue](model_cls=cast(type[BaseModel], index))
-        else:
-            raise RegistryError(self._name, "Unsupported index type: {type(index)}")
+        # MigrationKey: (Versionable, Versionable)
+        if isinstance(index, tuple) and isinstance(index[0], Versionable):
+            return index in self._migrations
 
-        if isinstance(query, ModelQuery):
+        # ModelVersionKey: (kind, version)
+        elif isinstance(index, tuple) and isinstance(index[0], str):
             try:
-                return self.get_model(query) is not None
+                return self.get_model(cast(ModelVersionKey, index)) is not None
             except ModelNotFoundError:
                 return False
-        elif isinstance(query, MigrationQuery):
+        # Pydantic model
+        elif isinstance(index, type) and issubclass(index, BaseModel):
             try:
-                return self.get_migration(query) is not None
-            except MigrationNotFoundError:
+                return self.get_model(cast(type[BaseModel], index)) is not None
+            except ModelNotFoundError:
                 return False
-        raise RegistryError(self._name, f"Unsupported query type: {type(query)}")
-
-    def __len__(self) -> int:
-        return len(self._by_versions)
+        raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
 
     def __getitem__(
         self, index: LookupKey
-    ) -> VersionedModelProtocol[VersionValue, VModel] | MigrationFunc:
+    ) -> Versionable[VersionValue, VModel] | MigrationFunc:
         """Lookup by version, model class, or slice.
 
         ``registry[v]``
@@ -117,34 +103,16 @@ class Registry(Generic[VersionValue]):
         Returns:
             The resolved entry, or raises :class:`RegistryError` on unknown formats.
         """
-        if isinstance(index, type):
-            if isinstance(index, Version) or isinstance(index, pendulum.Date):
-                query = ModelQuery[VersionValue](
-                    version_value=cast(VersionValue, index)
-                )
-            elif issubclass(index, BaseModel):
-                query = ModelQuery[VersionValue](model_cls=cast(type[BaseModel], index))
-            else:
-                raise RegistryError(self._name, "Unsupported index type: {type(index)}")
-            return self.get_model(query)
-        elif isinstance(index, slice):
-            if isinstance(index.start, Version) or isinstance(index, pendulum.Date):
-                query = MigrationQuery[VersionValue](
-                    version_range=(index.start, index.stop)  # type: ignore[arg-type]
-                )
-            elif issubclass(index.start, BaseModel):
-                query = MigrationQuery[VersionValue](
-                    version_range=(index.start, index.stop)  # type: ignore[arg-type]
-                )
-            else:
-                raise RegistryError(
-                    self._name, f"Unsupported index type: {type(index)}"
-                )
-            return cast(MigrationFunc, self.get_migration(query))
+        if isinstance(index, tuple) and isinstance(index[1], (Version, pendulum.Date)):
+            return self.get_model(index)  # type: ignore[arg-type]
+        elif isinstance(index, type) and issubclass(index, BaseModel):
+            return self.get_model(cast(type[BaseModel], index))
+        elif isinstance(index, tuple) and isinstance(index[0], Versionable):
+            return self.get_migration(index)
         raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
 
     @property
-    def versions(self: Self) -> list[VersionedModelProtocol]:
+    def versions(self: Self) -> list[Versionable]:
         """Registered versions in ascending order.
 
         Returns:
@@ -184,7 +152,16 @@ class Registry(Generic[VersionValue]):
         return list(chain(*self._hooks.values()))
 
     @property
-    def latest(self: Self) -> VersionedModelProtocol:
+    def latest_version(self) -> Versionable:
+        """The most recently registered version overall."""
+        if not self._by_versions:
+            raise RegistryError(self._name, "No versions registered")
+        return self._by_versions[-1]
+
+    def latest(
+        self: Self,
+        kind: ModelKind,
+    ) -> Versionable[VersionValue, VModel]:
         """Most recent (highest) registered version.
 
         Returns:
@@ -193,28 +170,39 @@ class Registry(Generic[VersionValue]):
         Raises:
             ValueError: If no versions are registered.
         """
-        if not self._by_versions:
+        if kind not in self._by_kinds:
             raise RegistryError(self._name, "No versions registered")
-        return self._by_versions[-1]
+        return self._by_kinds[kind][-1]
 
-    @lru_cache
-    def is_backward_compatible(self: Self, query: ModelQuery[VersionValue]) -> bool:
+    @lru_cache(typed=True)
+    def is_backward_compatible(
+        self: Self,
+        key: ModelVersionKey | type[BaseModel],
+    ) -> bool:
         """True if *version* is marked as backward-compatible."""
-        predicate = query.predicate
-        if predicate is None:
-            raise RegistryError(self._name, "No lookup predicate is defined")
+        if isinstance(key, type) and issubclass(key, BaseModel):
+            target = self._by_models.get(key)
+        if isinstance(key, tuple) and isinstance(key[0], str):
+            sentinel = VersionSentinel[VersionValue](key[0], key[1])
+            idx = bisect.bisect_left(self._by_versions, sentinel)
+            if idx < len(self._by_versions):
+                target = self._by_versions[idx]
+            else:
+                target = None
+        else:
+            raise RegistryError(self._name, f"Invalid key: {key}")
 
-        sentinel = VersionSentinel[VersionValue](cast(VersionValue, predicate))
-        idx = bisect.bisect_left(self._backward_compatible, sentinel)
-        return (
-            idx < len(self._backward_compatible)
-            and self._backward_compatible[idx] == sentinel
-        )
+        if target is None:
+           raise ModelNotFoundError(self._name, key)
+
+        idx = bisect.bisect_left(self._backward_compatible, target)
+        return idx < len(self._backward_compatible) and self._backward_compatible[idx] == target
 
     def copy(self: Self, name: str | None = None) -> "Registry[VersionValue]":
         """Return an independent shallow copy."""
         new = Registry(name=name)
         new._by_versions = list(self._by_versions)
+        new._by_kinds = dict(self._by_kinds)
         new._backward_compatible = list(self._backward_compatible)
         new._migrations = dict(self._migrations)
         new._hooks = defaultdict(list, {k: list(v) for k, v in self._hooks.items()})
@@ -222,9 +210,9 @@ class Registry(Generic[VersionValue]):
 
     def store_model(
         self: Self,
-        version: VersionedModelProtocol[VersionValue, VModel],
+        version: Versionable[VersionValue, VModel],
         backward_compatible: bool = False,
-    ) -> VersionedModelProtocol:
+    ) -> Versionable:
         """Register a model class at *version*.
 
         Raises ValueError if (version, cls) is already registered.
@@ -234,33 +222,64 @@ class Registry(Generic[VersionValue]):
                 registry_name=self._name,
                 version=version.version,
             )
-        bisect.insort_left(self._by_versions, version)
         self._by_models[version.model] = version
+        bisect.insort_left(self._by_versions, version)
+        bisect.insort_left(self._by_kinds[version.version[0]], version)
         if backward_compatible:
             bisect.insort_left(self._backward_compatible, version)
         return version
 
+    def _find_model(
+        self: Self,
+        key: (
+            type[BaseModel] |
+            Versionable[VersionValue, VModel] |
+            VersionSentinel[VersionValue]
+        ),
+    ) -> Versionable | None:
+        """Find a registered model by class, versioned model, or sentinel."""
+        if isinstance(key, type) and issubclass(key, BaseModel):
+            return self._by_models.get(key)
+        if isinstance(key, (Versionable, VersionSentinel)):
+            idx = bisect.bisect_left(self._by_versions, key)
+            if (
+                idx < len(self._by_versions)
+                and (target := self._by_versions[idx]) == key
+            ):
+                return target
+        return None
+
     def get_model(
-        self: Self, query: ModelQuery[VersionValue]
-    ) -> VersionedModelProtocol:
-        """Return the model class for *version* (default: latest)."""
-        predicate = query.predicate
-        if predicate is None and query.use_latest:
-            return self.latest
-        if isinstance(predicate, Version) or isinstance(predicate, pendulum.Date):
-            sentinel = VersionSentinel[VersionValue](cast(VersionValue, predicate))
+        self: Self,
+        key: ModelVersionKey | type[BaseModel],
+    ) -> Versionable:
+        """Return the model matching *key*, or raise :class:`ModelNotFoundError`.
+
+        *key* may be a ``(kind, version)`` tuple or a
+        :class:`pydantic.BaseModel` subclass.
+        """
+        if isinstance(key, type) and issubclass(key, BaseModel):
+            model = self._by_models.get(key)
+        elif isinstance(key, tuple) and isinstance(key[0], str):
+            sentinel = VersionSentinel[VersionValue](key[0], key[1])
             idx = bisect.bisect_left(self._by_versions, sentinel)
-            if idx < len(self._by_versions) and self._by_versions[idx] == sentinel:
-                return self._by_versions[idx]
-        elif issubclass(predicate, BaseModel):
-            if predicate in self._by_models:
-                return self._by_models[predicate]
-        raise ModelNotFoundError(self._name, predicate)
+            if (idx < len(self._by_versions)):
+                model = self._by_versions[idx]
+            else:
+                model = None
+        else:
+            model = None
+
+        if model is None:
+            raise ModelNotFoundError(self._name, key)
+        return model
 
     def remove_model(
-        self: Self, version: VersionedModelProtocol[VersionValue, VModel]
+        self: Self,
+        key: ModelVersionKey,
     ) -> None:
         """Remove a model version and clean up related migrations and flags."""
+        version = VersionSentinel[VersionValue](key[0], key[1])
         idx = bisect.bisect_left(self._by_versions, version)
         if idx == len(self._by_versions) or self._by_versions[idx] != version:
             raise RegistryError(self._name, f"Version {version} is not registered")
@@ -276,113 +295,91 @@ class Registry(Generic[VersionValue]):
             )
 
         version = self._by_versions[idx]
-        del self._by_versions[idx]
-        del self._by_models[version.model]
+
         if version in self._backward_compatible:
             bc_idx = bisect.bisect_left(self._backward_compatible, version)
             del self._backward_compatible[bc_idx]
 
+        del self._by_versions[idx]
+        del self._by_models[version.model]
+
+        idx = bisect.bisect_left(self._by_kinds[version.version[0]], version)
+        del self._by_kinds[version.version[0]][idx]
+
     def clear_models(self: Self) -> None:
         """Remove all models from the registry."""
-        if not self._migrations:
+        if self._migrations:
             raise RegistryError(self._name, "Clear migrations first")
         self._by_versions.clear()
         self._by_models.clear()
+        self._by_kinds.clear()
         self._backward_compatible.clear()
 
     def store_migration(
         self: Self,
-        from_version: VersionedModelProtocol,
-        to_version: VersionedModelProtocol,
+        key: (
+            tuple[ModelVersionKey, ModelVersionKey]
+            | tuple[type[BaseModel], type[BaseModel]]
+            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+        ),
         func: MigrationFunc,
     ) -> MigrationFunc:
         """Register a migration function between two versions.
 
+        *key* is a ``(from, to)`` pair where both elements are
+        ``(kind, version)`` tuples **or** both are model classes.
+
         Migrations between non-adjacent versions are allowed only when all
         intermediate versions are backward-compatible.
         """
-        if from_version not in self._by_versions or to_version not in self._by_versions:
-            raise RegistryError(
-                self._name,
-                f"Versions {from_version} and {to_version} must be registered",
-            )
-        start = bisect.bisect_left(self._by_versions, from_version)
-        stop = bisect.bisect_left(self._by_versions, to_version)
-        if start != stop - 1:
-            intermediate = self._by_versions[start + 1 : stop]
-            backward_compatible_query = all(
-                self.is_backward_compatible(
-                    ModelQuery[VersionValue](version_value=v.version)
-                )
-                for v in intermediate
-            )
-            if not backward_compatible_query:
-                raise RegistryError(
-                    self._name,
-                    f"Versions {from_version} and {to_version} are not adjacent "
-                    "and intermediate versions are not all backward-compatible",
-                )
-        if (from_version, to_version) in self._migrations:
-            raise RegistryError(
-                self._name,
-                f"Migration from {from_version} to {to_version} is already registered",
-            )
+        if (isinstance(key[0], type) and issubclass(key[0], BaseModel)) or (isinstance(key[0], tuple) and issubclass(key[1], str)):
+            migration_key = cast(MigrationKey, self._resolve_migration_pair(key))
+        else:
+            migration_key = cast(MigrationKey, key)
 
-        self._migrations[(from_version, to_version)] = func
+        if any(v not in self._by_versions for v in migration_key):
+            raise MigrationNotFoundError(self._name, migration_key)
+
+        if migration_key in self._migrations:
+            raise MigrationAlreadyRegisteredError(self._name, migration_key)
+
+        self._migrations[migration_key] = func
         return func
 
     def get_migration(
         self,
-        query: MigrationQuery,
-    ) -> MigrationFunc | list[MigrationFunc]:
-        """Return migration function(s) matching *query*.
+        key: (
+            tuple[ModelVersionKey, ModelVersionKey]
+            | tuple[type[BaseModel], type[BaseModel]]
+            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+        )
+    ) -> MigrationFunc:
+        """Return the migration for *key*, or raise :class:`MigrationError`.
 
-        A single ``(from, to)`` pair returns a ``MigrationFunc``.
-        Multiple pairs return a ``list[MigrationFunc]``.
-        If *query.use_latest* is True and only one value is given,
-        the latest registered version is used as the target.
+        *key* is a ``(from, to)`` pair where both elements are
+        ``(kind, version)`` tuples **or** both are model classes.
         """
-        predicates = list(query.predicate)
-        if not predicates:
-            raise ValueError("At least one version or model required")
-
-        if query.use_latest and len(predicates) == 1:
-            predicates.append(self.latest.version)
-
-        if len(predicates) < self.MIN_PREDICATES:
-            raise ValueError(
-                "At least two values required (or one with use_latest=True)"
+        if not isinstance(key[0], Versionable):
+            migration_key = cast(
+                MigrationKey,
+                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
             )
+        else:
+            migration_key = cast(MigrationKey, key)
 
-        results: list[MigrationFunc] = []
-        for from_raw, to_raw in pairwise(predicates):
-            from_v = self._resolve_predicate(from_raw, query)
-            to_v = self._resolve_predicate(to_raw, query)
-            key = (from_v, to_v)
-            if key not in self._migrations:
-                raise MigrationError(
-                    self._name, str(from_v), str(to_v), "No migration found"
-                )
-            results.append(self._migrations[key])
-
-        return results[0] if len(results) == 1 else results
-
-    def _resolve_predicate(
-        self,
-        raw: VersionValue | type[BaseModel],
-        query: MigrationQuery,
-    ) -> VersionedModelProtocol:
-        """Resolve a raw predicate to a registered ``VersionedModelProtocol``."""
-        if isinstance(raw, type):
-            return self._by_models[raw]
-        sentinel = VersionSentinel(raw)
-        idx = bisect.bisect_left(self._by_versions, sentinel)
-        return self._by_versions[idx]
+        if migration_key not in self._migrations:
+            raise MigrationNotFoundError(
+                self._name, migration_key,
+            )
+        return self._migrations[migration_key]
 
     def remove_migration(
         self: Self,
-        from_version: VersionedModelProtocol,
-        to_version: VersionedModelProtocol | None = None,
+        key: (
+            tuple[ModelVersionKey, ModelVersionKey]
+            | tuple[type[BaseModel], type[BaseModel]]
+            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+        ),
     ) -> None:
         """Remove migration(s).
 
@@ -390,120 +387,92 @@ class Registry(Generic[VersionValue]):
         ``remove_migration(v1:v3)`` → all migrations in the range [v1, v3).
         """
 
-        if to_version is None:
-            to_version = self.latest
-        key = (from_version, to_version)
+        if not isinstance(key[0], Versionable):
+            migration_key = cast(
+                MigrationKey,
+                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+            )
+        else:
+            migration_key = cast(MigrationKey, key)
 
-        if key in self._hooks:
-            raise ValueError(f"Cannot remove migration {key}. Remove hooks first.")
+        if migration_key in self._hooks:
+            raise MigrationNotFoundError(self._name, migration_key)
 
-        if key not in self._migrations:
-            if not bool(self.find_migration_path(from_version, to_version)):
-                raise MigrationError(
-                    self._name,
-                    from_version,
-                    to_version,
-                    "No migration found",
-                )
-        del self._migrations[key]
-
-    def _remove_migration_range(
-        self: Self,
-        from_version: VersionedModelProtocol,
-        to_version: VersionedModelProtocol,
-    ) -> None:
-        lo = bisect.bisect_left(self._by_versions, from_version)
-        hi = bisect.bisect_left(self._by_versions, to_version)
-        for i in range(lo, hi):
-            key = (self._by_versions[i], self._by_versions[i + 1])
-            if key in self._hooks:
-                raise ValueError(f"Cannot remove migration {key}. Remove hooks first.")
-            if key in self._migrations:
-                del self._migrations[key]
+        del self._migrations[migration_key]
 
     def clear_migrations(self: Self) -> None:
         """Remove all migrations from the registry."""
         self.clear_hooks()
         self._migrations.clear()
 
-    def find_migration_path(
-        self: Self,
-        from_version: VersionedModelProtocol,
-        to_version: VersionedModelProtocol,
-    ) -> list[tuple[VersionedModelProtocol, VersionedModelProtocol]]:
-        """Check whether a complete migration chain exists between two versions."""
-        if from_version not in self._by_versions:
-            raise ModelNotFoundError(self._name, from_version)
-        if to_version not in self._by_versions:
-            raise ModelNotFoundError(self._name, to_version)
-
-        lo = bisect.bisect_left(self._by_versions, from_version)
-        hi = bisect.bisect_left(self._by_versions, to_version)
-        if lo >= hi:
-            raise MigrationError(
-                self._name,
-                from_version,
-                to_version,
-                "Left version must be older than right version",
-            )
-        path = []
-        current = from_version
-        while lo < hi:
-            nxt = self._by_versions[lo + 1]
-            if (current, nxt) in self._migrations:
-                path.append((current, nxt))
-                current = nxt
-                lo += 1
-            elif self.is_backward_compatible(current):
-                current = self.versions[
-                    bisect.bisect_left(self._by_versions, current) + 1
-                ]
-                lo += 1
-            else:
-                raise MigrationError(
-                    self._name,
-                    current,
-                    nxt,
-                    f"No migration key is found ({current}, {nxt})",
-                )
-        return path
-
     def add_hook(
         self: Self,
+        key: (
+            tuple[ModelVersionKey, ModelVersionKey]
+            | tuple[type[BaseModel], type[BaseModel]]
+            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+        ),
         hook: MigrationHookProtocol,
-        from_version: VersionedModelProtocol,
-        to_version: VersionedModelProtocol,
     ) -> None:
         """Register a hook for a migration step.
 
         Args:
+            key: The migration key to associate with the hook.
             hook: The hook instance to register.
             from_version: Source version of the migration step.
             to_version: Target version of the migration step.
         """
-        self._hooks[(from_version, to_version)].append(hook)
 
-    def get_hook(
+        if not isinstance(key[0], Versionable):
+            migration_key = cast(
+                MigrationKey,
+                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+            )
+        else:
+            migration_key = cast(MigrationKey, key)
+
+        if migration_key not in self._migrations:
+            raise RegistryError(self._name, f"No migration found for key {migration_key}")
+        self._hooks[migration_key].append(hook)
+
+    def get_hooks(
         self: Self,
-        from_version: VersionedModelProtocol,
-        to_version: VersionedModelProtocol,
+        key: (
+            tuple[ModelVersionKey, ModelVersionKey]
+            | tuple[type[BaseModel], type[BaseModel]]
+            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+        ),
     ) -> list[MigrationHookProtocol]:
         """Return hooks registered for a migration step.
 
         Args:
-            from_version: Source version of the migration step.
-            to_version: Target version of the migration step.
+            key: The migration key to retrieve hooks for.
+            hook: Optional hook to filter by.
 
         Returns:
-            List of hooks for ``(from_version, to_version)``, or an empty
+            List of hooks for ``key``, or an empty
             list if none are registered.
         """
-        return self._hooks.get((from_version, to_version), [])
+
+        if not isinstance(key[0], Versionable):
+            migration_key = cast(
+                MigrationKey,
+                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+            )
+        else:
+            migration_key = cast(MigrationKey, key)
+
+        if migration_key not in self._hooks:
+            raise RegistryError(self._name, f"No hooks registered for key {key}")
+        return self._hooks[migration_key]
 
     def remove_hook(
         self: Self,
-        from_version: VersionedModelProtocol,
-        to_version: VersionedModelProtocol,
+        key: (
+            tuple[ModelVersionKey, ModelVersionKey]
+            | tuple[type[BaseModel], type[BaseModel]]
+            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+        ),
         hook: MigrationHookProtocol | None = None,
     ) -> None:
         """Remove hooks for a migration step.
@@ -517,32 +486,58 @@ class Registry(Generic[VersionValue]):
         Raises:
             ValueError: If *hook* is given but not registered for this key.
         """
-        key = (from_version, to_version)
+
+        if not isinstance(key[0], Versionable):
+            migration_key = cast(
+                MigrationKey,
+                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+            )
+        else:
+            migration_key = cast(MigrationKey, key)
+
+        if migration_key not in self._hooks:
+            raise RegistryError(self._name, f"No hooks registered for migration {migration_key}")
+
         if hook is None:
-            del self._hooks[key]
-        elif hook in self._hooks[key]:
-            self._hooks[key].remove(hook)
+            del self._hooks[migration_key]
+        elif hook in self._hooks[migration_key]:
+            self._hooks[migration_key].remove(hook)
         else:
             raise ValueError(f"Hook {hook!r} is not registered for migration {key}")
 
     def clear_hooks(
         self: Self,
-        from_version: VersionedModelProtocol | None = None,
-        to_version: VersionedModelProtocol | None = None,
+        key: (
+            tuple[ModelVersionKey, ModelVersionKey]
+            | tuple[type[BaseModel], type[BaseModel]]
+            | tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]
+            | None
+        ) = None,
     ) -> None:
         """Clear hooks from the registry.
 
         Args:
+            key: If given, clear only hooks for this migration key.
             from_version: If given, scope clearing to this source version.
                 If ``None``, clears all hooks globally.
             to_version: Target version. Required when *from_version* is given.
                 If ``None``, defaults to the latest registered version.
         """
-        if from_version is None:
+
+        if key is None:
+            [l.clear() for l in self._hooks.values()]
             self._hooks.clear()
+
+        if isinstance(key, tuple) and not isinstance(key[0], Versionable):
+            migration_key = cast(
+                MigrationKey,
+                tuple(self.get_model(part) for part in key)  # type: ignore[assignment]
+            )
         else:
-            if to_version is None:
-                to_version = self.latest
-            key = (from_version, to_version)
-            if key in self._hooks:
-                del self._hooks[key]
+            migration_key = cast(MigrationKey, key)
+
+        if migration_key not in self._hooks:
+            raise RegistryError(self._name, f"No hooks registered for migration {migration_key}")
+
+        self._hooks[migration_key].clear()
+        del self._hooks[migration_key]
