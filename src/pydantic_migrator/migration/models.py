@@ -10,7 +10,7 @@ from .types import MigrationDirectionStrategy
 class VersioningSettings(BaseModel):
     kind_property: str = Field(
         default="kind",
-        description="Field name that holds the model family identifier (e.g., 'Address').",
+        description="Field name that holds the model family identifier (e.g., 'Address').",  # noqa: E501
     )
     version_property: str = Field(
         default="version",
