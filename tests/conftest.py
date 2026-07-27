@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from pydantic_migrator.migration.models import VersioningSettings
 import pytest
 from typer.testing import CliRunner
 
-from pydantic_migrator.migration import MigrationSettings
+from pydantic_migrator.migration import DiscoverySettings, MigrationSettings
 
 # from tests.examples.nested_models import NestedModelManager
 # from tests.examples.semver import SemverManager
@@ -23,8 +24,18 @@ def runner() -> CliRunner:
 
 
 @pytest.fixture
+def versioning_settings() -> VersioningSettings:
+    return VersioningSettings()
+
+
+@pytest.fixture
 def migration_settings() -> MigrationSettings:
     return MigrationSettings()
+
+
+@pytest.fixture
+def discovery_settings() -> DiscoverySettings:
+    return DiscoverySettings()
 
 
 # @pytest.fixture(scope="function")

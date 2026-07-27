@@ -8,14 +8,22 @@ from .exceptions import (
     RegistryError,
     VersionedModelError,
 )
+from .graph import GraphBuilder
 from .hooks import MetricsHook, MigrationHook
 from .manager import ModelManager
-from .models import MigrationQuery, MigrationSettings, ModelQuery
+from .models import (
+    DiscoverySettings,
+    MigrationSettings,
+    VersioningSettings,
+)
+from .queries import MigrationQuery, ModelQuery
 from .reflection import TypeInspector
 from .registry import Registry
 from .versioning import VersionedModel
 
 __all__ = [
+    "DiscoverySettings",
+    "GraphBuilder",
     "MetricsHook",
     "MigrationEngine",
     "MigrationError",
@@ -32,5 +40,6 @@ __all__ = [
     "TypeInspector",
     "VersionedModel",
     "VersionedModelError",
+    "VersioningSettings",
     "types",
 ]

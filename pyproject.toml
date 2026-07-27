@@ -12,7 +12,8 @@ license = "Apache-2.0"
 dependencies = [
   "pydantic[email,timezone]>=2.11",
   "pydantic-extra-types[phonenumbers]>=2.9",
-  "semver>=3.0"
+  "semver>=3.0",
+  "pendulum>=3.2.0"
 ]
 
 [project.optional-dependencies]
