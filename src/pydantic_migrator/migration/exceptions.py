@@ -2,11 +2,7 @@
 
 from typing import Self
 
-from pendulum import Date
-from pydantic import BaseModel
-from semver import Version
-
-from .types import VersionValue
+from .types import MigrationKey, ModelVersionKey, VersionValue, VModel
 
 
 class RegistryError(Exception):
@@ -28,7 +24,7 @@ class VersionedModelError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        version: VersionValue,
+        version: ModelVersionKey,
         message: str,
     ) -> None:
         """Initializes VersionedModelError."""
@@ -43,17 +39,11 @@ class ModelNotFoundError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        lookup_key: VersionValue | type[BaseModel],
+        key: ModelVersionKey | type[VModel],
     ) -> None:
         """Initializes ModelNotFoundError."""
-        self.lookup_key = lookup_key
-        if isinstance(lookup_key, Version) or isinstance(lookup_key, Date):
-            msg = f"Model version '{lookup_key}' not found in '{registry_name}'"
-        elif issubclass(lookup_key, BaseModel):
-            msg = (
-                f"Model version '{lookup_key.__name__}' not found in '{registry_name}'"
-            )
-        super().__init__(registry_name, msg)
+        self.key = key
+        super().__init__(registry_name, f"Model not found: {key}")
 
 
 class ModelAlreadyRegisteredError(RegistryError):
@@ -62,7 +52,7 @@ class ModelAlreadyRegisteredError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        version: VersionValue,
+        version: ModelVersionKey,
     ) -> None:
         """Initializes ModelAlreadyRegisteredError."""
         self.version = version
@@ -76,8 +66,8 @@ class MigrationPathNotFoundError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        from_version: VersionValue,
-        to_version: VersionValue,
+        from_version: ModelVersionKey,
+        to_version: ModelVersionKey,
     ) -> None:
         """Initializes MigrationPathNotFoundError."""
         self.from_version = from_version
@@ -92,15 +82,13 @@ class MigrationError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        from_version: object,
-        to_version: object,
+        key: MigrationKey,
         reason: str | None = None,
     ) -> None:
         """Initializes MigrationError."""
-        self.from_version = from_version
-        self.to_version = to_version
+        self.key = key
         self.reason = reason
-        msg = f"Migration failed: {from_version} → {to_version}"
+        msg = f"Migration failed: {key[0]} → {key[1]}"
         if reason:
             msg += f"\nReason: {reason}"
         super().__init__(registry_name, msg)
@@ -112,13 +100,11 @@ class MigrationNotFoundError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        from_version: object,
-        to_version: object,
+        key: MigrationKey,
     ) -> None:
         """Initializes MigrationNotFoundError."""
-        self.from_version = from_version
-        self.to_version = to_version
-        msg = f"Migration not found: {from_version} → {to_version}"
+        self.key = key
+        msg = f"Migration not found: {key[0]} → {key[1]}"
         super().__init__(registry_name, msg)
 
 
@@ -128,13 +114,11 @@ class MigrationAlreadyRegisteredError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        from_version: object,
-        to_version: object,
+        key: MigrationKey,
     ) -> None:
         """Initializes MigrationAlreadyRegisteredError."""
-        self.from_version = from_version
-        self.to_version = to_version
-        msg = f"Migration already registered: {from_version} → {to_version}"
+        self.key = key
+        msg = f"Migration already registered: {key[0]} → {key[1]}"
         super().__init__(registry_name, msg)
 
 

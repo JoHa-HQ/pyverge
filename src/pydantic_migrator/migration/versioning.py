@@ -9,12 +9,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Generic, cast
+from typing import Generic
 
 import pendulum
 from semver import Version
 
-from .types import VersionValue, VModel
+from .types import ModelKind, VersionValue, VModel
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +25,12 @@ class VersionedModel(Generic[VersionValue, VModel]):
     """A model version that can be either semver or ISO date.
 
     Optionally carries the Pydantic model class so the registry can
-    treat ``(version, model)`` as a single comparable unit.
+    treat ``(version, kind)`` as a single comparable unit.
     """
 
+    _model: type[VModel]
     _value: VersionValue
-    _model_cls: type[VModel]
+    _kind: ModelKind
 
     @classmethod
     def of(cls, value: str) -> Version | pendulum.Date:
@@ -61,33 +62,53 @@ class VersionedModel(Generic[VersionValue, VModel]):
 
     @property
     def model(self) -> type[VModel]:
-        return self._model_cls
+        return self._model
 
     @property
-    def version(self) -> VersionValue:
-        return self._value
+    def version(self) -> tuple[ModelKind, VersionValue]:
+        return self._kind, self._value
 
     def __lt__(self, other: object) -> bool:
-        return self._value < cast(VersionedModel, other)._value
+        if not isinstance(other, (VersionedModel, VersionSentinel)):
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
+        elif self.strategy != other.strategy:
+            raise TypeError(
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
+            )
+        return (self._kind, self._value) < (other._kind, other._value)
 
     def __eq__(self, other: object) -> bool:
-        if self.strategy != cast(VersionedModel, other).strategy:
-            raise TypeError(
-                f"Cannot compare ModelVersion[{self.strategy}] with ModelVersion[{other.strategy}]"  # noqa: E501
+        if not isinstance(other, (VersionedModel, VersionSentinel)):
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
-        return self._value == cast(VersionedModel, other)._value
+        elif self.strategy != other.strategy:
+            raise TypeError(
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
+            )
+        return (self._kind, self._value) == (other._kind, other._value)
 
     def __gt__(self, other: object) -> bool:
-        return self._value > cast(VersionedModel, other)._value
+        if not isinstance(other, (VersionedModel, VersionSentinel)):
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
+        elif self.strategy != other.strategy:
+            raise TypeError(
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
+            )
+        return (self._kind, self._value) > (other._kind, other._value)
 
     def __hash__(self) -> int:
-        return hash(self._value)
+        return hash((self._kind, self._value))
 
     def __str__(self) -> str:
-        return str(self._value)
+        return f"{self._kind}:{self._value}"
 
     def __repr__(self) -> str:
-        return f"ModelVersion[{self.strategy.__name__}, {self.model.__name__}]({self._value})"  # noqa: E501
+        return f"ModelVersion[{self.strategy.__name__}, {self.model.__name__}]({self._value}, {self._kind})"  # noqa: E501
 
 
 @total_ordering
@@ -99,20 +120,52 @@ class VersionSentinel(Generic[VersionValue]):
     can search by version string without constructing a full VersionedModel.
     """
 
+    _kind: ModelKind
     _value: VersionValue
 
     @property
     def strategy(self) -> type[VersionValue]:
         return type(self._value)
 
+    @property
+    def kind(self) -> ModelKind:
+        return self._kind
+
     def __lt__(self, other: object) -> bool:
-        return self._value < cast(VersionedModel, other)._value
+        if not isinstance(other, (VersionedModel, VersionSentinel)):
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
+        elif self.strategy != other.strategy:
+            raise TypeError(
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
+            )
+        return (self._kind, self._value) < (other._kind, other._value)
 
     def __eq__(self, other: object) -> bool:
-        return self._value == cast(VersionedModel, other)._value
+        if not isinstance(other, (VersionedModel, VersionSentinel)):
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
+        elif self.strategy != other.strategy:
+            raise TypeError(
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
+            )
+        return (self._kind, self._value) == (other._kind, other._value)
 
     def __gt__(self, other: object) -> bool:
-        return self._value > cast(VersionedModel, other)._value
+        if not isinstance(other, (VersionedModel, VersionSentinel)):
+            raise NotImplementedError(
+                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
+            )
+        elif self.strategy != other.strategy:
+            raise TypeError(
+                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
+            )
+        return (self._kind, self._value) > (other._kind, other._value)
 
     def __hash__(self) -> int:
-        return hash(self._value)
+        return hash((self._kind, self._value))
+
+    def __str__(self) -> str:
+        return f"{self._kind}:{self._value}"
