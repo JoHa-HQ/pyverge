@@ -40,7 +40,7 @@ def create_example_models_file(path: Path) -> None:
         path.write_text('''"""Versioned models managed by pydantic-migrator."""
 
 from pydantic import BaseModel
-from pydantic_migrator import ModelManager
+from pydantic_migrator.migration import ModelManager
 
 # Create manager instance
 manager = ModelManager()

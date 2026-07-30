@@ -40,6 +40,42 @@ migrated = manager.migrate(
 )
 ```
 
+## Registration Patterns
+
+### Lazy registration
+
+Define model classes first and register them later, either at the class level or on a manager instance. This keeps schema definition separate from runtime wiring and makes testing easier.
+
+```python
+from pydantic import BaseModel
+from pydantic_migrator import ModelManager
+
+class UserV1(BaseModel):
+    name: str
+    email: str
+
+class UserV2(BaseModel):
+    name: str
+    email: str
+    age: int | None = None
+
+def add_age(data: dict) -> dict:
+    data["age"] = None
+    return data
+
+# Class-level registration (preferred)
+Manager = ModelManager
+Manager.model("User", "1.0.0")(UserV1)
+Manager.model("User", "2.0.0")(UserV2)
+Manager.migration("User", "1.0.0", "2.0.0")(add_age)
+
+# Instance-level registration (alternative)
+manager = ModelManager()
+manager.model("User", "1.0.0")(UserV1)
+manager.model("User", "2.0.0")(UserV2)
+manager.migration("User", "1.0.0", "2.0.0")(add_age)
+```
+
 ## Next Steps
 
 - Learn about [model registration](sdk/models.md)

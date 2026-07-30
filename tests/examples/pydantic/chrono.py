@@ -14,11 +14,11 @@ Benefits:
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from tests.examples.pydantic.base import BaseModel, Field, UserBaseModel
 
 # from pydantic_migrator.migration import MigrationSettings, ModelManager
 
-# SemverManager = ModelManager[Version, MigrationSettings()]
+# ChronoManager = ModelManager[Date, MigrationSettings()]
 
 
 class Role(StrEnum):
@@ -27,42 +27,38 @@ class Role(StrEnum):
     GUEST = "guest"
 
 
-class UserBaseModel(BaseModel):
-    kind: Literal["User"]
-
-
-# @SemverManager.model()
-class UserV011Dev7(UserBaseModel):
+# @ChronoManager.model()
+class UserV20250101(UserBaseModel):
     """Added address and age."""
 
     name: str
     email: str
     age: int | None = None
     role: Role
-    version: Literal["0.1.1+dev.7"]
+    version: Literal["2025-01-01"] = "2025-01-01"
 
 
-# @SemverManager.model()
-class UserV1(UserBaseModel):
+# @ChronoManager.model()
+class UserV20250310(UserBaseModel):
     """Initial user model."""
 
     name: str
     email: str
     role: Role
-    version: Literal["1.0.0"]
+    version: Literal["2025-03-10"] = "2025-03-10"
 
 
-# @SemverManager.model(backward_compatible=True)
-class UserV123(UserBaseModel):
+# @ChronoManager.model(backward_compatible=True)
+class UserV20251231(UserBaseModel):
     name: str
     email: str
     role: Role
     last_name: str | None = None
-    version: Literal["1.2.3"]
+    version: Literal["2025-12-31"] = "2025-12-31"
 
 
-# @SemverManager.model()
-class UserV200Beta1(UserBaseModel):
+# @ChronoManager.model()
+class UserV20260228(UserBaseModel):
     """Beta release for 2.0.0."""
 
     id: str
@@ -70,34 +66,24 @@ class UserV200Beta1(UserBaseModel):
     email: str
     role: Role
     beta_feature_enabled: bool = False
-    version: Literal["2.0.0-beta.1"]
+    version: Literal["2026-02-28"] = "2026-02-28"
 
 
-# @SemverManager.model(backward_compatible=True)
-class UserV2(UserBaseModel):
-    """Added age field."""
-
+# @ChronoManager.model()
+class UserV20260301_120530300Z(UserBaseModel):
     name: str
     email: str
-    age: int | None = None
     role: Role
-    version: Literal["2.0.0"]
+    version: Literal["2026-03-01T12:05:30+03:00"] = "2026-03-01T12:05:30+03:00"
 
 
-# @SemverManager.model()
-class UserV3(UserBaseModel):
-    """Added status field."""
-
-    name: str
-    email: str
-    age: int = Field(default=0, ge=0)
-    role: Role
-    status: Literal["active", "inactive"] = "active"
-    version: Literal["3.0.0"]
-
-
+# Step 3: Create discriminated union
 User = Annotated[
-    UserV011Dev7 | UserV1 | UserV123 | UserV200Beta1 | UserV2 | UserV3,
+    UserV20250101
+    | UserV20250310
+    | UserV20251231
+    | UserV20260228
+    | UserV20260301_120530300Z,
     Field(discriminator="version"),
 ]
 
@@ -106,14 +92,15 @@ class UserContainer(BaseModel):
     document: User
 
 
-# @SemverManager.migration(UserV1, UserV2)
+# Step 5: Register migrations at class level
+# @ChronoManager.migration(UserV20250101, UserV20250310)
 def migrate_v1_to_v2(data: dict) -> dict:
     data["age"] = None
     return data
 
 
-# @SemverManager.migration(UserV2, UserV3)
+# @ChronoManager.migration(UserV20251231, UserV20260228)
 def migrate_v2_to_v3(data: dict) -> dict:
-    data["age"] = data.get("age", 0)
-    data["status"] = "active"
+    data["last_name"] = data.get("last_name")
+    data["beta_feature_enabled"] = False
     return data
