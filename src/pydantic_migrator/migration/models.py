@@ -4,7 +4,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .types import MigrationDirectionStrategy
+from .types import (
+    ExtraFieldStrategy,
+    MigrationDirectionStrategy,
+    MissingFieldStrategy,
+    TargetStrategy,
+    ValidationMode,
+)
 
 
 class VersioningSettings(BaseModel):
@@ -34,6 +40,29 @@ class DiscoverySettings(VersioningSettings):
             "N = discover up to N levels deep."
         ),
     )
+    validation_mode: ValidationMode = Field(
+        default="lax",
+        description=(
+            "How strictly to validate payload structure when a container is used. "
+            "'strict' — reject any type or shape deviation. "
+            "'lax' — allow coercion where the schema library permits. "
+            "'none' — trust shape, skip schema validation."
+        ),
+    )
+    on_missing_field: MissingFieldStrategy = Field(
+        default="raise",
+        description=(
+            "What to do when a container expects a field that is absent. "
+            "'raise' — fail fast. 'skip' — leave the subtree untouched."
+        ),
+    )
+    on_extra_field: ExtraFieldStrategy = Field(
+        default="ignore",
+        description=(
+            "What to do when the payload contains a field not in the container. "
+            "'raise' — fail fast. 'ignore' — silently drop it from discovery."
+        ),
+    )
 
 
 class MigrationSettings(DiscoverySettings):
@@ -51,7 +80,6 @@ class MigrationSettings(DiscoverySettings):
                 version_property="version",
                 direction="forward",
                 on_direction_violation="raise",
-                mode="streaming",
                 parallel_workers=4,
             )
     """
@@ -83,28 +111,19 @@ class MigrationSettings(DiscoverySettings):
             "'raise' — fail before any migration."
         ),
     )
-    mode: Literal["sequential", "streaming"] = Field(
-        default="sequential",
-        description=(
-            "Payload traversal mode. "
-            "'sequential' — collect all entries, migrate depth-grouped. "
-            "'streaming' — yield entries one at a time (lower memory)."
-        ),
-    )
     parallel_workers: int = Field(
         default=0,
         ge=0,
         description=(
-            "Number of worker threads for concurrent discovery. "
-            "0 = sequential. Capped at ``os.cpu_count()``. "
-            "Applies to either mode."
+            "Number of worker threads for concurrent execution. "
+            "0 = sequential. Capped at ``os.cpu_count()``."
         ),
     )
-    target_strategy: Literal["latest"] = Field(
+    target_strategy: TargetStrategy = Field(
         default="latest",
         description=(
-            "Convergence target for discovered entries. "
-            "'latest' — converge each entry to the highest "
-            "registered version for its model type."
+            "Convergence target for discovered entries when no explicit "
+            "target is given. 'latest' — converge each entry to the highest "
+            "registered version for its model type. 'skip' — do not migrate."
         ),
     )

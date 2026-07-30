@@ -2,7 +2,12 @@
 
 from typing import Self
 
-from .types import MigrationKey, ModelVersionKey, VersionValue, VModel
+from .types import (
+    MigrationKey,
+    ModelVersionKey,
+    VersionValue,
+    VModel,
+)
 
 
 class RegistryError(Exception):
@@ -16,6 +21,23 @@ class RegistryError(Exception):
         """Initializes RegistryError."""
         self.registry_name = registry_name
         super().__init__(message)
+
+
+class InvalidVersionError(RegistryError):
+    """Raised when a version string cannot be parsed."""
+
+    def __init__(
+        self: Self,
+        registry_name: str,
+        version: VersionValue,
+        reason: str | None = None,
+    ) -> None:
+        """Initializes InvalidVersionError."""
+        self.version = version
+        msg = f"Invalid version string: '{version}'"
+        if reason:
+            msg += f"\n{reason}"
+        super().__init__(registry_name, msg)
 
 
 class VersionedModelError(RegistryError):
@@ -66,31 +88,13 @@ class MigrationPathNotFoundError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        from_version: ModelVersionKey,
-        to_version: ModelVersionKey,
+        from_version: MigrationKey,
+        to_version: MigrationKey,
     ) -> None:
         """Initializes MigrationPathNotFoundError."""
         self.from_version = from_version
         self.to_version = to_version
         msg = f"Migration path not found: {from_version} → {to_version}"
-        super().__init__(registry_name, msg)
-
-
-class MigrationError(RegistryError):
-    """Raised when a migration fails or cannot be found."""
-
-    def __init__(
-        self: Self,
-        registry_name: str,
-        key: MigrationKey,
-        reason: str | None = None,
-    ) -> None:
-        """Initializes MigrationError."""
-        self.key = key
-        self.reason = reason
-        msg = f"Migration failed: {key[0]} → {key[1]}"
-        if reason:
-            msg += f"\nReason: {reason}"
         super().__init__(registry_name, msg)
 
 
@@ -122,21 +126,16 @@ class MigrationAlreadyRegisteredError(RegistryError):
         super().__init__(registry_name, msg)
 
 
-class InvalidVersionError(RegistryError):
-    """Raised when a version string cannot be parsed."""
+class MigrationPathIntegrityError(RegistryError):
+    """Raised when an operation would break a kind's migration path."""
 
-    def __init__(
-        self: Self,
-        registry_name: str,
-        version: VersionValue,
-        reason: str | None = None,
-    ) -> None:
-        """Initializes InvalidVersionError."""
-        self.version = version
-        msg = f"Invalid version string: '{version}'"
-        if reason:
-            msg += f"\n{reason}"
-        super().__init__(registry_name, msg)
+    def __init__(self, registry_name: str, key: MigrationKey) -> None:
+        self.key = key
+        super().__init__(
+            registry_name,
+            f"Cannot remove {key[0]}→{key[1]}: "
+            "it is on the migration path. Remove with force or register a replacement.",
+        )
 
 
 class MigrationMissingFieldError(VersionedModelError):
@@ -152,3 +151,85 @@ class MigrationMissingFieldError(VersionedModelError):
         self.field_name = field_name
         msg = f"Required field '{field_name}' is missing in payload for {registry_name} - {version}"  # noqa: E501
         super().__init__(registry_name, version, msg)
+
+
+class EngineError(Exception):
+    """Raised when the engine encounters an error."""
+
+    def __init__(
+        self: Self,
+        msg: str,
+    ) -> None:
+        """Initializes EngineError."""
+        self.msg = msg
+        super().__init__(msg)
+
+
+class DiscoveryError(EngineError):
+    """Raised when payload discovery fails."""
+
+
+class DiscoveryValidationError(DiscoveryError):
+    """Raised when the payload does not conform to the container schema."""
+
+    def __init__(
+        self: Self,
+        path: tuple[str | int, ...],
+        message: str,
+    ) -> None:
+        """Initializes DiscoveryValidationError."""
+        self.path = path
+        super().__init__(f"Discovery validation failed at {path}: {message}")
+
+
+class MaxDepthExceededError(DiscoveryError):
+    """Raised when a versioned entry is found deeper than ``max_migration_depth``."""
+
+    def __init__(
+        self: Self,
+        path: tuple[str | int, ...],
+        depth: int,
+        kind: str,
+        version: str,
+        max_depth: int,
+    ) -> None:
+        """Initializes MaxDepthExceededError."""
+        self.path = path
+        self.depth = depth
+        self.kind = kind
+        self.version = version
+        self.max_depth = max_depth
+        super().__init__(
+            f"Versioned entry {kind}@{version} at path {path} (depth {depth}) "
+            f"exceeds max_migration_depth ({max_depth})."
+        )
+
+
+class MigrationError(Exception):
+    """Raised when a migration fails or cannot be found."""
+
+    def __init__(
+        self: Self,
+        kind: Any,
+        source: Any | None = None,
+        target: Any | None = None,
+        reason: str | None = None,
+    ) -> None:
+        """Initializes MigrationError.
+
+        Accepts either the old ``(source, target)`` form or the explicit
+        ``kind, source, target`` form for convenience.
+        """
+        if isinstance(kind, tuple) and len(kind) == 2 and source is None:
+            source = kind[0]
+            target = kind[1]
+            kind = "unknown"
+
+        self.kind = kind
+        self.source = source
+        self.target = target
+        self.reason = reason
+        msg = f"Migration failed: {kind} {source} → {target}"
+        if reason:
+            msg += f"\nReason: {reason}"
+        super().__init__(msg)
