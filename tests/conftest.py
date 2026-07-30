@@ -1,10 +1,18 @@
 from __future__ import annotations
 
-from pydantic_migrator.migration.models import VersioningSettings
+import pendulum
 import pytest
-from typer.testing import CliRunner
+import semver
 
-from pydantic_migrator.migration import DiscoverySettings, MigrationSettings
+from pydantic_migrator.migration import (
+    DiscoverySettings,
+    Engine,
+    MigrationSettings,
+    PydanticModelAdapter,
+    Registry,
+)
+from pydantic_migrator.migration.models import VersioningSettings
+from tests.utils import make_engine
 
 # from tests.examples.nested_models import NestedModelManager
 # from tests.examples.semver import SemverManager
@@ -14,51 +22,74 @@ from pydantic_migrator.migration import DiscoverySettings, MigrationSettings
 
 
 @pytest.fixture
-def runner() -> CliRunner:
-    return CliRunner()
-
-
-# @pytest.fixture
-# def application(runner: CliRunner) -> Callable[..., Result]:
-#     return partial(runner.invoke, app)
-
-
-@pytest.fixture
-def versioning_settings() -> VersioningSettings:
-    return VersioningSettings()
+def versioning_settings(
+    version_property: str = "version",
+    kind_property: str = "kind",
+) -> VersioningSettings:
+    return VersioningSettings(
+        version_property=version_property,
+        kind_property=kind_property,
+    )
 
 
 @pytest.fixture
-def migration_settings() -> MigrationSettings:
-    return MigrationSettings()
+def model_adapter(versioning_settings: VersioningSettings) -> PydanticModelAdapter:
+    return PydanticModelAdapter(
+        version_property=versioning_settings.version_property,
+        kind_property=versioning_settings.kind_property,
+    )
 
 
 @pytest.fixture
-def discovery_settings() -> DiscoverySettings:
-    return DiscoverySettings()
+def migration_settings(
+    version_property: str = "version",
+    kind_property: str = "kind",
+) -> MigrationSettings:
+    return MigrationSettings(
+        version_property=version_property,
+        kind_property=kind_property,
+    )
 
 
-# @pytest.fixture(scope="function")
-# def default_registry() -> Registry:
-#     return SemverManager.registry.copy()
+@pytest.fixture
+def discovery_settings(
+    version_property: str = "version",
+    kind_property: str = "kind",
+) -> DiscoverySettings:
+    return DiscoverySettings(
+        version_property=version_property, kind_property=kind_property
+    )
 
 
-# @pytest.fixture(scope="function")
-# def nested_registry() -> Registry:
-#     return NestedModelManager.registry.copy()
+@pytest.fixture(scope="function")
+def semver_registry(name: str | None = None) -> Registry:
+    return Registry[semver.Version](name=name)
 
 
-# @pytest.fixture
-# def default_manager() -> DefaultManager:
-#     return DefaultManager(ManagerSettings(version_property="version"))
+@pytest.fixture(scope="function")
+def date_registry(name: str | None = None) -> Registry:
+    return Registry[pendulum.DateTime](name=name)
 
 
-# @pytest.fixture
-# def eager_manager_instance() -> ModelManager[EagerUserContainer]:
-#     return eager_manager
+@pytest.fixture
+def registry(request: pytest.FixtureRequest) -> Registry:
+    if request.param == semver.Version:
+        return request.getfixturevalue("semver_registry")
+    elif request.param == pendulum.DateTime:
+        return request.getfixturevalue("date_registry")
+    else:
+        raise ValueError(f"Unsupported registry type: {request.param}")
 
 
-# @pytest.fixture
-# def coordinator() -> Coordinator:  # pragma: no cover
-#     """Coordinator with multiple model families"""
-#     return Coordinator()
+@pytest.fixture
+def semver_engine(
+    semver_registry: Registry, migration_settings: MigrationSettings
+) -> Engine[semver.Version]:
+    return make_engine(semver_registry, migration_settings)
+
+
+@pytest.fixture
+def date_engine(
+    date_registry: Registry, migration_settings: MigrationSettings
+) -> Engine[pendulum.DateTime]:
+    return make_engine(date_registry, migration_settings)

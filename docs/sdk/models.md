@@ -98,3 +98,68 @@ user = versioned.load(data)  # validated instance
 Use ``@manager.register[MyModel](...)`` with a parameterized ``ModelManager[T]`` when
 you need static type inference for a specific version. The ``@manager.model(...)``
 decorator remains available for untyped registration.
+
+## Coordinating Multiple Model Families
+
+For projects with several versioned model families, a ``Coordinator`` centralizes
+registration, validation, migration testing, and schema export. Each family gets its
+own manager while sharing global defaults.
+
+```python
+from enum import StrEnum
+from typing import Annotated
+from pydantic import BaseModel, Field
+from pydantic_migrator import Coordinator
+
+class Status(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+class UserV1(BaseModel):
+    username: str
+    email: str
+
+class UserV2(BaseModel):
+    username: str
+    email: str
+    full_name: str | None = None
+    status: Status = Status.ACTIVE
+
+User = Annotated[UserV1 | UserV2, Field(discriminator="version")]
+
+class UserContainer(BaseModel):
+    document: User
+
+
+class ProjectV1(BaseModel):
+    name: str
+    owner: str
+
+class ProjectV2(BaseModel):
+    name: str
+    owner: str
+    description: str | None = None
+    visibility: str = "private"
+
+Project = Annotated[ProjectV1 | ProjectV2, Field(discriminator="version")]
+
+class ProjectContainer(BaseModel):
+    document: Project
+
+
+coordinator = Coordinator(
+    defaults={"version_property": "version"},
+    managers={
+        UserContainer: {"kind": "User"},
+        ProjectContainer: {"kind": "Project", "version_property": "schema_version"},
+    },
+)
+
+# Access individual managers
+user_mgr = coordinator[UserContainer]
+project_mgr = coordinator["ProjectContainer"]
+
+# Cross-cutting operations
+coordinator.test_all_migrations()
+coordinator.dump_schemas("./schemas")
+```

@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from pydantic_migrator import ModelManager
+from pydantic_migrator.migration import ModelManager
 
 
 class ConfigError(Exception):
