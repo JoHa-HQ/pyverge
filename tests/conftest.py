@@ -4,14 +4,14 @@ import pendulum
 import pytest
 import semver
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
     DiscoverySettings,
     Engine,
     MigrationSettings,
     PydanticModelAdapter,
     Registry,
+    VersioningSettings,
 )
-from pydantic_migrator.migration.models import VersioningSettings
 from tests.utils import make_engine
 
 # from tests.examples.nested_models import NestedModelManager

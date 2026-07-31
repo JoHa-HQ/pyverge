@@ -9,14 +9,14 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
     DiscoverySettings,
+    GraphEntry,
+    MaxDepthExceededError,
     PydanticModelAdapter,
     Registry,
     types,
 )
-from pydantic_migrator.migration.exceptions import MaxDepthExceededError
-from pydantic_migrator.migration.graph import GraphEntry
 from tests.examples.pydantic.chrono import UserV20250310, UserV20251231
 from tests.examples.pydantic.chrono_nested import (
     AddressV20240101,

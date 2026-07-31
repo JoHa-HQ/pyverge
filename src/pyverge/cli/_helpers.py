@@ -37,10 +37,10 @@ def create_example_models_file(path: Path) -> None:
         return
 
     try:
-        path.write_text('''"""Versioned models managed by pydantic-migrator."""
+        path.write_text('''"""Versioned models managed by pyverge."""
 
 from pydantic import BaseModel
-from pydantic_migrator.migration import ModelManager
+from pyverge.migration import ModelManager
 
 # Create manager instance
 manager = ModelManager()
@@ -183,11 +183,11 @@ def print_next_steps(multiple: bool) -> None:
         typer.echo("  • api_v1 (api.v1.models)")
         typer.echo("  • api_v2 (api.v2.models)")
         typer.echo("\nCommands:")
-        typer.echo("  pydantic-migrator managers              - List all managers")
-        typer.echo("  pydantic-migrator info api_v1           - Show manager details")
-        typer.echo("  pydantic-migrator validate -M api_v1 ...  - Use specific manager")
+        typer.echo("  pyverge managers              - List all managers")
+        typer.echo("  pyverge info api_v1           - Show manager details")
+        typer.echo("  pyverge validate -M api_v1 ...  - Use specific manager")
     else:
         typer.echo("\nNext steps:")
         typer.echo("  1. Edit models.py to add your models")
-        typer.echo("  2. Run: pydantic-migrator info")
-        typer.echo("  3. Run: pydantic-migrator validate -d data.json -s User -v 1.0.0")
+        typer.echo("  2. Run: pyverge info")
+        typer.echo("  3. Run: pyverge validate -d data.json -s User -v 1.0.0")

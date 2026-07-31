@@ -5,24 +5,22 @@ from __future__ import annotations
 import pytest
 import semver
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
+    DefaultEntryMigration,
     DiscoverySettings,
     Engine,
     LevelParallelExecutor,
+    MigrationError,
+    MigrationNotFoundError,
     MigrationSettings,
+    PydanticDiff,
     PydanticModelAdapter,
     Registry,
     SequentialExecutor,
+    StepExecutor,
+    VersionEdge,
     types,
 )
-from pydantic_migrator.migration.diff import PydanticDiff
-from pydantic_migrator.migration.exceptions import (
-    MigrationError,
-    MigrationNotFoundError,
-)
-from pydantic_migrator.migration.executor import StepExecutor
-from pydantic_migrator.migration.strategy import DefaultEntryMigration
-from pydantic_migrator.migration.versioning import VersionEdge
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
     AddressV2,

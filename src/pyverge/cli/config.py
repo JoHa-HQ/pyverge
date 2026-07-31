@@ -1,4 +1,4 @@
-"""Configuration locating and loading for pydantic-migrator CLI."""
+"""Configuration locating and loading for pyverge CLI."""
 
 import importlib.util
 import sys
@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from pydantic_migrator.migration import ModelManager
+from pyverge.migration import ModelManager
 
 
 class ConfigError(Exception):

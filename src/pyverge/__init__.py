@@ -1,4 +1,4 @@
-"""pydantic-migrator - versioned Pydantic models and schemas with migrations."""
+"""pyverge - versioned Pydantic models and schemas with migrations."""
 
 from . import migration
 from ._version import __version__
