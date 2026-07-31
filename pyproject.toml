@@ -3,9 +3,9 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pydantic-migrator"
+name = "pyverge"
 dynamic = ["version"]
-description = "Schema evolution and migrations for Pydantic models"
+description = "Migration orchestration framework"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
@@ -36,17 +36,14 @@ cli = [
 ]
 
 [project.scripts]
-pydantic-migrator = "pydantic_migrator.cli.main:app"
+pyverge = "pyverge.cli.main:app"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "$version"
 
-[tool.hatch.build.hooks.vcs]
-version-file = "src/pydantic_migrator/_version.py"
-
 [tool.hatch.build.targets.wheel]
-packages = ["src/pydantic_migrator"]
+packages = ["src/pyverge"]
 
 [tool.hatch.version]
 source = "vcs"
