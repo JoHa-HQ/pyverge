@@ -1,9 +1,11 @@
 from typing import cast
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
     CompoundKeyWalker,
+    DefaultEntryMigration,
     DiscoverySettings,
     Engine,
+    EntryMigration,
     GraphBuilder,
     MigrationGraph,
     ModelAdapter,
@@ -16,7 +18,6 @@ from pydantic_migrator.migration import (
     VersionNode,
     types,
 )
-from pydantic_migrator.migration.strategy import DefaultEntryMigration, EntryMigration
 
 
 def envelope_model(

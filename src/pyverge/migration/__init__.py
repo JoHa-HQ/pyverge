@@ -4,6 +4,7 @@ from .diff import PydanticDiff
 from .engine import Engine
 from .exceptions import (
     DiscoveryError,
+    DiscoveryValidationError,
     EngineError,
     MaxDepthExceededError,
     MigrationAlreadyRegisteredError,
@@ -16,7 +17,7 @@ from .exceptions import (
     RegistryError,
     VersionedModelError,
 )
-from .executor import LevelParallelExecutor, SequentialExecutor
+from .executor import LevelParallelExecutor, SequentialExecutor, StepExecutor
 from .graph import GraphBuilder, GraphEntry, MigrationGraph
 from .hooks import MigrationHook, OTELHook
 from .manager import ModelManager
@@ -25,10 +26,10 @@ from .models import (
     MigrationSettings,
     VersioningSettings,
 )
-from .policy import compile_target_resolver
+from .policy import compile_target_resolver, compile_target_spec
 from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
-from .types import Walker
+from .types import ModelData, Walker
 from .versioning import SentinelEdge, SentinelNode, VersionEdge, VersionNode
 from .walker import CompoundKeyWalker, PydanticWalker
 
@@ -37,6 +38,7 @@ __all__ = [
     "DefaultEntryMigration",
     "DiscoveryError",
     "DiscoverySettings",
+    "DiscoveryValidationError",
     "Engine",
     "EngineError",
     "EntryMigration",
@@ -54,6 +56,7 @@ __all__ = [
     "MigrationSettings",
     "ModelAdapter",
     "ModelAlreadyRegisteredError",
+    "ModelData",
     "ModelManager",
     "ModelNotFoundError",
     "OTELHook",
@@ -65,11 +68,14 @@ __all__ = [
     "SentinelEdge",
     "SentinelNode",
     "SequentialExecutor",
+    "StepExecutor",
     "VersionEdge",
     "VersionNode",
     "VersionedModelError",
     "VersioningSettings",
     "Walker",
     "compile_target_resolver",
+    "compile_target_spec",
     "types",
 ]
+

@@ -8,15 +8,15 @@ from unittest.mock import MagicMock
 import pytest
 import semver
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
+    DefaultEntryMigration,
     DiscoverySettings,
     GraphEntry,
+    MigrationError,
+    ModelData,
     PydanticModelAdapter,
     Registry,
 )
-from pydantic_migrator.migration.exceptions import MigrationError
-from pydantic_migrator.migration.strategy import DefaultEntryMigration
-from pydantic_migrator.migration.types import ModelData
 from tests.examples.pydantic.semver_nested import PersonV1, PersonV2
 from tests.utils import envelope_model
 

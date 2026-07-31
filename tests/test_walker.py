@@ -8,19 +8,17 @@ import pendulum
 import pytest
 import semver
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
     CompoundKeyWalker,
     DiscoverySettings,
+    DiscoveryValidationError,
     Engine,
+    MaxDepthExceededError,
     MigrationSettings,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
     types,
-)
-from pydantic_migrator.migration.exceptions import (
-    DiscoveryValidationError,
-    MaxDepthExceededError,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,

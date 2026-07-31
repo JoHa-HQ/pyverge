@@ -4,7 +4,7 @@ import pendulum
 import pytest
 import semver
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
     MigrationAlreadyRegisteredError,
     MigrationHook,
     MigrationNotFoundError,

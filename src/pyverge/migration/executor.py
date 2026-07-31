@@ -1,5 +1,3 @@
-"""Execution strategies for convergent migration graphs."""
-
 from __future__ import annotations
 
 import copy
@@ -169,8 +167,7 @@ class LevelParallelExecutor(Executor):
                     ): entry
                     for entry in level
                 }
-                for future in futures:
-                    entry = futures[future]
+                for future, entry in futures.items():
                     try:
                         migrated = future.result()
                     except Exception as exc:
