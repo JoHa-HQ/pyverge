@@ -9,10 +9,11 @@ import pendulum
 import pytest
 import semver
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
     CompoundKeyWalker,
     DiscoverySettings,
     Engine,
+    EntryMigration,
     GraphBuilder,
     MigrationAlreadyRegisteredError,
     MigrationHook,
@@ -30,7 +31,6 @@ from pydantic_migrator.migration import (
     VersionNode,
     types,
 )
-from pydantic_migrator.migration.strategy import EntryMigration
 from tests.examples.pydantic.chrono import (
     UserV20250310,
     UserV20251231,

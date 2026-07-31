@@ -7,15 +7,15 @@ from typing import Any
 import pytest
 import semver
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
     DiscoverySettings,
     MigrationSettings,
     PydanticModelAdapter,
     Registry,
+    RegistryError,
     compile_target_resolver,
+    compile_target_spec,
 )
-from pydantic_migrator.migration.exceptions import RegistryError
-from pydantic_migrator.migration.policy import _compile_spec
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
     AddressV2,
@@ -55,7 +55,7 @@ def populated_registry(
     return registry
 
 
-class TestCompileSpec:
+class TestCompileTargetSpec:
     """Unit tests for compiling a single target spec into a resolver."""
 
     def test_skip_returns_none(
@@ -65,7 +65,9 @@ class TestCompileSpec:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
-        resolver = _compile_spec(populated_registry, "skip", version_property="version")
+        resolver = compile_target_spec(
+            populated_registry, "skip", version_property="version"
+        )
         assert resolver("Person", source) is None
 
     def test_latest_returns_highest_version(
@@ -75,7 +77,7 @@ class TestCompileSpec:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
-        resolver = _compile_spec(
+        resolver = compile_target_spec(
             populated_registry, "latest", version_property="version"
         )
         target = resolver("Person", source)
@@ -89,7 +91,7 @@ class TestCompileSpec:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, AddressV2)
-        resolver = _compile_spec(
+        resolver = compile_target_spec(
             populated_registry, "earliest", version_property="version"
         )
         target = resolver("Address", source)
@@ -103,7 +105,9 @@ class TestCompileSpec:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
-        resolver = _compile_spec(populated_registry, None, version_property="version")
+        resolver = compile_target_spec(
+            populated_registry, None, version_property="version"
+        )
         assert resolver("Person", source) is None
 
     def test_model_class_resolves_to_registered_versionable(
@@ -113,7 +117,7 @@ class TestCompileSpec:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
-        resolver = _compile_spec(
+        resolver = compile_target_spec(
             populated_registry, PersonV2, version_property="version"
         )
         target = resolver("Person", source)
@@ -128,7 +132,7 @@ class TestCompileSpec:
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
         target_node = envelope_model(adapter, settings, PersonV2)
-        resolver = _compile_spec(
+        resolver = compile_target_spec(
             populated_registry,
             target_node,
             version_property="version",
@@ -140,7 +144,9 @@ class TestCompileSpec:
         populated_registry: Registry[semver.Version],
     ) -> None:
         with pytest.raises(RegistryError):
-            _compile_spec(populated_registry, "unknown", version_property="version")
+            compile_target_spec(
+                populated_registry, "unknown", version_property="version"
+            )
 
     def test_model_class_wrong_kind_raises(
         self,
@@ -149,7 +155,7 @@ class TestCompileSpec:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, AddressV1)
-        resolver = _compile_spec(
+        resolver = compile_target_spec(
             populated_registry, PersonV2, version_property="version"
         )
         with pytest.raises(RegistryError):

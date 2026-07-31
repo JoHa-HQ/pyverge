@@ -60,7 +60,7 @@ def compile_target_resolver(
             ModelKind | Literal["*"],
             TargetResolver,
         ] = {
-            kind: _compile_spec(registry, spec, version_property=version_property)
+            kind: compile_target_spec(registry, spec, version_property=version_property)
             for kind, spec in policy.items()
         }
         fallback = resolvers.pop("*", None)
@@ -76,10 +76,10 @@ def compile_target_resolver(
 
         return resolve
 
-    return _compile_spec(registry, policy, version_property=version_property)
+    return compile_target_spec(registry, policy, version_property=version_property)
 
 
-def _compile_spec(
+def compile_target_spec(
     registry: Registry[VersionValue],
     spec: TargetSpec,
     *,

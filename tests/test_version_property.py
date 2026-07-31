@@ -8,7 +8,7 @@ from pendulum import Date
 from pydantic import BaseModel
 from semver import Version
 
-from pydantic_migrator.migration import (
+from pyverge.migration import (
     PydanticDiff,
     PydanticModelAdapter,
     VersionEdge,
@@ -358,7 +358,7 @@ class TestMigrationEdge:
         source_model: type[types.VModel],
         target_model: type[types.VModel],
     ) -> None:
-        """Construction raises ValueError when source and target have different kinds."""
+        """Construction fails when source and target have different kinds."""
         source = envelope_model(model_adapter, versioning_settings, source_model)
         target = envelope_model(model_adapter, versioning_settings, target_model)
         with pytest.raises(ValueError):

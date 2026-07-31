@@ -1,6 +1,5 @@
-"""Exceptions."""
-
-from typing import Self
+from collections.abc import Sequence
+from typing import Any, Self
 
 from .types import (
     MigrationKey,
@@ -210,7 +209,7 @@ class MigrationError(Exception):
 
     def __init__(
         self: Self,
-        kind: Any,
+        kind: Any | Sequence[Any],
         source: Any | None = None,
         target: Any | None = None,
         reason: str | None = None,
@@ -220,16 +219,21 @@ class MigrationError(Exception):
         Accepts either the old ``(source, target)`` form or the explicit
         ``kind, source, target`` form for convenience.
         """
+        source_kind, target_kind = None, None
         if isinstance(kind, tuple) and len(kind) == 2 and source is None:
-            source = kind[0]
-            target = kind[1]
+            source, target = kind
             kind = "unknown"
+        if source is not None and hasattr(source, "version"):
+            source_kind = source.kind
+        if target is not None and hasattr(target, "version"):
+            target_kind = target.kind
+        display_kind = kind or source_kind or target_kind or "unknown"
 
-        self.kind = kind
+        self.kind = display_kind
         self.source = source
         self.target = target
         self.reason = reason
-        msg = f"Migration failed: {kind} {source} → {target}"
+        msg = f"Migration failed: {display_kind} {source} → {target}"
         if reason:
             msg += f"\nReason: {reason}"
         super().__init__(msg)
