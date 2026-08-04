@@ -101,9 +101,7 @@ def test_finds_registered_versioned_dict(
     walker_kwargs: dict[str, Any] = {"settings": discovery_settings}
     if walker_cls is PydanticWalker:
         walker_kwargs["adapter"] = model_adapter
-    entries = list(
-        walker_cls(registry, **walker_kwargs).discover(payload, **kwargs)
-    )
+    entries = list(walker_cls(registry, **walker_kwargs).discover(payload, **kwargs))
     assert len(entries) == 1
     assert entries[0][0] == ("document",)
     assert entries[0][2].model is UserV1

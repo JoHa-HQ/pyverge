@@ -61,6 +61,18 @@ line-length = 88
 [tool.ruff.lint]
 select = ["E", "F", "I", "PL", "UP", "RUF"]
 
+[tool.ruff.lint.per-file-ignores]
+# Long-standing signatures and branch-heavy walkers; not worth refactoring now.
+"src/pyverge/migration/engine.py" = ["PLR0913"]
+"src/pyverge/migration/executor.py" = ["PLR0913"]
+"src/pyverge/migration/strategy.py" = ["PLR0913"]
+"src/pyverge/migration/walker.py" = ["PLR0912", "PLR0913"]
+"src/pyverge/migration/types.py" = ["PLR0913"]
+"tests/utils.py" = ["PLR0913"]
+"tests/test_engine.py" = ["PLR0913"]
+"tests/test_graph.py" = ["PLR0913"]
+"tests/test_version_property.py" = ["PLR0913"]
+
 [tool.semantic_release]
 branch = "main"
 commit_message = "chore(release): {version} [skip ci]"
