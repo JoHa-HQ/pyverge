@@ -128,9 +128,7 @@ def _load_toml_config(config_path: Path) -> dict[str, ManagerConfig]:
     # Handle pyproject.toml vs pyverge.toml
     if config_path.name == "pyproject.toml":
         if "tool" not in data or "pyverge" not in data["tool"]:
-            raise ConfigError(
-                "No [tool.pyverge] section found in pyproject.toml"
-            )
+            raise ConfigError("No [tool.pyverge] section found in pyproject.toml")
         config_data = data["tool"]["pyverge"]
     else:
         config_data = data.get("pyverge", data)

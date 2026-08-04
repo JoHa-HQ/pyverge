@@ -173,9 +173,7 @@ def managers(
         if not available:
             typer.echo("No managers configured\n")
             typer.echo("Configuration can be added to:")
-            typer.echo(
-                '  1. pyproject.toml: [tool.pyverge] manager = "models"'
-            )
+            typer.echo('  1. pyproject.toml: [tool.pyverge] manager = "models"')
             typer.echo('  2. pyverge.toml: [pyverge] manager = "models"')
             typer.echo("  3. Auto-discovery: Define __manager__ in models.py")
             return
@@ -188,9 +186,7 @@ def managers(
             table.add_row(name, module)
 
         console.print(table)
-        console.print(
-            "\n[dim]Use with: pyverge validate --manager <name> ...[/dim]"
-        )
+        console.print("\n[dim]Use with: pyverge validate --manager <name> ...[/dim]")
 
     except ConfigError as e:
         typer.secho(str(e), fg=typer.colors.RED)
