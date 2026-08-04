@@ -10,6 +10,7 @@ import semver
 from pyverge.migration import (
     DiscoverySettings,
     MigrationSettings,
+    ModelNotFoundError,
     PydanticModelAdapter,
     Registry,
     RegistryError,
@@ -220,6 +221,36 @@ class TestCompileTargetResolver:
         address_target = resolver("Address", address_source)
         assert address_target is not None
         assert address_target.version == ("Address", semver.VersionInfo(1, 0, 0))
+
+    def test_per_kind_pinned_version_string(
+        self,
+        populated_registry: Registry[semver.Version],
+        adapter: PydanticModelAdapter,
+        settings: DiscoverySettings,
+    ) -> None:
+        policy: dict[str, Any] = {"Person": "1.0.0", "*": "latest"}
+        resolver = compile_target_resolver(populated_registry, policy)
+
+        person_source = envelope_model(adapter, settings, PersonV2)
+        person_target = resolver("Person", person_source)
+        assert person_target is not None
+        assert person_target.version == ("Person", semver.VersionInfo(1, 0, 0))
+
+        address_source = envelope_model(adapter, settings, AddressV1)
+        address_target = resolver("Address", address_source)
+        assert address_target is not None
+        assert address_target.version == ("Address", semver.VersionInfo(3, 0, 0))
+
+    def test_pinned_unregistered_version_raises(
+        self,
+        populated_registry: Registry[semver.Version],
+        adapter: PydanticModelAdapter,
+        settings: DiscoverySettings,
+    ) -> None:
+        resolver = compile_target_resolver(populated_registry, {"Person": "9.9.9"})
+        source = envelope_model(adapter, settings, PersonV1)
+        with pytest.raises(ModelNotFoundError):
+            resolver("Person", source)
 
     def test_per_kind_unknown_kind_uses_wildcard(
         self,
