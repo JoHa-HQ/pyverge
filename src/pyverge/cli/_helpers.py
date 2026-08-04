@@ -39,47 +39,61 @@ def create_example_models_file(path: Path) -> None:
     try:
         path.write_text('''"""Versioned models managed by pyverge."""
 
-from pydantic import BaseModel
-from pyverge.migration import ModelManager
+from typing import Literal
 
-# Create manager instance
-manager = ModelManager()
+import semver
+from pydantic import BaseModel
+
+from pyverge.migration import (
+    MigrationSettings,
+    ModelManager,
+    PydanticModelAdapter,
+)
+
+# Create a scoped manager class
+UserManager = ModelManager.scoped(
+    semver.Version,
+    adapter=PydanticModelAdapter(),
+    settings=MigrationSettings(),
+)
 
 
 # Version 1: Initial user model
-@manager.model("User", "1.0.0")
+@UserManager.model()
 class UserV1(BaseModel):
     """User model v1.0.0"""
+    kind: Literal["User"] = "User"
+    version: Literal["1.0.0"] = "1.0.0"
     name: str
     email: str
 
 
 # Version 2: Add age field
-@manager.model("User", "2.0.0")
+@UserManager.model()
 class UserV2(BaseModel):
     """User model v2.0.0"""
+    kind: Literal["User"] = "User"
+    version: Literal["2.0.0"] = "2.0.0"
     name: str
     email: str
     age: int | None = None
 
 
 # Define migration
-@manager.migration("User", "1.0.0", "2.0.0")
-def add_age_field(data):
+@UserManager.migration("User", "1.0.0", "2.0.0")
+def add_age_field(data: dict) -> dict:
     """Add optional age field."""
     return {**data, "age": None}
 
 
-# Export manager for CLI discovery
-__manager__ = manager
+# Export manager instance for CLI discovery
+__manager__ = UserManager()
 
 
 # Alternative: Factory function pattern
 # def create_manager():
 #     """Factory function for creating manager with custom setup."""
-#     mgr = ModelManager()
-#     # Register models...
-#     return mgr
+#     return UserManager()
 #
 # __manager__ = create_manager
 ''')
@@ -94,7 +108,7 @@ def create_single_manager_config(project_dir: Path, use_pyproject: bool) -> None
     try:
         if use_pyproject:
             config_file = project_dir / "pyproject.toml"
-            config_content = """[tool.pydantic-migrator]
+            config_content = """[tool.pyverge]
 manager = "models"
 """
             if config_file.exists():
@@ -108,9 +122,9 @@ version = "0.1.0"
 {config_content}""")
                 typer.secho(f"Created {config_file}", fg=typer.colors.GREEN)
         else:
-            config_file = project_dir / "migrator.toml"
+            config_file = project_dir / "pyverge.toml"
             if not config_file.exists():
-                config_file.write_text("""[pydantic-migrator]
+                config_file.write_text("""[pyverge]
 manager = "models"
 
 # Optional: Use factory function
@@ -118,7 +132,7 @@ manager = "models"
 
 # Optional: Pass initialization arguments
 # init_args = []
-# [pydantic-migrator.init_kwargs]
+# [pyverge.init_kwargs]
 # debug = false
 """)
                 typer.secho(f"Created {config_file}", fg=typer.colors.GREEN)
@@ -131,30 +145,30 @@ def create_multi_manager_config(project_dir: Path, use_pyproject: bool) -> None:
     """Create multi-manager configuration."""
     try:
         if use_pyproject:
-            config_content = """[tool.pydantic-migrator.managers]
+            config_content = """[tool.pyverge.managers]
 default = "models"
 api_v1 = "api.v1.models"
 api_v2 = "api.v2.models"
 
 # Optional: Configure specific manager with init args
-# [tool.pydantic-migrator.managers.api_v1]
+# [tool.pyverge.managers.api_v1]
 # manager = "api.v1.models:create_manager"
 # init_args = ["production"]
 """
         else:
-            config_content = """[pydantic-migrator.managers]
+            config_content = """[pyverge.managers]
 default = "models"
 api_v1 = "api.v1.models"
 api_v2 = "api.v2.models"
 
 # Optional: Configure specific manager with init args
-# [pydantic-migrator.managers.api_v1]
+# [pyverge.managers.api_v1]
 # manager = "api.v1.models:create_manager"
 # init_args = ["production"]
 """
 
         config_file = project_dir / (
-            "pyproject.toml" if use_pyproject else "migrator.toml"
+            "pyproject.toml" if use_pyproject else "pyverge.toml"
         )
 
         if config_file.exists() and use_pyproject:

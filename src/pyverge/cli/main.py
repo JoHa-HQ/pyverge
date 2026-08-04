@@ -1,4 +1,4 @@
-"""Command-line interface for pydantic-migrator."""
+"""Command-line interface for pyverge."""
 
 import json
 from pathlib import Path
@@ -23,7 +23,7 @@ from .config import (
     load_manager,
 )
 
-app = typer.Typer(help="Schema evolution and migrations for Pydantic models")
+app = typer.Typer(help="Schema evolution and migrations for versioned models")
 console = Console()
 
 ManagerOption = Annotated[
@@ -42,7 +42,7 @@ ConfigOption = Annotated[
         ...,
         "--config",
         "-c",
-        help="Path to config file (pyproject.toml or migrator.toml)",
+        help="Path to config file (pyproject.toml or pyverge.toml)",
     ),
 ]
 
@@ -174,9 +174,9 @@ def managers(
             typer.echo("No managers configured\n")
             typer.echo("Configuration can be added to:")
             typer.echo(
-                '  1. pyproject.toml: [tool.pydantic-migrator] manager = "models"'
+                '  1. pyproject.toml: [tool.pyverge] manager = "models"'
             )
-            typer.echo('  2. migrator.toml: [pydantic-migrator] manager = "models"')
+            typer.echo('  2. pyverge.toml: [pyverge] manager = "models"')
             typer.echo("  3. Auto-discovery: Define __manager__ in models.py")
             return
 
@@ -189,7 +189,7 @@ def managers(
 
         console.print(table)
         console.print(
-            "\n[dim]Use with: pydantic-migrator validate --manager <name> ...[/dim]"
+            "\n[dim]Use with: pyverge validate --manager <name> ...[/dim]"
         )
 
     except ConfigError as e:
@@ -281,7 +281,7 @@ def export(
     """Export JSON Schema definitions.
 
     Example:
-        pydantic-migrator export -o ./schemas
+        pyverge export -o ./schemas
     """
     try:
         mgr = load_manager(manager, config)
@@ -316,7 +316,7 @@ def init(
         typer.Option(
             ...,
             "--pyproject",
-            help="Use pyproject.toml instead of migrator.toml",
+            help="Use pyproject.toml instead of pyverge.toml",
         ),
     ] = False,
     multiple: Annotated[
@@ -328,7 +328,7 @@ def init(
         ),
     ] = False,
 ) -> None:
-    """Initialize a pydantic-migrator project with example configuration."""
+    """Initialize a pyverge project with example configuration."""
     try:
         project_dir = Path(project_dir)
         project_dir.mkdir(parents=True, exist_ok=True)

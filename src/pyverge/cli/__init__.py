@@ -1,1 +1,1 @@
-"""The pydantic-migrator CLI subpackage."""
+"""The pyverge CLI subpackage."""
