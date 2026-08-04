@@ -57,13 +57,12 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py311"
 line-length = 88
-exclude = ["src/pyverge/_version.py"]
+respect-gitignore = true
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "PL", "UP", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-# Long-standing signatures and branch-heavy walkers; not worth refactoring now.
 "src/pyverge/migration/engine.py" = ["PLR0913"]
 "src/pyverge/migration/executor.py" = ["PLR0913"]
 "src/pyverge/migration/strategy.py" = ["PLR0913"]
