@@ -24,7 +24,7 @@ from .types import (
     VersionValue,
     VModel,
 )
-from .versioning import SentinelNode
+from .versioning import SentinelNode, VersionNode
 
 
 def compile_target_resolver(
@@ -42,6 +42,8 @@ def compile_target_resolver(
     Policy forms:
         * ``None`` or ``"skip"`` → skip every entry.
         * ``"latest"`` / ``"earliest"`` → registry extreme for the kind.
+        * an explicit version string (e.g. ``"1.5.0"``) → the registered
+          version for the entry's kind.
         * ``type[BaseModel]`` → resolve via registry to a versionable.
         * :class:`Versionable` → use as-is.
         * ``dict`` → per-kind override. The special key ``"*"`` is the
@@ -93,15 +95,14 @@ def compile_target_spec(
     # to a string (their ``__eq__`` intentionally raises for mixed types).
     if isinstance(spec, str):
         if spec == "skip":
-            return _skip_resolver
-        if spec == "latest":
-            return _latest_resolver(registry)
-        if spec == "earliest":
-            return _earliest_resolver(registry)
-        raise RegistryError(
-            registry.name,
-            f"Unsupported target strategy: {spec!r}",
-        )
+            resolver = _skip_resolver
+        elif spec == "latest":
+            resolver = _latest_resolver(registry)
+        elif spec == "earliest":
+            resolver = _earliest_resolver(registry)
+        else:
+            resolver = _string_resolver(registry, spec)
+        return resolver
 
     if isinstance(spec, type) and issubclass(spec, BaseModel):
         return _model_resolver(registry, spec, version_property=version_property)
@@ -193,36 +194,29 @@ def _versionable_resolver(
 def _string_resolver(
     registry: Registry[VersionValue],
     value: str,
-    *,
-    version_property: str,
 ) -> TargetResolver:
-    """Resolve a raw string as either a kind or a version value."""
+    """Resolve an explicit version string to a registered versionable.
 
-    # First try to interpret the string as a version value for the current kind.
+    The string is parsed eagerly with :meth:`VersionNode.of`, which understands
+    both semver and ISO date values.  Resolving against an unregistered version
+    raises ``ModelNotFoundError``; an unparsable value fails fast here.
+    """
+    try:
+        parsed = VersionNode.of(value)
+    except ValueError:
+        raise RegistryError(
+            registry.name,
+            f"Could not resolve string target {value!r} to a version",
+        ) from None
+
     def resolve(
         kind: ModelKind,
         _current: Versionable[VersionValue, VModel],
     ) -> Versionable[VersionValue, VModel] | None:
-        strategy = _current.strategy
-        try:
-            parsed = strategy(value)
-            sentinel: Versionable[VersionValue, VModel] = cast(
-                Versionable[VersionValue, VModel],
-                SentinelNode(kind, parsed),
-            )
-            return registry.get_model(sentinel)
-        except (TypeError, ValueError):
-            pass
-
-        # If that fails, try finding a kind whose literal name matches.
-        if kind == value:
-            raise RegistryError(
-                registry.name,
-                f"String target {value!r} matched a kind, not a version",
-            )
-        raise RegistryError(
-            registry.name,
-            f"Could not resolve string target {value!r} to a version",
+        sentinel: Versionable[VersionValue, VModel] = cast(
+            Versionable[VersionValue, VModel],
+            SentinelNode(kind, parsed),
         )
+        return registry.get_model(sentinel)
 
     return resolve

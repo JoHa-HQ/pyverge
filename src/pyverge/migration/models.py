@@ -74,7 +74,7 @@ class MigrationSettings(DiscoverySettings):
     Example:
         .. code-block:: python
 
-            from pydantic_migrator.migration.settings import MigrationSettings
+            from pyverge.migration import MigrationSettings
 
             config = MigrationSettings(
                 version_property="version",

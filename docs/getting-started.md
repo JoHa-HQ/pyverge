@@ -4,81 +4,142 @@
 
 ```bash
 # Core library
-pip install pydantic-migrator
+pip install pyverge
 
 # With CLI
-pip install "pydantic-migrator[cli]"
+pip install "pyverge[cli]"
 ```
+
+The engine is provider-agnostic and works on plain dicts. The examples below
+use the shipped Pydantic adapter; adapters for other model libraries plug in
+the same way.
 
 ## Quick Start
 
 ```python
+from typing import Literal
+
+import semver
 from pydantic import BaseModel
-from pydantic_migrator import ModelManager
 
-manager = ModelManager()
+from pyverge.migration import (
+    MigrationSettings,
+    ModelManager,
+    PydanticModelAdapter,
+)
 
-@manager.model("User", "1.0.0")
+# A manager binds a version strategy to an adapter and settings.
+UserManager = ModelManager.scoped(
+    semver.Version,
+    adapter=PydanticModelAdapter(),
+    settings=MigrationSettings(),
+)
+
+
+# Register versioned models. Version and kind are read from the class itself.
+@UserManager.model()
 class UserV1(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["1.0.0"] = "1.0.0"
     name: str
     email: str
 
-@manager.model("User", "2.0.0")
+
+@UserManager.model()
 class UserV2(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["2.0.0"] = "2.0.0"
     name: str
     email: str
     age: int | None = None
 
-@manager.migration("User", "1.0.0", "2.0.0")
-def add_age(data):
+
+# Register a migration between two versions.
+@UserManager.migration("User", "1.0.0", "2.0.0")
+def add_age(data: dict) -> dict:
     return {**data, "age": None}
 
-# Migrate data
+
+manager = UserManager()
+
+# Migrate data — converges every versioned entry to the configured target.
 migrated = manager.migrate(
-    {"name": "Alice", "email": "alice@example.com"},
-    "User", "1.0.0", "2.0.0"
+    {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"}
 )
 ```
+
+`migrate()` converges the payload to the configured target policy (by default
+`latest`, the most recently registered version of each kind).
 
 ## Registration Patterns
 
 ### Lazy registration
 
-Define model classes first and register them later, either at the class level or on a manager instance. This keeps schema definition separate from runtime wiring and makes testing easier.
+Define model classes first and register them later, either at the class level
+or on a manager instance. This keeps schema definition separate from runtime
+wiring and makes testing easier.
 
 ```python
+from typing import Literal
+
+import semver
 from pydantic import BaseModel
-from pydantic_migrator import ModelManager
+
+from pyverge.migration import (
+    MigrationSettings,
+    ModelManager,
+    PydanticModelAdapter,
+)
+
+UserManager = ModelManager.scoped(
+    semver.Version,
+    adapter=PydanticModelAdapter(),
+    settings=MigrationSettings(),
+)
+
 
 class UserV1(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["1.0.0"] = "1.0.0"
     name: str
     email: str
 
+
 class UserV2(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["2.0.0"] = "2.0.0"
     name: str
     email: str
     age: int | None = None
+
 
 def add_age(data: dict) -> dict:
     data["age"] = None
     return data
 
-# Class-level registration (preferred)
-Manager = ModelManager
-Manager.model("User", "1.0.0")(UserV1)
-Manager.model("User", "2.0.0")(UserV2)
-Manager.migration("User", "1.0.0", "2.0.0")(add_age)
 
-# Instance-level registration (alternative)
-manager = ModelManager()
-manager.model("User", "1.0.0")(UserV1)
-manager.model("User", "2.0.0")(UserV2)
-manager.migration("User", "1.0.0", "2.0.0")(add_age)
+# Class-level registration (preferred) — no instance needed.
+UserManager.model()(UserV1)
+UserManager.model()(UserV2)
+UserManager.migration("User", "1.0.0", "2.0.0")(add_age)
+
+# Instance-level registration (alternative) — use a separate manager class.
+OtherManager = ModelManager.scoped(
+    semver.Version,
+    adapter=PydanticModelAdapter(),
+    settings=MigrationSettings(),
+)
+manager = OtherManager()
+manager.store_model(UserV1)
+manager.store_model(UserV2)
+manager.store_migration((UserV1, UserV2), add_age)
 ```
+
+Class-level and instance-level registration are alternatives — an instance shares
+its class's registry, so registering the same model through both would raise
+`ModelAlreadyRegisteredError`.
 
 ## Next Steps
 
-- Learn about [model registration](sdk/models.md)
-- Define [migrations](sdk/migrations.md)
-- [Export schemas](sdk/schemas.md) as JSON Schema
-- Use the [CLI](cli.md) for project bootstrapping
+- Read the [concepts](concepts.md) page to understand the building blocks.
+- See the [showcases](../showcases/README.md) for end-to-end examples.

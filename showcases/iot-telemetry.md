@@ -9,16 +9,16 @@ visualize telemetry.
 
 ## How converge helps
 
-Each telemetry payload carries a `device_kind` and `firmware_version`. The
-engine migrates incoming payloads to the latest firmware schema before they
-reach storage or stream consumers. Per-device-kind policies let some fleets lag
-behind intentionally.
+Each telemetry payload carries a `kind` and `version` (firmware). The manager
+migrates incoming payloads to the latest firmware schema before they reach
+storage or stream consumers. Per-kind policies let some fleets lag behind
+intentionally.
 
 ## Example flow
 
 1. A temperature sensor reports at firmware `1.0.0`: `{"temp": 22}`.
 2. Firmware `2.0.0` adds `humidity` and renames `temp` to `temperature_c`.
-3. The engine registers both schemas and a migration `1.0.0 → 2.0.0`.
+3. The manager registers both schemas and a migration `1.0.0 → 2.0.0`.
 4. All stored telemetry appears as `2.0.0` records.
 
 ## Convergence policy
@@ -31,18 +31,17 @@ behind intentionally.
 
 ## Per-fleet lag
 
-Some devices cannot be upgraded immediately. A per-kind policy pins those fleets
-to an intermediate target while the rest converge to `latest`:
+Some devices cannot be upgraded immediately. A per-kind target policy pins those
+fleets to an intermediate version while the rest converge to `latest`:
 
 ```python
-resolver = compile_target_resolver(
-    registry,
-    {
-        "LegacySensor": "1.5.0",
-        "*": "latest",
-    },
+manager.migrate(
+    payload,
+    target={"LegacySensor": "1.5.0", "*": "latest"},
 )
 ```
+
+Pinned kinds must be registered with the manager.
 
 ## Quick start
 
@@ -52,85 +51,58 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pydantic_migrator.migration import (
-    Engine,
-    GraphBuilder,
-    MigrationSettings,
-    PydanticModelAdapter,
-    Registry,
-    SequentialExecutor,
-    VersionNode,
-    compile_target_resolver,
-)
-from pydantic_migrator.migration.walker import CompoundKeyWalker
+from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
 
-adapter = PydanticModelAdapter(version_property="version", kind_property="kind")
-registry = Registry[semver.Version]()
-
-
-def _version(model_cls: type[BaseModel], kind: str, version_str: str) -> VersionNode:
-    return VersionNode(model_cls, VersionNode.of(version_str), kind)
-
-
-class TempSensorV1(BaseModel):
-    device_id: str
-    temp: float
-    version: Literal["1.0.0"] = "1.0.0"
-
-
-class TempSensorV2(BaseModel):
-    device_id: str
-    temperature_c: float
-    humidity: float | None = None
-    version: Literal["2.0.0"] = "2.0.0"
-
-
-engine = Engine(
-    registry,
-    MigrationSettings(
-        version_property="version",
-        kind_property="kind",
+TempSensorManager = ModelManager.scoped(
+    semver.Version,
+    adapter=PydanticModelAdapter(),
+    settings=MigrationSettings(
         direction="forward",
         on_direction_violation="skip",
     ),
-    SequentialExecutor(),
-    GraphBuilder(
-        registry,
-        MigrationSettings(),
-        CompoundKeyWalker(registry, settings=MigrationSettings()),
-    ),
-    adapter,
 )
 
-v1 = _version(TempSensorV1, "TempSensor", "1.0.0")
-v2 = _version(TempSensorV2, "TempSensor", "2.0.0")
 
-engine.store_model(v1)
-engine.store_model(v2)
+@TempSensorManager.model()
+class TempSensorV1(BaseModel):
+    kind: Literal["TempSensor"] = "TempSensor"
+    version: Literal["1.0.0"] = "1.0.0"
+    device_id: str
+    temp: float
 
-engine.store_migration(
-    (v1, v2),
-    lambda d: {
-        "device_id": d["device_id"],
-        "temperature_c": d["temp"],
+
+@TempSensorManager.model()
+class TempSensorV2(BaseModel):
+    kind: Literal["TempSensor"] = "TempSensor"
+    version: Literal["2.0.0"] = "2.0.0"
+    device_id: str
+    temperature_c: float
+    humidity: float | None = None
+
+
+@TempSensorManager.migration("TempSensor", "1.0.0", "2.0.0")
+def rename_temp(data: dict) -> dict:
+    return {
+        "device_id": data["device_id"],
+        "temperature_c": data["temp"],
         "humidity": None,
-    },
-)
+    }
 
-resolver = compile_target_resolver(registry, "latest")
+
+manager = TempSensorManager()
 
 payload = {"kind": "TempSensor", "version": "1.0.0", "device_id": "abc", "temp": 22.5}
-migrated = engine.migrate(payload, target_resolver=resolver)
+migrated = manager.migrate(payload)
 assert migrated["version"] == "2.0.0"
 assert migrated["temperature_c"] == 22.5
 ```
 
 ### Abstractions used
 
-- **Engine** — converges each telemetry payload independently.
-- **compile_target_resolver** — lets fleets use different targets.
-- **SequentialExecutor** — fine for per-message gateway use; switch to
-  `LevelParallelExecutor` for batch ingestion.
+- **ModelManager** — converges each telemetry payload independently.
+- **`target` policy** — per-kind targets let fleets use different schemas.
+- **`on_direction_violation="skip"`** — newer messages arriving at an older
+  gateway are left as-is instead of failing.
 
 ## Out of scope
 

@@ -32,10 +32,7 @@ the app reverts. Target policies per config kind make this explicit.
 When rolling back an app version, pin the config target to the older schema:
 
 ```python
-resolver = compile_target_resolver(
-    registry,
-    {"FeatureFlags": "1.0.0"},
-)
+manager.migrate(payload, target={"FeatureFlags": "1.0.0"})
 ```
 
 ## Quick start
@@ -46,81 +43,61 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pydantic_migrator.migration import (
-    Engine,
-    GraphBuilder,
-    MigrationSettings,
-    PydanticModelAdapter,
-    Registry,
-    SequentialExecutor,
-    VersionNode,
-    compile_target_resolver,
-)
-from pydantic_migrator.migration.walker import CompoundKeyWalker
+from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
 
-adapter = PydanticModelAdapter(version_property="version", kind_property="kind")
-registry = Registry[semver.Version]()
-
-
-def _version(model_cls: type[BaseModel], kind: str, version_str: str) -> VersionNode:
-    return VersionNode(model_cls, VersionNode.of(version_str), kind)
-
-
-class FeatureFlagsV1(BaseModel):
-    dark_mode: bool
-    version: Literal["1.0.0"] = "1.0.0"
-
-
-class FeatureFlagsV2(BaseModel):
-    dark_mode: bool
-    notifications: bool = True
-    version: Literal["2.0.0"] = "2.0.0"
-
-
-engine = Engine(
-    registry,
-    MigrationSettings(
-        version_property="version",
-        kind_property="kind",
+FeatureFlagsManager = ModelManager.scoped(
+    semver.Version,
+    adapter=PydanticModelAdapter(),
+    settings=MigrationSettings(
         direction="any",
-        target_strategy="latest",
         on_direction_violation="raise",
     ),
-    SequentialExecutor(),
-    GraphBuilder(
-        registry,
-        MigrationSettings(),
-        CompoundKeyWalker(registry, settings=MigrationSettings()),
-    ),
-    adapter,
 )
 
-v1 = _version(FeatureFlagsV1, "FeatureFlags", "1.0.0")
-v2 = _version(FeatureFlagsV2, "FeatureFlags", "2.0.0")
 
-engine.store_model(v1)
-engine.store_model(v2)
+@FeatureFlagsManager.model()
+class FeatureFlagsV1(BaseModel):
+    kind: Literal["FeatureFlags"] = "FeatureFlags"
+    version: Literal["1.0.0"] = "1.0.0"
+    dark_mode: bool
 
-engine.store_migration(
-    (v1, v2),
-    lambda d: {**d, "notifications": True},
-)
-engine.store_migration(
-    (v2, v1),
-    lambda d: {k: v for k, v in d.items() if k in {"dark_mode", "version", "kind"}},
-)
+
+@FeatureFlagsManager.model()
+class FeatureFlagsV2(BaseModel):
+    kind: Literal["FeatureFlags"] = "FeatureFlags"
+    version: Literal["2.0.0"] = "2.0.0"
+    dark_mode: bool
+    notifications: bool = True
+
+
+@FeatureFlagsManager.migration("FeatureFlags", "1.0.0", "2.0.0")
+def add_notifications(data: dict) -> dict:
+    return {**data, "notifications": True}
+
+
+@FeatureFlagsManager.migration("FeatureFlags", "2.0.0", "1.0.0")
+def drop_notifications(data: dict) -> dict:
+    return {k: v for k, v in data.items() if k in {"kind", "version", "dark_mode"}}
+
+
+manager = FeatureFlagsManager()
 
 # Normal load: latest schema.
-migrated = engine.migrate(
+migrated = manager.migrate(
     {"kind": "FeatureFlags", "version": "1.0.0", "dark_mode": True}
 )
 assert migrated["version"] == "2.0.0"
 assert migrated["notifications"] is True
 
 # Rollback: pin to the earliest schema.
-rollback = engine.migrate(
-    {"kind": "FeatureFlags", "version": "2.0.0", "dark_mode": True, "notifications": False},
-    target_resolver=compile_target_resolver(registry, {"FeatureFlags": "earliest"}),
+rollback = manager.migrate(
+    {
+        "kind": "FeatureFlags",
+        "version": "2.0.0",
+        "dark_mode": True,
+        "notifications": False,
+    },
+    target="earliest",
 )
 assert rollback["version"] == "1.0.0"
 assert "notifications" not in rollback
@@ -128,12 +105,11 @@ assert "notifications" not in rollback
 
 ### Abstractions used
 
-- **Engine** with `direction="any"` — supports both forward migration and
+- **ModelManager** with `direction="any"` — supports both forward migration and
   backward rollback.
-- **compile_target_resolver** — lets the app pin a specific target schema at
-  runtime.
-- **SequentialExecutor** — configuration payloads are typically small and
-  single-threaded.
+- **`target` policy** — `manager.migrate(payload, target=...)` pins a specific
+  schema at runtime (`"latest"`, `"earliest"`, or a per-kind dict).
+- **Migration functions** — registered both ways (`1.0.0 → 2.0.0` and back).
 
 ## Out of scope
 

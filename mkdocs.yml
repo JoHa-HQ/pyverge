@@ -1,6 +1,6 @@
-site_name: pydantic-migrator
-site_description: Schema evolution and migrations for Pydantic models
-repo_url: https://github.com/joha-hq/pydantic-migrator
+site_name: pyverge
+site_description: Schema evolution and migrations for versioned models
+repo_url: https://github.com/JoHa-HQ/pyverge
 
 theme:
   name: material
@@ -13,14 +13,8 @@ theme:
     - search.highlight
 
 nav:
-  - Home: index.md
-  - Getting Started: getting-started.md
-  - SDK:
-      - Models: sdk/models.md
-      - Migrations: sdk/migrations.md
-      - Schema Export: sdk/schemas.md
-  - CLI: cli.md
-  - API Reference: api-reference.md
+  - Home: getting-started.md
+  - Concepts: concepts.md
 
 markdown_extensions:
   - pymdownx.highlight

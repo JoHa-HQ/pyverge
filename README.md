@@ -1,69 +1,135 @@
-# pydantic-migrator
+# pyverge
 
-Schema evolution and migrations for Pydantic models. Version your models, define migrations between versions, validate/migrate data at runtime, and export JSON Schema definitions.
+Schema evolution and migrations for versioned data models. Version your
+models, define migrations between versions, and converge payloads to a target
+schema at runtime.
+
+The engine is provider-agnostic: it works on plain dicts and only touches a
+model library through the `ModelAdapter` seam. A Pydantic adapter ships today;
+adapters for other providers (dataclasses, attrs, marshmallow, MessagePack,
+etc.) plug in the same way.
 
 ## Installation
 
 ```bash
-# Core library (model versioning, migrations, schema generation)
-pip install pydantic-migrator
+# Core library (versioned registry, migration engine, diffing)
+pip install pyverge
 
-# With CLI (validate, migrate, diff, export commands)
-pip install "pydantic-migrator[cli]"
+# With CLI (init, validate, migrate, diff, export commands)
+pip install "pyverge[cli]"
 
-# With dev dependencies
-pip install "pydantic-migrator[dev]"
+# With OpenTelemetry migration hooks
+pip install "pyverge[telemetry]"
 ```
+
+Development dependencies are managed as a dependency group; install them with
+`uv sync --group dev` (or `hatch`/your tool's equivalent).
 
 ## Quick Start
 
 ```python
+from typing import Literal
+
+import semver
 from pydantic import BaseModel
-from pydantic_migrator import ModelManager, Registry
 
-# Register versioned models
-registry = Registry()
+from pyverge.migration import (
+    MigrationSettings,
+    ModelManager,
+    PydanticModelAdapter,
+)
 
-@registry.register("User", "1.0.0")
+# A manager binds a version strategy to an adapter and settings.
+UserManager = ModelManager.scoped(
+    semver.Version,
+    adapter=PydanticModelAdapter(),
+    settings=MigrationSettings(),
+)
+
+
+# Register versioned models. Version and kind are read from the class itself.
+@UserManager.model()
 class UserV1(BaseModel):
-    name: str
-
-@registry.register("User", "2.0.0")
-class UserV2(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["1.0.0"] = "1.0.0"
     name: str
     email: str
 
-# Create manager and register a migration
-manager = ModelManager(registry)
 
-@manager.migration("User", "1.0.0", "2.0.0")
-def add_email(data):
-    return {**data, "email": f"{data['name']}@example.com"}
+@UserManager.model()
+class UserV2(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["2.0.0"] = "2.0.0"
+    name: str
+    email: str
+    age: int | None = None
 
-# Migrate data
-migrated = manager.migrate({"name": "Alice"}, "User", "1.0.0", "2.0.0")
+
+# Register a migration between two versions.
+@UserManager.migration("User", "1.0.0", "2.0.0")
+def add_age(data: dict) -> dict:
+    return {**data, "age": None}
+
+
+manager = UserManager()
+
+# Migrate data — converges every versioned entry to the configured target.
+migrated = manager.migrate(
+    {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"}
+)
+# -> {"kind": "User", "version": "2.0.0", "name": "Alice", "email": "a@b.com", "age": None}
 ```
 
 ## CLI
 
 ```bash
-# Requires: pip install "pydantic-migrator[cli]"
+# Requires: pip install "pyverge[cli]"
 
-pydantic-migrator init          # Bootstrap a new project
-pydantic-migrator validate      # Validate data against a schema version
-pydantic-migrator migrate       # Migrate data between versions
-pydantic-migrator diff          # Show differences between versions
-pydantic-migrator export        # Export JSON Schema definitions
-pydantic-migrator info          # List registered models and versions
+pyverge init          # Bootstrap a new project
+pyverge validate      # Validate data against a schema version
+pyverge migrate       # Migrate data between versions
+pyverge diff          # Show differences between versions
+pyverge export        # Export JSON Schema definitions
+pyverge info          # List registered models and versions
+pyverge managers      # List available managers from configuration
 ```
+
+Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
+`pyproject.toml`), pointing at the module that defines your manager.
 
 ## Features
 
-- **Versioned model registry** — decorator-based registration with semantic versions
-- **Step-wise migrations** — register functions between versions with auto-migration for nested models
-- **Batch operations** — streaming batch migrations for large datasets
-- **JSON Schema export** — generate and dump schemas from versioned models
-- **Model diffing** — breaking change detection, markdown/JSON output
-- **Migration hooks** — observability via before/after/error callbacks
-- **Migration testing** — input/expected-output test framework with pytest integration
-- **Typed model retrieval** — `get()` / `get_latest()` return `VersionedModel` with `.cls` and `.load()`; see [Models SDK docs](docs/sdk/models.md)
+- **Versioned model registry** — decorator-based registration with semver or ISO date versioning
+- **Provider adapters** — pluggable `ModelAdapter`; Pydantic ships today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
+- **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
+- **Target policies** — converge to `latest`, `earliest`, a pinned version, or per-kind overrides
+- **Executors** — sequential or level-parallel batch convergence
+- **Model diffing** — breaking-change detection with JSON Patch rendering
+- **Migration hooks** — observability via before/after/error callbacks, plus an OpenTelemetry hook
+
+## Documentation
+
+- [Getting Started](docs/getting-started.md)
+- [Concepts](docs/concepts.md)
+- [Showcases](showcases/README.md)
+
+## Plan
+
+Items intentionally out of scope for this documentation pass, tracked here for
+follow-up:
+
+- **CLI/manager facade alignment** — the CLI calls `validate_data`, `get`,
+  `diff`, `list_models`, `list_versions`, and `dump_schemas` on a manager, and
+  `migrate(data, schema, from_version, to_version)`. The current
+  `ModelManager` does not expose these; the CLI needs a matching facade before
+  its commands work end-to-end.
+- **Additional model providers** — adapters for dataclasses, attrs, marshmallow,
+  and MessagePack, mirroring `PydanticModelAdapter` behind the `ModelAdapter`
+  seam.
+- **Real-source integrations** — `showcases/` projects wiring for document
+  storage (converge on read), Kafka consumers, RabbitMQ/streams workers, and
+  MQTT/IoT gateways on the high-level `ModelManager` API, with thin adapters
+  around real drivers (`motor`, `confluent-kafka`, `aio-pika`, `paho-mqtt`).
+  The transport glue is not shipped yet.
+- **API reference** — an auto-generated API reference page will be restored
+  once the SDK surface is stable.
