@@ -98,9 +98,10 @@ def test_finds_registered_versioned_dict(
     }
     if container is not None:
         kwargs["container"] = container
-    entries = list(
-        walker_cls(registry, settings=discovery_settings).discover(payload, **kwargs)
-    )
+    walker_kwargs: dict[str, Any] = {"settings": discovery_settings}
+    if walker_cls is PydanticWalker:
+        walker_kwargs["adapter"] = model_adapter
+    entries = list(walker_cls(registry, **walker_kwargs).discover(payload, **kwargs))
     assert len(entries) == 1
     assert entries[0][0] == ("document",)
     assert entries[0][2].model is UserV1
@@ -161,7 +162,9 @@ def test_pydantic_walker_requires_container(
     discovery_settings: DiscoverySettings,
     registry: Registry[semver.Version],
 ) -> None:
-    walker = PydanticWalker(registry, settings=discovery_settings)
+    walker = PydanticWalker(
+        registry, settings=discovery_settings, adapter=model_adapter
+    )
     with pytest.raises(DiscoveryValidationError, match="container model"):
         list(walker.discover({}, target_resolver=_null_resolver()))
 
@@ -181,7 +184,7 @@ def test_pydantic_walker_invalid_payload_raises(
     settings: DiscoverySettings,
 ) -> None:
     register_models(model_adapter, registry, discovery_settings, UserV1)
-    walker = PydanticWalker(registry, settings=settings)
+    walker = PydanticWalker(registry, settings=settings, adapter=model_adapter)
     payload = {
         "document": {
             "kind": "User",
@@ -213,7 +216,7 @@ def test_pydantic_walker_validation_mode_none_skips_model_validate(
     settings: DiscoverySettings,
 ) -> None:
     register_models(model_adapter, registry, discovery_settings, UserV1)
-    walker = PydanticWalker(registry, settings=settings)
+    walker = PydanticWalker(registry, settings=settings, adapter=model_adapter)
     payload = {
         "document": {
             "kind": "User",

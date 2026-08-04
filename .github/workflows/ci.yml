@@ -19,7 +19,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
-      - run: uv sync --extra dev
+      - run: uv sync --group dev
       - run: uv run pre-commit run --all-files
       - name: Check conventional commits
         if: github.event_name == 'pull_request'

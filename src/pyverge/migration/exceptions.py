@@ -8,6 +8,9 @@ from .types import (
     VModel,
 )
 
+# Length of an endpoint-pair key, e.g. ``(source, target)``.
+_ENDPOINT_PAIR = 2
+
 
 class RegistryError(Exception):
     """Raised when a registry error occurs."""
@@ -220,7 +223,7 @@ class MigrationError(Exception):
         ``kind, source, target`` form for convenience.
         """
         source_kind, target_kind = None, None
-        if isinstance(kind, tuple) and len(kind) == 2 and source is None:
+        if isinstance(kind, tuple) and len(kind) == _ENDPOINT_PAIR and source is None:
             source, target = kind
             kind = "unknown"
         if source is not None and hasattr(source, "version"):

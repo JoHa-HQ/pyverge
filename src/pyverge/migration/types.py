@@ -18,7 +18,6 @@ from pydantic import BaseModel
 from semver import Version as SemVer
 
 if TYPE_CHECKING:
-    from .adapters import ModelAdapter
     from .graph import MigrationGraph
     from .registry import Registry
     from .strategy import EntryMigration
@@ -273,6 +272,36 @@ class Renderable(Protocol):
     """Protocol for objects that can be rendered as a string."""
 
     def __call__(self) -> Any: ...
+
+
+@runtime_checkable
+class ModelAdapter(Protocol):
+    """Provider-specific model operations.
+
+    Implementations are provided for each supported model provider
+    (Pydantic, attrs, dataclasses, MessagePack, etc.).  The migration
+    engine and registry remain provider-agnostic.
+    """
+
+    def version(self, model_cls: type[Any]) -> str: ...
+    def kind(self, model_cls: type[Any]) -> str: ...
+    def finalize(
+        self, target_model: type[Any], data: dict[str, Any]
+    ) -> dict[str, Any]: ...
+    def validate(
+        self,
+        data: dict[str, Any],
+        container: type[Any],
+        *,
+        strict: bool = False,
+    ) -> dict[str, Any]: ...
+    def resolve_model(self, annotation: Any) -> type[BaseModel] | None: ...
+    def field_model(
+        self, parent_model: type[Any], field_name: str
+    ) -> type[BaseModel] | None: ...
+    def versionable(
+        self, model_cls: type[VModel]
+    ) -> Versionable[VersionValue, VModel]: ...
 
 
 VersionPair: TypeAlias = tuple[
