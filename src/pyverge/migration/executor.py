@@ -4,7 +4,6 @@ import copy
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any, Generic
 
-from .adapters import ModelAdapter
 from .exceptions import MigrationError, MigrationNotFoundError
 from .graph import GraphEntry, MigrationGraph
 from .registry import Registry
@@ -14,6 +13,7 @@ from .types import (
     DirectionViolationStrategy,
     Executor,
     MigrationDirectionStrategy,
+    ModelAdapter,
     ModelData,
     Versionable,
     VersionMissingStrategy,

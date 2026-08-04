@@ -36,7 +36,6 @@ from typing import Any, Generic, cast
 
 from pydantic import BaseModel
 
-from .adapters import ModelAdapter
 from .engine import Engine
 from .executor import SequentialExecutor
 from .graph import GraphBuilder
@@ -49,6 +48,7 @@ from .types import (
     Executor,
     MigrationDirectionStrategy,
     MigrationFunc,
+    ModelAdapter,
     ModelData,
     ModelKind,
     ModelVersionKey,
@@ -83,9 +83,7 @@ def _resolve_migration_key(
             cast(VersionValue, VersionNode.of(target_version)),
         )
     else:
-        source_cls, target_cls = cast(
-            tuple[type[VModel], type[VModel]], key
-        )
+        source_cls, target_cls = cast(tuple[type[VModel], type[VModel]], key)
         source_key, target_key = source_cls, target_cls
     return engine.get_model(source_key), engine.get_model(target_key)
 
@@ -113,8 +111,10 @@ class _ModelDescriptor:
         def decorator(
             *args: Any,
         ) -> type[VModel] | Callable[[type[VModel]], type[VModel]]:
-            if len(args) == 1 and isinstance(args[0], type) and issubclass(
-                args[0], BaseModel
+            if (
+                len(args) == 1
+                and isinstance(args[0], type)
+                and issubclass(args[0], BaseModel)
             ):
                 model_cls = args[0]
                 engine = owner._engine
@@ -126,9 +126,7 @@ class _ModelDescriptor:
                 return model_cls
 
             if len(args) != 0:
-                raise TypeError(
-                    "manager.model expects no args or a model class"
-                )
+                raise TypeError("manager.model expects no args or a model class")
 
             def wrapper(model_cls: type[VModel]) -> type[VModel]:
                 engine = owner._engine
@@ -350,9 +348,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         Accepts a raw model class (converted to a ``Versionable`` by the
         adapter) or a pre-built ``VersionNode``.
         """
-        return self.engine.store_model(
-            self.engine.adapter.versionable(key)
-        )
+        return self.engine.store_model(self.engine.adapter.versionable(key))
 
     def store_migration(
         self,
@@ -393,14 +389,13 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     def get_migration(
         self,
         key: (
-            tuple[ModelVersionKey, ModelVersionKey]
-            | tuple[type[VModel], type[VModel]]
-        )
+            tuple[ModelVersionKey, ModelVersionKey] | tuple[type[VModel], type[VModel]]
+        ),
     ) -> MigrationFunc:
         """Return a registered migration function."""
         return self.engine.get_migration(key)
 
-    def migrate(
+    def migrate(  # noqa: PLR0913
         self,
         data: ModelData,
         target: TargetPolicy | None = None,

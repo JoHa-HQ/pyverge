@@ -7,13 +7,13 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .adapters import ModelAdapter
 from .exceptions import DiscoveryValidationError, MaxDepthExceededError
 from .models import DiscoverySettings
 from .registry import Registry
 from .types import (
     Entry,
     MigrationDirectionStrategy,
+    ModelAdapter,
     TargetResolver,
     VersionValue,
 )
@@ -231,9 +231,7 @@ class PydanticWalker(WalkerProtocol):
 
             field_model: type[BaseModel] | None = None
             if parent_model is not None and path:
-                field_model = self._adapter.field_model(
-                    parent_model, str(path[-1])
-                )
+                field_model = self._adapter.field_model(parent_model, str(path[-1]))
 
             for key, nested in value.items():
                 child_model = field_model
@@ -256,9 +254,7 @@ class PydanticWalker(WalkerProtocol):
         elif isinstance(value, list):
             item_model: type[BaseModel] | None = None
             if parent_model is not None and path:
-                item_model = self._adapter.field_model(
-                    parent_model, str(path[-1])
-                )
+                item_model = self._adapter.field_model(parent_model, str(path[-1]))
 
             for idx, item in enumerate(value):
                 yield from self._walk(

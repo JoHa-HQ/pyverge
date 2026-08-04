@@ -5,7 +5,6 @@ from typing import Any, Generic, Self
 
 from pydantic import BaseModel
 
-from .adapters import ModelAdapter
 from .diff import PydanticDiff
 from .exceptions import (
     MigrationError,
@@ -26,6 +25,7 @@ from .types import (
     MigrationDirectionStrategy,
     MigrationFunc,
     MigrationKeyInput,
+    ModelAdapter,
     ModelData,
     ModelKind,
     ModelVersionKey,
@@ -263,9 +263,9 @@ class Engine(Generic[VersionValue]):
                 SentinelEdge.from_pair(versions[i], versions[i + 1])
                 for i in range(lo, hi)
             ]
-            for key in gap:
+            for gap_edge in gap:
                 try:
-                    edge = registry.get_migration_by_edge(key)
+                    edge = registry.get_migration_by_edge(gap_edge)
                 except MigrationNotFoundError as exc:
                     raise RegistryError(
                         registry.name,

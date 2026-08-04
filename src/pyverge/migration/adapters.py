@@ -8,7 +8,7 @@ provider-specific introspection APIs directly.
 
 from __future__ import annotations
 
-from typing import Any, Protocol, cast, runtime_checkable
+from typing import Any, cast
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -16,36 +16,6 @@ from pydantic_core import PydanticUndefined
 
 from .types import VersionValue, VModel
 from .versioning import VersionNode
-
-
-@runtime_checkable
-class ModelAdapter(Protocol):
-    """Provider-specific model operations.
-
-    Implementations are provided for each supported model provider
-    (Pydantic, attrs, dataclasses, MessagePack, etc.).  The migration
-    engine and registry remain provider-agnostic.
-    """
-
-    def version(self, model_cls: type[Any]) -> str: ...
-    def kind(self, model_cls: type[Any]) -> str: ...
-    def finalize(
-        self, target_model: type[Any], data: dict[str, Any]
-    ) -> dict[str, Any]: ...
-    def validate(
-        self,
-        data: dict[str, Any],
-        container: type[Any],
-        *,
-        strict: bool = False,
-    ) -> dict[str, Any]: ...
-    def resolve_model(self, annotation: Any) -> type[BaseModel] | None: ...
-    def field_model(
-        self, parent_model: type[Any], field_name: str
-    ) -> type[BaseModel] | None: ...
-    def versionable(
-        self, model_cls: type[VModel]
-    ) -> VersionNode[VersionValue, VModel]: ...
 
 
 class PydanticModelAdapter:
@@ -145,9 +115,7 @@ class PydanticModelAdapter:
             return None
         return self.resolve_model(field_info.annotation)
 
-    def versionable(
-        self, model_cls: type[VModel]
-    ) -> VersionNode[VersionValue, VModel]:
+    def versionable(self, model_cls: type[VModel]) -> VersionNode[VersionValue, VModel]:
         """Build a ``VersionNode`` wrapping *model_cls* using its encoded metadata."""
         return VersionNode[VersionValue, VModel](
             _model=model_cls,

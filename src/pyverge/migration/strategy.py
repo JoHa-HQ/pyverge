@@ -25,7 +25,7 @@ from .types import (
 )
 
 if TYPE_CHECKING:
-    from .adapters import ModelAdapter
+    from .types import ModelAdapter
 
 
 @runtime_checkable

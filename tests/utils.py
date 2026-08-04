@@ -8,7 +8,6 @@ from pyverge.migration import (
     EntryMigration,
     GraphBuilder,
     MigrationGraph,
-    ModelAdapter,
     PydanticDiff,
     PydanticModelAdapter,
     Registry,
@@ -21,7 +20,7 @@ from pyverge.migration import (
 
 
 def envelope_model(
-    adapter: ModelAdapter,
+    adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
     model_cls: type[types.VModel],
 ) -> VersionNode[types.VersionValue, types.VModel]:
@@ -35,7 +34,7 @@ def envelope_model(
 
 
 def edge_from_models(
-    adapter: ModelAdapter,
+    adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
     source_cls: type[types.VModel],
     target_cls: type[types.VModel],
@@ -58,7 +57,7 @@ def edge_from_models(
 
 
 def register_models(
-    adapter: ModelAdapter,
+    adapter: types.ModelAdapter,
     registry: Registry[types.VersionValue],
     settings: VersioningSettings,
     *models: type[types.VModel],
@@ -104,7 +103,7 @@ def make_engine(
 
 
 def populate_graph(
-    adapter: ModelAdapter,
+    adapter: types.ModelAdapter,
     registry: Registry[types.VersionValue],
     discovery_settings: DiscoverySettings,
     *models: type[types.VModel],
