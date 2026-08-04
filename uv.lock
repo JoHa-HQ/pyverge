@@ -1462,10 +1462,6 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-cli = [
-  {name = "rich"},
-  {name = "typer"}
-]
 dev = [
   {name = "commitizen"},
   {name = "hatch"},
@@ -1480,24 +1476,21 @@ dev = [
   {name = "ty"},
   {name = "typing-extensions"}
 ]
-telemetry = [
-  {name = "opentelemetry-distro"},
-  {name = "opentelemetry-exporter-otlp"}
-]
 
 [package.metadata]
 requires-dist = [
+  {name = "opentelemetry-distro", extras = ["telemetry"], marker = "extra == 'telemetry'", specifier = ">=0.65b0"},
+  {name = "opentelemetry-exporter-otlp", extras = ["telemetry"], marker = "extra == 'telemetry'", specifier = ">=1.44.0"},
   {name = "pendulum", specifier = ">=3.2.0"},
   {name = "pydantic", extras = ["email", "timezone"], specifier = ">=2.11"},
   {name = "pydantic-extra-types", extras = ["phonenumbers"], specifier = ">=2.9"},
-  {name = "semver", specifier = ">=3.0"}
+  {name = "rich", marker = "extra == 'cli'", specifier = ">=13"},
+  {name = "semver", specifier = ">=3.0"},
+  {name = "typer", marker = "extra == 'cli'", specifier = ">=0.21"}
 ]
+provides-extras = ["cli", "telemetry"]
 
 [package.metadata.requires-dev]
-cli = [
-  {name = "rich", specifier = ">=13"},
-  {name = "typer", specifier = ">=0.21"}
-]
 dev = [
   {name = "commitizen", specifier = ">=4.16.2"},
   {name = "hatch", specifier = ">=1.16.5"},
@@ -1512,9 +1505,15 @@ dev = [
   {name = "ty", specifier = ">=0.0.1a5"},
   {name = "typing-extensions", specifier = ">=4.15.0"}
 ]
+
+[package.optional-dependencies]
+cli = [
+  {name = "rich"},
+  {name = "typer"}
+]
 telemetry = [
-  {name = "opentelemetry-distro", specifier = ">=0.65b0"},
-  {name = "opentelemetry-exporter-otlp", specifier = ">=1.44.0"}
+  {name = "opentelemetry-distro"},
+  {name = "opentelemetry-exporter-otlp"}
 ]
 
 [[package]]

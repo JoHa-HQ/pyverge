@@ -3,10 +3,6 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-telemetry = [
-  "opentelemetry-distro>=0.65b0",
-  "opentelemetry-exporter-otlp>=1.44.0"
-]
 dev = [
   "python-semantic-release>=10.5",
   "pytest>=8.3",
@@ -21,10 +17,6 @@ dev = [
   "pytest-stub>=1.1.0",
   "typing-extensions>=4.15.0"
 ]
-cli = [
-  "typer>=0.21",
-  "rich>=13"
-]
 
 [project]
 name = "pyverge"
@@ -38,6 +30,16 @@ dependencies = [
   "pydantic-extra-types[phonenumbers]>=2.9",
   "semver>=3.0",
   "pendulum>=3.2.0"
+]
+
+[project.optional-dependencies]
+telemetry = [
+  "opentelemetry-distro[telemetry]>=0.65b0",
+  "opentelemetry-exporter-otlp[telemetry]>=1.44.0"
+]
+cli = [
+  "typer>=0.21",
+  "rich>=13"
 ]
 
 [project.scripts]
