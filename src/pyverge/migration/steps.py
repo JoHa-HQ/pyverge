@@ -3,9 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Generic, Protocol
 
-from .types import Attachable, Migratable, ModelData
+from .types import (
+    Attachable,
+    Migratable,
+    ModelData,
+    VersionValue,
+    VSource,
+    VTarget,
+)
 
 
 class _Step(Protocol):
@@ -15,25 +22,27 @@ class _Step(Protocol):
         self,
         data: ModelData,
         hooks: list[Attachable],
-        from_version: Any,
-        to_version: Any,
     ) -> ModelData: ...
 
 
 @dataclass(frozen=True, slots=True)
-class ExplicitStep:
-    """Step backed by a registered :class:`Migratable` edge."""
+class ExplicitStep(Generic[VersionValue, VSource, VTarget]):
+    """Step backed by a registered :class:`Migratable` edge.
 
-    edge: Migratable[Any, Any, Any]
+    ``from_version`` / ``to_version`` are derived from the edge itself and
+    passed to the hooks — no external endpoints are required.
+    """
+
+    edge: Migratable[VersionValue, VSource, VTarget]
 
     def execute(
         self,
         data: ModelData,
         hooks: list[Attachable],
-        from_version: Any,
-        to_version: Any,
     ) -> ModelData:
-        kind = getattr(from_version, "kind", "unknown")
+        kind = self.edge.kind
+        from_version = self.edge.source
+        to_version = self.edge.target
         for hook in hooks:
             hook.before_migrate(str(kind), from_version, to_version, data)
         result = self.edge(data)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic
 
 from .adapters import ModelAdapter
 from .exceptions import MigrationError, MigrationNotFoundError
@@ -15,7 +15,12 @@ from .types import (
     Executor,
     MigrationDirectionStrategy,
     ModelData,
+    Versionable,
     VersionMissingStrategy,
+    VersionValue,
+    VModel,
+    VSource,
+    VTarget,
 )
 from .versioning import SentinelEdge
 
@@ -23,16 +28,16 @@ if TYPE_CHECKING:
     from .strategy import EntryMigration
 
 
-class StepExecutor:
+class StepExecutor(Generic[VersionValue]):
     """Resolves and runs a single migration step from the registry."""
 
-    def __init__(self, registry: Registry[Any]) -> None:
+    def __init__(self, registry: Registry[VersionValue]) -> None:
         self._registry = registry
 
     def execute_step(
         self,
-        step_from: Any,
-        step_to: Any,
+        step_from: Versionable[VersionValue, VModel],
+        step_to: Versionable[VersionValue, VModel],
         data: ModelData,
         hooks: tuple[Attachable, ...],
         vp: str,
@@ -41,7 +46,7 @@ class StepExecutor:
         step = self._resolve_step(step_from, step_to)
         hooks_list = list(hooks)
         try:
-            result = step.execute(data, hooks_list, step_from, step_to)
+            result = step.execute(data, hooks_list)
         except MigrationError:
             raise
         except Exception as exc:
@@ -59,13 +64,15 @@ class StepExecutor:
 
     def _resolve_step(
         self,
-        step_from: Any,
-        step_to: Any,
-    ) -> ExplicitStep:
+        step_from: Versionable[VersionValue, VModel],
+        step_to: Versionable[VersionValue, VModel],
+    ) -> ExplicitStep[VersionValue, VSource, VTarget]:
         """Resolve an edge to an explicit migration step."""
         key = SentinelEdge.from_pair(step_from, step_to)
         if self._registry.has_migration(key):
-            return ExplicitStep(self._registry.get_migration(key))
+            return ExplicitStep[VersionValue, VSource, VTarget](
+                self._registry.get_migration(key)
+            )
         raise MigrationNotFoundError(
             self._registry.name,
             (step_from, step_to),
@@ -78,10 +85,10 @@ class SequentialExecutor(Executor):
     def run(
         self,
         data: ModelData,
-        graph: MigrationGraph[Any],
+        graph: MigrationGraph[VersionValue],
         *,
-        registry: Registry[Any],
-        entry_migration: EntryMigration[Any],
+        registry: Registry[VersionValue],
+        entry_migration: EntryMigration[VersionValue],
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
@@ -120,10 +127,10 @@ class LevelParallelExecutor(Executor):
     def run(
         self,
         data: ModelData,
-        graph: MigrationGraph[Any],
+        graph: MigrationGraph[VersionValue],
         *,
-        registry: Registry[Any],
-        entry_migration: EntryMigration[Any],
+        registry: Registry[VersionValue],
+        entry_migration: EntryMigration[VersionValue],
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
@@ -182,14 +189,14 @@ class LevelParallelExecutor(Executor):
 
 
 def _run_task(
-    entry_migration: EntryMigration[Any],
+    entry_migration: EntryMigration[VersionValue],
     step_executor: StepExecutor,
     adapter: ModelAdapter,
     version_property: str,
     direction: MigrationDirectionStrategy,
     on_direction_violation: DirectionViolationStrategy,
     on_missing_path: VersionMissingStrategy,
-    entry: GraphEntry[Any],
+    entry: GraphEntry[VersionValue, VModel],
     current: ModelData,
 ) -> ModelData:
     """Helper for running a task inside a thread pool."""
