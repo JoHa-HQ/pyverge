@@ -8,6 +8,7 @@ from pyverge.migration import (
     DiscoverySettings,
     Engine,
     MigrationSettings,
+    ModelManager,
     PydanticModelAdapter,
     Registry,
     VersioningSettings,
@@ -79,6 +80,32 @@ def registry(request: pytest.FixtureRequest) -> Registry:
         return request.getfixturevalue("date_registry")
     else:
         raise ValueError(f"Unsupported registry type: {request.param}")
+
+
+@pytest.fixture
+def semver_manager(
+    model_adapter: PydanticModelAdapter,
+) -> type[ModelManager[semver.Version]]:
+    return ModelManager.scoped(semver.Version, model_adapter)
+
+
+@pytest.fixture
+def chrono_manager(
+    model_adapter: PydanticModelAdapter,
+) -> type[ModelManager[pendulum.Date]]:
+    return ModelManager.scoped(pendulum.Date, model_adapter)
+
+
+@pytest.fixture
+def manager(
+    request: pytest.FixtureRequest,
+) -> type[ModelManager]:
+    if request.param == semver.Version:
+        return request.getfixturevalue("semver_manager")
+    elif request.param == pendulum.Date:
+        return request.getfixturevalue("chrono_manager")
+    else:
+        raise ValueError(f"Unsupported manager strategy: {request.param}")
 
 
 @pytest.fixture

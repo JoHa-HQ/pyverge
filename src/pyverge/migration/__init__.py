@@ -1,5 +1,5 @@
 from . import types
-from .adapters import ModelAdapter, PydanticModelAdapter
+from .adapters import PydanticModelAdapter
 from .diff import PydanticDiff
 from .engine import Engine
 from .exceptions import (
@@ -29,7 +29,6 @@ from .models import (
 from .policy import compile_target_resolver, compile_target_spec
 from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
-from .types import ModelData, Walker
 from .versioning import SentinelEdge, SentinelNode, VersionEdge, VersionNode
 from .walker import CompoundKeyWalker, PydanticWalker
 
@@ -54,9 +53,7 @@ __all__ = [
     "MigrationNotFoundError",
     "MigrationPathIntegrityError",
     "MigrationSettings",
-    "ModelAdapter",
     "ModelAlreadyRegisteredError",
-    "ModelData",
     "ModelManager",
     "ModelNotFoundError",
     "OTELHook",
@@ -73,9 +70,7 @@ __all__ = [
     "VersionNode",
     "VersionedModelError",
     "VersioningSettings",
-    "Walker",
     "compile_target_resolver",
     "compile_target_spec",
     "types",
 ]
-

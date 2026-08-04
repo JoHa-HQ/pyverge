@@ -13,6 +13,7 @@ from .registry import Registry
 from .types import (
     Entry,
     MigrationDirectionStrategy,
+    ModelAdapter,
     TargetResolver,
     VersionValue,
 )
@@ -20,39 +21,6 @@ from .types import (
     Walker as WalkerProtocol,
 )
 from .versioning import SentinelNode, VersionNode
-
-
-def _resolve_base_model(annotation: Any) -> type[BaseModel] | None:
-    """Return the first concrete ``BaseModel`` subclass inside *annotation*.
-
-    Handles direct types, ``Optional[T]``, ``list[T]``, and ``Union`` forms.
-    """
-    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-        return annotation
-
-    origin = getattr(annotation, "__origin__", None)
-    args = getattr(annotation, "__args__", ())
-
-    if origin is list and args:
-        return _resolve_base_model(args[0])
-
-    for arg in args:
-        resolved = _resolve_base_model(arg)
-        if resolved is not None:
-            return resolved
-
-    return None
-
-
-def _version_value(registry: Registry[Any], kind: str, version_str: str) -> Any:
-    """Parse *version_str* into the value type used by *kind* in *registry*."""
-    versions = registry.kind_versions(kind)
-    if not versions:
-        raise ValueError(f"No versions registered for kind {kind!r}")
-    reference = versions[0]
-    if isinstance(reference, VersionNode):
-        return VersionNode.of(version_str)
-    return version_str
 
 
 class CompoundKeyWalker(WalkerProtocol):
@@ -102,8 +70,7 @@ class CompoundKeyWalker(WalkerProtocol):
             is_versioned = False
             if isinstance(kind, str) and isinstance(version_str, str):
                 try:
-                    version_value = _version_value(self._registry, kind, version_str)
-                    sentinel = SentinelNode(kind, version_value)
+                    sentinel = SentinelNode(kind, VersionNode.of(version_str))
                 except Exception:
                     sentinel = None
                 if sentinel is not None and self._registry.has_model(sentinel):
@@ -171,9 +138,11 @@ class PydanticWalker(WalkerProtocol):
         registry: Registry[VersionValue],
         *,
         settings: DiscoverySettings,
+        adapter: ModelAdapter,
     ) -> None:
         self._registry = registry
         self._settings = settings
+        self._adapter = adapter
 
     def discover(
         self,
@@ -194,12 +163,11 @@ class PydanticWalker(WalkerProtocol):
             validated = data
         else:
             try:
-                if validation_mode == "strict":
-                    validated = container.model_validate(data, strict=True).model_dump(
-                        by_alias=True
-                    )
-                else:
-                    validated = container.model_validate(data).model_dump(by_alias=True)
+                validated = self._adapter.validate(
+                    data,
+                    container,
+                    strict=(validation_mode == "strict"),
+                )
             except Exception as exc:
                 raise DiscoveryValidationError(
                     path=(),
@@ -246,8 +214,7 @@ class PydanticWalker(WalkerProtocol):
             version_str = value.get(vp)
             if isinstance(kind, str) and isinstance(version_str, str):
                 try:
-                    version_value = _version_value(self._registry, kind, version_str)
-                    sentinel = SentinelNode(kind, version_value)
+                    sentinel = SentinelNode(kind, VersionNode.of(version_str))
                 except Exception:
                     sentinel = None
                 if sentinel is not None and self._registry.has_model(sentinel):
@@ -263,21 +230,15 @@ class PydanticWalker(WalkerProtocol):
                             return
 
             field_model: type[BaseModel] | None = None
-            if parent_model is not None:
-                field_info = (
-                    parent_model.model_fields.get(str(path[-1])) if path else None
-                )
-                if field_info is not None:
-                    field_model = _resolve_base_model(field_info.annotation)
+            if parent_model is not None and path:
+                field_model = self._adapter.field_model(parent_model, str(path[-1]))
 
             for key, nested in value.items():
                 child_model = field_model
                 if child_model is not None:
-                    child_field = child_model.model_fields.get(str(key))
-                    if child_field is not None:
-                        resolved = _resolve_base_model(child_field.annotation)
-                        if resolved is not None:
-                            child_model = resolved
+                    resolved = self._adapter.field_model(child_model, str(key))
+                    if resolved is not None:
+                        child_model = resolved
 
                 yield from self._walk(
                     nested,
@@ -293,9 +254,7 @@ class PydanticWalker(WalkerProtocol):
         elif isinstance(value, list):
             item_model: type[BaseModel] | None = None
             if parent_model is not None and path:
-                field_info = parent_model.model_fields.get(str(path[-1]))
-                if field_info is not None:
-                    item_model = _resolve_base_model(field_info.annotation)
+                item_model = self._adapter.field_model(parent_model, str(path[-1]))
 
             for idx, item in enumerate(value):
                 yield from self._walk(

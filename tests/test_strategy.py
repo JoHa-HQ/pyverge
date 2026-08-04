@@ -13,9 +13,9 @@ from pyverge.migration import (
     DiscoverySettings,
     GraphEntry,
     MigrationError,
-    ModelData,
     PydanticModelAdapter,
     Registry,
+    types,
 )
 from tests.examples.pydantic.semver_nested import PersonV1, PersonV2
 from tests.utils import envelope_model
@@ -68,7 +68,7 @@ class TestDefaultEntryMigration:
     ) -> None:
         entry = GraphEntry(path=(), source=source, target=source, steps=())
         strategy = DefaultEntryMigration()
-        current: ModelData = {"version": "1.0.0"}
+        current: types.ModelData = {"version": "1.0.0"}
 
         result = strategy.migrate(
             entry,
@@ -113,7 +113,7 @@ class TestDefaultEntryMigration:
         execute_step: MagicMock,
     ) -> None:
         strategy = DefaultEntryMigration()
-        current: ModelData = {"version": "1.0.0"}
+        current: types.ModelData = {"version": "1.0.0"}
 
         result = strategy.migrate(
             entry,
@@ -138,7 +138,7 @@ class TestDefaultEntryMigration:
         execute_step: MagicMock,
     ) -> None:
         strategy = DefaultEntryMigration()
-        current: ModelData = {"version": "1.0.0"}
+        current: types.ModelData = {"version": "1.0.0"}
 
         result = strategy.migrate(
             entry,
@@ -197,7 +197,7 @@ class TestDefaultEntryMigration:
             "no path",
         )
         strategy = DefaultEntryMigration()
-        current: ModelData = {"version": "1.0.0"}
+        current: types.ModelData = {"version": "1.0.0"}
 
         result = strategy.migrate(
             entry,

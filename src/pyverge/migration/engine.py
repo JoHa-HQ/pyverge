@@ -5,7 +5,6 @@ from typing import Any, Generic, Self
 
 from pydantic import BaseModel
 
-from .adapters import ModelAdapter
 from .diff import PydanticDiff
 from .exceptions import (
     MigrationError,
@@ -26,6 +25,7 @@ from .types import (
     MigrationDirectionStrategy,
     MigrationFunc,
     MigrationKeyInput,
+    ModelAdapter,
     ModelData,
     ModelKind,
     ModelVersionKey,
@@ -263,9 +263,9 @@ class Engine(Generic[VersionValue]):
                 SentinelEdge.from_pair(versions[i], versions[i + 1])
                 for i in range(lo, hi)
             ]
-            for key in gap:
+            for gap_edge in gap:
                 try:
-                    edge = registry.get_migration_by_edge(key)
+                    edge = registry.get_migration_by_edge(gap_edge)
                 except MigrationNotFoundError as exc:
                     raise RegistryError(
                         registry.name,
@@ -488,6 +488,7 @@ class Engine(Generic[VersionValue]):
         on_direction_violation: DirectionViolationStrategy | None = None,
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
+        entry_migration: EntryMigration[VersionValue] | None = None,
     ) -> ModelData:
         """Converge every versioned entry in *data* to match the policy."""
         effective_direction = direction or self.settings.direction
@@ -512,12 +513,13 @@ class Engine(Generic[VersionValue]):
         )
 
         active_executor = executor or self.default_executor
+        active_entry_migration = entry_migration or self.entry_migration
 
         return active_executor.run(
             data,
             graph,
             registry=self.registry,
-            entry_migration=self.entry_migration,
+            entry_migration=active_entry_migration,
             adapter=self.adapter,
             version_property=vp,
             direction=effective_direction,
