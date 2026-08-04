@@ -73,11 +73,11 @@ def locate_config(
     config_file: Path | None = None,
     start_dir: Path | None = None,
 ) -> dict[str, ManagerConfig]:
-    """Locate pydantic-migrator configuration in the following order.
+    """Locate pyverge configuration in the following order.
 
     1. Explicit config file (if provided)
-    2. pyproject.toml [tool.pydantic-migrator]
-    3. migrator.toml
+    2. pyproject.toml [tool.pyverge]
+    3. pyverge.toml
     4. Auto-locate __manager__ in Python files
 
     Args:
@@ -109,10 +109,10 @@ def locate_config(
         except ConfigError:
             pass  # Fall through to next option
 
-    # 3. Check migrator.toml
-    migrator_toml = start_dir / "migrator.toml"
-    if migrator_toml.exists():
-        config = _load_toml_config(migrator_toml)
+    # 3. Check pyverge.toml
+    pyverge_toml = start_dir / "pyverge.toml"
+    if pyverge_toml.exists():
+        config = _load_toml_config(pyverge_toml)
         if config:
             return config
 
@@ -125,19 +125,17 @@ def _load_toml_config(config_path: Path) -> dict[str, ManagerConfig]:
     with open(config_path, "rb") as f:
         data = tomllib.load(f)
 
-    # Handle pyproject.toml vs migrator.toml
+    # Handle pyproject.toml vs pyverge.toml
     if config_path.name == "pyproject.toml":
-        if "tool" not in data or "pydantic-migrator" not in data["tool"]:
-            raise ConfigError(
-                "No [tool.pydantic-migrator] section found in pyproject.toml"
-            )
-        config_data = data["tool"]["pydantic-migrator"]
+        if "tool" not in data or "pyverge" not in data["tool"]:
+            raise ConfigError("No [tool.pyverge] section found in pyproject.toml")
+        config_data = data["tool"]["pyverge"]
     else:
-        config_data = data.get("pydantic-migrator", data)
+        config_data = data.get("pyverge", data)
 
     managers = {}
 
-    # Single manager format: [tool.pydantic-migrator] or [pydantic-migrator]
+    # Single manager format: [tool.pyverge] or [pyverge]
     # manager = "path.to.module"
     # or
     # manager = "path.to.module:manager_name"
@@ -161,8 +159,8 @@ def _load_toml_config(config_path: Path) -> dict[str, ManagerConfig]:
 
         return managers
 
-    # Multiple managers format: [tool.pydantic-migrator.managers] or [managers]
-    # [tool.pydantic-migrator.managers.default]
+    # Multiple managers format: [tool.pyverge.managers] or [managers]
+    # [tool.pyverge.managers.default]
     # manager = "models"
     # or just:
     # managers.default = "models"
@@ -285,8 +283,8 @@ def _auto_locate_managers(start_dir: Path) -> dict[str, ManagerConfig]:
             continue
 
     raise ConfigError(
-        "No pydantic-migrator configuration found."
-        " Create a pyproject.toml or migrator.toml, "
+        "No pyverge configuration found."
+        " Create a pyproject.toml or pyverge.toml, "
         "or define __manager__ in models.py"
     )
 

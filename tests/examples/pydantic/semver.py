@@ -16,7 +16,7 @@ from typing import Annotated, Literal
 
 from tests.examples.pydantic.base import BaseModel, Field, UserBaseModel
 
-# from pydantic_migrator.migration import MigrationSettings, ModelManager
+# from pyverge.migration import MigrationSettings, ModelManager
 
 # SemverManager = ModelManager[Version, MigrationSettings()]
 

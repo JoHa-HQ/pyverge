@@ -8,10 +8,10 @@ Writing per-version upcasters by hand becomes unmanageable.
 
 ## How converge helps
 
-The engine treats every event as a self-describing payload. The developer writes
-small migration functions between adjacent versions; the engine composes the
-full path and applies it atomically per event. This is exactly the “upcaster”
-pattern from event-sourcing literature.
+Every event is a self-describing payload. The developer writes small migration
+functions between adjacent versions; the engine composes the full path and
+applies it atomically per event. This is exactly the "upcaster" pattern from
+event-sourcing literature.
 
 ## Example flow
 
@@ -33,8 +33,8 @@ pattern from event-sourcing literature.
 ## Per-consumer / per-topic policies
 
 The same event kind may be consumed by different services at different target
-versions. Each consumer builds its own `TargetResolver` and passes it to the
-shared engine through `migrate(..., target_resolver=...)`.
+versions. Each consumer holds its own `target` policy and passes it to the
+shared manager through `migrate(..., target=...)`.
 
 ## All-or-nothing per entry
 
@@ -50,97 +50,66 @@ from typing import Any, Literal
 import semver
 from pydantic import BaseModel
 
-from pydantic_migrator.migration import (
-    Engine,
-    GraphBuilder,
-    MigrationSettings,
-    PydanticModelAdapter,
-    Registry,
-    SequentialExecutor,
-    VersionNode,
-    compile_target_resolver,
-)
-from pydantic_migrator.migration.walker import CompoundKeyWalker
+from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
 
-adapter = PydanticModelAdapter(version_property="version", kind_property="kind")
-registry = Registry[semver.Version]()
-
-
-def _version(model_cls: type[BaseModel], kind: str, version_str: str) -> VersionNode:
-    return VersionNode(model_cls, VersionNode.of(version_str), kind)
-
-
-class OrderV1(BaseModel):
-    order_id: str
-    total: float
-    version: Literal["1.0.0"] = "1.0.0"
-
-
-class OrderV2(BaseModel):
-    order_id: str
-    total: float
-    currency: str = "USD"
-    version: Literal["2.0.0"] = "2.0.0"
-
-
-class OrderV3(BaseModel):
-    order_id: str
-    total: float
-    currency: str = "USD"
-    items: list[dict[str, Any]] = []
-    version: Literal["3.0.0"] = "3.0.0"
-
-
-engine = Engine(
-    registry,
-    MigrationSettings(
-        version_property="version",
-        kind_property="kind",
+OrderManager = ModelManager.scoped(
+    semver.Version,
+    adapter=PydanticModelAdapter(),
+    settings=MigrationSettings(
         direction="forward",
         on_missing_path="raise",
         on_direction_violation="raise",
     ),
-    SequentialExecutor(),
-    GraphBuilder(
-        registry,
-        MigrationSettings(),
-        CompoundKeyWalker(registry, settings=MigrationSettings()),
-    ),
-    adapter,
 )
 
-v1 = _version(OrderV1, "Order", "1.0.0")
-v2 = _version(OrderV2, "Order", "2.0.0")
-v3 = _version(OrderV3, "Order", "3.0.0")
 
-engine.store_model(v1)
-engine.store_model(v2)
-engine.store_model(v3)
+@OrderManager.model()
+class OrderV1(BaseModel):
+    kind: Literal["Order"] = "Order"
+    version: Literal["1.0.0"] = "1.0.0"
+    order_id: str
+    total: float
 
-engine.store_migration(
-    (v1, v2),
-    lambda d: {**d, "currency": "USD"},
-)
-engine.store_migration(
-    (v2, v3),
-    lambda d: {**d, "items": []},
-)
+
+@OrderManager.model()
+class OrderV2(BaseModel):
+    kind: Literal["Order"] = "Order"
+    version: Literal["2.0.0"] = "2.0.0"
+    order_id: str
+    total: float
+    currency: str = "USD"
+
+
+@OrderManager.model()
+class OrderV3(BaseModel):
+    kind: Literal["Order"] = "Order"
+    version: Literal["3.0.0"] = "3.0.0"
+    order_id: str
+    total: float
+    currency: str = "USD"
+    items: list[dict[str, Any]] = []
+
+
+@OrderManager.migration("Order", "1.0.0", "2.0.0")
+def add_currency(data: dict) -> dict:
+    return {**data, "currency": "USD"}
+
+
+@OrderManager.migration("Order", "2.0.0", "3.0.0")
+def add_items(data: dict) -> dict:
+    return {**data, "items": []}
 
 
 class OrderConsumer:
-    def __init__(self, engine: Engine[semver.Version], target_version: str) -> None:
-        self.engine = engine
-        self.target_version = target_version
+    def __init__(self, manager, target_version: str) -> None:
+        self._manager = manager
+        self._target = {"Order": target_version}
 
     def handle(self, event: dict) -> dict:
-        resolver = compile_target_resolver(
-            self.engine.registry,
-            {"Order": self.target_version},
-        )
-        return self.engine.migrate(event, target_resolver=resolver)
+        return self._manager.migrate(event, target=self._target)
 
 
-consumer = OrderConsumer(engine, "3.0.0")
+consumer = OrderConsumer(OrderManager(), "3.0.0")
 migrated = consumer.handle(
     {"kind": "Order", "version": "1.0.0", "order_id": "42", "total": 9.99}
 )
@@ -151,12 +120,12 @@ assert migrated["items"] == []
 
 ### Abstractions used
 
-- **Engine** — owns the registry, builds the graph, and executes migrations.
-- **Registry** — stores versions and explicit migration edges.
-- **VersionNode** — binds a model class, kind, and parsed version value.
-- **compile_target_resolver** — turns a declarative target policy into a
-  per-entry resolver.
-- **SequentialExecutor** — runs entries one at a time in topological order.
+- **ModelManager** — high-level facade; registers models and migrations with
+  decorators, and converges events with `migrate(event, target=...)`.
+- **`@OrderManager.model()` / `@OrderManager.migration(...)`** — declarative
+  registration at class level.
+- **Per-consumer target** — `{"Order": "3.0.0"}` pins a consumer to a specific
+  schema without touching the shared manager.
 
 ## Out of scope
 
