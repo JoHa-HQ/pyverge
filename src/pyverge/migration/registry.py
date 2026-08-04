@@ -226,7 +226,9 @@ class Registry(Generic[VersionValue]):
         """Return an independent shallow copy."""
         new = Registry(name=name)
         new._by_versions = list(self._by_versions)
-        new._by_kinds = {k: list(v) for k, v in self._by_kinds.items()}
+        new._by_kinds = defaultdict(
+            list, {k: list(v) for k, v in self._by_kinds.items()}
+        )
         new._by_models = dict(self._by_models)
         new._migrations = defaultdict(
             list, {k: list(v) for k, v in self._migrations.items()}
