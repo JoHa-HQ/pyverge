@@ -80,8 +80,8 @@ def default_graph_builder(
 
 def make_engine(
     registry: Registry[types.VersionValue],
-    settings: types.VersioningSettings,
-    adapter: ModelAdapter | None = None,
+    settings: VersioningSettings,
+    adapter: types.ModelAdapter | None = None,
     entry_migration: EntryMigration[types.VersionValue] | None = None,
 ) -> Engine[types.VersionValue]:
     """Create an engine with the standard walker and sequential executor."""
