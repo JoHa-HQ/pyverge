@@ -2,20 +2,11 @@
 requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
-[project]
-name = "pyverge"
-dynamic = ["version"]
-description = "Migration orchestration framework"
-readme = "README.md"
-requires-python = ">=3.11"
-license = "Apache-2.0"
-dependencies = [
-  "pydantic[email,timezone]>=2.11",
-  "pydantic-extra-types[phonenumbers]>=2.9",
-  "semver>=3.0"
+[dependency-groups]
+telemetry = [
+  "opentelemetry-distro>=0.65b0",
+  "opentelemetry-exporter-otlp>=1.44.0"
 ]
-
-[project.optional-dependencies]
 dev = [
   "python-semantic-release>=10.5",
   "pytest>=8.3",
@@ -35,6 +26,20 @@ cli = [
   "rich>=13"
 ]
 
+[project]
+name = "pyverge"
+dynamic = ["version"]
+description = "Migration orchestration framework"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+  "pydantic[email,timezone]>=2.11",
+  "pydantic-extra-types[phonenumbers]>=2.9",
+  "semver>=3.0",
+  "pendulum>=3.2.0"
+]
+
 [project.scripts]
 pyverge = "pyverge.cli.main:app"
 
@@ -42,14 +47,14 @@ pyverge = "pyverge.cli.main:app"
 name = "cz_conventional_commits"
 tag_format = "$version"
 
+[tool.hatch.build.hooks.vcs]
+version-file = "src/pyverge/_version.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyverge"]
 
 [tool.hatch.version]
 source = "vcs"
-
-[tool.hatch.version.vcs]
-tag = ""
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
