@@ -53,9 +53,8 @@ from pydantic import BaseModel
 
 from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
 
-TempSensorManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+TempSensorManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(
         direction="forward",
         on_direction_violation="skip",

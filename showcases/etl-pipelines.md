@@ -50,9 +50,8 @@ from pydantic import BaseModel
 
 from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
 
-CustomerManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+CustomerManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(
         direction="forward",
         target_strategy="latest",
