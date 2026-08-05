@@ -11,9 +11,8 @@ class-level ``Engine`` and ``Registry``.
 Example:
     .. code-block:: python
 
-        UserManager = ModelManager.scoped(
-            semver.Version,
-            adapter=PydanticModelAdapter(),
+        UserManager = ModelManager[semver.Version].scoped(
+            PydanticModelAdapter(),
             settings=MigrationSettings(),
         )
 
@@ -32,7 +31,7 @@ Example:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, ClassVar, Generic, TypeVar, cast, overload
+from typing import Any, ClassVar, Generic, cast, overload
 
 from pydantic import BaseModel
 
@@ -54,6 +53,7 @@ from .types import (
     ModelVersionKey,
     TargetPolicy,
     TargetResolver,
+    TContainer,
     Versionable,
     VersionMissingStrategy,
     VersionValue,
@@ -62,8 +62,6 @@ from .types import (
 )
 from .versioning import VersionNode
 from .walker import CompoundKeyWalker
-
-TContainer = TypeVar("TContainer", bound=BaseModel)
 
 
 def _resolve_migration_key(
@@ -120,11 +118,7 @@ class _ModelDescriptor:
                 and issubclass(args[0], BaseModel)
             ):
                 model_cls = args[0]
-                engine = getattr(owner, "_engine", None)
-                if engine is None:
-                    raise TypeError(
-                        "ModelManager requires a strategy. Use ModelManager.scoped(...)"
-                    )
+                engine = owner._engine
                 engine.store_model(engine.adapter.versionable(model_cls))
                 return model_cls
 
@@ -132,11 +126,7 @@ class _ModelDescriptor:
                 raise TypeError("manager.model expects no args or a model class")
 
             def wrapper(model_cls: type[VModel]) -> type[VModel]:
-                engine = getattr(owner, "_engine", None)
-                if engine is None:
-                    raise TypeError(
-                        "ModelManager requires a strategy. Use ModelManager.scoped(...)"
-                    )
+                engine = owner._engine
                 engine.store_model(engine.adapter.versionable(model_cls))
                 return model_cls
 
@@ -170,11 +160,7 @@ class _MigrationDescriptor:
             backward_compatible: bool = False,
         ) -> Callable[[MigrationFunc], MigrationFunc]:
             def wrapper(func: MigrationFunc) -> MigrationFunc:
-                engine = getattr(owner, "_engine", None)
-                if engine is None:
-                    raise TypeError(
-                        "ModelManager requires a strategy. Use ModelManager.scoped(...)"
-                    )
+                engine = owner._engine
                 engine.store_migration(
                     _resolve_migration_key(engine, args),
                     func,
@@ -247,7 +233,6 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     level; then instantiate for the runtime facade.
     """
 
-    _strategy: ClassVar[type[VersionValue]]  # type: ignore[misc]
     _settings: ClassVar[MigrationSettings]
     _adapter: ClassVar[ModelAdapter]
     _engine: ClassVar[Engine[VersionValue]]  # type: ignore[misc]
@@ -263,6 +248,13 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             raise ValueError("Missing the engine instance")
         self.engine = engine or type(self)._engine
 
+    def __class_getitem__(
+        cls, strategy: type[VersionValue]
+    ) -> type[ModelManager[VersionValue]]:
+        klass = type(cls.__name__, (cls,), {})
+        klass.__name__ = f"ModelManager[{strategy.__name__}]"
+        return klass
+
     @property
     def registry(self) -> Registry[VersionValue]:
         """Return the instance registry."""
@@ -271,7 +263,6 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     @classmethod
     def scoped(
         cls,
-        strategy: type[VersionValue],
         adapter: ModelAdapter,
         *,
         settings: MigrationSettings | None = None,
@@ -285,7 +276,6 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         *adapter* and *settings*).
 
         Args:
-            strategy: Version strategy — ``semver.Version`` or ``pendulum.Date``.
             adapter: Model adapter used to read version/kind from models.
             settings: Migration configuration; defaults to ``MigrationSettings()``.
             engine: Optional pre-built engine.  The caller is responsible for
@@ -305,7 +295,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         else:
             active_walker = walker
             registry = walker.registry
-        engine = engine or Engine(
+        engine = engine or Engine[VersionValue](
             registry=registry,
             settings=settings,
             default_executor=SequentialExecutor(),
@@ -318,7 +308,6 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             entry_migration=DefaultEntryMigration(),
         )
         namespace: dict[str, Any] = {
-            "_strategy": strategy,
             "_settings": settings,
             "_adapter": adapter,
             "_engine": engine,

@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from .types import VersionValue, VModel
+from .types import Versionable, VersionValue, VModel
 from .versioning import VersionNode
 
 
@@ -115,12 +115,15 @@ class PydanticModelAdapter:
             return None
         return self.resolve_model(field_info.annotation)
 
-    def versionable(self, model_cls: type[VModel]) -> VersionNode[VersionValue, VModel]:
+    def versionable(self, model_cls: type[VModel]) -> Versionable[VersionValue, VModel]:
         """Build a ``VersionNode`` wrapping *model_cls* using its encoded metadata."""
-        return VersionNode[VersionValue, VModel](
-            _model=model_cls,
-            _value=cast(VersionValue, VersionNode.of(self.version(model_cls))),
-            _kind=self.kind(model_cls),
+        return cast(
+            Versionable[VersionValue, VModel],
+            VersionNode[VersionValue, VModel](
+                _model=model_cls,
+                _value=cast(VersionValue, VersionNode.of(self.version(model_cls))),
+                _kind=self.kind(model_cls),
+            ),
         )
 
     @staticmethod

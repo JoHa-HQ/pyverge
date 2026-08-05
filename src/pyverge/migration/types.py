@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from .registry import Registry
     from .strategy import EntryMigration
 
+
+TContainer = TypeVar("TContainer", bound=BaseModel)
 # Invariant — used where VModel appears in both input and output positions
 VModel = TypeVar("VModel", bound=BaseModel)
 # Invariant — SemVer and Date are parallel strategies, so the components get separated
