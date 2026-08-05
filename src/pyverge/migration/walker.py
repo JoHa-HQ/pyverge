@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Generic
 
 from pydantic import BaseModel
 
@@ -23,7 +23,7 @@ from .types import (
 from .versioning import SentinelNode, VersionNode
 
 
-class CompoundKeyWalker(WalkerProtocol):
+class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
     """Containerless walker: every dict is checked for ``(kind, version)``.
 
     Only registered compound keys produce entries.  No structural validation
@@ -40,6 +40,11 @@ class CompoundKeyWalker(WalkerProtocol):
         self._registry = registry
         self._settings = settings
         self._direction = direction
+
+    @property
+    def registry(self) -> Registry[VersionValue]:
+        """The registry this walker discovers against."""
+        return self._registry
 
     def discover(
         self,
@@ -125,7 +130,7 @@ class CompoundKeyWalker(WalkerProtocol):
                 )
 
 
-class PydanticWalker(WalkerProtocol):
+class PydanticWalker(WalkerProtocol, Generic[VersionValue]):
     """Container-driven walker that uses a Pydantic model to guide discovery.
 
     Validates the payload against *container* first, then recursively visits
@@ -143,6 +148,11 @@ class PydanticWalker(WalkerProtocol):
         self._registry = registry
         self._settings = settings
         self._adapter = adapter
+
+    @property
+    def registry(self) -> Registry[VersionValue]:
+        """The registry this walker discovers against."""
+        return self._registry
 
     def discover(
         self,

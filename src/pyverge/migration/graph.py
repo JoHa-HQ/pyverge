@@ -207,6 +207,11 @@ class GraphBuilder(Generic[VersionValue]):
         self._settings = settings
         self._walker = walker
 
+    @property
+    def walker(self) -> Walker:
+        """The configured payload walker."""
+        return self._walker
+
     def build(
         self,
         data: dict[str, Any],

@@ -40,9 +40,8 @@ from pyverge.migration import (
 )
 
 # A manager binds a version strategy to an adapter and settings.
-UserManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+UserManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(),
 )
 

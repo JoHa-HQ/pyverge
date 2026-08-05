@@ -29,9 +29,8 @@ from pyverge.migration import (
 )
 
 # A manager binds a version strategy to an adapter and settings.
-UserManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+UserManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(),
 )
 
@@ -91,9 +90,8 @@ from pyverge.migration import (
     PydanticModelAdapter,
 )
 
-UserManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+UserManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(),
 )
 
@@ -124,9 +122,8 @@ UserManager.model()(UserV2)
 UserManager.migration("User", "1.0.0", "2.0.0")(add_age)
 
 # Instance-level registration (alternative) — use a separate manager class.
-OtherManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+OtherManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(),
 )
 manager = OtherManager()

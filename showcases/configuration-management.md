@@ -45,9 +45,8 @@ from pydantic import BaseModel
 
 from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
 
-FeatureFlagsManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+FeatureFlagsManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(
         direction="any",
         on_direction_violation="raise",

@@ -206,15 +206,15 @@ migration step.
 
 ## Manager
 
-`ModelManager.scoped(strategy, adapter=..., settings=...)` builds a configured
-manager class. Models, migrations, and hooks are registered with the class
+`ModelManager[strategy].scoped(adapter=..., settings=...)` builds a configured
+manager class, where *strategy* is the version strategy (`semver.Version`,
+`pendulum.Date`). Models, migrations, and hooks are registered with the class
 decorators `@Manager.model()`, `@Manager.migration(...)`, and `@Manager.hook(...)`
 at class level; instantiate the class for the runtime facade.
 
 ```python
-UserManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+UserManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(),
 )
 

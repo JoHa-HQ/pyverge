@@ -51,9 +51,8 @@ from pyverge.migration import (
 )
 
 # Create a scoped manager class
-UserManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+UserManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(),
 )
 

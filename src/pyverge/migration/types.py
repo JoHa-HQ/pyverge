@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from .registry import Registry
     from .strategy import EntryMigration
 
+
+TContainer = TypeVar("TContainer", bound=BaseModel)
 # Invariant — used where VModel appears in both input and output positions
 VModel = TypeVar("VModel", bound=BaseModel)
 # Invariant — SemVer and Date are parallel strategies, so the components get separated
@@ -325,6 +327,9 @@ class TargetResolver(Protocol):
 
 class Walker(Protocol):
     """Protocol for schema-aware payload discovery."""
+
+    @property
+    def registry(self) -> Registry[VersionValue]: ...
 
     def discover(
         self,
