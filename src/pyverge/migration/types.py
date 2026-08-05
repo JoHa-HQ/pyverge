@@ -326,6 +326,9 @@ class TargetResolver(Protocol):
 class Walker(Protocol):
     """Protocol for schema-aware payload discovery."""
 
+    @property
+    def registry(self) -> Registry[VersionValue]: ...
+
     def discover(
         self,
         data: dict[str, Any],

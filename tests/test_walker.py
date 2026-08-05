@@ -62,7 +62,7 @@ def test_compound_key_empty_payload_returns_no_entries(
     discovery_settings: DiscoverySettings,
     registry: Registry[semver.Version],
 ) -> None:
-    walker = CompoundKeyWalker(registry, settings=discovery_settings)
+    walker = CompoundKeyWalker[semver.Version](registry, settings=discovery_settings)
     entries = list(walker.discover({}, target_resolver=_null_resolver(), max_depth=-1))
     assert entries == []
 
