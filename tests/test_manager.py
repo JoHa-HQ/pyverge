@@ -2,8 +2,8 @@
 
 Documents the intended API through executable examples:
 
-* ``ModelManager.scoped(strategy, adapter, *, settings=...)`` builds a configured
-  class carrying a class-level ``Registry`` and ``Engine``.
+* ``ModelManager[strategy].scoped(adapter, *, settings=...)`` builds a
+  configured class carrying a class-level ``Registry`` and ``Engine``.
 * ``model`` / ``migration`` / ``hook`` decorators register entities at class
   level only — they are not available on instances.
 * Instances share the class-level ``Engine`` and ``Registry``.
@@ -61,14 +61,13 @@ class TestScoping:
     def test_strategy_only_defaults(
         self, semver_manager: type[ModelManager[semver.Version]]
     ) -> None:
-        assert semver_manager._strategy is semver.Version
         assert isinstance(semver_manager().registry, Registry)
         assert semver_manager().registry.versions == []
 
     def test_strategy_settings_adapter(self) -> None:
         settings = MigrationSettings(version_property="v", kind_property="k")
         adapter = PydanticModelAdapter(version_property="v", kind_property="k")
-        UserManager = ModelManager.scoped(semver.Version, adapter, settings=settings)
+        UserManager = ModelManager[semver.Version].scoped(adapter, settings=settings)
 
         assert UserManager._settings is settings
         assert UserManager._adapter is adapter
@@ -76,8 +75,8 @@ class TestScoping:
     def test_explicit_engine_used_as_is(self) -> None:
         registry = Registry[semver.Version]()
         engine = make_engine(registry, MigrationSettings())
-        UserManager = ModelManager.scoped(
-            semver.Version, PydanticModelAdapter(), engine=engine
+        UserManager = ModelManager[semver.Version].scoped(
+            PydanticModelAdapter(), engine=engine
         )
 
         assert UserManager._engine is engine
@@ -85,11 +84,6 @@ class TestScoping:
     def test_engine_missing_strategy_raises(self) -> None:
         with pytest.raises(ValueError):
             ModelManager().engine
-
-    def test_date_strategy(
-        self, chrono_manager: type[ModelManager[pendulum.Date]]
-    ) -> None:
-        assert chrono_manager._strategy is pendulum.Date
 
     def test_class_decorators_not_available_on_instance(
         self, semver_manager: type[ModelManager[semver.Version]]
@@ -192,7 +186,7 @@ class TestClassLevelRegistration:
         assert result["document"]["version"] == "2025-12-31"
 
     def test_unscoped_registration_raises(self) -> None:
-        with pytest.raises(TypeError, match="scoped"):
+        with pytest.raises(AttributeError):
             ModelManager.model(UserV1)
 
 
@@ -348,8 +342,7 @@ class TestMigrateInstanceOnly:
 class TestMigrateWithContainer:
     @pytest.mark.parametrize("walker", [PydanticWalker], indirect=["walker"])
     def test_container_guided_migration(self, walker) -> None:
-        UserManager = ModelManager.scoped(
-            semver.Version,
+        UserManager = ModelManager[semver.Version].scoped(
             PydanticModelAdapter(),
             walker=walker,
         )
@@ -362,8 +355,7 @@ class TestMigrateWithContainer:
 
     @pytest.mark.parametrize("walker", [PydanticWalker], indirect=["walker"])
     def test_container_returns_typed_instance(self, walker) -> None:
-        UserManager = ModelManager.scoped(
-            semver.Version,
+        UserManager = ModelManager[semver.Version].scoped(
             PydanticModelAdapter(),
             walker=walker,
         )
@@ -377,8 +369,7 @@ class TestMigrateWithContainer:
 
     @pytest.mark.parametrize("walker", [PydanticWalker], indirect=["walker"])
     def test_container_validates_payload(self, walker) -> None:
-        UserManager = ModelManager.scoped(
-            semver.Version,
+        UserManager = ModelManager[semver.Version].scoped(
             PydanticModelAdapter(),
             walker=walker,
         )

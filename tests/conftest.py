@@ -82,7 +82,7 @@ def registry(request: pytest.FixtureRequest) -> Registry:
 def semver_manager(
     model_adapter: PydanticModelAdapter,
 ) -> type[ModelManager[semver.Version]]:
-    return ModelManager.scoped(semver.Version, model_adapter)
+    return ModelManager[semver.Version].scoped(model_adapter)
 
 
 @pytest.fixture
@@ -96,7 +96,8 @@ def walker(
 
     Parametrize with a walker class (e.g. ``PydanticWalker``) to obtain a
     walker bound to the shared ``semver_registry``; pass it to
-    ``ModelManager.scoped(walker=...)`` to drive container-guided discovery.
+    ``ModelManager[semver.Version].scoped(walker=...)`` to drive
+    container-guided discovery.
     """
     if request.param == PydanticWalker:
         return PydanticWalker(
@@ -112,7 +113,7 @@ def walker(
 def chrono_manager(
     model_adapter: PydanticModelAdapter,
 ) -> type[ModelManager[pendulum.Date]]:
-    return ModelManager.scoped(pendulum.Date, model_adapter)
+    return ModelManager[pendulum.Date].scoped(model_adapter)
 
 
 @pytest.fixture
