@@ -18,10 +18,12 @@ import pytest
 import semver
 
 from pyverge.migration import (
+    DiscoveryValidationError,
     MigrationHook,
     MigrationSettings,
     ModelManager,
     PydanticModelAdapter,
+    PydanticWalker,
     Registry,
 )
 from tests.examples.pydantic.base import UserBaseModel
@@ -33,6 +35,7 @@ from tests.examples.pydantic.chrono import (
     migrate_v1_to_v2 as migrate_chrono_v1_to_v2,
 )
 from tests.examples.pydantic.semver import (
+    UserContainer,
     UserV1,
     UserV2,
     UserV3,
@@ -58,17 +61,17 @@ class TestScoping:
     def test_strategy_only_defaults(
         self, semver_manager: type[ModelManager[semver.Version]]
     ) -> None:
-        assert semver_manager._bound_strategy is semver.Version
-        assert isinstance(semver_manager.registry, Registry)
-        assert semver_manager.registry.versions == []
+        assert semver_manager._strategy is semver.Version
+        assert isinstance(semver_manager().registry, Registry)
+        assert semver_manager().registry.versions == []
 
     def test_strategy_settings_adapter(self) -> None:
         settings = MigrationSettings(version_property="v", kind_property="k")
         adapter = PydanticModelAdapter(version_property="v", kind_property="k")
         UserManager = ModelManager.scoped(semver.Version, adapter, settings=settings)
 
-        assert UserManager._bound_settings is settings
-        assert UserManager._bound_adapter is adapter
+        assert UserManager._settings is settings
+        assert UserManager._adapter is adapter
 
     def test_explicit_engine_used_as_is(self) -> None:
         registry = Registry[semver.Version]()
@@ -80,13 +83,13 @@ class TestScoping:
         assert UserManager._engine is engine
 
     def test_engine_missing_strategy_raises(self) -> None:
-        with pytest.raises(TypeError, match="strategy"):
+        with pytest.raises(ValueError):
             ModelManager().engine
 
     def test_date_strategy(
         self, chrono_manager: type[ModelManager[pendulum.Date]]
     ) -> None:
-        assert chrono_manager._bound_strategy is pendulum.Date
+        assert chrono_manager._strategy is pendulum.Date
 
     def test_class_decorators_not_available_on_instance(
         self, semver_manager: type[ModelManager[semver.Version]]
@@ -112,7 +115,7 @@ class TestClassLevelRegistration:
             name: str
             age: int | None = None
 
-        versions = [str(v) for v in semver_manager.registry.versions]
+        versions = [str(v) for v in semver_manager().registry.versions]
         assert versions == ["User:1.0.0", "User:2.0.0"]
 
     def test_direct_class_form(
@@ -121,7 +124,7 @@ class TestClassLevelRegistration:
         semver_manager.model(UserV1)
         semver_manager.model(UserV2)
 
-        assert {str(v) for v in semver_manager.registry.versions} == {
+        assert {str(v) for v in semver_manager().registry.versions} == {
             "User:1.0.0",
             "User:2.0.0",
         }
@@ -298,7 +301,7 @@ class TestSharedEngine:
 
         expected = f"User:{version}"
         assert [str(v) for v in manager_instance.registry.versions] == [expected]
-        assert [str(v) for v in manager.registry.versions] == [expected]
+        assert [str(v) for v in manager().registry.versions] == [expected]
 
     @pytest.mark.parametrize(
         ("manager", "model", "version"),
@@ -340,3 +343,57 @@ class TestMigrateInstanceOnly:
         result = semver_manager().migrate(_payload("1.0.0"))
         assert result["document"]["version"] == "2.0.0"
         assert result["document"]["age"] is None
+
+
+class TestMigrateWithContainer:
+    @pytest.mark.parametrize("walker", [PydanticWalker], indirect=["walker"])
+    def test_container_guided_migration(self, walker) -> None:
+        UserManager = ModelManager.scoped(
+            semver.Version,
+            PydanticModelAdapter(),
+            walker=walker,
+        )
+        UserManager.model(UserV1)
+        UserManager.model(UserV2)
+        UserManager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
+
+        result = UserManager().migrate(_payload("1.0.0"), container=UserContainer)
+        assert result.document.version == "2.0.0"
+
+    @pytest.mark.parametrize("walker", [PydanticWalker], indirect=["walker"])
+    def test_container_returns_typed_instance(self, walker) -> None:
+        UserManager = ModelManager.scoped(
+            semver.Version,
+            PydanticModelAdapter(),
+            walker=walker,
+        )
+        UserManager.model(UserV1)
+        UserManager.model(UserV2)
+        UserManager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
+
+        result = UserManager().migrate(_payload("1.0.0"), container=UserContainer)
+        assert isinstance(result, UserContainer)
+        assert result.document.version == "2.0.0"
+
+    @pytest.mark.parametrize("walker", [PydanticWalker], indirect=["walker"])
+    def test_container_validates_payload(self, walker) -> None:
+        UserManager = ModelManager.scoped(
+            semver.Version,
+            PydanticModelAdapter(),
+            walker=walker,
+        )
+        UserManager.model(UserV1)
+        UserManager.model(UserV2)
+        UserManager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
+
+        invalid = {
+            "document": {
+                "kind": "User",
+                "version": "1.0.0",
+                "name": "Alice",
+                "email": "alice@example.com",
+                "role": "bogus",
+            }
+        }
+        with pytest.raises(DiscoveryValidationError):
+            UserManager().migrate(invalid, container=UserContainer)

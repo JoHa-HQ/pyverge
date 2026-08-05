@@ -32,7 +32,7 @@ Example:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, Generic, cast
+from typing import Any, ClassVar, Generic, TypeVar, cast, overload
 
 from pydantic import BaseModel
 
@@ -58,9 +58,12 @@ from .types import (
     VersionMissingStrategy,
     VersionValue,
     VModel,
+    Walker,
 )
 from .versioning import VersionNode
 from .walker import CompoundKeyWalker
+
+TContainer = TypeVar("TContainer", bound=BaseModel)
 
 
 def _resolve_migration_key(
@@ -117,7 +120,7 @@ class _ModelDescriptor:
                 and issubclass(args[0], BaseModel)
             ):
                 model_cls = args[0]
-                engine = owner._engine
+                engine = getattr(owner, "_engine", None)
                 if engine is None:
                     raise TypeError(
                         "ModelManager requires a strategy. Use ModelManager.scoped(...)"
@@ -129,7 +132,7 @@ class _ModelDescriptor:
                 raise TypeError("manager.model expects no args or a model class")
 
             def wrapper(model_cls: type[VModel]) -> type[VModel]:
-                engine = owner._engine
+                engine = getattr(owner, "_engine", None)
                 if engine is None:
                     raise TypeError(
                         "ModelManager requires a strategy. Use ModelManager.scoped(...)"
@@ -167,7 +170,7 @@ class _MigrationDescriptor:
             backward_compatible: bool = False,
         ) -> Callable[[MigrationFunc], MigrationFunc]:
             def wrapper(func: MigrationFunc) -> MigrationFunc:
-                engine = owner._engine
+                engine = getattr(owner, "_engine", None)
                 if engine is None:
                     raise TypeError(
                         "ModelManager requires a strategy. Use ModelManager.scoped(...)"
@@ -210,7 +213,7 @@ class _HookDescriptor:
             hook: Attachable,
         ) -> Callable[[type[VModel]], type[VModel]]:
             def wrapper(marker: type[VModel]) -> type[VModel]:
-                engine = owner._engine
+                engine = getattr(owner, "_engine", None)
                 if engine is None:
                     raise TypeError(
                         "ModelManager requires a strategy. Use ModelManager.scoped(...)"
@@ -236,29 +239,6 @@ class _ManagerMeta(type):
     hook = _HookDescriptor()
 
 
-class _RegistryDescriptor:
-    """Class-level registry read: class registry on the class, engine registry on an instance."""  # noqa: E501
-
-    def __get__(
-        self,
-        obj: ModelManager[VersionValue] | None,
-        objtype: type[ModelManager[VersionValue]] | None = None,
-    ) -> Registry[VersionValue]:
-        owner = objtype
-        if obj is None:
-            assert owner is not None
-            if owner._registry is None:
-                raise TypeError(
-                    "ModelManager requires a strategy. Use ModelManager.scoped(...)"
-                )
-            return owner._registry
-        if obj._engine is None:
-            raise TypeError(
-                "ModelManager requires a strategy. Use ModelManager.scoped(...)"
-            )
-        return obj._engine.registry
-
-
 class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     """Class factory scoping a migration ``Engine`` to a version strategy.
 
@@ -267,13 +247,10 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     level; then instantiate for the runtime facade.
     """
 
-    registry = _RegistryDescriptor()
-
-    _bound_strategy: type[VersionValue] | None = None
-    _bound_settings: MigrationSettings | None = None
-    _bound_adapter: ModelAdapter | None = None
-    _registry: Registry[Any] | None = None
-    _engine: Engine[Any] | None = None
+    _strategy: ClassVar[type[VersionValue]]  # type: ignore[misc]
+    _settings: ClassVar[MigrationSettings]
+    _adapter: ClassVar[ModelAdapter]
+    _engine: ClassVar[Engine[VersionValue]]  # type: ignore[misc]
 
     def __init__(self, engine: Engine[VersionValue] | None = None) -> None:
         """Initialize the runtime facade.
@@ -282,16 +259,14 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             engine: Optional per-instance engine override.  When omitted, the
                 instance wraps its own copy of the class registry.
         """
-        self._engine = engine or type(self)._engine
+        if engine is None and not hasattr(type(self), "_engine"):
+            raise ValueError("Missing the engine instance")
+        self.engine = engine or type(self)._engine
 
     @property
-    def engine(self) -> Engine[VersionValue]:
-        """Return the instance engine."""
-        if self._engine is None:
-            raise TypeError(
-                "ModelManager requires a strategy. Use ModelManager.scoped(...)"
-            )
-        return self._engine
+    def registry(self) -> Registry[VersionValue]:
+        """Return the instance registry."""
+        return self.engine.registry
 
     @classmethod
     def scoped(
@@ -301,6 +276,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         *,
         settings: MigrationSettings | None = None,
         engine: Engine[VersionValue] | None = None,
+        walker: (Walker | None) = None,
     ) -> type[ModelManager[VersionValue]]:
         """Build a ``ModelManager`` subclass bound to *strategy*.
 
@@ -314,29 +290,43 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             settings: Migration configuration; defaults to ``MigrationSettings()``.
             engine: Optional pre-built engine.  The caller is responsible for
                 aligning it with *strategy*, *adapter* and *settings*.
+            walker: Optional preconfigured payload walker.  When a walker
+                instance is given, its ``registry`` becomes the manager's
+                registry.  Defaults to the containerless
+                :class:`~pyverge.migration.CompoundKeyWalker`; supply a
+                schema-driven walker (e.g.
+                :class:`~pyverge.migration.PydanticWalker`) to enable
+                container-guided discovery.
         """
-        bound_settings = settings or MigrationSettings()
-        namespace: dict[str, Any] = {
-            "_bound_strategy": strategy,
-            "_bound_settings": bound_settings,
-            "_bound_adapter": adapter,
-            "__module__": cls.__module__,
-            "__qualname__": cls.__name__,
-        }
-        scoped_manager = type(cls.__name__, (cls,), namespace)
-        scoped_manager._registry = Registry[VersionValue]()
-        scoped_manager._engine = engine or Engine(
-            registry=scoped_manager._registry,
-            settings=bound_settings,
+        settings = settings or MigrationSettings()
+        if walker is None:
+            registry = Registry[VersionValue]()
+            active_walker = CompoundKeyWalker(registry, settings=settings)
+        else:
+            active_walker = walker
+            registry = walker.registry
+        engine = engine or Engine(
+            registry=registry,
+            settings=settings,
             default_executor=SequentialExecutor(),
             graph_builder=GraphBuilder(
-                scoped_manager._registry,
-                bound_settings,
-                CompoundKeyWalker(scoped_manager._registry, settings=bound_settings),
+                registry,
+                settings,
+                active_walker,
             ),
             adapter=adapter,
             entry_migration=DefaultEntryMigration(),
         )
+        namespace: dict[str, Any] = {
+            "_strategy": strategy,
+            "_settings": settings,
+            "_adapter": adapter,
+            "_engine": engine,
+            "__module__": cls.__module__,
+            "__qualname__": cls.__name__,
+        }
+
+        scoped_manager = type(cls.__name__, (cls,), namespace)
         return scoped_manager
 
     def store_model(
@@ -395,6 +385,40 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         """Return a registered migration function."""
         return self.engine.get_migration(key)
 
+    @overload
+    def migrate(
+        self,
+        data: ModelData,
+        target: TargetPolicy | None = None,
+        *,
+        target_resolver: TargetResolver | None = None,
+        container: type[TContainer],
+        version_property: str | None = None,
+        depth_limit: int | None = None,
+        direction: MigrationDirectionStrategy | None = None,
+        on_direction_violation: DirectionViolationStrategy | None = None,
+        on_version_not_found: VersionMissingStrategy | None = None,
+        executor: Executor | None = None,
+        entry_migration: EntryMigration[VersionValue] | None = None,
+    ) -> TContainer: ...
+
+    @overload
+    def migrate(
+        self,
+        data: ModelData,
+        target: TargetPolicy | None = None,
+        *,
+        target_resolver: TargetResolver | None = None,
+        container: None = None,
+        version_property: str | None = None,
+        depth_limit: int | None = None,
+        direction: MigrationDirectionStrategy | None = None,
+        on_direction_violation: DirectionViolationStrategy | None = None,
+        on_version_not_found: VersionMissingStrategy | None = None,
+        executor: Executor | None = None,
+        entry_migration: EntryMigration[VersionValue] | None = None,
+    ) -> ModelData: ...
+
     def migrate(  # noqa: PLR0913
         self,
         data: ModelData,
@@ -410,8 +434,12 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         executor: Executor | None = None,
         entry_migration: EntryMigration[VersionValue] | None = None,
     ) -> ModelData:
-        """Migrate *data* to the configured target policy."""
-        return self.engine.migrate(
+        """Migrate *data* to the configured target policy.
+
+        When *container* is given, the migrated payload is validated against it
+        and a typed container instance is returned instead of a dict.
+        """
+        migrated = self.engine.migrate(
             data,
             target=target,
             target_resolver=target_resolver,
@@ -424,6 +452,9 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             executor=executor,
             entry_migration=entry_migration,
         )
+        if container is None:
+            return migrated
+        return cast(ModelData, container.model_validate(migrated))
 
     def info(self) -> dict[str, str | int | dict[str, str | int]]:
         """Return manager metadata."""

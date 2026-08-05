@@ -10,16 +10,12 @@ from pyverge.migration import (
     MigrationSettings,
     ModelManager,
     PydanticModelAdapter,
+    PydanticWalker,
     Registry,
     VersioningSettings,
 )
+from pyverge.migration.types import Walker
 from tests.utils import make_engine
-
-# from tests.examples.nested_models import NestedModelManager
-# from tests.examples.semver import SemverManager
-
-# from tests.examples.eager import UserContainer as EagerUserContainer
-# from tests.examples.eager import eager_manager
 
 
 @pytest.fixture
@@ -87,6 +83,29 @@ def semver_manager(
     model_adapter: PydanticModelAdapter,
 ) -> type[ModelManager[semver.Version]]:
     return ModelManager.scoped(semver.Version, model_adapter)
+
+
+@pytest.fixture
+def walker(
+    request: pytest.FixtureRequest,
+    semver_registry: Registry,
+    migration_settings: MigrationSettings,
+    model_adapter: PydanticModelAdapter,
+) -> Walker:
+    """Indirect fixture: a preconfigured walker built from ``request.param``.
+
+    Parametrize with a walker class (e.g. ``PydanticWalker``) to obtain a
+    walker bound to the shared ``semver_registry``; pass it to
+    ``ModelManager.scoped(walker=...)`` to drive container-guided discovery.
+    """
+    if request.param == PydanticWalker:
+        return PydanticWalker(
+            semver_registry,
+            settings=migration_settings,
+            adapter=model_adapter,
+        )
+
+    raise ValueError(f"Unsupported walker type: {request.param}")
 
 
 @pytest.fixture
