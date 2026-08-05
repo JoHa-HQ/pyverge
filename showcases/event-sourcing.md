@@ -52,9 +52,8 @@ from pydantic import BaseModel
 
 from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
 
-OrderManager = ModelManager.scoped(
-    semver.Version,
-    adapter=PydanticModelAdapter(),
+OrderManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
     settings=MigrationSettings(
         direction="forward",
         on_missing_path="raise",
