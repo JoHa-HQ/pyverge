@@ -414,7 +414,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         target: TargetPolicy | None = None,
         *,
         target_resolver: TargetResolver | None = None,
-        container: type[BaseModel] | None = None,
+        container: type[TContainer] | None = None,
         version_property: str | None = None,
         depth_limit: int | None = None,
         direction: MigrationDirectionStrategy | None = None,
@@ -422,7 +422,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
         entry_migration: EntryMigration[VersionValue] | None = None,
-    ) -> ModelData:
+    ) -> ModelData | TContainer:
         """Migrate *data* to the configured target policy.
 
         When *container* is given, the migrated payload is validated against it
@@ -443,7 +443,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         )
         if container is None:
             return migrated
-        return cast(ModelData, container.model_validate(migrated))
+        return container.model_validate(migrated)
 
     def info(self) -> dict[str, str | int | dict[str, str | int]]:
         """Return manager metadata."""
