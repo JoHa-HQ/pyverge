@@ -23,9 +23,11 @@ from pyverge.migration import (
     MigrationHook,
     MigrationSettings,
     ModelManager,
+    ModelNotFoundError,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
+    RegistryError,
 )
 from tests.examples.pydantic.base import UserBaseModel
 from tests.examples.pydantic.chrono import (
@@ -252,6 +254,84 @@ class TestInstanceFacade:
 
         manager.migrate(_payload("1.0.0"))
         assert hook.calls == 1
+
+
+class TestLookupHelpers:
+    def test_get_returns_model_class(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        manager = semver_manager()
+        manager.store_model(UserV1)
+        manager.store_model(UserV2)
+
+        assert manager.get("User", "1.0.0") is UserV1
+        assert manager.get("User", "2.0.0") is UserV2
+
+    def test_get_unknown_raises(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        manager = semver_manager()
+        manager.store_model(UserV1)
+
+        with pytest.raises(ModelNotFoundError):
+            manager.get("User", "9.0.0")
+
+    def test_get_kind_is_strict(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        manager = semver_manager()
+        manager.store_model(UserV1)
+
+        with pytest.raises(ModelNotFoundError):
+            manager.get("user", "1.0.0")
+
+    def test_get_latest_returns_highest(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        manager = semver_manager()
+        manager.store_model(UserV1)
+        manager.store_model(UserV2)
+        manager.store_model(UserV3)
+
+        assert manager.get_latest("User") is UserV3
+
+    def test_get_latest_unknown_kind_raises(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        manager = semver_manager()
+        manager.store_model(UserV1)
+
+        with pytest.raises(RegistryError):
+            manager.get_latest("Missing")
+
+    def test_list_versions_ascending(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        manager = semver_manager()
+        manager.store_model(UserV3)
+        manager.store_model(UserV1)
+        manager.store_model(UserV2)
+
+        assert manager.list_versions("User") == ["1.0.0", "2.0.0", "3.0.0"]
+
+    def test_list_versions_unknown_kind_empty(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        manager = semver_manager()
+        manager.store_model(UserV1)
+
+        assert manager.list_versions("Missing") == []
+
+    def test_chrono_lookup_helpers(
+        self, chrono_manager: type[ModelManager[pendulum.Date]]
+    ) -> None:
+        manager = chrono_manager()
+        manager.store_model(UserV20250310)
+        manager.store_model(UserV20251231)
+
+        assert manager.get("User", "2025-03-10") is UserV20250310
+        assert manager.get_latest("User") is UserV20251231
+        assert manager.list_versions("User") == ["2025-03-10", "2025-12-31"]
 
 
 class TestSharedEngine:
