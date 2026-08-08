@@ -1,7 +1,7 @@
 """Migrations manager."""
 
 import bisect
-from typing import Any, Generic, Self
+from typing import Any, Generic, Self, cast
 
 from pydantic import BaseModel
 
@@ -96,13 +96,13 @@ class Engine(Generic[VersionValue]):
 
     @staticmethod
     def _resolve_model_key(
-        key: Versionable[VersionValue, VModel] | ModelVersionKey | type[BaseModel],
+        key: Comparable | ModelVersionKey | type[BaseModel],
     ) -> SentinelNode[VersionValue] | type[BaseModel]:
         """Normalize a model key to the registry's strict form."""
         if isinstance(key, tuple):
             return SentinelNode(*key)
         if isinstance(key, SentinelNode):
-            return key
+            return cast(SentinelNode[VersionValue], key)
         if isinstance(key, type) and issubclass(key, BaseModel):
             return key
         return SentinelNode(key.kind, key.version[1])
@@ -198,7 +198,7 @@ class Engine(Generic[VersionValue]):
 
     def get_model(
         self: Self,
-        key: Versionable[VersionValue, VModel] | ModelVersionKey | type[VModel],
+        key: Comparable | ModelVersionKey | type[VModel],
     ) -> Versionable:
         """Return the model matching *key*."""
         resolved = self._resolve_model_key(key)
@@ -208,7 +208,7 @@ class Engine(Generic[VersionValue]):
 
     def remove_model(
         self: Self,
-        key: Versionable[VersionValue, VModel] | ModelVersionKey | type[VModel],
+        key: Comparable | ModelVersionKey | type[VModel],
     ) -> None:
         """Remove a model version from the registry."""
         if isinstance(key, tuple):
