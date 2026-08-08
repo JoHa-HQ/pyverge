@@ -270,7 +270,7 @@ class TestLookupHelpers:
         indirect=["manager"],
         ids=["semver", "date"],
     )
-    def test_get_returns_model_class(
+    def test_get_returns_versionable(
         self,
         manager: type[ModelManager],
         models: list[type],
@@ -281,7 +281,7 @@ class TestLookupHelpers:
             mgr.store_model(model)
 
         for model, version in zip(models, versions, strict=True):
-            assert mgr.get("User", version) is model
+            assert mgr.get("User", version).model is model
 
     @pytest.mark.parametrize(
         ("manager", "model", "missing_version"),
@@ -344,7 +344,7 @@ class TestLookupHelpers:
         for model in models:
             mgr.store_model(model)
 
-        assert mgr.get_latest("User") is latest
+        assert mgr.get_latest("User").model is latest
 
     @pytest.mark.parametrize(
         ("manager", "model"),

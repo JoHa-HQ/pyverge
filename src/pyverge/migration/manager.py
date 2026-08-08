@@ -409,14 +409,14 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         """Return a registered model version."""
         return self.engine.get_model(key)
 
-    def get(self, kind: ModelKind, version: str) -> type[VModel]:
-        """Return the registered model class for *kind* at *version*."""
+    def get(self, kind: ModelKind, version: str) -> Versionable[VersionValue, VModel]:
+        """Return the registered version for *kind* at *version*."""
         parsed = cast(VersionValue, VersionNode.of(version))
-        return cast(type[VModel], self.get_model((kind, parsed)).model)
+        return self.get_model((kind, parsed))
 
-    def get_latest(self, kind: ModelKind) -> type[VModel]:
-        """Return the model class for the highest registered version of *kind*."""
-        return cast(type[VModel], self.engine.model_latest(kind).model)
+    def get_latest(self, kind: ModelKind) -> Versionable[VersionValue, VModel]:
+        """Return the highest registered version for *kind*."""
+        return self.engine.model_latest(kind)
 
     def list_versions(self, kind: ModelKind) -> list[Versionable[VersionValue, VModel]]:
         """Return registered versions for *kind*, ascending."""
