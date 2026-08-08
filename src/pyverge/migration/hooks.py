@@ -6,7 +6,7 @@ from typing import Any
 
 from opentelemetry.trace import Span, SpanKind, StatusCode, Tracer
 
-from .types import Versionable
+from .types import Comparable
 
 
 class MigrationHook:
@@ -20,16 +20,16 @@ class MigrationHook:
     def before_migrate(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         data: Mapping[str, Any],
     ) -> None: ...
 
     def after_migrate(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         original_data: Mapping[str, Any],
         migrated_data: Mapping[str, Any],
     ) -> None: ...
@@ -37,8 +37,8 @@ class MigrationHook:
     def on_error(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         data: Mapping[str, Any],
         error: Exception,
     ) -> None: ...
@@ -71,8 +71,8 @@ class OTELHook(MigrationHook):
     def before_migrate(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         data: Mapping[str, Any],
     ) -> None:
         self._start_time = time.perf_counter()
@@ -90,8 +90,8 @@ class OTELHook(MigrationHook):
     def after_migrate(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         original_data: Mapping[str, Any],
         migrated_data: Mapping[str, Any],
     ) -> None:
@@ -107,8 +107,8 @@ class OTELHook(MigrationHook):
     def on_error(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         data: Mapping[str, Any],
         error: Exception,
     ) -> None:

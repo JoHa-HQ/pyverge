@@ -7,6 +7,7 @@ from typing import Any
 import pendulum
 import pytest
 import semver
+from pydantic import BaseModel
 
 from pyverge.migration import (
     CompoundKeyWalker,
@@ -39,7 +40,7 @@ from tests.utils import envelope_model, make_engine, register_models
 
 
 def _latest_resolver(
-    registry: Registry[types.VersionValue],
+    registry: Registry[types.VersionValue, BaseModel],
 ) -> types.TargetResolver:
     def resolve(kind: types.ModelKind, current: types.Versionable) -> types.Versionable:
         return registry.latest(kind)
@@ -60,7 +61,7 @@ def _null_resolver() -> types.TargetResolver:
 def test_compound_key_empty_payload_returns_no_entries(
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
 ) -> None:
     walker = CompoundKeyWalker[semver.Version](
         registry, settings=discovery_settings, adapter=model_adapter
@@ -82,7 +83,7 @@ def test_finds_registered_versioned_dict(
     container: type | None,
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
 ) -> None:
     register_models(model_adapter, registry, discovery_settings, UserV1, UserV2)
     payload = {
@@ -114,7 +115,7 @@ def test_finds_registered_versioned_dict(
 def test_compound_key_unknown_version_is_skipped(
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
 ) -> None:
     register_models(model_adapter, registry, discovery_settings, UserV1)
     payload = {
@@ -135,7 +136,7 @@ def test_compound_key_unknown_version_is_skipped(
 def test_compound_key_max_depth_exceeded_for_nested_entry(
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
 ) -> None:
     register_models(model_adapter, registry, discovery_settings, UserV1)
     walker = CompoundKeyWalker(
@@ -167,7 +168,7 @@ def test_compound_key_max_depth_exceeded_for_nested_entry(
 def test_pydantic_walker_requires_container(
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
 ) -> None:
     walker = PydanticWalker(
         registry, settings=discovery_settings, adapter=model_adapter
@@ -187,7 +188,7 @@ def test_pydantic_walker_requires_container(
 def test_pydantic_walker_invalid_payload_raises(
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
     settings: DiscoverySettings,
 ) -> None:
     register_models(model_adapter, registry, discovery_settings, UserV1)
@@ -219,7 +220,7 @@ def test_pydantic_walker_invalid_payload_raises(
 def test_pydantic_walker_validation_mode_none_skips_model_validate(
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
     settings: DiscoverySettings,
 ) -> None:
     register_models(model_adapter, registry, discovery_settings, UserV1)
@@ -247,7 +248,7 @@ def test_pydantic_walker_validation_mode_none_skips_model_validate(
 def semver_engine(
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    semver_registry: Registry[semver.Version],
+    semver_registry: Registry[semver.Version, BaseModel],
 ) -> Engine:
     for model in (UserV1, UserV2, UserV3):
         semver_registry.store_model(
@@ -290,7 +291,7 @@ def semver_engine(
 def chrono_engine(
     model_adapter: PydanticModelAdapter,
     discovery_settings: DiscoverySettings,
-    date_registry: Registry[pendulum.Date],
+    date_registry: Registry[pendulum.Date, BaseModel],
 ) -> Engine:
     for model in (UserV20250310, UserV20251231):
         date_registry.store_model(
