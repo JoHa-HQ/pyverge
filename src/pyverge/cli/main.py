@@ -77,12 +77,12 @@ def validate(
         try:
             mgr.get(schema, version).cls.model_validate(data_dict)
         except ValidationError as e:
-            console.print("\n[red]Validation errors:[/red]")
+            typer.secho("\nValidation errors:", fg=typer.colors.RED)
             for error in e.errors():
                 field = ".".join(str(loc) for loc in error["loc"])
-                console.print(f"  • {field}: {error['msg']}")
+                typer.echo(f"  • {field}: {error['msg']}")
         except Exception as e:
-            console.print(f"\n{e}")
+            typer.echo(f"\n{e}")
 
         raise typer.Exit(1)
 
@@ -136,7 +136,7 @@ def migrate(  # noqa: PLR0913
                 typer.echo(f"Using manager: {manager}")
             typer.secho(f"Output written to: {output}", dim=True)
         else:
-            console.print(json.dumps(migrated.model_dump(), indent=2))
+            typer.echo(json.dumps(migrated.model_dump(), indent=2))
 
         raise typer.Exit(0)
 
@@ -186,7 +186,7 @@ def managers(
             table.add_row(name, module)
 
         console.print(table)
-        console.print("\n[dim]Use with: pyverge validate --manager <name> ...[/dim]")
+        typer.echo("\nUse with: pyverge validate --manager <name> ...")
 
     except ConfigError as e:
         typer.secho(str(e), fg=typer.colors.RED)
@@ -202,24 +202,26 @@ def info(
     try:
         mgr = resolve_manager(manager, config)
 
-        console.print(f"[bold]Manager: {manager}[/bold]\n")
+        typer.secho(f"Manager: {manager}", bold=True)
+        typer.echo("")
 
         versions = mgr.list_versions()
         models = sorted({v.model.__name__ for v in versions})
 
         if not models:
-            console.print("[yellow]No models registered[/yellow]")
+            typer.secho("No models registered", fg=typer.colors.YELLOW)
             return
 
-        console.print("[bold]Registered Models:[/bold]\n")
+        typer.secho("Registered Models:", bold=True)
+        typer.echo("")
 
         for model_name in models:
-            console.print(f"  [bold]{model_name}[/bold]")
+            typer.secho(f"  {model_name}", bold=True)
             for v in versions:
                 if v.model.__name__ == model_name:
-                    console.print(f"    • v{v.version[1]}")
+                    typer.echo(f"    • v{v.version[1]}")
 
-        console.print(f"\n[dim]Total: {len(models)} models[/dim]")
+        typer.echo(f"\nTotal: {len(models)} models")
 
     except ConfigError as e:
         typer.secho(str(e), fg=typer.colors.RED)
@@ -250,20 +252,18 @@ def diff(  # noqa: PLR0913
         diff_result = mgr.diff(schema, from_version, to_version)
 
         if format == "json":
-            console.print(
-                json.dumps(diff_result.render(), indent=2, default=str)
-            )
+            typer.echo(json.dumps(diff_result.render(), indent=2, default=str))
         else:
-            console.print(f"[red]Unknown format: {format}[/red]")
+            typer.secho(f"Unknown format: {format}", fg=typer.colors.RED)
             raise typer.Exit(1)
 
     except ConfigError as e:
-        console.print(f"[red]{e}[/red]")
+        typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1) from e
     except typer.Exit:
         raise
     except Exception as e:
-        console.print(f"[red]Diff error: {e}[/red]")
+        typer.secho(f"Diff error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
 
 
@@ -337,7 +337,7 @@ def init(
         else:
             create_single_manager_config(project_dir, use_pyproject)
 
-        console.print("\n[green]✓ Project initialized![/green]")
+        typer.secho("\n✓ Project initialized!", fg=typer.colors.GREEN)
         print_next_steps(multiple)
 
     except PermissionError as e:
