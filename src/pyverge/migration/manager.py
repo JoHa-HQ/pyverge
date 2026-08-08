@@ -418,9 +418,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         """Return the model class for the highest registered version of *kind*."""
         return cast(type[VModel], self.engine.model_latest(kind).model)
 
-    def list_versions(
-        self, kind: ModelKind
-    ) -> list[Versionable[VersionValue, VModel]]:
+    def list_versions(self, kind: ModelKind) -> list[Versionable[VersionValue, VModel]]:
         """Return registered versions for *kind*, ascending."""
         return self.registry.kind_versions(kind)
 
