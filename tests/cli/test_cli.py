@@ -47,9 +47,7 @@ def _manager_with_model() -> ModelManager[semver.Version]:
 
 
 class TestManagersCommand:
-    def test_lists_managers_in_module(
-        self, runner: CliRunner, snapshot
-    ) -> None:
+    def test_lists_managers_in_module(self, runner: CliRunner, snapshot) -> None:
         _register_manager("e2e_pkg.managers", _manager_with_model())
 
         result = runner.invoke(app, ["managers", "e2e_pkg.managers"])
@@ -59,9 +57,7 @@ class TestManagersCommand:
 
 
 class TestCheckCommand:
-    def test_check_valid_payload(
-        self, runner: CliRunner, tmp_path: Path
-    ) -> None:
+    def test_check_valid_payload(self, runner: CliRunner, tmp_path: Path) -> None:
         _register_manager("e2e_pkg.check", _manager_with_model())
         data_file = tmp_path / "payload.json"
         data_file.write_text('{"name": "Alice"}')
@@ -89,7 +85,7 @@ class TestCheckCommand:
     ) -> None:
         _register_manager("e2e_pkg.check", _manager_with_model())
         data_file = tmp_path / "payload.json"
-        data_file.write_text('{}')
+        data_file.write_text("{}")
 
         result = runner.invoke(
             app,
@@ -110,9 +106,7 @@ class TestCheckCommand:
 
 
 class TestInfoCommand:
-    def test_info_lists_registered_models(
-        self, runner: CliRunner, snapshot
-    ) -> None:
+    def test_info_lists_registered_models(self, runner: CliRunner, snapshot) -> None:
         _register_manager("e2e_pkg.container", _manager_with_model())
 
         result = runner.invoke(app, ["info", "e2e_pkg.container:manager"])
