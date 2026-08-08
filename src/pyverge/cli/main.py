@@ -20,7 +20,7 @@ from ._helpers import (
 from .config import (
     ConfigError,
     list_available_managers,
-    load_manager,
+    resolve_manager,
 )
 
 app = typer.Typer(help="Schema evolution and migrations for versioned models")
@@ -32,7 +32,7 @@ ManagerOption = Annotated[
         ...,
         "--manager",
         "-m",
-        help="Manager name (for multiple managers)",
+        help="Manager name or import path (module:object_path)",
     ),
 ]
 
@@ -61,7 +61,7 @@ def validate(
 ) -> None:
     """Validate data against a schema version."""
     try:
-        mgr = load_manager(manager, config)
+        mgr = resolve_manager(manager, config)
         data_dict = load_json_file(data)
 
         is_valid = mgr.validate_data(data_dict, schema, version)
@@ -121,7 +121,7 @@ def migrate(  # noqa: PLR0913
 ) -> None:
     """Migrate data from one schema version to another."""
     try:
-        mgr = load_manager(manager, config)
+        mgr = resolve_manager(manager, config)
         data_dict = load_json_file(data)
 
         migrated = mgr.migrate(data_dict, schema, from_version, to_version)
@@ -200,7 +200,7 @@ def info(
 ) -> None:
     """Show information about a specific manager."""
     try:
-        mgr = load_manager(manager, config)
+        mgr = resolve_manager(manager, config)
 
         console.print(f"[bold]Manager: {manager}[/bold]\n")
 
@@ -245,7 +245,7 @@ def diff(  # noqa: PLR0913
 ) -> None:
     """Show differences between schema versions."""
     try:
-        mgr = load_manager(manager, config)
+        mgr = resolve_manager(manager, config)
         diff_result = mgr.diff(schema, from_version, to_version)
 
         if format == "markdown":
@@ -280,7 +280,7 @@ def export(
         pyverge export -o ./schemas
     """
     try:
-        mgr = load_manager(manager, config)
+        mgr = resolve_manager(manager, config)
         output.mkdir(parents=True, exist_ok=True)
         mgr.dump_schemas(output)
         typer.secho(

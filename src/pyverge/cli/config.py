@@ -334,6 +334,35 @@ def load_manager(
     return _import_manager(config)
 
 
+def resolve_manager(
+    spec: str,
+    config_file: Path | None = None,
+    start_dir: Path | None = None,
+) -> ModelManager:
+    """Resolve a manager from either a config name or an import path.
+
+    ``spec`` is a manager name (looked up in configuration) or an explicit
+    ``module_path:object_path`` pair — e.g. ``myapp.container:UserManager`` or
+    ``myapp.container:services.user_manager`` — where ``object_path`` is
+    resolved via dotted attribute navigation.
+    """
+    if ":" not in spec:
+        return load_manager(spec, config_file, start_dir)
+
+    module_path, object_path = spec.split(":", 1)
+    cwd = Path.cwd()
+    module = _import_module(cwd, module_path)
+    obj: Any = module
+    for part in object_path.split("."):
+        obj = getattr(obj, part)
+    if not isinstance(obj, ModelManager):
+        raise ConfigError(
+            f"Manager '{spec}' resolved to {type(obj).__name__}, "
+            "expected a ModelManager"
+        )
+    return obj
+
+
 def _import_module(cwd: Path, module_path: str) -> ModuleType:
     """Imports a module where a manager may or may not be located."""
     try:
