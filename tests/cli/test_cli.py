@@ -23,7 +23,7 @@ def runner() -> CliRunner:
 
 def _register_manager(name: str, manager: ModelManager) -> None:
     module = types.ModuleType(name)
-    module.manager = manager
+    module.manager = manager  # ty: ignore[unresolved-attribute]
     sys.modules[name] = module
 
 
