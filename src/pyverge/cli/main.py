@@ -1,5 +1,3 @@
-"""Command-line interface for pyverge."""
-
 import json
 from pathlib import Path
 from typing import Annotated
@@ -10,17 +8,12 @@ from rich.console import Console
 from rich.table import Table
 
 from ._helpers import (
-    create_example_models_file,
-    create_multi_manager_config,
-    create_single_manager_config,
     load_json_file,
-    print_next_steps,
-    write_json_file,
 )
 from .config import (
     ConfigError,
-    list_available_managers,
-    load_manager,
+    list_managers_from_module,
+    resolve_manager,
 )
 
 app = typer.Typer(help="Schema evolution and migrations for versioned models")
@@ -32,23 +25,13 @@ ManagerOption = Annotated[
         ...,
         "--manager",
         "-m",
-        help="Manager name (for multiple managers)",
-    ),
-]
-
-ConfigOption = Annotated[
-    Path | None,
-    typer.Option(
-        ...,
-        "--config",
-        "-c",
-        help="Path to config file (pyproject.toml or pyverge.toml)",
+        help="Manager import path (module:object_path)",
     ),
 ]
 
 
 @app.command()
-def validate(
+def check(
     data: Annotated[
         Path, typer.Option(..., "--data", "-d", help="Path to data file (JSON)")
     ],
@@ -56,36 +39,25 @@ def validate(
     version: Annotated[
         str, typer.Option(..., "--version", "-v", help="Schema version")
     ],
-    manager: ManagerOption = "default",
-    config: ConfigOption = None,
+    manager: ManagerOption,
 ) -> None:
-    """Validate data against a schema version."""
+    """Check a payload against a schema version."""
     try:
-        mgr = load_manager(manager, config)
+        mgr = resolve_manager(manager)
         data_dict = load_json_file(data)
 
-        is_valid = mgr.validate_data(data_dict, schema, version)
+        mgr.validate(data_dict, schema, version)
 
-        if is_valid:
-            typer.secho(f"✓ Valid against {schema} v{version}", fg=typer.colors.GREEN)
-            if manager != "default":
-                typer.echo(f"Using manager: {manager}")
-            raise typer.Exit(0)
+        typer.secho(f"✓ Valid against {schema} v{version}", fg=typer.colors.GREEN)
+        raise typer.Exit(0)
 
+    except ValidationError as e:
         typer.secho("✗ Validation failed", fg=typer.colors.RED)
-
-        try:
-            mgr.get(schema, version).cls.model_validate(data_dict)
-        except ValidationError as e:
-            console.print("\n[red]Validation errors:[/red]")
-            for error in e.errors():
-                field = ".".join(str(loc) for loc in error["loc"])
-                console.print(f"  • {field}: {error['msg']}")
-        except Exception as e:
-            console.print(f"\n{e}")
-
-        raise typer.Exit(1)
-
+        typer.secho("\nValidation errors:", fg=typer.colors.RED)
+        for error in e.errors():
+            field = ".".join(str(loc) for loc in error["loc"])
+            typer.echo(f"  • {field}: {error['msg']}")
+        raise typer.Exit(1) from e
     except ConfigError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1) from e
@@ -103,122 +75,58 @@ def validate(
 
 
 @app.command()
-def migrate(  # noqa: PLR0913
-    data: Annotated[
-        Path, typer.Option(..., "--data", "-d", help="Path to data file (JSON)")
-    ],
-    schema: Annotated[str, typer.Option(..., "--schema", "-s", help="Schema name")],
-    from_version: Annotated[
-        str, typer.Option(..., "--from", "-f", help="Source version")
-    ],
-    to_version: Annotated[str, typer.Option(..., "--to", "-t", help="Target version")],
-    output: Annotated[
-        Path | None,
-        typer.Option(..., "--output", "-o", help="Output file (default: stdout)"),
-    ] = None,
-    manager: ManagerOption = "default",
-    config: ConfigOption = None,
-) -> None:
-    """Migrate data from one schema version to another."""
-    try:
-        mgr = load_manager(manager, config)
-        data_dict = load_json_file(data)
-
-        migrated = mgr.migrate(data_dict, schema, from_version, to_version)
-
-        if output:
-            write_json_file(output, migrated.model_dump())
-            typer.secho(
-                f"✓ Migrated {schema} v{from_version} → v{to_version}",
-                fg=typer.colors.GREEN,
-            )
-            if manager != "default":
-                typer.echo(f"Using manager: {manager}")
-            typer.secho(f"Output written to: {output}", dim=True)
-        else:
-            console.print(json.dumps(migrated.model_dump(), indent=2))
-
-        raise typer.Exit(0)
-
-    except ConfigError as e:
-        typer.secho(str(e), fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except FileNotFoundError as e:
-        typer.secho(f"File not found: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except json.JSONDecodeError as e:
-        typer.secho(f"Invalid JSON in {data}: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except ValidationError as e:
-        typer.secho("Migration validation failed:", fg=typer.colors.RED)
-        for error in e.errors():
-            field = ".".join(str(loc) for loc in error["loc"])
-            typer.echo(f"  • {field}: {error['msg']}")
-        raise typer.Exit(1) from e
-    except typer.Exit:
-        raise
-    except Exception as e:
-        typer.secho(f"Migration error: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-
-
-@app.command()
 def managers(
-    config: ConfigOption = None,
+    module: Annotated[
+        str, typer.Argument(..., help="Module path to inspect for managers")
+    ],
 ) -> None:
-    """List all available managers from configuration."""
+    """List ModelManagers defined in a module."""
     try:
-        available = list_available_managers(config)
+        names = list_managers_from_module(module)
 
-        if not available:
-            typer.echo("No managers configured\n")
-            typer.echo("Configuration can be added to:")
-            typer.echo('  1. pyproject.toml: [tool.pyverge] manager = "models"')
-            typer.echo('  2. pyverge.toml: [pyverge] manager = "models"')
-            typer.echo("  3. Auto-discovery: Define __manager__ in models.py")
-            return
-
-        table = Table(title="Available Managers")
+        table = Table(title=f"Managers in {module}")
         table.add_column("Name", style="cyan")
-        table.add_column("Module", style="green")
 
-        for name, module in sorted(available.items()):
-            table.add_row(name, module)
+        for name in sorted(names):
+            table.add_row(name)
 
         console.print(table)
-        console.print("\n[dim]Use with: pyverge validate --manager <name> ...[/dim]")
 
-    except ConfigError as e:
-        typer.secho(str(e), fg=typer.colors.RED)
+    except ImportError as e:
+        typer.secho(f"Cannot import module '{module}': {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
 
 
 @app.command()
 def info(
-    manager: Annotated[str, typer.Argument(..., help="Manager name")] = "default",
-    config: ConfigOption = None,
+    manager: Annotated[
+        str, typer.Argument(..., help="Manager import path (module:object_path)")
+    ],
 ) -> None:
     """Show information about a specific manager."""
     try:
-        mgr = load_manager(manager, config)
+        mgr = resolve_manager(manager)
 
-        console.print(f"[bold]Manager: {manager}[/bold]\n")
+        typer.secho(f"Manager: {manager}", bold=True)
+        typer.echo("")
 
-        models = mgr.list_models()
+        versions = mgr.list_versions()
+        models = sorted({v.model.__name__ for v in versions})
 
         if not models:
-            console.print("[yellow]No models registered[/yellow]")
+            typer.secho("No models registered", fg=typer.colors.YELLOW)
             return
 
-        console.print("[bold]Registered Models:[/bold]\n")
+        typer.secho("Registered Models:", bold=True)
+        typer.echo("")
 
-        for model_name in sorted(models):
-            versions = mgr.list_versions(model_name)
-            console.print(f"  [bold]{model_name}[/bold]")
-            for ver in versions:
-                console.print(f"    • v{ver}")
+        for model_name in models:
+            typer.secho(f"  {model_name}", bold=True)
+            for v in versions:
+                if v.model.__name__ == model_name:
+                    typer.echo(f"    • v{v.version[1]}")
 
-        console.print(f"\n[dim]Total: {len(models)} models[/dim]")
+        typer.echo(f"\nTotal: {len(models)} models")
 
     except ConfigError as e:
         typer.secho(str(e), fg=typer.colors.RED)
@@ -231,27 +139,24 @@ def info(
 
 
 @app.command()
-def diff(  # noqa: PLR0913
+def diff(
     schema: Annotated[str, typer.Option(..., "--schema", "-s", help="Schema name")],
     from_version: Annotated[
         str, typer.Option(..., "--from", "-f", help="Source version")
     ],
     to_version: Annotated[str, typer.Option(..., "--to", "-t", help="Target version")],
+    manager: ManagerOption,
     format: Annotated[
-        str, typer.Option(..., "--format", help="Output format (markdown, json)")
-    ] = "markdown",
-    manager: ManagerOption = "default",
-    config: ConfigOption = None,
+        str, typer.Option(..., "--format", help="Output format (json)")
+    ] = "json",
 ) -> None:
     """Show differences between schema versions."""
     try:
-        mgr = load_manager(manager, config)
+        mgr = resolve_manager(manager)
         diff_result = mgr.diff(schema, from_version, to_version)
 
-        if format == "markdown":
-            console.print(diff_result.to_markdown())
-        elif format == "json":
-            console.print(json.dumps(diff_result.to_dict(), indent=2))
+        if format == "json":
+            typer.echo(json.dumps(diff_result.render(), indent=2, default=str))
         else:
             typer.secho(f"Unknown format: {format}", fg=typer.colors.RED)
             raise typer.Exit(1)
@@ -263,92 +168,6 @@ def diff(  # noqa: PLR0913
         raise
     except Exception as e:
         typer.secho(f"Diff error: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-
-
-@app.command()
-def export(
-    output: Annotated[
-        Path, typer.Option(..., "--output", "-o", help="Output directory")
-    ],
-    manager: ManagerOption = "default",
-    config: ConfigOption = None,
-) -> None:
-    """Export JSON Schema definitions.
-
-    Example:
-        pyverge export -o ./schemas
-    """
-    try:
-        mgr = load_manager(manager, config)
-        output.mkdir(parents=True, exist_ok=True)
-        mgr.dump_schemas(output)
-        typer.secho(
-            f"✓ Exported JSON Schema schemas to {output}/",
-            fg=typer.colors.GREEN,
-        )
-    except ConfigError as e:
-        typer.secho(str(e), fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except typer.Exit:
-        raise
-    except Exception as e:
-        typer.secho(f"Export error: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-
-
-@app.command()
-def init(
-    project_dir: Annotated[
-        Path,
-        typer.Argument(
-            ...,
-            help="Project directory",
-            default_factory=lambda: Path.cwd(),  # noqa: PLW0108
-        ),
-    ],
-    use_pyproject: Annotated[
-        bool,
-        typer.Option(
-            ...,
-            "--pyproject",
-            help="Use pyproject.toml instead of pyverge.toml",
-        ),
-    ] = False,
-    multiple: Annotated[
-        bool,
-        typer.Option(
-            ...,
-            "--multiple",
-            help="Create config for multiple managers",
-        ),
-    ] = False,
-) -> None:
-    """Initialize a pyverge project with example configuration."""
-    try:
-        project_dir = Path(project_dir)
-        project_dir.mkdir(parents=True, exist_ok=True)
-
-        create_example_models_file(project_dir / "models.py")
-
-        if multiple:
-            create_multi_manager_config(project_dir, use_pyproject)
-        else:
-            create_single_manager_config(project_dir, use_pyproject)
-
-        console.print("\n[green]✓ Project initialized![/green]")
-        print_next_steps(multiple)
-
-    except PermissionError as e:
-        typer.secho(f"Permission denied: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except OSError as e:
-        typer.secho(f"Failed to create project: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except typer.Exit:
-        raise
-    except Exception as e:
-        typer.secho(f"Initialization error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
 
 

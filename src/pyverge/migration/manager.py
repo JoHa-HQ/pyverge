@@ -35,6 +35,7 @@ from typing import Any, ClassVar, Generic, cast, overload
 
 from pydantic import BaseModel
 
+from .diff import PydanticDiff
 from .engine import Engine
 from .executor import SequentialExecutor
 from .graph import GraphBuilder
@@ -499,3 +500,36 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
                 "migrations": len(engine.registry.kinds),
             },
         }
+
+    def list_versions(self) -> list[Versionable[VersionValue, VModel]]:
+        """Return all registered versions as ``Versionable`` objects."""
+        return self.registry.versions
+
+    def get(self, kind: ModelKind, version: str) -> Versionable[VersionValue, VModel]:
+        """Return the registered versionable for ``kind``@``version``."""
+        return self.get_model(
+            (kind, cast(VersionValue, self.engine.adapter.of(version)))
+        )
+
+    def validate(self, data: ModelData, kind: ModelKind, version: str) -> None:
+        """Validate *data* against ``kind``@``version``.
+
+        Raises :class:`ValidationError` when the payload is invalid.
+        """
+        versionable = self.get(kind, version)
+        self.engine.adapter.validate(data, versionable.model)
+
+    def diff(
+        self,
+        kind: ModelKind,
+        from_version: str,
+        to_version: str,
+    ) -> PydanticDiff[VersionValue, VModel, VModel]:
+        """Build a diff between two versions of *kind*."""
+        source = self.get_model(
+            (kind, cast(VersionValue, self.engine.adapter.of(from_version)))
+        )
+        target = self.get_model(
+            (kind, cast(VersionValue, self.engine.adapter.of(to_version)))
+        )
+        return PydanticDiff.from_pair(source=source, target=target)

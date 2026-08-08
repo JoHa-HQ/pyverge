@@ -751,8 +751,7 @@ class TestPydanticDiff:
         target = envelope_model(model_adapter, versioning_settings, UserV2)
 
         diff = PydanticDiff.from_pair(source=source, target=target)
-        patch = diff.render()
-        serialized = patch()
+        serialized = diff.render()
         assert isinstance(serialized, list)
         add_ops = [op for op in serialized if op["op"] == "add"]
         assert any(op["path"] == "/age" for op in add_ops)
