@@ -46,7 +46,7 @@ def check(
         mgr = resolve_manager(manager)
         data_dict = load_json_file(data)
 
-        mgr.validate_data(data_dict, schema, version)
+        mgr.validate(data_dict, schema, version)
 
         typer.secho(f"✓ Valid against {schema} v{version}", fg=typer.colors.GREEN)
         raise typer.Exit(0)

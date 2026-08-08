@@ -505,17 +505,13 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         """Return all registered versions as ``Versionable`` objects."""
         return self.registry.versions
 
-    def get(
-        self, kind: ModelKind, version: str
-    ) -> Versionable[VersionValue, VModel]:
+    def get(self, kind: ModelKind, version: str) -> Versionable[VersionValue, VModel]:
         """Return the registered versionable for ``kind``@``version``."""
         return self.get_model(
             (kind, cast(VersionValue, self.engine.adapter.of(version)))
         )
 
-    def validate_data(
-        self, data: ModelData, kind: ModelKind, version: str
-    ) -> None:
+    def validate(self, data: ModelData, kind: ModelKind, version: str) -> None:
         """Validate *data* against ``kind``@``version``.
 
         Raises :class:`ValidationError` when the payload is invalid.
