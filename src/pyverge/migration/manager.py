@@ -235,7 +235,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
 
     _settings: ClassVar[MigrationSettings]
     _adapter: ClassVar[ModelAdapter]
-    _engine: ClassVar[Engine[VersionValue]]  # type: ignore[misc]
+    _engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
 
     def __init__(self, engine: Engine[VersionValue] | None = None) -> None:
         """Initialize the runtime facade.

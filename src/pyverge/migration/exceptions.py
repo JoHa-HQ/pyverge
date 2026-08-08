@@ -2,14 +2,12 @@ from collections.abc import Sequence
 from typing import Any, Self
 
 from .types import (
+    MIGRATION_PAIR_LEN,
     MigrationKey,
     ModelBase,
     ModelVersionKey,
     VersionValue,
 )
-
-# Length of an endpoint-pair key, e.g. ``(source, target)``.
-_ENDPOINT_PAIR = 2
 
 
 class RegistryError(Exception):
@@ -48,7 +46,7 @@ class VersionedModelError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        version: ModelVersionKey,
+        version: VersionValue | ModelVersionKey,
         message: str,
     ) -> None:
         """Initializes VersionedModelError."""
@@ -223,7 +221,11 @@ class MigrationError(Exception):
         ``kind, source, target`` form for convenience.
         """
         source_kind, target_kind = None, None
-        if isinstance(kind, tuple) and len(kind) == _ENDPOINT_PAIR and source is None:
+        if (
+            isinstance(kind, tuple)
+            and len(kind) == MIGRATION_PAIR_LEN
+            and source is None
+        ):
             source, target = kind
             kind = "unknown"
         if source is not None and hasattr(source, "version"):

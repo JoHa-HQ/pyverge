@@ -19,6 +19,7 @@ repos:
       - id: ty
         name: ty check
         entry: uv run ty check
+        always_run: true
         language: system
         pass_filenames: false
         types: [python, pyi]

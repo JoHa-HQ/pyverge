@@ -488,7 +488,7 @@ class TestMigrationEdge:
                     diff=PydanticDiff.from_pair(
                         *[
                             envelope_model(model_adapter, versioning_settings, el)
-                            for el in nodes[0]
+                            for el in nodes[0]  # ty: ignore
                         ]
                     ),
                     func=lambda d: d,
@@ -497,7 +497,7 @@ class TestMigrationEdge:
                     diff=PydanticDiff.from_pair(
                         *[
                             envelope_model(model_adapter, versioning_settings, el)
-                            for el in nodes[1]
+                            for el in nodes[1]  # ty: ignore
                         ]
                     ),
                     func=lambda d: {"x": 1},

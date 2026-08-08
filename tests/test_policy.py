@@ -150,7 +150,7 @@ class TestCompileTargetSpec:
         with pytest.raises(RegistryError):
             compile_target_spec(
                 populated_registry,
-                "unknown",
+                "unknown",  # ty: ignore
                 version_property="version",
                 adapter=adapter,
             )
@@ -258,7 +258,7 @@ class TestCompileTargetResolver:
         settings: DiscoverySettings,
     ) -> None:
         resolver = compile_target_resolver(
-            populated_registry, {"Person": "9.9.9"}, adapter=adapter
+            populated_registry, {"Person": "9.9.9"}, adapter=adapter  # ty: ignore
         )
         source = envelope_model(adapter, settings, PersonV1)
         with pytest.raises(ModelNotFoundError):
