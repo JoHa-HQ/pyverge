@@ -475,7 +475,7 @@ class Engine(Generic[VersionValue]):
     def migrate(
         self: Self,
         data: ModelData,
-        target: TargetPolicy | None = None,
+        target: TargetPolicy = None,
         *,
         target_resolver: TargetResolver | None = None,
         container: type[ModelBase] | None = None,

@@ -62,6 +62,7 @@ def compile_target_resolver(
         A callable matching :class:`TargetResolver`.
     """
     if isinstance(policy, dict):
+        policy_dict = cast(dict[ModelKind | Literal["*"], TargetSpec], policy)
         resolvers: dict[
             ModelKind | Literal["*"],
             TargetResolver,
@@ -69,7 +70,7 @@ def compile_target_resolver(
             kind: compile_target_spec(
                 registry, spec, version_property=version_property, adapter=adapter
             )
-            for kind, spec in policy.items()
+            for kind, spec in policy_dict.items()
         }
         fallback = resolvers.pop("*", None)
 
@@ -85,7 +86,10 @@ def compile_target_resolver(
         return resolve
 
     return compile_target_spec(
-        registry, policy, version_property=version_property, adapter=adapter
+        registry,
+        cast(TargetSpec, policy),
+        version_property=version_property,
+        adapter=adapter,
     )
 
 
@@ -113,18 +117,18 @@ def compile_target_spec(
             resolver = _string_resolver(registry, spec, adapter)
         return resolver
 
-    if isinstance(spec, type) and issubclass(spec, BaseModel):
+    if isinstance(spec, type) and issubclass(spec, ModelBase):
         return _model_resolver(registry, spec, version_property=version_property)
 
     # Treat any remaining value as an explicit versionable target.  This avoids
     # an ``isinstance(spec, Versionable)`` protocol check that would trigger the
     # strict ``__eq__`` semantics of :class:`VersionNode` / :class:`SentinelNode`.
-    return _versionable_resolver(spec)
+    return _versionable_resolver(cast(Versionable, spec))
 
 
 def _skip_resolver(
-    _kind: ModelKind,
-    _current: Versionable[VersionValue_co, VModel_co],
+    kind: ModelKind,
+    current: Versionable[VersionValue_co, VModel_co],
 ) -> Versionable[VersionValue_co, VModel_co] | None:
     return None
 
@@ -134,7 +138,7 @@ def _latest_resolver(
 ) -> TargetResolver:
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue_co, VModel_co],
+        current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
         return registry.latest(kind)
 
@@ -146,7 +150,7 @@ def _earliest_resolver(
 ) -> TargetResolver:
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue_co, VModel_co],
+        current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
         return registry.earliest(kind)
 
@@ -169,7 +173,7 @@ def _model_resolver(
 
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue_co, VModel_co],
+        current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
         if kind != target.kind:
             raise RegistryError(
@@ -183,11 +187,11 @@ def _model_resolver(
 
 
 def _versionable_resolver(
-    target: Versionable[VersionValue_co, VModel_co],
+    target: Versionable,
 ) -> TargetResolver:
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue_co, VModel_co],
+        current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
         if kind != target.kind:
             raise RegistryError(
@@ -222,7 +226,7 @@ def _string_resolver(
 
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue_co, VModel_co],
+        current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
         sentinel: Versionable[VersionValue_co, VModel_co] = cast(
             Versionable[VersionValue_co, VModel_co],
