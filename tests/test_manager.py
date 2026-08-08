@@ -29,7 +29,7 @@ from pyverge.migration import (
     Registry,
     RegistryError,
 )
-from tests.examples.pydantic.base import UserBaseModel
+from tests.examples.pydantic.base import BaseModel, UserBaseModel
 from tests.examples.pydantic.chrono import (
     UserV20250310,
     UserV20251231,
@@ -273,7 +273,7 @@ class TestLookupHelpers:
     def test_get_returns_versionable(
         self,
         manager: type[ModelManager],
-        models: list[type],
+        models: list[type[BaseModel]],
         versions: list[str],
     ) -> None:
         mgr = manager()
@@ -295,7 +295,7 @@ class TestLookupHelpers:
     def test_get_unknown_raises(
         self,
         manager: type[ModelManager],
-        model: type,
+        model: type[BaseModel],
         missing_version: str,
     ) -> None:
         mgr = manager()
@@ -316,7 +316,7 @@ class TestLookupHelpers:
     def test_get_kind_is_strict(
         self,
         manager: type[ModelManager],
-        model: type,
+        model: type[BaseModel],
         version: str,
     ) -> None:
         mgr = manager()
@@ -337,8 +337,8 @@ class TestLookupHelpers:
     def test_get_latest_returns_highest(
         self,
         manager: type[ModelManager],
-        models: list[type],
-        latest: type,
+        models: list[type[BaseModel]],
+        latest: type[BaseModel],
     ) -> None:
         mgr = manager()
         for model in models:
@@ -358,7 +358,7 @@ class TestLookupHelpers:
     def test_get_latest_unknown_kind_raises(
         self,
         manager: type[ModelManager],
-        model: type,
+        model: type[BaseModel],
     ) -> None:
         mgr = manager()
         mgr.store_model(model)
@@ -382,8 +382,8 @@ class TestLookupHelpers:
     def test_list_versions_ascending(
         self,
         manager: type[ModelManager],
-        models: list[type],
-        expected: list[type],
+        models: list[type[BaseModel]],
+        expected: list[type[BaseModel]],
     ) -> None:
         mgr = manager()
         for model in models:
