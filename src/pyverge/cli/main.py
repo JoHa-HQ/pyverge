@@ -204,7 +204,8 @@ def info(
 
         console.print(f"[bold]Manager: {manager}[/bold]\n")
 
-        models = mgr.list_models()
+        versions = mgr.list_versions()
+        models = sorted({v.model.__name__ for v in versions})
 
         if not models:
             console.print("[yellow]No models registered[/yellow]")
@@ -212,11 +213,11 @@ def info(
 
         console.print("[bold]Registered Models:[/bold]\n")
 
-        for model_name in sorted(models):
-            versions = mgr.list_versions(model_name)
+        for model_name in models:
             console.print(f"  [bold]{model_name}[/bold]")
-            for ver in versions:
-                console.print(f"    • v{ver}")
+            for v in versions:
+                if v.model.__name__ == model_name:
+                    console.print(f"    • v{v.version[1]}")
 
         console.print(f"\n[dim]Total: {len(models)} models[/dim]")
 

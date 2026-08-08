@@ -500,14 +500,6 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             },
         }
 
-    def list_models(self) -> list[str]:
-        """Return the registered model class names, sorted."""
-        return sorted({v.model.__name__ for v in self.registry.versions})
-
-    def list_versions(self, model_name: str) -> list[str]:
-        """Return the registered version strings for *model_name*."""
-        return [
-            str(v.version[1])
-            for v in self.registry.versions
-            if v.model.__name__ == model_name
-        ]
+    def list_versions(self) -> list[Versionable[VersionValue, VModel]]:
+        """Return all registered versions as ``Versionable`` objects."""
+        return self.registry.versions
