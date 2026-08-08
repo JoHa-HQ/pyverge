@@ -100,12 +100,13 @@ class Engine(Generic[VersionValue]):
     ) -> SentinelNode[VersionValue] | type[BaseModel]:
         """Normalize a model key to the registry's strict form."""
         if isinstance(key, tuple):
-            return SentinelNode(*key)
+            kind, value = cast(ModelVersionKey, key)
+            return SentinelNode[VersionValue](kind, value)
         if isinstance(key, SentinelNode):
             return cast(SentinelNode[VersionValue], key)
         if isinstance(key, type) and issubclass(key, BaseModel):
             return key
-        return SentinelNode(key.kind, key.version[1])
+        return SentinelNode[VersionValue](key.kind, key.version[1])
 
     def __contains__(self, index: Any) -> bool:
         """Check membership of a model version or migration edge."""
@@ -153,8 +154,8 @@ class Engine(Generic[VersionValue]):
     def __getitem__(self, index: Any) -> MigrationFunc | list[MigrationFunc]:
         """Select a migration function or a path of functions."""
         if isinstance(index, slice):
-            from_v = self._resolve_model_key(index.start)
-            to_v = self._resolve_model_key(index.stop)
+            from_v = self.get_model(self._resolve_model_key(index.start))
+            to_v = self.get_model(self._resolve_model_key(index.stop))
             path = self.find_migration_path(from_v, to_v)
             return [
                 self.registry.get_migration_by_edge(
@@ -212,7 +213,8 @@ class Engine(Generic[VersionValue]):
     ) -> None:
         """Remove a model version from the registry."""
         if isinstance(key, tuple):
-            sentinel = SentinelNode(*key)
+            kind, value = cast(ModelVersionKey, key)
+            sentinel = SentinelNode[VersionValue](kind, value)
         elif isinstance(key, type) and issubclass(key, BaseModel):
             sentinel = self.registry.get_model_by_class(key)
         else:
@@ -396,9 +398,9 @@ class Engine(Generic[VersionValue]):
 
     def find_migration_path(
         self: Self,
-        from_version: Comparable,
-        to_version: Comparable,
-    ) -> list[tuple[Comparable, Comparable]]:
+        from_version: Versionable,
+        to_version: Versionable,
+    ) -> list[tuple[Versionable, Versionable]]:
         """Return a complete migration chain between two versions."""
         registry = self.registry
 
@@ -430,7 +432,7 @@ class Engine(Generic[VersionValue]):
             return []
 
         step = 1 if lo < hi else -1
-        path: list[tuple[Comparable, Comparable]] = []
+        path: list[tuple[Versionable, Versionable]] = []
         current = from_version
         while lo != hi:
             nxt = kind_versions[lo + step]
