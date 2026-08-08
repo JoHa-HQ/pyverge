@@ -3,8 +3,6 @@
 import bisect
 from typing import Any, Generic, Self, cast
 
-from pydantic import BaseModel
-
 from .diff import PydanticDiff
 from .exceptions import (
     MigrationError,
@@ -96,7 +94,7 @@ class Engine(Generic[VersionValue]):
 
     def _resolve_model_key(
         self: Self,
-        key: Comparable | ModelVersionKey | type[BaseModel],
+        key: Comparable | ModelVersionKey | type[ModelBase],
     ) -> SentinelNode[VersionValue]:
         """Normalize a model key to the registry's strict sentinel form."""
         if isinstance(key, tuple):
@@ -104,7 +102,7 @@ class Engine(Generic[VersionValue]):
             return SentinelNode[VersionValue](kind, value)
         if isinstance(key, SentinelNode):
             return cast(SentinelNode[VersionValue], key)
-        if isinstance(key, type) and issubclass(key, BaseModel):
+        if isinstance(key, type) and issubclass(key, ModelBase):
             versionable = self.registry.get_model_by_class(key)
             return SentinelNode[VersionValue](
                 versionable.kind, versionable.version[1]
@@ -213,7 +211,7 @@ class Engine(Generic[VersionValue]):
         if isinstance(key, tuple):
             kind, value = cast(ModelVersionKey, key)
             sentinel = SentinelNode[VersionValue](kind, value)
-        elif isinstance(key, type) and issubclass(key, BaseModel):
+        elif isinstance(key, type) and issubclass(key, ModelBase):
             sentinel = self.registry.get_model_by_class(key)
         else:
             sentinel = key
@@ -228,7 +226,7 @@ class Engine(Generic[VersionValue]):
 
     def find_model(
         self: Self,
-        key: ModelVersionKey | type[BaseModel] | ModelKind,
+        key: ModelVersionKey | type[ModelBase] | ModelKind,
     ) -> Versionable | None:
         """Return the model matching *key*, or ``None`` if not found."""
         try:
@@ -483,7 +481,7 @@ class Engine(Generic[VersionValue]):
         target: TargetPolicy | None = None,
         *,
         target_resolver: TargetResolver | None = None,
-        container: type[BaseModel] | None = None,
+        container: type[ModelBase] | None = None,
         version_property: str | None = None,
         depth_limit: int | None = None,
         direction: MigrationDirectionStrategy | None = None,
