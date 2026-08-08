@@ -235,6 +235,7 @@ class VersionEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
         return f"VersionEdge({self.diff.source}→{self.diff.target})"
 
 
+@total_ordering
 class SentinelEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
     """Key-only edge sentinel, symmetric to :class:`SentinelNode`.
 
@@ -245,8 +246,8 @@ class SentinelEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
 
     def __init__(
         self,
-        source: Versionable[VersionValue_co, VSource_co],
-        target: Versionable[VersionValue_co, VTarget_co],
+        source: Comparable,
+        target: Comparable,
     ) -> None:
         self._source = source
         self._target = target
@@ -260,8 +261,8 @@ class SentinelEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
     @classmethod
     def from_pair(
         cls,
-        source: Versionable[VersionValue_co, VSource_co],
-        target: Versionable[VersionValue_co, VTarget_co],
+        source: Comparable,
+        target: Comparable,
     ) -> Self:
         return cls(source, target)
 
@@ -278,11 +279,11 @@ class SentinelEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
         return (self._source, self._target)
 
     @property
-    def source(self) -> Versionable[VersionValue_co, VSource_co]:
+    def source(self) -> Comparable:
         return self._source
 
     @property
-    def target(self) -> Versionable[VersionValue_co, VTarget_co]:
+    def target(self) -> Comparable:
         return self._target
 
     def __lt__(self, other: object) -> bool:

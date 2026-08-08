@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from .registry import Registry
     from .strategy import EntryMigration
 
+ModelBase: TypeAlias = BaseModel
 
 TContainer = TypeVar("TContainer", bound=BaseModel)
 # Invariant — used where VModel appears in both input and output positions
@@ -34,11 +35,14 @@ VSource_co = TypeVar("VSource_co", bound=BaseModel, covariant=True)
 VTarget_co = TypeVar("VTarget_co", bound=BaseModel, covariant=True)
 
 # Covariant — used in protocols where VModel is output-only
-Container_co = TypeVar("Container_co", bound=BaseModel, covariant=True)
 VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
-VModel_co = TypeVar("VModel_co", bound=BaseModel, covariant=True)
-# Covariant — used in Renderable for the rendered output type
+VModel_co = TypeVar("VModel_co", bound=ModelBase, covariant=True)
+
+ProviderBase_co = TypeVar(
+    "ProviderBase_co", bound=ModelBase, covariant=True, default=ModelBase
+)
 Renderable_co = TypeVar("Renderable_co", covariant=True)
+Container_co = TypeVar("Container_co", bound=BaseModel, covariant=True)
 
 JsonPrimities: TypeAlias = int | float | str | bool | None | dict[str, Any] | list[Any]
 JsonValue: TypeAlias = JsonPrimities | dict[str, JsonPrimities] | list[JsonPrimities]
@@ -79,26 +83,34 @@ TargetPolicy: TypeAlias = "TargetSpec | dict[ModelKind | Literal['*'], TargetSpe
 
 
 @runtime_checkable
-class Comparable(Protocol[VersionValue_co]):
-    """Total ordering over the version key.
+class Orderable(Protocol):
+    """Functional aspect: total ordering + hashing + dedupe.
 
+    Shared ordering contract for version nodes and migration edges.
     Compatible with :func:`functools.total_ordering`: ``__le__``/``__ge__``
-    are derived from ``__lt__``/``__gt__``/``__eq__`` by the decorator, so a
-    decorated class satisfies this protocol structurally.
+    are derived from ``__lt__``/``__gt__``/``__eq__`` by the decorator.
     """
 
     @property
-    def strategy(self) -> type[VersionValue_co]: ...
-    @property
     def kind(self) -> ModelKind: ...
-    @property
-    def version(self) -> tuple[ModelKind, VersionValue_co]: ...
-
     def __lt__(self, other: object) -> bool: ...
     def __gt__(self, other: object) -> bool: ...
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
     def __str__(self) -> str: ...
+
+
+@runtime_checkable
+class Comparable(Orderable, Protocol[VersionValue_co]):
+    """Version identity aspect: ``strategy`` + ``version``, plus ordering.
+
+    Implemented by :class:`VersionNode` and :class:`SentinelNode`.
+    """
+
+    @property
+    def strategy(self) -> type[VersionValue_co]: ...
+    @property
+    def version(self) -> tuple[ModelKind, VersionValue_co]: ...
 
 
 @runtime_checkable
@@ -115,37 +127,38 @@ class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co, VModel_
 
 
 @runtime_checkable
-class Migratable(Protocol[VersionValue_co, VSource_co, VTarget_co]):
-    """Protocol for a migration edge identifier.
+class Transitional(Orderable, Protocol[VersionValue_co, VSource_co, VTarget_co]):
+    """Edge identity aspect: a directed ``source`` → ``target`` transition.
 
-    Shared by :class:`VersionEdge` and :class:`SentinelEdge`.  Carries
-    ``source``, ``target``, ``edge`` and comparison/hash semantics.  A
-    registered migration also supplies ``func`` and ``diff``; sentinels
-    may leave those as ``None``.
+    Implemented by :class:`VersionEdge` and :class:`SentinelEdge`.  Carries
+    ``source``, ``target``, ``edge`` and ordering semantics, but no execution.
+    Endpoints are :class:`Comparable` so edges may reference sentinel keys.
     """
 
     @property
-    def kind(self) -> ModelKind: ...
+    def edge(self) -> tuple[Comparable, Comparable]: ...
     @property
-    def edge(
-        self,
-    ) -> tuple[
-        Versionable[VersionValue_co, VSource_co],
-        Versionable[VersionValue_co, VTarget_co],
-    ]: ...
+    def source(self) -> Comparable: ...
     @property
-    def source(self) -> Versionable[VersionValue_co, VSource_co]: ...
-    @property
-    def target(self) -> Versionable[VersionValue_co, VTarget_co]: ...
+    def target(self) -> Comparable: ...
 
-    func: MigrationFunc | None
-    diff: Diffable[VersionValue_co] | None
+
+@runtime_checkable
+class Migratable(
+    Transitional[VersionValue, VSource_co, VTarget_co],
+    Protocol[VersionValue, VSource_co, VTarget_co],
+):
+    """Executable aspect: a transition that can run a migration.
+
+    Adds a required ``func`` and ``diff`` on top of :class:`Transitional`.
+    Implemented by :class:`VersionEdge`; sentinels are key-only and satisfy
+    :class:`Transitional` only.
+    """
+
+    func: MigrationFunc
+    diff: Diffable[VersionValue]
 
     def __call__(self, data: ModelData) -> ModelData: ...
-    def __lt__(self, other: object) -> bool: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __hash__(self) -> int: ...
-    def __str__(self) -> str: ...
 
 
 @runtime_checkable
@@ -188,96 +201,77 @@ class Diffable(Protocol[VersionValue_co]):
     satisfies this protocol.
     """
 
-    source: Versionable
-    target: Versionable
-    added_fields: list[str]
-    removed_fields: list[str]
-    modified_fields: dict[str, dict[str, Any]]
-    added_field_info: dict[str, dict[str, Any]]
-    unchanged_fields: list[str]
-    renderer: type[Renderable]
-    is_backward_compatible: bool
+    @property
+    def source(self) -> Versionable: ...
 
     @property
-    def kind(self) -> ModelKind:
-        """The model family identifier (e.g. ``'User'``)."""
-        ...
+    def target(self) -> Versionable: ...
 
     @property
-    def edge(self) -> MigrationKey:
-        """The migration edge key, a tuple of (source, target) versions."""
-        ...
+    def added_fields(self) -> list[str]: ...
 
     @property
-    def is_backward(self) -> bool:
-        """True when the source version is newer than the target."""
-        ...
+    def removed_fields(self) -> list[str]: ...
 
     @property
-    def is_forward(self) -> bool:
-        """True when the source version is older than the target."""
-        ...
+    def modified_fields(self) -> dict[str, dict[str, Any]]: ...
 
     @property
-    def has_additions(self) -> bool:
-        """At least one field was added in the target version."""
-        ...
+    def added_field_info(self) -> dict[str, dict[str, Any]]: ...
 
     @property
-    def has_removals(self) -> bool:
-        """At least one field was removed from the source version."""
-        ...
+    def unchanged_fields(self) -> list[str]: ...
 
     @property
-    def has_modifications(self) -> bool:
-        """At least one common field changed type, default, or required status."""
-        ...
+    def renderer(self) -> type[Renderable]: ...
 
     @property
-    def has_type_changes(self) -> bool:
-        """At least one field changed its type annotation."""
-        ...
+    def is_backward_compatible(self) -> bool: ...
 
     @property
-    def has_constraint_changes(self) -> bool:
-        """At least one field changed required/optional status."""
-        ...
+    def kind(self) -> ModelKind: ...
 
-    def is_added(self, field: str) -> bool:
-        """True if *field* exists in target but not source."""
-        ...
+    @property
+    def edge(self) -> MigrationKey: ...
 
-    def is_removed(self, field: str) -> bool:
-        """True if *field* exists in source but not target."""
-        ...
+    @property
+    def is_backward(self) -> bool: ...
 
-    def is_modified(self, field: str) -> bool:
-        """True if *field* exists in both but has changed."""
-        ...
+    @property
+    def is_forward(self) -> bool: ...
 
-    def is_added_required(self, field: str) -> bool:
-        """True if *field* was added and is required (no default)."""
-        ...
+    @property
+    def has_additions(self) -> bool: ...
 
-    def added_default(self, field: str) -> Any:
-        """Return the default value for a newly added field, or None."""
-        ...
+    @property
+    def has_removals(self) -> bool: ...
 
-    def modified_change(self, field: str, key: str) -> Any | None:
-        """Return a specific change detail for *field* (e.g. type_changed)."""
-        ...
+    @property
+    def has_modifications(self) -> bool: ...
 
-    def is_union_expansion(self, field: str) -> bool:
-        """True if *field* changed from required to optional (T -> T|None)."""
-        ...
+    @property
+    def has_type_changes(self) -> bool: ...
 
-    def is_union_contraction(self, field: str) -> bool:
-        """True if *field* changed from optional to required (T|None -> T)."""
-        ...
+    @property
+    def has_constraint_changes(self) -> bool: ...
 
-    def render(self) -> Renderable:
-        """Render the diff using the configured output strategy."""
-        ...
+    def is_added(self, field: str) -> bool: ...
+
+    def is_removed(self, field: str) -> bool: ...
+
+    def is_modified(self, field: str) -> bool: ...
+
+    def is_added_required(self, field: str) -> bool: ...
+
+    def added_default(self, field: str) -> Any: ...
+
+    def modified_change(self, field: str, key: str) -> Any | None: ...
+
+    def is_union_expansion(self, field: str) -> bool: ...
+
+    def is_union_contraction(self, field: str) -> bool: ...
+
+    def render(self) -> Renderable: ...
 
 
 @runtime_checkable
@@ -289,8 +283,11 @@ class Renderable(Protocol[VersionValue, Renderable_co]):
     later.  Calling it produces the typed rendered output.
     """
 
-    diff: Diffable[VersionValue]
-    format: str
+    @property
+    def diff(self) -> Diffable[VersionValue]: ...
+
+    @property
+    def format(self) -> str: ...
 
     def __call__(self) -> Renderable_co: ...
 
@@ -299,9 +296,10 @@ class Renderable(Protocol[VersionValue, Renderable_co]):
 class ModelAdapter(Protocol):
     """Provider-specific model operations.
 
-    Implementations are provided for each supported model provider
-    (Pydantic, attrs, dataclasses, MessagePack, etc.).  The migration
-    engine and registry remain provider-agnostic.
+    Anchored to a model provider via ``ProviderBase_co`` at use sites.
+    Implementations are provided for each supported model provider (Pydantic,
+    attrs, dataclasses, MessagePack, etc.).  The migration engine and registry
+    remain provider-agnostic.
     """
 
     def version(self, model_cls: type[Any]) -> str: ...
