@@ -16,6 +16,7 @@ from typing import Literal
 import pendulum
 import pytest
 import semver
+from pydantic import BaseModel
 
 from pyverge.migration import (
     DiscoveryValidationError,
@@ -73,7 +74,7 @@ class TestScoping:
         assert UserManager._adapter is adapter
 
     def test_explicit_engine_used_as_is(self) -> None:
-        registry = Registry[semver.Version, UserBaseModel]()
+        registry = Registry[semver.Version, BaseModel]()
         engine = make_engine(registry, MigrationSettings())
         UserManager = ModelManager[semver.Version].scoped(
             PydanticModelAdapter(), engine=engine
@@ -98,12 +99,12 @@ class TestClassLevelRegistration:
     def test_bare_model_decorator_derives_key(
         self, semver_manager: type[ModelManager[semver.Version]]
     ) -> None:
-        @semver_manager.model()
+        @semver_manager.model()  # ty: ignore
         class UserV1(UserBaseModel):
             version: Literal["1.0.0"] = "1.0.0"
             name: str
 
-        @semver_manager.model()
+        @semver_manager.model()  # ty: ignore
         class UserV2(UserBaseModel):
             version: Literal["2.0.0"] = "2.0.0"
             name: str
@@ -165,7 +166,7 @@ class TestClassLevelRegistration:
 
         hook = CountingHook()
 
-        @semver_manager.hook("User", "1.0.0", "2.0.0", hook)
+        @semver_manager.hook("User", "1.0.0", "2.0.0", hook)  # ty: ignore
         class _HookMarker:
             pass
 
@@ -194,7 +195,7 @@ class TestInstanceFacade:
     def test_runtime_registration_during_init(
         self, semver_manager: type[ModelManager[semver.Version]]
     ) -> None:
-        class RuntimeManager(semver_manager):
+        class RuntimeManager(semver_manager):  # ty: ignore
             def __init__(self) -> None:
                 super().__init__()
                 self.store_model(UserV1)
@@ -291,7 +292,7 @@ class TestSharedEngine:
         version: str,
     ) -> None:
         manager_instance = manager()
-        manager_instance.store_model(model)
+        manager_instance.store_model(model)  # ty: ignore
 
         expected = f"User:{version}"
         assert [str(v) for v in manager_instance.registry.versions] == [expected]
@@ -325,7 +326,7 @@ class TestMigrateInstanceOnly:
         self, semver_manager: type[ModelManager[semver.Version]]
     ) -> None:
         with pytest.raises(TypeError):
-            semver_manager.migrate({})
+            semver_manager.migrate({})  # ty: ignore
 
     def test_instance_migrate(
         self, semver_manager: type[ModelManager[semver.Version]]

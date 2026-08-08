@@ -60,6 +60,8 @@ ModelData: TypeAlias = dict[str, Any]
 ModelVersionKey: TypeAlias = tuple[ModelKind, VersionValue]
 
 MigrationKey: TypeAlias = tuple[VersionValue, VersionValue]
+#: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
+MIGRATION_PAIR_LEN: int = 2
 MigrationFunc: TypeAlias = Callable[[ModelData], ModelData]
 MigrationHookMap: TypeAlias = dict["Migratable", list["Attachable"]]
 MigrationDirectionStrategy: TypeAlias = Literal["any", "forward", "backward"]
@@ -76,9 +78,7 @@ MigrationKeyInput: TypeAlias = (
     | "VersionPair"
 )
 
-TargetSpec: TypeAlias = (
-    "Versionable[VersionValue, BaseModel] | type[BaseModel] | TargetStrategy | None"
-)
+TargetSpec: TypeAlias = "Versionable[VersionValue, BaseModel] | type[BaseModel] | TargetStrategy | str | None"  # noqa: E501
 TargetPolicy: TypeAlias = "TargetSpec | dict[ModelKind | Literal['*'], TargetSpec]"
 
 

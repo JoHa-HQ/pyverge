@@ -323,7 +323,7 @@ class TestMigrationGraph:
         self,
         model_adapter: PydanticModelAdapter,
         discovery_settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
         models: list[type[types.VModel]],
         payload: dict,
         entry_lookup: tuple[str],
@@ -370,7 +370,7 @@ class TestMigrationGraph:
         self,
         model_adapter: PydanticModelAdapter,
         discovery_settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
         models: list[type[types.VModel]],
         payload: dict,
         entry_lookup: tuple[str],
@@ -406,7 +406,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
         payload: dict,
         label: str,
     ) -> None:
@@ -475,7 +475,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(
             model_adapter, registry, settings, PersonV1, PersonV2, AddressV1, AddressV2
@@ -513,7 +513,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(
             model_adapter, registry, settings, PersonV1, PersonV2, ContactV1
@@ -549,7 +549,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(model_adapter, registry, settings, PersonV1)
 
@@ -581,7 +581,7 @@ class TestGraphBuilder:
     def test_custom_property_names(
         self,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         class _Item(BaseModel):
             name: str
@@ -612,7 +612,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(
             model_adapter, registry, settings, PersonV1, PersonV2, AddressV1, AddressV2
@@ -664,7 +664,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
         expect_error: bool,
     ) -> None:
         """Versioned entries deeper than max_depth raise; within limit are accepted."""
@@ -704,7 +704,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         """max_depth can be overridden at build time independently of settings."""
         register_models(model_adapter, registry, settings, PersonV1, AddressV1)
@@ -740,7 +740,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: semver.Version,
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(
             model_adapter, registry, settings, PersonV1, PersonV2, AddressV1, AddressV2

@@ -61,6 +61,7 @@ from .types import (
     VModel,
     Walker,
 )
+from .versioning import VersionNode
 from .walker import CompoundKeyWalker
 
 
@@ -89,6 +90,32 @@ def _resolve_migration_key(
     return engine.get_model(source_key), engine.get_model(target_key)
 
 
+class ModelProxy(Generic[VersionValue, VModel]):
+    """Binds a model class to its version/kind for later registration.
+
+    Resolves the exact model type so callers can hold a typed versionable.
+    """
+
+    __slots__ = ("_kind", "_model", "_value")
+
+    def __init__(
+        self,
+        model: type[VModel],
+        value: VersionValue,
+        kind: ModelKind,
+    ) -> None:
+        self._model = model
+        self._value = value
+        self._kind = kind
+
+    def __call__(self) -> Versionable[VersionValue, VModel]:
+        return VersionNode[VersionValue, VModel](
+            _model=self._model,
+            _value=self._value,
+            _kind=self._kind,
+        )
+
+
 class _ModelDescriptor:
     """Metaclass descriptor implementing ``@manager.model(...)``.
 
@@ -104,31 +131,45 @@ class _ModelDescriptor:
         self,
         obj: type[ModelManager[VersionValue]],
         objtype: type | None = None,
-    ) -> Callable[..., type[VModel] | Callable[[type[VModel]], type[VModel]]]:
+    ) -> Callable[
+        ...,
+        type[VModel]
+        | ModelProxy[VersionValue, VModel]
+        | Callable[[type[VModel]], type[VModel]],
+    ]:
         owner = obj
         if owner is None:
             raise TypeError("ModelManager descriptor used without an owner class")
 
         def decorator(
             *args: Any,
-        ) -> type[VModel] | Callable[[type[VModel]], type[VModel]]:
+        ) -> (
+            type[VModel]
+            | ModelProxy[VersionValue, VModel]
+            | Callable[[type[VModel]], type[VModel]]
+        ):
+            def wrapper(model_cls: type[VModel]) -> type[VModel]:
+                engine = owner._engine
+                proxy = ModelProxy[VersionValue, VModel](
+                    model_cls,
+                    cast(
+                        VersionValue,
+                        engine.adapter.of(engine.adapter.version(model_cls)),
+                    ),
+                    engine.adapter.kind(model_cls),
+                )
+                engine.store_model(proxy())
+                return model_cls
+
             if (
                 len(args) == 1
                 and isinstance(args[0], type)
                 and issubclass(args[0], BaseModel)
             ):
-                model_cls = args[0]
-                engine = owner._engine
-                engine.store_model(engine.adapter.versionable(model_cls))
-                return model_cls
+                return wrapper(args[0])
 
             if len(args) != 0:
                 raise TypeError("manager.model expects no args or a model class")
-
-            def wrapper(model_cls: type[VModel]) -> type[VModel]:
-                engine = owner._engine
-                engine.store_model(engine.adapter.versionable(model_cls))
-                return model_cls
 
             return wrapper
 
@@ -235,7 +276,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
 
     _settings: ClassVar[MigrationSettings]
     _adapter: ClassVar[ModelAdapter]
-    _engine: ClassVar[Engine[VersionValue]]  # type: ignore[misc]
+    _engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
 
     def __init__(self, engine: Engine[VersionValue] | None = None) -> None:
         """Initialize the runtime facade.

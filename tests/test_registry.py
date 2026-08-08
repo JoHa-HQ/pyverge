@@ -201,7 +201,7 @@ class TestModel:
             (
                 Registry[pendulum.Date, BaseModel](),
                 UserV20260228,
-                SentinelNode("User", pendulum.parse("2026-02-28").date()),
+                SentinelNode("User", pendulum.Date(2026, 2, 28)),
             ),
         ],
     )
@@ -386,7 +386,11 @@ class TestMigration:
         registry.store_model(versions[0])
         with pytest.raises(MigrationNotFoundError):
             edge = edge_from_models(
-                model_adapter, versioning_settings, models[0], models[1], func=print
+                model_adapter,
+                versioning_settings,
+                models[0],
+                models[1],
+                func=lambda d: d,
             )
             registry.store_migration(edge)
 
@@ -509,7 +513,7 @@ class TestHooks:
             registry.store_model(v)
 
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=print
+            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
         hook = MigrationHook()
@@ -537,7 +541,7 @@ class TestHooks:
             registry.store_model(v)
 
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=print
+            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         assert registry.get_hooks(edge) == []
 
@@ -563,7 +567,7 @@ class TestHooks:
         hook1 = MigrationHook()
         hook2 = MigrationHook()
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=print
+            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
         registry.store_migration(edge)
@@ -593,7 +597,7 @@ class TestHooks:
             registry.store_model(v)
 
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=print
+            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         registry.store_migration(edge)
         registry.add_hook(edge, MigrationHook())
@@ -621,7 +625,7 @@ class TestHooks:
             registry.store_model(v)
 
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=print
+            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
         registry.store_migration(edge)
@@ -649,7 +653,7 @@ class TestHooks:
             registry.store_model(v)
 
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=print
+            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
         registry.store_migration(edge)
@@ -680,7 +684,7 @@ class TestHooks:
             registry.store_model(v)
 
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=print
+            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
         registry.store_migration(edge)
@@ -1125,10 +1129,10 @@ class TestEdgePairLookup:
 
     def test_get_migration_by_edge_missing_raises(self) -> None:
         registry = Registry[semver.Version, BaseModel]()
-        v1 = VersionNode[semver.Version, object](
+        v1 = VersionNode[semver.Version, UserV1](
             _model=UserV1, _value=semver.Version(1, 0, 0), _kind="User"
         )
-        v2 = VersionNode[semver.Version, object](
+        v2 = VersionNode[semver.Version, UserV2](
             _model=UserV2, _value=semver.Version(2, 0, 0), _kind="User"
         )
         with pytest.raises(MigrationNotFoundError):
