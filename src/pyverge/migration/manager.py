@@ -411,7 +411,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
 
     def get(self, kind: ModelKind, version: str) -> Versionable[VersionValue, VModel]:
         """Return the registered version for *kind* at *version*."""
-        parsed = cast(VersionValue, VersionNode.of(version))
+        parsed = cast(VersionValue, self.engine.adapter.of(version))
         return self.get_model((kind, parsed))
 
     def get_latest(self, kind: ModelKind) -> Versionable[VersionValue, VModel]:
