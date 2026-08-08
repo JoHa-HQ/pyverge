@@ -59,9 +59,9 @@ from .types import (
     VersionMissingStrategy,
     VersionValue,
     VModel,
-    VModel_co,
     Walker,
 )
+from .versioning import VersionNode
 from .walker import CompoundKeyWalker
 
 
@@ -90,6 +90,52 @@ def _resolve_migration_key(
     return engine.get_model(source_key), engine.get_model(target_key)
 
 
+class ModelProxy(Generic[VersionValue, VModel]):
+    """Binds a model class to its version/kind for later registration.
+
+    Resolves the exact model type so callers can hold a typed versionable.
+    """
+
+    __slots__ = ("_kind", "_model", "_value")
+
+    def __init__(
+        self,
+        model: type[VModel],
+        value: VersionValue,
+        kind: ModelKind,
+    ) -> None:
+        self._model = model
+        self._value = value
+        self._kind = kind
+
+    @property
+    def model(self) -> type[VModel]:
+        """The bound model class."""
+        return self._model
+
+    @property
+    def value(self) -> VersionValue:
+        """The version value."""
+        return self._value
+
+    @property
+    def kind(self) -> ModelKind:
+        """The model family identifier."""
+        return self._kind
+
+    def versionable(self, adapter: ModelAdapter) -> Versionable[VersionValue, VModel]:
+        """Build the ``VersionNode`` binding without re-parsing the version."""
+        return VersionNode[VersionValue, VModel](
+            _model=self._model,
+            _value=self._value,
+            _kind=self._kind,
+        )
+
+    def __call__(self, adapter: ModelAdapter) -> Versionable[VersionValue, VModel]:
+        """Resolve this proxy to its versionable binding."""
+        return self.versionable(adapter)
+
+
 class _ModelDescriptor:
     """Metaclass descriptor implementing ``@manager.model(...)``.
 
@@ -105,14 +151,23 @@ class _ModelDescriptor:
         self,
         obj: type[ModelManager[VersionValue]],
         objtype: type | None = None,
-    ) -> Callable[..., type[VModel_co] | Callable[[type[VModel_co]], type[VModel_co]]]:
+    ) -> Callable[
+        ...,
+        type[VModel]
+        | ModelProxy[VersionValue, VModel]
+        | Callable[[type[VModel]], type[VModel]],
+    ]:
         owner = obj
         if owner is None:
             raise TypeError("ModelManager descriptor used without an owner class")
 
         def decorator(
             *args: Any,
-        ) -> type[VModel_co] | Callable[[type[VModel_co]], type[VModel_co]]:
+        ) -> (
+            type[VModel]
+            | ModelProxy[VersionValue, VModel]
+            | Callable[[type[VModel]], type[VModel]]
+        ):
             if (
                 len(args) == 1
                 and isinstance(args[0], type)
@@ -120,13 +175,21 @@ class _ModelDescriptor:
             ):
                 model_cls = args[0]
                 engine = owner._engine
-                engine.store_model(engine.adapter.versionable(model_cls))
-                return model_cls
+                proxy = ModelProxy[VersionValue, VModel](
+                    model_cls,
+                    cast(
+                        VersionValue,
+                        engine.adapter.of(engine.adapter.version(model_cls)),
+                    ),
+                    engine.adapter.kind(model_cls),
+                )
+                engine.store_model(proxy.versionable(engine.adapter))
+                return proxy
 
             if len(args) != 0:
                 raise TypeError("manager.model expects no args or a model class")
 
-            def wrapper(model_cls: type[VModel_co]) -> type[VModel_co]:
+            def wrapper(model_cls: type[VModel]) -> type[VModel]:
                 engine = owner._engine
                 engine.store_model(engine.adapter.versionable(model_cls))
                 return model_cls
@@ -188,7 +251,7 @@ class _HookDescriptor:
         self,
         obj: type[ModelManager[VersionValue]],
         objtype: type | None = None,
-    ) -> Callable[..., Callable[[type[VModel_co]], type[VModel_co]]]:
+    ) -> Callable[..., Callable[[type[VModel]], type[VModel]]]:
         owner = obj
         if owner is None:
             raise TypeError("ModelManager descriptor used without an owner class")
@@ -198,8 +261,8 @@ class _HookDescriptor:
             source_version: str,
             target_version: str,
             hook: Attachable,
-        ) -> Callable[[type[VModel_co]], type[VModel_co]]:
-            def wrapper(marker: type[VModel_co]) -> type[VModel_co]:
+        ) -> Callable[[type[VModel]], type[VModel]]:
+            def wrapper(marker: type[VModel]) -> type[VModel]:
                 engine = getattr(owner, "_engine", None)
                 if engine is None:
                     raise TypeError(
