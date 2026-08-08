@@ -78,9 +78,7 @@ MigrationKeyInput: TypeAlias = (
     | "VersionPair"
 )
 
-TargetSpec: TypeAlias = (
-    "Versionable[VersionValue, BaseModel] | type[BaseModel] | TargetStrategy | None"
-)
+TargetSpec: TypeAlias = "Versionable[VersionValue, BaseModel] | type[BaseModel] | TargetStrategy | str | None"  # noqa: E501
 TargetPolicy: TypeAlias = "TargetSpec | dict[ModelKind | Literal['*'], TargetSpec]"
 
 
