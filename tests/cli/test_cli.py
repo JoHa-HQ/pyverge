@@ -69,7 +69,7 @@ class TestInfoCommand:
 
 
 class TestDiffCommand:
-    def test_diff_renders_json_patch(self, runner: CliRunner) -> None:
+    def test_diff_renders_json_patch(self, runner: CliRunner, snapshot) -> None:
         _register_manager("e2e_pkg.diff", _manager_with_model())
 
         result = runner.invoke(
@@ -88,5 +88,4 @@ class TestDiffCommand:
         )
 
         assert result.exit_code == 0
-        assert '"op": "add"' in result.stdout
-        assert "age" in result.stdout
+        assert result.stdout == snapshot

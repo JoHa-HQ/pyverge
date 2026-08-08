@@ -1,0 +1,28 @@
+# serializer version: 1
+# name: TestDiffCommand.test_diff_renders_json_patch
+  '''
+  [
+    {
+      "op": "add",
+      "path": "/age",
+      "value": 0
+    },
+    {
+      "op": "replace",
+      "path": "/version",
+      "changes": {
+        "type_changed": {
+          "from": "typing.Literal['1.0.0']",
+          "to": "typing.Literal['2.0.0']"
+        },
+        "default_changed": {
+          "from": "1.0.0",
+          "to": "2.0.0"
+        }
+      },
+      "value": null
+    }
+  ]
+  
+  '''
+# ---
