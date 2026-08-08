@@ -27,14 +27,14 @@ from .types import (
     TargetResolver,
     Versionable,
     VersionValue,
-    VModel,
+    VModel_co,
     Walker,
 )
 from .versioning import SentinelEdge
 
 
 @dataclass(frozen=True, slots=True)
-class GraphEntry(Generic[VersionValue, VModel]):
+class GraphEntry(Generic[VersionValue, VModel_co]):
     """A single versioned entry discovered in a payload.
 
     Attributes:
@@ -49,13 +49,17 @@ class GraphEntry(Generic[VersionValue, VModel]):
     """
 
     path: tuple[str | int, ...]
-    source: Versionable[VersionValue, VModel]
-    target: Versionable[VersionValue, VModel]
+    source: Versionable[VersionValue, VModel_co]
+    target: Versionable[VersionValue, VModel_co]
     steps: tuple[
-        tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]], ...
+        tuple[
+            Versionable[VersionValue, VModel_co],
+            Versionable[VersionValue, VModel_co],
+        ],
+        ...,
     ] = ()
     hooks: tuple[tuple[Attachable, ...], ...] = ()
-    target_model: type[VModel] | None = None
+    target_model: type[VModel_co] | None = None
 
     @property
     def kind(self) -> ModelKind:

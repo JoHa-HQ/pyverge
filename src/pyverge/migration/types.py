@@ -54,7 +54,7 @@ SchemaTransformer = Callable[[JsonSchema], JsonSchema]
 
 RenderingFormat = Literal["json-patch"]
 
-Entry = tuple[tuple[str, ...], int, "Versionable[VersionValue, BaseModel]"]
+Entry = tuple[tuple[str | int, ...], int, "Versionable[VersionValue, BaseModel]"]
 ModelKind: TypeAlias = str
 ModelData: TypeAlias = dict[str, Any]
 ModelVersionKey: TypeAlias = tuple[ModelKind, VersionValue]
