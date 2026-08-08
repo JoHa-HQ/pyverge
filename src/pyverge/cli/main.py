@@ -254,16 +254,16 @@ def diff(  # noqa: PLR0913
                 json.dumps(diff_result.render(), indent=2, default=str)
             )
         else:
-            typer.secho(f"Unknown format: {format}", fg=typer.colors.RED)
+            console.print(f"[red]Unknown format: {format}[/red]")
             raise typer.Exit(1)
 
     except ConfigError as e:
-        typer.secho(str(e), fg=typer.colors.RED)
+        console.print(f"[red]{e}[/red]")
         raise typer.Exit(1) from e
     except typer.Exit:
         raise
     except Exception as e:
-        typer.secho(f"Diff error: {e}", fg=typer.colors.RED)
+        console.print(f"[red]Diff error: {e}[/red]")
         raise typer.Exit(1) from e
 
 
