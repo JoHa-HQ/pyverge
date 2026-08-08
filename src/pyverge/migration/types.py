@@ -38,12 +38,10 @@ VTarget_co = TypeVar("VTarget_co", bound=BaseModel, covariant=True)
 VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
 VModel_co = TypeVar("VModel_co", bound=ModelBase, covariant=True)
 
-ProviderBase_co = TypeVar(
-    "ProviderBase_co", bound=ModelBase, covariant=True, default=ModelBase
-)
+ProviderBase_co = TypeVar("ProviderBase_co", bound=ModelBase, covariant=True)
 # Invariant — Registry is mutable (store/remove), so its type params must be
 # invariant even though the protocol-facing covariant variants exist above.
-ProviderBase = TypeVar("ProviderBase", bound=ModelBase, default=ModelBase)
+ProviderBase = TypeVar("ProviderBase", bound=ModelBase)
 Renderable_co = TypeVar("Renderable_co", covariant=True)
 Container_co = TypeVar("Container_co", bound=BaseModel, covariant=True)
 
@@ -171,16 +169,16 @@ class Attachable(Protocol):
     def before_migrate(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         data: dict[str, Any],
     ) -> None: ...
 
     def after_migrate(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         original_data: dict[str, Any],
         migrated_data: dict[str, Any],
     ) -> None: ...
@@ -188,8 +186,8 @@ class Attachable(Protocol):
     def on_error(
         self,
         name: str,
-        from_version: Versionable,
-        to_version: Versionable,
+        from_version: Comparable,
+        to_version: Comparable,
         data: dict[str, Any],
         error: Exception,
     ) -> None: ...
@@ -356,7 +354,7 @@ class Walker(Protocol):
     """Protocol for schema-aware payload discovery."""
 
     @property
-    def registry(self) -> Registry[VersionValue]: ...
+    def registry(self) -> Registry[VersionValue, ModelBase]: ...
 
     def discover(
         self,
@@ -382,7 +380,7 @@ class Executor(Protocol):
         data: ModelData,
         graph: MigrationGraph,
         *,
-        registry: Registry,
+        registry: Registry[VersionValue, ModelBase],
         entry_migration: EntryMigration,
         adapter: ModelAdapter,
         version_property: str,
