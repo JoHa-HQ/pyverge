@@ -501,14 +501,6 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             },
         }
 
-    @overload
-    def list_versions(self) -> list[Versionable[VersionValue, VModel]]: ...
-
-    @overload
-    def list_versions(
-        self, kind: ModelKind
-    ) -> list[Versionable[VersionValue, VModel]]: ...
-
     def list_versions(
         self, kind: ModelKind | None = None
     ) -> list[Versionable[VersionValue, VModel]]:
