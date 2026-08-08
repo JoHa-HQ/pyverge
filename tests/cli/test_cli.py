@@ -34,7 +34,14 @@ def _manager_with_model() -> ModelManager[semver.Version]:
         version: Literal["1.0.0"] = "1.0.0"
         name: str
 
+    class UserV2(BaseModel):
+        kind: Literal["User"] = "User"
+        version: Literal["2.0.0"] = "2.0.0"
+        name: str
+        age: int = 0
+
     mgr.store_model(UserV1)
+    mgr.store_model(UserV2)
     return mgr
 
 
@@ -59,3 +66,27 @@ class TestInfoCommand:
         result = runner.invoke(app, ["info", "e2e_pkg.missing:manager"])
 
         assert result.exit_code == 1
+
+
+class TestDiffCommand:
+    def test_diff_renders_json_patch(self, runner: CliRunner) -> None:
+        _register_manager("e2e_pkg.diff", _manager_with_model())
+
+        result = runner.invoke(
+            app,
+            [
+                "diff",
+                "--schema",
+                "User",
+                "--from",
+                "1.0.0",
+                "--to",
+                "2.0.0",
+                "--manager",
+                "e2e_pkg.diff:manager",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert '"op": "add"' in result.stdout
+        assert "age" in result.stdout

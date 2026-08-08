@@ -239,8 +239,8 @@ def diff(  # noqa: PLR0913
     ],
     to_version: Annotated[str, typer.Option(..., "--to", "-t", help="Target version")],
     format: Annotated[
-        str, typer.Option(..., "--format", help="Output format (markdown, json)")
-    ] = "markdown",
+        str, typer.Option(..., "--format", help="Output format (json)")
+    ] = "json",
     manager: ManagerOption = "default",
     config: ConfigOption = None,
 ) -> None:
@@ -249,10 +249,10 @@ def diff(  # noqa: PLR0913
         mgr = resolve_manager(manager, config)
         diff_result = mgr.diff(schema, from_version, to_version)
 
-        if format == "markdown":
-            console.print(diff_result.to_markdown())
-        elif format == "json":
-            console.print(json.dumps(diff_result.to_dict(), indent=2))
+        if format == "json":
+            console.print(
+                json.dumps(diff_result.render(), indent=2, default=str)
+            )
         else:
             typer.secho(f"Unknown format: {format}", fg=typer.colors.RED)
             raise typer.Exit(1)

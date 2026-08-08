@@ -237,6 +237,7 @@ class PydanticDiff(Generic[VersionValue, VSource_co, VTarget_co]):
         rc = self.modified_change(field, "required_changed")
         return rc is not None and not rc["from"] and rc["to"]
 
+    @property
     def render(self) -> Renderable:
         """Render this diff using the configured strategy."""
         return self.renderer(self)
