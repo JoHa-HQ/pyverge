@@ -19,6 +19,7 @@ from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
 from .types import (
     Attachable,
+    Comparable,
     DirectionViolationStrategy,
     Executor,
     Migratable,
@@ -110,8 +111,8 @@ class Engine(Generic[VersionValue]):
         """Check membership of a model version or migration edge."""
         if isinstance(index, slice):
             try:
-                from_v = self._resolve_model_key(index.start)
-                to_v = self._resolve_model_key(index.stop)
+                from_v = self.get_model(self._resolve_model_key(index.start))
+                to_v = self.get_model(self._resolve_model_key(index.stop))
                 self.find_migration_path(from_v, to_v)
                 return True
             except (MigrationError, ModelNotFoundError, RegistryError, TypeError):
@@ -395,9 +396,9 @@ class Engine(Generic[VersionValue]):
 
     def find_migration_path(
         self: Self,
-        from_version: Versionable,
-        to_version: Versionable,
-    ) -> list[tuple[Versionable, Versionable]]:
+        from_version: Comparable,
+        to_version: Comparable,
+    ) -> list[tuple[Comparable, Comparable]]:
         """Return a complete migration chain between two versions."""
         registry = self.registry
 
@@ -429,7 +430,7 @@ class Engine(Generic[VersionValue]):
             return []
 
         step = 1 if lo < hi else -1
-        path: list[tuple[Versionable, Versionable]] = []
+        path: list[tuple[Comparable, Comparable]] = []
         current = from_version
         while lo != hi:
             nxt = kind_versions[lo + step]
