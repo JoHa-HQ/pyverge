@@ -271,6 +271,7 @@ class Diffable(Protocol[VersionValue_co]):
 
     def is_union_contraction(self, field: str) -> bool: ...
 
+    @property
     def render(self) -> Renderable: ...
 
 

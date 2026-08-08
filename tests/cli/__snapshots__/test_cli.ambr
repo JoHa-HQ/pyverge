@@ -1,0 +1,56 @@
+# serializer version: 1
+# name: TestDiffCommand.test_diff_renders_json_patch
+  '''
+  [
+    {
+      "op": "add",
+      "path": "/age",
+      "value": 0
+    },
+    {
+      "op": "replace",
+      "path": "/version",
+      "changes": {
+        "type_changed": {
+          "from": "typing.Literal['1.0.0']",
+          "to": "typing.Literal['2.0.0']"
+        },
+        "default_changed": {
+          "from": "1.0.0",
+          "to": "2.0.0"
+        }
+      },
+      "value": null
+    }
+  ]
+  
+  '''
+# ---
+# name: TestInfoCommand.test_info_lists_registered_models
+  '''
+  Manager: e2e_pkg.container:manager
+  
+  Registered Models:
+  
+    UserV1
+      • v1.0.0
+    UserV2
+      • v2.0.0
+  
+  Total: 2 models
+  
+  '''
+# ---
+# name: TestManagersCommand.test_lists_managers_in_module
+  '''
+  Managers in
+  e2e_pkg.man
+     agers   
+  ┏━━━━━━━━━┓
+  ┃ Name    ┃
+  ┡━━━━━━━━━┩
+  │ manager │
+  └─────────┘
+  
+  '''
+# ---
