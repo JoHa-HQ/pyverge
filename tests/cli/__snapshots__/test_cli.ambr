@@ -41,3 +41,16 @@
   
   '''
 # ---
+# name: TestManagersCommand.test_lists_managers_in_module
+  '''
+  Managers in
+  e2e_pkg.man
+     agers   
+  ┏━━━━━━━━━┓
+  ┃ Name    ┃
+  ┡━━━━━━━━━┩
+  │ manager │
+  └─────────┘
+  
+  '''
+# ---

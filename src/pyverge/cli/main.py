@@ -14,7 +14,7 @@ from ._helpers import (
 )
 from .config import (
     ConfigError,
-    list_available_managers,
+    list_managers_from_module,
     resolve_manager,
 )
 
@@ -27,17 +27,7 @@ ManagerOption = Annotated[
         ...,
         "--manager",
         "-m",
-        help="Manager name or import path (module:object_path)",
-    ),
-]
-
-ConfigOption = Annotated[
-    Path | None,
-    typer.Option(
-        ...,
-        "--config",
-        "-c",
-        help="Path to config file (pyproject.toml or pyverge.toml)",
+        help="Manager import path (module:object_path)",
     ),
 ]
 
@@ -51,19 +41,16 @@ def check(
     version: Annotated[
         str, typer.Option(..., "--version", "-v", help="Schema version")
     ],
-    manager: ManagerOption = "default",
-    config: ConfigOption = None,
+    manager: ManagerOption,
 ) -> None:
     """Check a payload against a schema version."""
     try:
-        mgr = resolve_manager(manager, config)
+        mgr = resolve_manager(manager)
         data_dict = load_json_file(data)
 
         mgr.validate_data(data_dict, schema, version)
 
         typer.secho(f"✓ Valid against {schema} v{version}", fg=typer.colors.GREEN)
-        if manager != "default":
-            typer.echo(f"Using manager: {manager}")
         raise typer.Exit(0)
 
     except ValidationError as e:
@@ -90,43 +77,36 @@ def check(
 
 @app.command()
 def managers(
-    config: ConfigOption = None,
+    module: Annotated[
+        str, typer.Argument(..., help="Module path to inspect for managers")
+    ],
 ) -> None:
-    """List all available managers from configuration."""
+    """List ModelManagers defined in a module."""
     try:
-        available = list_available_managers(config)
+        names = list_managers_from_module(module)
 
-        if not available:
-            typer.echo("No managers configured\n")
-            typer.echo("Configuration can be added to:")
-            typer.echo('  1. pyproject.toml: [tool.pyverge] manager = "models"')
-            typer.echo('  2. pyverge.toml: [pyverge] manager = "models"')
-            typer.echo("  3. Auto-discovery: Define __manager__ in models.py")
-            return
-
-        table = Table(title="Available Managers")
+        table = Table(title=f"Managers in {module}")
         table.add_column("Name", style="cyan")
-        table.add_column("Module", style="green")
 
-        for name, module in sorted(available.items()):
-            table.add_row(name, module)
+        for name in sorted(names):
+            table.add_row(name)
 
         console.print(table)
-        typer.echo("\nUse with: pyverge validate --manager <name> ...")
 
-    except ConfigError as e:
-        typer.secho(str(e), fg=typer.colors.RED)
+    except ImportError as e:
+        typer.secho(f"Cannot import module '{module}': {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
 
 
 @app.command()
 def info(
-    manager: Annotated[str, typer.Argument(..., help="Manager name")] = "default",
-    config: ConfigOption = None,
+    manager: Annotated[
+        str, typer.Argument(..., help="Manager import path (module:object_path)")
+    ],
 ) -> None:
     """Show information about a specific manager."""
     try:
-        mgr = resolve_manager(manager, config)
+        mgr = resolve_manager(manager)
 
         typer.secho(f"Manager: {manager}", bold=True)
         typer.echo("")
@@ -160,21 +140,20 @@ def info(
 
 
 @app.command()
-def diff(  # noqa: PLR0913
+def diff(
     schema: Annotated[str, typer.Option(..., "--schema", "-s", help="Schema name")],
     from_version: Annotated[
         str, typer.Option(..., "--from", "-f", help="Source version")
     ],
     to_version: Annotated[str, typer.Option(..., "--to", "-t", help="Target version")],
+    manager: ManagerOption,
     format: Annotated[
         str, typer.Option(..., "--format", help="Output format (json)")
     ] = "json",
-    manager: ManagerOption = "default",
-    config: ConfigOption = None,
 ) -> None:
     """Show differences between schema versions."""
     try:
-        mgr = resolve_manager(manager, config)
+        mgr = resolve_manager(manager)
         diff_result = mgr.diff(schema, from_version, to_version)
 
         if format == "json":

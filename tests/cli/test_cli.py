@@ -47,10 +47,15 @@ def _manager_with_model() -> ModelManager[semver.Version]:
 
 
 class TestManagersCommand:
-    def test_no_config_reports_hint(self, runner: CliRunner) -> None:
-        result = runner.invoke(app, ["managers"])
+    def test_lists_managers_in_module(
+        self, runner: CliRunner, snapshot
+    ) -> None:
+        _register_manager("e2e_pkg.managers", _manager_with_model())
+
+        result = runner.invoke(app, ["managers", "e2e_pkg.managers"])
+
         assert result.exit_code == 0
-        assert "No managers configured" in result.stdout
+        assert result.stdout == snapshot
 
 
 class TestCheckCommand:
