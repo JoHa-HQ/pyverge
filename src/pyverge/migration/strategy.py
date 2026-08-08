@@ -11,13 +11,12 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generic, Protocol, runtime_checkable
 
-from pydantic import BaseModel
-
 from .exceptions import MigrationError
 from .graph import GraphEntry
 from .types import (
     DirectionViolationStrategy,
     MigrationDirectionStrategy,
+    ModelBase,
     ModelData,
     RunnableMigration,
     VersionMissingStrategy,
@@ -34,7 +33,7 @@ class EntryMigration(Protocol[VersionValue]):
 
     def migrate(
         self,
-        entry: GraphEntry[VersionValue, BaseModel],
+        entry: GraphEntry[VersionValue, ModelBase],
         current: ModelData,
         *,
         execute_step: Callable[
@@ -60,7 +59,7 @@ class _DefaultMigrationTask:
 
     def __init__(
         self,
-        entry: GraphEntry[Any, BaseModel],
+        entry: GraphEntry[Any, ModelBase],
         current: ModelData,
         *,
         execute_step: Callable[
@@ -127,7 +126,7 @@ class DefaultEntryMigration(Generic[VersionValue]):
 
     def migrate(
         self,
-        entry: GraphEntry[VersionValue, BaseModel],
+        entry: GraphEntry[VersionValue, ModelBase],
         current: ModelData,
         *,
         execute_step: Callable[
