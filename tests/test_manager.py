@@ -257,81 +257,140 @@ class TestInstanceFacade:
 
 
 class TestLookupHelpers:
+    @pytest.mark.parametrize(
+        ("manager", "models", "versions"),
+        [
+            (semver.Version, [UserV1, UserV2], ["1.0.0", "2.0.0"]),
+            (
+                pendulum.Date,
+                [UserV20250310, UserV20251231],
+                ["2025-03-10", "2025-12-31"],
+            ),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
     def test_get_returns_model_class(
-        self, semver_manager: type[ModelManager[semver.Version]]
+        self,
+        manager: type[ModelManager],
+        models: list[type],
+        versions: list[str],
     ) -> None:
-        manager = semver_manager()
-        manager.store_model(UserV1)
-        manager.store_model(UserV2)
+        mgr = manager()
+        for model in models:
+            mgr.store_model(model)
 
-        assert manager.get("User", "1.0.0") is UserV1
-        assert manager.get("User", "2.0.0") is UserV2
+        for model, version in zip(models, versions, strict=True):
+            assert mgr.get("User", version) is model
 
+    @pytest.mark.parametrize(
+        ("manager", "model", "missing_version"),
+        [
+            (semver.Version, UserV1, "9.0.0"),
+            (pendulum.Date, UserV20250310, "2099-01-01"),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
     def test_get_unknown_raises(
-        self, semver_manager: type[ModelManager[semver.Version]]
+        self,
+        manager: type[ModelManager],
+        model: type,
+        missing_version: str,
     ) -> None:
-        manager = semver_manager()
-        manager.store_model(UserV1)
+        mgr = manager()
+        mgr.store_model(model)
 
         with pytest.raises(ModelNotFoundError):
-            manager.get("User", "9.0.0")
+            mgr.get("User", missing_version)
 
+    @pytest.mark.parametrize(
+        ("manager", "model", "version"),
+        [
+            (semver.Version, UserV1, "1.0.0"),
+            (pendulum.Date, UserV20250310, "2025-03-10"),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
     def test_get_kind_is_strict(
-        self, semver_manager: type[ModelManager[semver.Version]]
+        self,
+        manager: type[ModelManager],
+        model: type,
+        version: str,
     ) -> None:
-        manager = semver_manager()
-        manager.store_model(UserV1)
+        mgr = manager()
+        mgr.store_model(model)
 
         with pytest.raises(ModelNotFoundError):
-            manager.get("user", "1.0.0")
+            mgr.get("user", version)
 
+    @pytest.mark.parametrize(
+        ("manager", "models", "latest"),
+        [
+            (semver.Version, [UserV1, UserV2, UserV3], UserV3),
+            (pendulum.Date, [UserV20250310, UserV20251231], UserV20251231),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
     def test_get_latest_returns_highest(
-        self, semver_manager: type[ModelManager[semver.Version]]
+        self,
+        manager: type[ModelManager],
+        models: list[type],
+        latest: type,
     ) -> None:
-        manager = semver_manager()
-        manager.store_model(UserV1)
-        manager.store_model(UserV2)
-        manager.store_model(UserV3)
+        mgr = manager()
+        for model in models:
+            mgr.store_model(model)
 
-        assert manager.get_latest("User") is UserV3
+        assert mgr.get_latest("User") is latest
 
+    @pytest.mark.parametrize(
+        ("manager", "model"),
+        [
+            (semver.Version, UserV1),
+            (pendulum.Date, UserV20250310),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
     def test_get_latest_unknown_kind_raises(
-        self, semver_manager: type[ModelManager[semver.Version]]
+        self,
+        manager: type[ModelManager],
+        model: type,
     ) -> None:
-        manager = semver_manager()
-        manager.store_model(UserV1)
+        mgr = manager()
+        mgr.store_model(model)
 
         with pytest.raises(RegistryError):
-            manager.get_latest("Missing")
+            mgr.get_latest("Missing")
 
+    @pytest.mark.parametrize(
+        ("manager", "models", "expected"),
+        [
+            (semver.Version, [UserV3, UserV1, UserV2], [UserV1, UserV2, UserV3]),
+            (
+                pendulum.Date,
+                [UserV20251231, UserV20250310],
+                [UserV20250310, UserV20251231],
+            ),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
     def test_list_versions_ascending(
-        self, semver_manager: type[ModelManager[semver.Version]]
+        self,
+        manager: type[ModelManager],
+        models: list[type],
+        expected: list[type],
     ) -> None:
-        manager = semver_manager()
-        manager.store_model(UserV3)
-        manager.store_model(UserV1)
-        manager.store_model(UserV2)
+        mgr = manager()
+        for model in models:
+            mgr.store_model(model)
 
-        assert manager.list_versions("User") == ["1.0.0", "2.0.0", "3.0.0"]
-
-    def test_list_versions_unknown_kind_empty(
-        self, semver_manager: type[ModelManager[semver.Version]]
-    ) -> None:
-        manager = semver_manager()
-        manager.store_model(UserV1)
-
-        assert manager.list_versions("Missing") == []
-
-    def test_chrono_lookup_helpers(
-        self, chrono_manager: type[ModelManager[pendulum.Date]]
-    ) -> None:
-        manager = chrono_manager()
-        manager.store_model(UserV20250310)
-        manager.store_model(UserV20251231)
-
-        assert manager.get("User", "2025-03-10") is UserV20250310
-        assert manager.get_latest("User") is UserV20251231
-        assert manager.list_versions("User") == ["2025-03-10", "2025-12-31"]
+        assert [n.model for n in mgr.list_versions("User")] == expected
+        assert mgr.list_versions("Missing") == []
 
 
 class TestSharedEngine:
