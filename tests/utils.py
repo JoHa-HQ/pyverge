@@ -1,5 +1,7 @@
 from typing import cast
 
+from pydantic import BaseModel
+
 from pyverge.migration import (
     CompoundKeyWalker,
     DefaultEntryMigration,
@@ -22,13 +24,13 @@ from pyverge.migration import (
 def envelope_model(
     adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
-    model_cls: type[types.VModel],
-) -> VersionNode[types.VersionValue, types.VModel]:
+    model_cls: type[types.VModel_co],
+) -> VersionNode[types.VersionValue_co, types.VModel_co]:
     version = adapter.of(adapter.version(model_cls))
     kind = adapter.kind(model_cls)
-    return VersionNode[types.VersionValue, model_cls](
+    return VersionNode[types.VersionValue_co, model_cls](
         _model=model_cls,
-        _value=cast(types.VersionValue, version),
+        _value=cast(types.VersionValue_co, version),
         _kind=kind,
     )
 
@@ -36,12 +38,12 @@ def envelope_model(
 def edge_from_models(
     adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
-    source_cls: type[types.VModel],
-    target_cls: type[types.VModel],
+    source_cls: type[types.VModel_co],
+    target_cls: type[types.VModel_co],
     *,
-    func: types.MigrationFunc | None = None,
+    func: types.MigrationFunc,
     backward_compatible: bool = False,
-) -> VersionEdge[types.VersionValue, types.VModel, types.VModel]:
+) -> VersionEdge[types.VersionValue_co, types.VModel_co, types.VModel_co]:
     """Build a VersionEdge by wrapping two model classes through
     ``envelope_model`` and computing a ``PydanticDiff``."""
     source = envelope_model(adapter, versioning_settings, source_cls)
@@ -58,19 +60,19 @@ def edge_from_models(
 
 def register_models(
     adapter: types.ModelAdapter,
-    registry: Registry[types.VersionValue],
+    registry: Registry[types.VersionValue_co, BaseModel],
     settings: VersioningSettings,
-    *models: type[types.VModel],
+    *models: type[types.VModel_co],
 ) -> None:
     for model_cls in models:
         registry.store_model(envelope_model(adapter, settings, model_cls))
 
 
 def default_graph_builder(
-    registry: Registry[types.VersionValue],
+    registry: Registry[types.VersionValue_co, BaseModel],
     settings: DiscoverySettings,
     adapter: types.ModelAdapter,
-) -> GraphBuilder[types.VersionValue]:
+) -> GraphBuilder[types.VersionValue_co]:
     """Return a graph builder with the standard compound-key walker."""
     return GraphBuilder(
         registry,
@@ -80,11 +82,11 @@ def default_graph_builder(
 
 
 def make_engine(
-    registry: Registry[types.VersionValue],
+    registry: Registry[types.VersionValue_co, BaseModel],
     settings: VersioningSettings,
     adapter: types.ModelAdapter | None = None,
-    entry_migration: EntryMigration[types.VersionValue] | None = None,
-) -> Engine[types.VersionValue]:
+    entry_migration: EntryMigration[types.VersionValue_co] | None = None,
+) -> Engine[types.VersionValue_co]:
     """Create an engine with the standard walker and sequential executor."""
     if adapter is None:
         adapter = PydanticModelAdapter(
@@ -105,13 +107,13 @@ def make_engine(
 
 def populate_graph(
     adapter: types.ModelAdapter,
-    registry: Registry[types.VersionValue],
+    registry: Registry[types.VersionValue_co, BaseModel],
     discovery_settings: DiscoverySettings,
-    *models: type[types.VModel],
+    *models: type[types.VModel_co],
     payload: dict,
     resolver: types.TargetResolver,
     max_depth: int | None = None,
-) -> MigrationGraph[types.VersionValue]:
+) -> MigrationGraph[types.VersionValue_co]:
     register_models(adapter, registry, discovery_settings, *models)
 
     builder = default_graph_builder(registry, discovery_settings, adapter)
