@@ -59,6 +59,7 @@ from .types import (
     VersionMissingStrategy,
     VersionValue,
     VModel,
+    VModel_co,
     Walker,
 )
 from .walker import CompoundKeyWalker
@@ -104,14 +105,14 @@ class _ModelDescriptor:
         self,
         obj: type[ModelManager[VersionValue]],
         objtype: type | None = None,
-    ) -> Callable[..., type[VModel] | Callable[[type[VModel]], type[VModel]]]:
+    ) -> Callable[..., type[VModel_co] | Callable[[type[VModel_co]], type[VModel_co]]]:
         owner = obj
         if owner is None:
             raise TypeError("ModelManager descriptor used without an owner class")
 
         def decorator(
             *args: Any,
-        ) -> type[VModel] | Callable[[type[VModel]], type[VModel]]:
+        ) -> type[VModel_co] | Callable[[type[VModel_co]], type[VModel_co]]:
             if (
                 len(args) == 1
                 and isinstance(args[0], type)
@@ -125,7 +126,7 @@ class _ModelDescriptor:
             if len(args) != 0:
                 raise TypeError("manager.model expects no args or a model class")
 
-            def wrapper(model_cls: type[VModel]) -> type[VModel]:
+            def wrapper(model_cls: type[VModel_co]) -> type[VModel_co]:
                 engine = owner._engine
                 engine.store_model(engine.adapter.versionable(model_cls))
                 return model_cls
@@ -187,7 +188,7 @@ class _HookDescriptor:
         self,
         obj: type[ModelManager[VersionValue]],
         objtype: type | None = None,
-    ) -> Callable[..., Callable[[type[VModel]], type[VModel]]]:
+    ) -> Callable[..., Callable[[type[VModel_co]], type[VModel_co]]]:
         owner = obj
         if owner is None:
             raise TypeError("ModelManager descriptor used without an owner class")
@@ -197,8 +198,8 @@ class _HookDescriptor:
             source_version: str,
             target_version: str,
             hook: Attachable,
-        ) -> Callable[[type[VModel]], type[VModel]]:
-            def wrapper(marker: type[VModel]) -> type[VModel]:
+        ) -> Callable[[type[VModel_co]], type[VModel_co]]:
+            def wrapper(marker: type[VModel_co]) -> type[VModel_co]:
                 engine = getattr(owner, "_engine", None)
                 if engine is None:
                     raise TypeError(
