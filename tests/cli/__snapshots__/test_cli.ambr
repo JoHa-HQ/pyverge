@@ -26,3 +26,18 @@
   
   '''
 # ---
+# name: TestInfoCommand.test_info_lists_registered_models
+  '''
+  Manager: e2e_pkg.container:manager
+  
+  Registered Models:
+  
+    UserV1
+      • v1.0.0
+    UserV2
+      • v2.0.0
+  
+  Total: 2 models
+  
+  '''
+# ---

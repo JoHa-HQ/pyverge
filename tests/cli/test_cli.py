@@ -105,14 +105,15 @@ class TestCheckCommand:
 
 
 class TestInfoCommand:
-    def test_info_lists_registered_models(self, runner: CliRunner) -> None:
+    def test_info_lists_registered_models(
+        self, runner: CliRunner, snapshot
+    ) -> None:
         _register_manager("e2e_pkg.container", _manager_with_model())
 
         result = runner.invoke(app, ["info", "e2e_pkg.container:manager"])
 
         assert result.exit_code == 0
-        assert "UserV1" in result.stdout
-        assert "v1.0.0" in result.stdout
+        assert result.stdout == snapshot
 
     def test_info_unknown_manager_exits_1(self, runner: CliRunner) -> None:
         result = runner.invoke(app, ["info", "e2e_pkg.missing:manager"])
