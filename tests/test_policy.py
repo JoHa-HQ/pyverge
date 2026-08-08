@@ -67,7 +67,7 @@ class TestCompileTargetSpec:
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
         resolver = compile_target_spec(
-            populated_registry, "skip", version_property="version"
+            populated_registry, "skip", version_property="version", adapter=adapter
         )
         assert resolver("Person", source) is None
 
@@ -79,7 +79,7 @@ class TestCompileTargetSpec:
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
         resolver = compile_target_spec(
-            populated_registry, "latest", version_property="version"
+            populated_registry, "latest", version_property="version", adapter=adapter
         )
         target = resolver("Person", source)
         assert target is not None
@@ -93,7 +93,7 @@ class TestCompileTargetSpec:
     ) -> None:
         source = envelope_model(adapter, settings, AddressV2)
         resolver = compile_target_spec(
-            populated_registry, "earliest", version_property="version"
+            populated_registry, "earliest", version_property="version", adapter=adapter
         )
         target = resolver("Address", source)
         assert target is not None
@@ -107,7 +107,7 @@ class TestCompileTargetSpec:
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
         resolver = compile_target_spec(
-            populated_registry, None, version_property="version"
+            populated_registry, None, version_property="version", adapter=adapter
         )
         assert resolver("Person", source) is None
 
@@ -119,7 +119,7 @@ class TestCompileTargetSpec:
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
         resolver = compile_target_spec(
-            populated_registry, PersonV2, version_property="version"
+            populated_registry, PersonV2, version_property="version", adapter=adapter
         )
         target = resolver("Person", source)
         assert target is not None
@@ -137,16 +137,21 @@ class TestCompileTargetSpec:
             populated_registry,
             target_node,
             version_property="version",
+            adapter=adapter,
         )
         assert resolver("Person", source) == target_node
 
     def test_unsupported_spec_raises(
         self,
         populated_registry: Registry[semver.Version],
+        adapter: PydanticModelAdapter,
     ) -> None:
         with pytest.raises(RegistryError):
             compile_target_spec(
-                populated_registry, "unknown", version_property="version"
+                populated_registry,
+                "unknown",
+                version_property="version",
+                adapter=adapter,
             )
 
     def test_model_class_wrong_kind_raises(
@@ -157,7 +162,7 @@ class TestCompileTargetSpec:
     ) -> None:
         source = envelope_model(adapter, settings, AddressV1)
         resolver = compile_target_spec(
-            populated_registry, PersonV2, version_property="version"
+            populated_registry, PersonV2, version_property="version", adapter=adapter
         )
         with pytest.raises(RegistryError):
             resolver("Address", source)
@@ -173,7 +178,9 @@ class TestCompileTargetResolver:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
-        resolver = compile_target_resolver(populated_registry, "latest")
+        resolver = compile_target_resolver(
+            populated_registry, "latest", adapter=adapter
+        )
         target = resolver("Person", source)
         assert target is not None
         assert target.version == ("Person", semver.VersionInfo(2, 0, 0))
@@ -185,7 +192,9 @@ class TestCompileTargetResolver:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, AddressV3)
-        resolver = compile_target_resolver(populated_registry, "earliest")
+        resolver = compile_target_resolver(
+            populated_registry, "earliest", adapter=adapter
+        )
         target = resolver("Address", source)
         assert target is not None
         assert target.version == ("Address", semver.VersionInfo(1, 0, 0))
@@ -197,7 +206,7 @@ class TestCompileTargetResolver:
         settings: DiscoverySettings,
     ) -> None:
         source = envelope_model(adapter, settings, PersonV1)
-        resolver = compile_target_resolver(populated_registry, "skip")
+        resolver = compile_target_resolver(populated_registry, "skip", adapter=adapter)
         assert resolver("Person", source) is None
 
     def test_per_kind_override_with_wildcard(
@@ -210,7 +219,7 @@ class TestCompileTargetResolver:
             "Person": "latest",
             "*": "earliest",
         }
-        resolver = compile_target_resolver(populated_registry, policy)
+        resolver = compile_target_resolver(populated_registry, policy, adapter=adapter)
 
         person_source = envelope_model(adapter, settings, PersonV1)
         person_target = resolver("Person", person_source)
@@ -229,7 +238,7 @@ class TestCompileTargetResolver:
         settings: DiscoverySettings,
     ) -> None:
         policy: dict[str, Any] = {"Person": "1.0.0", "*": "latest"}
-        resolver = compile_target_resolver(populated_registry, policy)
+        resolver = compile_target_resolver(populated_registry, policy, adapter=adapter)
 
         person_source = envelope_model(adapter, settings, PersonV2)
         person_target = resolver("Person", person_source)
@@ -247,7 +256,9 @@ class TestCompileTargetResolver:
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
-        resolver = compile_target_resolver(populated_registry, {"Person": "9.9.9"})
+        resolver = compile_target_resolver(
+            populated_registry, {"Person": "9.9.9"}, adapter=adapter
+        )
         source = envelope_model(adapter, settings, PersonV1)
         with pytest.raises(ModelNotFoundError):
             resolver("Person", source)
@@ -262,7 +273,7 @@ class TestCompileTargetResolver:
             "Person": "skip",
             "*": "latest",
         }
-        resolver = compile_target_resolver(populated_registry, policy)
+        resolver = compile_target_resolver(populated_registry, policy, adapter=adapter)
         address_source = envelope_model(adapter, settings, AddressV1)
         address_target = resolver("Address", address_source)
         assert address_target is not None
@@ -275,7 +286,7 @@ class TestCompileTargetResolver:
         settings: DiscoverySettings,
     ) -> None:
         policy: dict[str, Any] = {"Person": "latest"}
-        resolver = compile_target_resolver(populated_registry, policy)
+        resolver = compile_target_resolver(populated_registry, policy, adapter=adapter)
         address_source = envelope_model(adapter, settings, AddressV1)
         assert resolver("Address", address_source) is None
 
@@ -294,6 +305,7 @@ class TestCompileTargetResolver:
         resolver = compile_target_resolver(
             populated_registry,
             migration_settings.target_strategy,
+            adapter=adapter,
         )
         target = resolver("Person", source)
         assert target is not None
@@ -306,4 +318,4 @@ class TestCompileTargetResolver:
     ) -> None:
         registry = Registry[semver.Version]()
         with pytest.raises(RegistryError):
-            compile_target_resolver(registry, PersonV2)
+            compile_target_resolver(registry, PersonV2, adapter=adapter)

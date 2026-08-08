@@ -24,7 +24,7 @@ def envelope_model(
     versioning_settings: VersioningSettings,
     model_cls: type[types.VModel],
 ) -> VersionNode[types.VersionValue, types.VModel]:
-    version = VersionNode.of(adapter.version(model_cls))
+    version = adapter.of(adapter.version(model_cls))
     kind = adapter.kind(model_cls)
     return VersionNode[types.VersionValue, model_cls](
         _model=model_cls,
@@ -69,12 +69,13 @@ def register_models(
 def default_graph_builder(
     registry: Registry[types.VersionValue],
     settings: DiscoverySettings,
+    adapter: types.ModelAdapter,
 ) -> GraphBuilder[types.VersionValue]:
     """Return a graph builder with the standard compound-key walker."""
     return GraphBuilder(
         registry,
         settings,
-        CompoundKeyWalker(registry, settings=settings),
+        CompoundKeyWalker(registry, settings=settings, adapter=adapter),
     )
 
 
@@ -96,7 +97,7 @@ def make_engine(
         registry,
         settings,  # type: ignore[arg-type]
         SequentialExecutor(),
-        default_graph_builder(registry, settings),  # type: ignore[arg-type]
+        default_graph_builder(registry, settings, adapter),  # type: ignore[arg-type]
         adapter,
         entry_migration,
     )
@@ -113,7 +114,7 @@ def populate_graph(
 ) -> MigrationGraph[types.VersionValue]:
     register_models(adapter, registry, discovery_settings, *models)
 
-    builder = default_graph_builder(registry, discovery_settings)
+    builder = default_graph_builder(registry, discovery_settings, adapter)
     return builder.build(
         payload,
         target_resolver=resolver,

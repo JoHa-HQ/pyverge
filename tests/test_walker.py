@@ -62,7 +62,9 @@ def test_compound_key_empty_payload_returns_no_entries(
     discovery_settings: DiscoverySettings,
     registry: Registry[semver.Version],
 ) -> None:
-    walker = CompoundKeyWalker[semver.Version](registry, settings=discovery_settings)
+    walker = CompoundKeyWalker[semver.Version](
+        registry, settings=discovery_settings, adapter=model_adapter
+    )
     entries = list(walker.discover({}, target_resolver=_null_resolver(), max_depth=-1))
     assert entries == []
 
@@ -98,9 +100,10 @@ def test_finds_registered_versioned_dict(
     }
     if container is not None:
         kwargs["container"] = container
-    walker_kwargs: dict[str, Any] = {"settings": discovery_settings}
-    if walker_cls is PydanticWalker:
-        walker_kwargs["adapter"] = model_adapter
+    walker_kwargs: dict[str, Any] = {
+        "settings": discovery_settings,
+        "adapter": model_adapter,
+    }
     entries = list(walker_cls(registry, **walker_kwargs).discover(payload, **kwargs))
     assert len(entries) == 1
     assert entries[0][0] == ("document",)
@@ -121,7 +124,9 @@ def test_compound_key_unknown_version_is_skipped(
             "name": "Alice",
         }
     }
-    walker = CompoundKeyWalker(registry, settings=discovery_settings)
+    walker = CompoundKeyWalker(
+        registry, settings=discovery_settings, adapter=model_adapter
+    )
     entries = list(walker.discover(payload, target_resolver=_latest_resolver(registry)))
     assert entries == []
 
@@ -133,7 +138,9 @@ def test_compound_key_max_depth_exceeded_for_nested_entry(
     registry: Registry[semver.Version],
 ) -> None:
     register_models(model_adapter, registry, discovery_settings, UserV1)
-    walker = CompoundKeyWalker(registry, settings=discovery_settings)
+    walker = CompoundKeyWalker(
+        registry, settings=discovery_settings, adapter=model_adapter
+    )
     payload = {
         "document": {
             "kind": "User",

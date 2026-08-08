@@ -192,12 +192,12 @@ class TestModel:
             (
                 Registry[semver.Version](),
                 UserV011Dev7,
-                SentinelNode("User", VersionNode.of("0.1.1+dev.7")),
+                SentinelNode("User", semver.Version.parse("0.1.1+dev.7")),
             ),
             (
                 Registry[pendulum.Date](),
                 UserV20260228,
-                SentinelNode("User", VersionNode.of("2026-02-28")),
+                SentinelNode("User", pendulum.parse("2026-02-28").date()),
             ),
         ],
     )

@@ -6,17 +6,13 @@ Date:   ``2024-06-01``, ``2025-03-15``
 
 from __future__ import annotations
 
-import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import total_ordering
-from typing import Generic, Self
-
-import pendulum
-from semver import Version
+from typing import Generic, Self, cast
 
 from .exceptions import MigrationError
 from .types import (
-    BaseModel,
+    Comparable,
     Diffable,
     Migratable,
     MigrationFunc,
@@ -25,63 +21,36 @@ from .types import (
     ModelKind,
     ModelVersionKey,
     Versionable,
-    VersionValue,
     VersionValue_co,
-    VModel,
-    VSource,
-    VTarget,
+    VModel_co,
+    VSource_co,
+    VTarget_co,
 )
-
-logger = logging.getLogger(__name__)
 
 
 @total_ordering
 @dataclass(frozen=True, slots=True)
-class VersionNode(Generic[VersionValue, VModel]):
+class VersionNode(Generic[VersionValue_co, VModel_co]):
     """A model version that can be either semver or ISO date.
 
     Optionally carries the Pydantic model class so the registry can
     treat ``(version, kind)`` as a single comparable unit.
     """
 
-    _model: type[VModel]
-    _value: VersionValue
+    _model: type[VModel_co]
+    _value: VersionValue_co
     _kind: ModelKind
 
-    @classmethod
-    def of(cls, value: str) -> Version | pendulum.Date:
-        """Parse a version string (mostly coming from Literal), then determine the strategy"""  # noqa: E501
-        try:
-            return Version.parse(value)
-        except ValueError:
-            logger.debug(f"Failed to parse semver: {str(value)!r}")
-
-        try:
-            parsed = pendulum.parse(str(value), exact=True)
-            if isinstance(parsed, pendulum.DateTime):
-                parsed = parsed.date()
-            if not isinstance(parsed, pendulum.Date):
-                raise ValueError(f"Expected date, got {parsed!r}")
-            return parsed
-        except ValueError:
-            logger.debug(f"Failed to parse date: {value!r}")
-
-        msg = (
-            f"Cannot parse version {value!r}. "
-            "Expected semver (e.g. '1.0.0') or ISO date (e.g. '2024-06-01')."
-        )
-        raise ValueError(msg)
-
     @property
-    def strategy(self) -> type[VersionValue]:
+    def strategy(self) -> type[VersionValue_co]:
         return type(self._value)
 
     @property
-    def model(self) -> type[VModel]:
+    def model(self) -> type[VModel_co]:
         return self._model
 
     @property
-    def version(self) -> tuple[ModelKind, VersionValue]:
+    def version(self) -> tuple[ModelKind, VersionValue_co]:
         return self._kind, self._value
 
     @property
@@ -93,33 +62,37 @@ class VersionNode(Generic[VersionValue, VModel]):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
-        elif self.strategy != other.strategy:
+
+        if self.strategy != other.strategy:
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        return (self._kind, self._value) < (other._kind, other._value)
+        other_c = cast(Comparable[VersionValue_co], other)
+        return self.version < other_c.version
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, (VersionNode, SentinelNode)):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
-        elif self.strategy != other.strategy:
+        if self.strategy != other.strategy:
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        return (self._kind, self._value) == (other._kind, other._value)
+        other_c = cast(Comparable[VersionValue_co], other)
+        return self.version == other_c.version
 
     def __gt__(self, other: object) -> bool:
         if not isinstance(other, (VersionNode, SentinelNode)):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
-        elif self.strategy != other.strategy:
+        if self.strategy != other.strategy:
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        return (self._kind, self._value) > (other._kind, other._value)
+        other_c = cast(Comparable[VersionValue_co], other)
+        return self.version > other_c.version
 
     def __hash__(self) -> int:
         return hash((self._kind, self._value))
@@ -160,7 +133,7 @@ class SentinelNode(Generic[VersionValue_co]):
         return (self._kind, self._value)
 
     @property
-    def model(self) -> type[BaseModel] | None:
+    def model(self) -> None:
         return None
 
     def __lt__(self, other: object) -> bool:
@@ -168,33 +141,36 @@ class SentinelNode(Generic[VersionValue_co]):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
-        elif self.strategy != other.strategy:
+        if self.strategy != other.strategy:
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        return (self._kind, self._value) < (other._kind, other._value)
+        other_c = cast(Comparable[VersionValue_co], other)
+        return self.version < other_c.version
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, (VersionNode, SentinelNode)):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
-        elif self.strategy != other.strategy:
+        if self.strategy != other.strategy:
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        return (self._kind, self._value) == (other._kind, other._value)
+        other_c = cast(Comparable[VersionValue_co], other)
+        return self.version == other_c.version
 
     def __gt__(self, other: object) -> bool:
         if not isinstance(other, (VersionNode, SentinelNode)):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
-        elif self.strategy != other.strategy:
+        if self.strategy != other.strategy:
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        return (self._kind, self._value) > (other._kind, other._value)
+        other_c = cast(Comparable[VersionValue_co], other)
+        return self.version > other_c.version
 
     def __hash__(self) -> int:
         return hash((self._kind, self._value))
@@ -205,11 +181,11 @@ class SentinelNode(Generic[VersionValue_co]):
 
 @total_ordering
 @dataclass(frozen=True, slots=True)
-class VersionEdge(Generic[VersionValue, VSource, VTarget]):
+class VersionEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
     """A directed migration edge connecting two versions of the same kind."""
 
-    diff: Diffable[VersionValue]
-    func: MigrationFunc | None = field(default=None)
+    diff: Diffable[VersionValue_co]
+    func: MigrationFunc
 
     @property
     def kind(self) -> ModelKind:
@@ -224,11 +200,11 @@ class VersionEdge(Generic[VersionValue, VSource, VTarget]):
         return self.diff.edge
 
     @property
-    def source(self) -> Versionable[VersionValue, VSource]:
+    def source(self) -> Versionable[VersionValue_co, VSource_co]:
         return self.diff.source
 
     @property
-    def target(self) -> Versionable[VersionValue, VTarget]:
+    def target(self) -> Versionable[VersionValue_co, VTarget_co]:
         return self.diff.target
 
     def __call__(self, data: ModelData) -> ModelData:
@@ -259,7 +235,7 @@ class VersionEdge(Generic[VersionValue, VSource, VTarget]):
         return f"VersionEdge({self.diff.source}→{self.diff.target})"
 
 
-class SentinelEdge(Generic[VersionValue, VSource, VTarget]):
+class SentinelEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
     """Key-only edge sentinel, symmetric to :class:`SentinelNode`.
 
     Stores just the source and target versions — no ``Diffable``.
@@ -269,23 +245,23 @@ class SentinelEdge(Generic[VersionValue, VSource, VTarget]):
 
     def __init__(
         self,
-        source: Versionable[VersionValue, VSource],
-        target: Versionable[VersionValue, VTarget],
+        source: Versionable[VersionValue_co, VSource_co],
+        target: Versionable[VersionValue_co, VTarget_co],
     ) -> None:
         self._source = source
         self._target = target
 
     @classmethod
     def from_version_edge(
-        cls, edge: Migratable[VersionValue, VSource, VTarget]
+        cls, edge: Migratable[VersionValue_co, VSource_co, VTarget_co]
     ) -> Self:
         return cls(edge.source, edge.target)
 
     @classmethod
     def from_pair(
         cls,
-        source: Versionable[VersionValue, VSource],
-        target: Versionable[VersionValue, VTarget],
+        source: Versionable[VersionValue_co, VSource_co],
+        target: Versionable[VersionValue_co, VTarget_co],
     ) -> Self:
         return cls(source, target)
 
@@ -302,11 +278,11 @@ class SentinelEdge(Generic[VersionValue, VSource, VTarget]):
         return (self._source, self._target)
 
     @property
-    def source(self) -> Versionable[VersionValue, VSource]:
+    def source(self) -> Versionable[VersionValue_co, VSource_co]:
         return self._source
 
     @property
-    def target(self) -> Versionable[VersionValue, VTarget]:
+    def target(self) -> Versionable[VersionValue_co, VTarget_co]:
         return self._target
 
     def __lt__(self, other: object) -> bool:

@@ -30,13 +30,15 @@ VModel = TypeVar("VModel", bound=BaseModel)
 VersionValue = TypeVar("VersionValue", SemVer, Date)
 
 # TypeVar for migration source and target models
-VSource = TypeVar("VSource", bound=BaseModel)
-VTarget = TypeVar("VTarget", bound=BaseModel)
+VSource_co = TypeVar("VSource_co", bound=BaseModel, covariant=True)
+VTarget_co = TypeVar("VTarget_co", bound=BaseModel, covariant=True)
 
 # Covariant — used in protocols where VModel is output-only
 Container_co = TypeVar("Container_co", bound=BaseModel, covariant=True)
 VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
 VModel_co = TypeVar("VModel_co", bound=BaseModel, covariant=True)
+# Covariant — used in Renderable for the rendered output type
+Renderable_co = TypeVar("Renderable_co", covariant=True)
 
 JsonPrimities: TypeAlias = int | float | str | bool | None | dict[str, Any] | list[Any]
 JsonValue: TypeAlias = JsonPrimities | dict[str, JsonPrimities] | list[JsonPrimities]
@@ -77,34 +79,43 @@ TargetPolicy: TypeAlias = "TargetSpec | dict[ModelKind | Literal['*'], TargetSpe
 
 
 @runtime_checkable
-class Versionable(Protocol[VersionValue_co, VModel_co]):
-    """Protocol for anything that identifies a model version.
+class Comparable(Protocol[VersionValue_co]):
+    """Total ordering over the version key.
 
-    Shared by :class:`VersionNode` and :class:`SentinelNode`.  The only
-    contract is the key dimensions ``(kind, value)`` plus comparison and
-    hashing.  A concrete model binding is optional: ``model`` may return
-    ``None`` for lightweight sentinels.
+    Compatible with :func:`functools.total_ordering`: ``__le__``/``__ge__``
+    are derived from ``__lt__``/``__gt__``/``__eq__`` by the decorator, so a
+    decorated class satisfies this protocol structurally.
     """
 
     @property
     def strategy(self) -> type[VersionValue_co]: ...
     @property
-    def model(self) -> type[VModel_co] | None: ...
+    def kind(self) -> ModelKind: ...
     @property
     def version(self) -> tuple[ModelKind, VersionValue_co]: ...
-    @property
-    def kind(self) -> ModelKind: ...
+
     def __lt__(self, other: object) -> bool: ...
-    def __le__(self, other: object) -> bool: ...
     def __gt__(self, other: object) -> bool: ...
-    def __ge__(self, other: object) -> bool: ...
     def __eq__(self, other: object) -> bool: ...
     def __hash__(self) -> int: ...
     def __str__(self) -> str: ...
 
 
 @runtime_checkable
-class Migratable(Protocol[VersionValue, VSource, VTarget]):
+class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co, VModel_co]):
+    """Protocol for a model version that always binds a model.
+
+    Adds a required ``model`` binding on top of :class:`Comparable`.  Shared
+    by :class:`VersionNode`.  Lightweight sentinels (:class:`SentinelNode`)
+    are orderable but model-less, so they satisfy :class:`Comparable` only.
+    """
+
+    @property
+    def model(self) -> type[VModel_co]: ...
+
+
+@runtime_checkable
+class Migratable(Protocol[VersionValue_co, VSource_co, VTarget_co]):
     """Protocol for a migration edge identifier.
 
     Shared by :class:`VersionEdge` and :class:`SentinelEdge`.  Carries
@@ -119,16 +130,16 @@ class Migratable(Protocol[VersionValue, VSource, VTarget]):
     def edge(
         self,
     ) -> tuple[
-        Versionable[VersionValue, VSource],
-        Versionable[VersionValue, VTarget],
+        Versionable[VersionValue_co, VSource_co],
+        Versionable[VersionValue_co, VTarget_co],
     ]: ...
     @property
-    def source(self) -> Versionable[VersionValue, VSource]: ...
+    def source(self) -> Versionable[VersionValue_co, VSource_co]: ...
     @property
-    def target(self) -> Versionable[VersionValue, VTarget]: ...
+    def target(self) -> Versionable[VersionValue_co, VTarget_co]: ...
 
     func: MigrationFunc | None
-    diff: Diffable[VersionValue] | None
+    diff: Diffable[VersionValue_co] | None
 
     def __call__(self, data: ModelData) -> ModelData: ...
     def __lt__(self, other: object) -> bool: ...
@@ -270,10 +281,18 @@ class Diffable(Protocol[VersionValue_co]):
 
 
 @runtime_checkable
-class Renderable(Protocol):
-    """Protocol for objects that can be rendered as a string."""
+class Renderable(Protocol[VersionValue, Renderable_co]):
+    """A renderable object holding its own diff state.
 
-    def __call__(self) -> Any: ...
+    Implementations preserve the :class:`Diffable` they were built from, so
+    callers may keep the renderer around and (re)render or export patches
+    later.  Calling it produces the typed rendered output.
+    """
+
+    diff: Diffable[VersionValue]
+    format: str
+
+    def __call__(self) -> Renderable_co: ...
 
 
 @runtime_checkable
@@ -287,6 +306,13 @@ class ModelAdapter(Protocol):
 
     def version(self, model_cls: type[Any]) -> str: ...
     def kind(self, model_cls: type[Any]) -> str: ...
+    def of(self, value: str) -> VersionValue:
+        """Parse a version string into a version value.
+
+        Understands both semver and ISO date strings.
+        """
+        ...
+
     def finalize(
         self, target_model: type[Any], data: dict[str, Any]
     ) -> dict[str, Any]: ...
@@ -302,18 +328,18 @@ class ModelAdapter(Protocol):
         self, parent_model: type[Any], field_name: str
     ) -> type[BaseModel] | None: ...
     def versionable(
-        self, model_cls: type[VModel]
-    ) -> Versionable[VersionValue, VModel]: ...
+        self, model_cls: type[VModel_co]
+    ) -> Versionable[VersionValue_co, VModel_co]: ...
 
 
 VersionPair: TypeAlias = tuple[
-    Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]
+    Versionable[VersionValue_co, VModel_co], Versionable[VersionValue_co, VModel_co]
 ]
 
 LookupKey: TypeAlias = (
-    Versionable[VersionValue, VModel]
-    | Migratable[VersionValue, VSource, VTarget]
-    | type[VModel]
+    Versionable[VersionValue_co, VModel_co]
+    | Migratable[VersionValue_co, VSource_co, VTarget_co]
+    | type[VModel_co]
 )
 
 
@@ -321,8 +347,8 @@ class TargetResolver(Protocol):
     """Callable that selects a convergence target for a discovered entry."""
 
     def __call__(
-        self, kind: ModelKind, current: Versionable[VersionValue, VModel]
-    ) -> Versionable[VersionValue, VModel] | None: ...
+        self, kind: ModelKind, current: Versionable[VersionValue_co, VModel_co]
+    ) -> Versionable[VersionValue_co, VModel_co] | None: ...
 
 
 class Walker(Protocol):

@@ -70,7 +70,7 @@ def _make_engine(
         registry,
         MigrationSettings(),
         executor or SequentialExecutor(),
-        default_graph_builder(registry, discovery),
+        default_graph_builder(registry, discovery, model_adapter),
         model_adapter,
         DefaultEntryMigration(),
     )

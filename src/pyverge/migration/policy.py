@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from .exceptions import ModelNotFoundError, RegistryError
 from .registry import Registry
 from .types import (
+    ModelAdapter,
     ModelKind,
     TargetPolicy,
     TargetResolver,
@@ -24,7 +25,7 @@ from .types import (
     VersionValue,
     VModel,
 )
-from .versioning import SentinelNode, VersionNode
+from .versioning import SentinelNode
 
 
 def compile_target_resolver(
@@ -32,6 +33,7 @@ def compile_target_resolver(
     policy: TargetPolicy | None,
     *,
     version_property: str = "version",
+    adapter: ModelAdapter,
 ) -> TargetResolver:
     """Build a :class:`TargetResolver` from a declarative policy.
 
@@ -62,7 +64,9 @@ def compile_target_resolver(
             ModelKind | Literal["*"],
             TargetResolver,
         ] = {
-            kind: compile_target_spec(registry, spec, version_property=version_property)
+            kind: compile_target_spec(
+                registry, spec, version_property=version_property, adapter=adapter
+            )
             for kind, spec in policy.items()
         }
         fallback = resolvers.pop("*", None)
@@ -78,7 +82,9 @@ def compile_target_resolver(
 
         return resolve
 
-    return compile_target_spec(registry, policy, version_property=version_property)
+    return compile_target_spec(
+        registry, policy, version_property=version_property, adapter=adapter
+    )
 
 
 def compile_target_spec(
@@ -86,6 +92,7 @@ def compile_target_spec(
     spec: TargetSpec,
     *,
     version_property: str,
+    adapter: ModelAdapter,
 ) -> TargetResolver:
     """Compile a single target spec into a resolver closure."""
     if spec is None:
@@ -101,7 +108,7 @@ def compile_target_spec(
         elif spec == "earliest":
             resolver = _earliest_resolver(registry)
         else:
-            resolver = _string_resolver(registry, spec)
+            resolver = _string_resolver(registry, spec, adapter)
         return resolver
 
     if isinstance(spec, type) and issubclass(spec, BaseModel):
@@ -194,15 +201,17 @@ def _versionable_resolver(
 def _string_resolver(
     registry: Registry[VersionValue],
     value: str,
+    adapter: ModelAdapter,
 ) -> TargetResolver:
     """Resolve an explicit version string to a registered versionable.
 
-    The string is parsed eagerly with :meth:`VersionNode.of`, which understands
-    both semver and ISO date values.  Resolving against an unregistered version
-    raises ``ModelNotFoundError``; an unparsable value fails fast here.
+    The string is parsed eagerly with the adapter's version parser, which
+    understands both semver and ISO date values.  Resolving against an
+    unregistered version raises ``ModelNotFoundError``; an unparsable value
+    fails fast here.
     """
     try:
-        parsed = VersionNode.of(value)
+        parsed = adapter.of(value)
     except ValueError:
         raise RegistryError(
             registry.name,
