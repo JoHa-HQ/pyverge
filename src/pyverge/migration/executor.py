@@ -14,13 +14,14 @@ from .types import (
     Executor,
     MigrationDirectionStrategy,
     ModelAdapter,
+    ModelBase,
     ModelData,
     Versionable,
     VersionMissingStrategy,
     VersionValue,
     VModel,
-    VSource,
-    VTarget,
+    VSource_co,
+    VTarget_co,
 )
 from .versioning import SentinelEdge
 
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
 class StepExecutor(Generic[VersionValue]):
     """Resolves and runs a single migration step from the registry."""
 
-    def __init__(self, registry: Registry[VersionValue]) -> None:
+    def __init__(self, registry: Registry[VersionValue, ModelBase]) -> None:
         self._registry = registry
 
     def execute_step(
@@ -66,11 +67,11 @@ class StepExecutor(Generic[VersionValue]):
         self,
         step_from: Versionable[VersionValue, VModel],
         step_to: Versionable[VersionValue, VModel],
-    ) -> ExplicitStep[VersionValue, VSource, VTarget]:
+    ) -> ExplicitStep[VersionValue, VSource_co, VTarget_co]:
         """Resolve an edge to an explicit migration step."""
         key = SentinelEdge.from_pair(step_from, step_to)
         if self._registry.has_migration(key):
-            return ExplicitStep[VersionValue, VSource, VTarget](
+            return ExplicitStep[VersionValue, VSource_co, VTarget_co](
                 self._registry.get_migration(key)
             )
         raise MigrationNotFoundError(
@@ -87,7 +88,7 @@ class SequentialExecutor(Executor):
         data: ModelData,
         graph: MigrationGraph[VersionValue],
         *,
-        registry: Registry[VersionValue],
+        registry: Registry[VersionValue, ModelBase],
         entry_migration: EntryMigration[VersionValue],
         adapter: ModelAdapter,
         version_property: str,
@@ -129,7 +130,7 @@ class LevelParallelExecutor(Executor):
         data: ModelData,
         graph: MigrationGraph[VersionValue],
         *,
-        registry: Registry[VersionValue],
+        registry: Registry[VersionValue, ModelBase],
         entry_migration: EntryMigration[VersionValue],
         adapter: ModelAdapter,
         version_property: str,

@@ -48,6 +48,7 @@ from .types import (
     MigrationDirectionStrategy,
     MigrationFunc,
     ModelAdapter,
+    ModelBase,
     ModelData,
     ModelKind,
     ModelVersionKey,
@@ -255,7 +256,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         return klass
 
     @property
-    def registry(self) -> Registry[VersionValue]:
+    def registry(self) -> Registry[VersionValue, ModelBase]:
         """Return the instance registry."""
         return self.engine.registry
 
@@ -289,7 +290,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         """
         settings = settings or MigrationSettings()
         if walker is None:
-            registry = Registry[VersionValue]()
+            registry = Registry[VersionValue, ModelBase]()
             active_walker = CompoundKeyWalker(
                 registry, settings=settings, adapter=adapter
             )

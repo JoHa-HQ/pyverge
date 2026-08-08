@@ -26,6 +26,7 @@ from .types import (
     MigrationFunc,
     MigrationKeyInput,
     ModelAdapter,
+    ModelBase,
     ModelData,
     ModelKind,
     ModelVersionKey,
@@ -66,7 +67,7 @@ class Engine(Generic[VersionValue]):
 
     def __init__(
         self: Self,
-        registry: Registry[VersionValue],
+        registry: Registry[VersionValue, ModelBase],
         settings: MigrationSettings,
         default_executor: Executor,
         graph_builder: GraphBuilder[VersionValue],
