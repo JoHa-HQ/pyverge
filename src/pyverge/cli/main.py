@@ -1,5 +1,3 @@
-"""Command-line interface for pyverge."""
-
 import json
 from pathlib import Path
 from typing import Annotated
@@ -74,6 +72,7 @@ def check(
     except Exception as e:
         typer.secho(f"Validation error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
+
 
 @app.command()
 def managers(
@@ -170,6 +169,7 @@ def diff(
     except Exception as e:
         typer.secho(f"Diff error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
+
 
 if __name__ == "__main__":
     app()

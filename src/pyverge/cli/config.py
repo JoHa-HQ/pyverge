@@ -1,5 +1,3 @@
-"""Manager resolution for the pyverge CLI (no config-file support)."""
-
 import importlib.util
 import sys
 from pathlib import Path
@@ -14,15 +12,10 @@ class ConfigError(Exception):
 
 
 def resolve_manager(spec: str) -> ModelManager:
-    """Resolve a manager from a ``module_path:object_path`` spec.
+    """Resolve a manager from a ``module_path:object_path`` spec."""
 
-    ``object_path`` is resolved via dotted attribute navigation, e.g.
-    ``myapp.container:UserManager`` or ``myapp.container:services.user_manager``.
-    """
     if ":" not in spec:
-        raise ConfigError(
-            f"Manager spec must be 'module:object_path', got '{spec}'"
-        )
+        raise ConfigError(f"Manager spec must be 'module:object_path', got '{spec}'")
 
     module_path, object_path = spec.split(":", 1)
     cwd = Path.cwd()
