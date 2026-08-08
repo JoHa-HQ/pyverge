@@ -503,6 +503,7 @@ class Engine(Generic[VersionValue]):
                 self.registry,
                 target or self.settings.target_strategy,
                 version_property=vp,
+                adapter=self.adapter,
             )
 
         graph = self.graph_builder.build(

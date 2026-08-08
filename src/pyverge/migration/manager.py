@@ -60,7 +60,6 @@ from .types import (
     VModel,
     Walker,
 )
-from .versioning import VersionNode
 from .walker import CompoundKeyWalker
 
 
@@ -77,11 +76,11 @@ def _resolve_migration_key(
         kind, source_version, target_version = cast(tuple[str, str, str], key)
         source_key: ModelVersionKey = (
             kind,
-            cast(VersionValue, VersionNode.of(source_version)),
+            cast(VersionValue, engine.adapter.of(source_version)),
         )
         target_key: ModelVersionKey = (
             kind,
-            cast(VersionValue, VersionNode.of(target_version)),
+            cast(VersionValue, engine.adapter.of(target_version)),
         )
     else:
         source_cls, target_cls = cast(tuple[type[VModel], type[VModel]], key)
@@ -291,7 +290,9 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         settings = settings or MigrationSettings()
         if walker is None:
             registry = Registry[VersionValue]()
-            active_walker = CompoundKeyWalker(registry, settings=settings)
+            active_walker = CompoundKeyWalker(
+                registry, settings=settings, adapter=adapter
+            )
         else:
             active_walker = walker
             registry = walker.registry

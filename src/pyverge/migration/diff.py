@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Generic, Self
 
+from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from .types import (
@@ -11,14 +12,18 @@ from .types import (
     Renderable,
     Versionable,
     VersionValue,
-    VSource,
-    VTarget,
+    VSource_co,
+    VTarget_co,
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JsonPatchRender(Generic[VersionValue]):
-    """Render as RFC 6902 JSON Patch."""
+    """Render as RFC 6902 JSON Patch.
+
+    Preserves the ``diff`` it was built from, so the renderer can be kept and
+    (re)rendered or exported later without losing the patch state.
+    """
 
     diff: Diffable[VersionValue]
     format: str = "json-patch"
@@ -51,7 +56,7 @@ class JsonPatchRender(Generic[VersionValue]):
 
 
 @dataclass(frozen=True)
-class PydanticDiff(Generic[VersionValue, VSource, VTarget]):
+class PydanticDiff(Generic[VersionValue, VSource_co, VTarget_co]):
     """Differences between two model versions — data with queryable predicates.
 
     Computed eagerly from two Pydantic model classes.  No migration logic —
@@ -59,21 +64,21 @@ class PydanticDiff(Generic[VersionValue, VSource, VTarget]):
     pluggable ``renderer`` strategy.
     """
 
-    source: Versionable[VersionValue, VSource]
-    target: Versionable[VersionValue, VTarget]
+    source: Versionable[VersionValue, VSource_co]
+    target: Versionable[VersionValue, VTarget_co]
     added_fields: list[str] = field(default_factory=list)
     removed_fields: list[str] = field(default_factory=list)
     modified_fields: dict[str, dict[str, Any]] = field(default_factory=dict)
     added_field_info: dict[str, dict[str, Any]] = field(default_factory=dict)
     unchanged_fields: list[str] = field(default_factory=list)
-    renderer: type[Renderable] = field(default=JsonPatchRender)
+    renderer: type[JsonPatchRender] = field(default=JsonPatchRender)
     is_backward_compatible: bool = False
 
     @classmethod
     def from_pair(
         cls: type[Self],
-        source: Versionable[VersionValue, VSource],
-        target: Versionable[VersionValue, VTarget],
+        source: Versionable[VersionValue, VSource_co],
+        target: Versionable[VersionValue, VTarget_co],
         *,
         is_backward_compatible: bool = False,
     ) -> Self:
@@ -132,7 +137,7 @@ class PydanticDiff(Generic[VersionValue, VSource, VTarget]):
         )
 
     @staticmethod
-    def _diff_fields(source: Any, target: Any) -> dict[str, Any]:
+    def _diff_fields(source: FieldInfo, target: FieldInfo) -> dict[str, Any]:
         changes: dict[str, Any] = {}
 
         if source.annotation != target.annotation:

@@ -20,7 +20,7 @@ from .types import (
 from .types import (
     Walker as WalkerProtocol,
 )
-from .versioning import SentinelNode, VersionNode
+from .versioning import SentinelNode
 
 
 class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
@@ -35,10 +35,12 @@ class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
         registry: Registry[VersionValue],
         *,
         settings: DiscoverySettings,
+        adapter: ModelAdapter,
         direction: MigrationDirectionStrategy = "any",
     ) -> None:
         self._registry = registry
         self._settings = settings
+        self._adapter = adapter
         self._direction = direction
 
     @property
@@ -75,7 +77,7 @@ class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
             is_versioned = False
             if isinstance(kind, str) and isinstance(version_str, str):
                 try:
-                    sentinel = SentinelNode(kind, VersionNode.of(version_str))
+                    sentinel = SentinelNode(kind, self._adapter.of(version_str))
                 except Exception:
                     sentinel = None
                 if sentinel is not None and self._registry.has_model(sentinel):
@@ -224,7 +226,7 @@ class PydanticWalker(WalkerProtocol, Generic[VersionValue]):
             version_str = value.get(vp)
             if isinstance(kind, str) and isinstance(version_str, str):
                 try:
-                    sentinel = SentinelNode(kind, VersionNode.of(version_str))
+                    sentinel = SentinelNode(kind, self._adapter.of(version_str))
                 except Exception:
                     sentinel = None
                 if sentinel is not None and self._registry.has_model(sentinel):
