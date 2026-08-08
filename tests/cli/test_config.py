@@ -9,12 +9,7 @@ import pytest
 import semver
 
 from pyverge.cli.config import ConfigError, resolve_manager
-from pyverge.migration import ModelManager, PydanticModelAdapter
-
-
-@pytest.fixture
-def manager() -> ModelManager[semver.Version]:
-    return ModelManager[semver.Version].scoped(PydanticModelAdapter())()
+from pyverge.migration import ModelManager
 
 
 def _register_module(name: str, attribute: str, value: object) -> None:
@@ -27,14 +22,18 @@ def _register_module(name: str, attribute: str, value: object) -> None:
 class TestResolveManagerByPath:
     """Resolution via ``module:object_path``."""
 
-    def test_single_attribute_path(self, manager: ModelManager[semver.Version]) -> None:
+    def test_single_attribute_path(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        manager = semver_manager()
         _register_module("fake_pkg.container", "manager", manager)
 
         assert resolve_manager("fake_pkg.container:manager") is manager
 
     def test_nested_object_path(
-        self, manager: ModelManager[semver.Version]
+        self, semver_manager: type[ModelManager[semver.Version]]
     ) -> None:
+        manager = semver_manager()
         container = types.SimpleNamespace()
         container.services = types.SimpleNamespace()
         container.services.user_manager = manager
