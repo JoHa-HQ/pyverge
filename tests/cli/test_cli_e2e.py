@@ -6,6 +6,7 @@ import sys
 import types
 from typing import Literal
 
+import pytest
 import semver
 from pydantic import BaseModel
 from typer.testing import CliRunner
@@ -13,7 +14,10 @@ from typer.testing import CliRunner
 from pyverge.cli.main import app
 from pyverge.migration import ModelManager, PydanticModelAdapter
 
-runner = CliRunner()
+
+@pytest.fixture
+def runner() -> CliRunner:
+    return CliRunner()
 
 
 def _register_manager(name: str, manager: ModelManager) -> None:
@@ -35,14 +39,14 @@ def _manager_with_model() -> ModelManager[semver.Version]:
 
 
 class TestManagersCommand:
-    def test_no_config_reports_hint(self) -> None:
+    def test_no_config_reports_hint(self, runner: CliRunner) -> None:
         result = runner.invoke(app, ["managers"])
         assert result.exit_code == 0
         assert "No managers configured" in result.stdout
 
 
 class TestInfoCommand:
-    def test_info_lists_registered_models(self) -> None:
+    def test_info_lists_registered_models(self, runner: CliRunner) -> None:
         _register_manager("e2e_pkg.container", _manager_with_model())
 
         result = runner.invoke(app, ["info", "e2e_pkg.container:manager"])
@@ -51,7 +55,7 @@ class TestInfoCommand:
         assert "UserV1" in result.stdout
         assert "v1.0.0" in result.stdout
 
-    def test_info_unknown_manager_exits_1(self) -> None:
+    def test_info_unknown_manager_exits_1(self, runner: CliRunner) -> None:
         result = runner.invoke(app, ["info", "e2e_pkg.missing:manager"])
 
         assert result.exit_code == 1
