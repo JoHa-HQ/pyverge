@@ -237,10 +237,7 @@ class VersionEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
 
 @total_ordering
 class SentinelEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
-    """Key-only edge sentinel, symmetric to :class:`SentinelNode`.
-
-    Stores just the source and target versions — no ``Diffable``.
-    """
+    """Lightweight value-only sentinel for searching across edges."""
 
     __slots__ = ("_source", "_target")
 
