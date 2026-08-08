@@ -108,32 +108,12 @@ class ModelProxy(Generic[VersionValue, VModel]):
         self._value = value
         self._kind = kind
 
-    @property
-    def model(self) -> type[VModel]:
-        """The bound model class."""
-        return self._model
-
-    @property
-    def value(self) -> VersionValue:
-        """The version value."""
-        return self._value
-
-    @property
-    def kind(self) -> ModelKind:
-        """The model family identifier."""
-        return self._kind
-
-    def versionable(self, adapter: ModelAdapter) -> Versionable[VersionValue, VModel]:
-        """Build the ``VersionNode`` binding without re-parsing the version."""
+    def __call__(self) -> Versionable[VersionValue, VModel]:
         return VersionNode[VersionValue, VModel](
             _model=self._model,
             _value=self._value,
             _kind=self._kind,
         )
-
-    def __call__(self, adapter: ModelAdapter) -> Versionable[VersionValue, VModel]:
-        """Resolve this proxy to its versionable binding."""
-        return self.versionable(adapter)
 
 
 class _ModelDescriptor:
@@ -175,7 +155,7 @@ class _ModelDescriptor:
             ):
                 model_cls = args[0]
                 engine = owner._engine
-                proxy = ModelProxy[VersionValue, VModel](
+                proxy = ModelProxy[VersionValue, model_cls](
                     model_cls,
                     cast(
                         VersionValue,
@@ -183,8 +163,8 @@ class _ModelDescriptor:
                     ),
                     engine.adapter.kind(model_cls),
                 )
-                engine.store_model(proxy.versionable(engine.adapter))
-                return proxy
+                engine.store_model(proxy())
+                return model_cls
 
             if len(args) != 0:
                 raise TypeError("manager.model expects no args or a model class")
