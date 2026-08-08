@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 import semver
+from pydantic import BaseModel
 
 from pyverge.migration import (
     DefaultEntryMigration,
@@ -40,7 +41,7 @@ from tests.utils import (
 
 
 def _latest_resolver(
-    registry: Registry[types.VersionValue],
+    registry: Registry[types.VersionValue, BaseModel],
 ) -> types.TargetResolver:
     def resolve(kind: types.ModelKind, current: types.Versionable) -> types.Versionable:
         return registry.latest(kind)
@@ -57,7 +58,7 @@ def _preserve_children_person(data: dict) -> dict:
 
 def _make_engine(
     model_adapter: PydanticModelAdapter,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
     discovery: DiscoverySettings,
     executor: types.Executor | None = None,
 ) -> Engine[semver.Version]:
@@ -104,7 +105,7 @@ def _make_engine(
 def test_executor_returns_new_payload(
     model_adapter: PydanticModelAdapter,
     executor: types.Executor,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
     discovery: DiscoverySettings,
 ) -> None:
     eng = _make_engine(model_adapter, registry, discovery, executor=executor)
@@ -148,7 +149,7 @@ def test_executor_returns_new_payload(
 def test_executor_noop_when_source_is_target(
     model_adapter: PydanticModelAdapter,
     executor: types.Executor,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
     discovery: DiscoverySettings,
 ) -> None:
     eng = _make_engine(model_adapter, registry, discovery, executor=executor)
@@ -191,7 +192,7 @@ class TestStepExecutor:
         self,
         model_adapter: PydanticModelAdapter,
         discovery_settings: DiscoverySettings,
-        registry: Registry[semver.Version],
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(model_adapter, registry, discovery_settings, PersonV1, PersonV2)
 
@@ -218,7 +219,7 @@ class TestStepExecutor:
         self,
         model_adapter: PydanticModelAdapter,
         discovery_settings: DiscoverySettings,
-        registry: Registry[semver.Version],
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(model_adapter, registry, discovery_settings, PersonV1, PersonV2)
         source = envelope_model(model_adapter, discovery_settings, PersonV1)
@@ -235,7 +236,7 @@ class TestStepExecutor:
 @pytest.mark.parametrize("discovery", [DiscoverySettings()])
 def test_sequential_executor_runs_in_topological_order(
     model_adapter: PydanticModelAdapter,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
     discovery: DiscoverySettings,
 ) -> None:
     register_models(
@@ -292,7 +293,7 @@ def test_sequential_executor_runs_in_topological_order(
 @pytest.mark.parametrize("discovery", [DiscoverySettings()])
 def test_executor_propagates_migration_error(
     model_adapter: PydanticModelAdapter,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
     discovery: DiscoverySettings,
 ) -> None:
     register_models(model_adapter, registry, discovery, PersonV1, PersonV2)
@@ -325,7 +326,7 @@ def test_executor_propagates_migration_error(
 @pytest.mark.parametrize("discovery", [DiscoverySettings()])
 def test_level_parallel_executor_single_entry_uses_no_pool(
     model_adapter: PydanticModelAdapter,
-    registry: Registry[semver.Version],
+    registry: Registry[semver.Version, BaseModel],
     discovery: DiscoverySettings,
 ) -> None:
     """A graph with one entry per level should not require thread workers."""

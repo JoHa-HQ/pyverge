@@ -14,6 +14,7 @@ from .types import (
     Entry,
     MigrationDirectionStrategy,
     ModelAdapter,
+    ModelBase,
     TargetResolver,
     VersionValue,
 )
@@ -32,7 +33,7 @@ class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
 
     def __init__(
         self,
-        registry: Registry[VersionValue],
+        registry: Registry[VersionValue, ModelBase],
         *,
         settings: DiscoverySettings,
         adapter: ModelAdapter,
@@ -44,7 +45,7 @@ class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
         self._direction = direction
 
     @property
-    def registry(self) -> Registry[VersionValue]:
+    def registry(self) -> Registry[VersionValue, ModelBase]:
         """The registry this walker discovers against."""
         return self._registry
 
@@ -142,7 +143,7 @@ class PydanticWalker(WalkerProtocol, Generic[VersionValue]):
 
     def __init__(
         self,
-        registry: Registry[VersionValue],
+        registry: Registry[VersionValue, ModelBase],
         *,
         settings: DiscoverySettings,
         adapter: ModelAdapter,
@@ -152,7 +153,7 @@ class PydanticWalker(WalkerProtocol, Generic[VersionValue]):
         self._adapter = adapter
 
     @property
-    def registry(self) -> Registry[VersionValue]:
+    def registry(self) -> Registry[VersionValue, ModelBase]:
         """The registry this walker discovers against."""
         return self._registry
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import pendulum
 import pytest
 import semver
+from pydantic import BaseModel
 
 from pyverge.migration import (
     DiscoverySettings,
@@ -60,12 +61,12 @@ def discovery_settings(
 
 @pytest.fixture(scope="function")
 def semver_registry(name: str | None = None) -> Registry:
-    return Registry[semver.Version](name=name)
+    return Registry[semver.Version, BaseModel](name=name)
 
 
 @pytest.fixture(scope="function")
 def date_registry(name: str | None = None) -> Registry:
-    return Registry[pendulum.DateTime](name=name)
+    return Registry[pendulum.DateTime, BaseModel](name=name)
 
 
 @pytest.fixture

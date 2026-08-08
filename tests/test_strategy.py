@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import semver
+from pydantic import BaseModel
 
 from pyverge.migration import (
     DefaultEntryMigration,
@@ -27,8 +28,8 @@ class TestDefaultEntryMigration:
         return PydanticModelAdapter()
 
     @pytest.fixture
-    def registry(self) -> Registry[semver.Version]:
-        return Registry[semver.Version]()
+    def registry(self) -> Registry[semver.Version, BaseModel]:
+        return Registry[semver.Version, BaseModel]()
 
     @pytest.fixture
     def discovery_settings(self) -> DiscoverySettings:

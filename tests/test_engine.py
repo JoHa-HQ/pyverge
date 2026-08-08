@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pendulum
 import pytest
 import semver
+from pydantic import BaseModel
 
 from pyverge.migration import (
     CompoundKeyWalker,
@@ -62,8 +63,8 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_store_and_get_model_by_tuple(
@@ -71,7 +72,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -83,8 +84,8 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_get_model_by_class(
@@ -92,7 +93,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -103,8 +104,8 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_get_model_by_versionable(
@@ -112,7 +113,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -124,9 +125,9 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, key",
         [
-            [Registry[semver.Version](), ("User", semver.Version(9, 9, 9))],
+            [Registry[semver.Version, BaseModel](), ("User", semver.Version(9, 9, 9))],
             [
-                Registry[pendulum.Date](),
+                Registry[pendulum.Date, BaseModel](),
                 ("User", pendulum.Date(2099, 1, 1)),
             ],
         ],
@@ -134,7 +135,7 @@ class TestModelManagement:
     def test_get_missing_model_raises(
         self,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         key: types.ModelVersionKey,
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -144,8 +145,8 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_store_duplicate_raises(
@@ -153,7 +154,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -167,12 +168,12 @@ class TestModelManagement:
         "registry, models, latest",
         [
             [
-                Registry[semver.Version](),
+                Registry[semver.Version, BaseModel](),
                 [UserV3, UserV1, UserV2],
                 UserV3,
             ],
             [
-                Registry[pendulum.Date](),
+                Registry[pendulum.Date, BaseModel](),
                 [UserV20251231, UserV20260228, UserV20250310],
                 UserV20260228,
             ],
@@ -183,7 +184,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
         latest: type[types.VModel],
     ) -> None:
@@ -199,15 +200,15 @@ class TestModelManagement:
     def test_model_latest_unknown_kind_raises(
         self, migration_settings: MigrationSettings
     ) -> None:
-        eng = make_engine(Registry[semver.Version](), migration_settings)
+        eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
         with pytest.raises(RegistryError):
             eng.model_latest("User")
 
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_find_model_hit(
@@ -215,7 +216,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -229,13 +230,13 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, key",
         [
-            [Registry[semver.Version](), ("User", semver.Version(9, 9, 9))],
+            [Registry[semver.Version, BaseModel](), ("User", semver.Version(9, 9, 9))],
         ],
     )
     def test_find_model_miss_returns_none(
         self,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         key: types.ModelVersionKey,
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -244,8 +245,8 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_contains_version_tuple(
@@ -253,7 +254,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -266,8 +267,8 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_remove_model_by_versionable(
@@ -275,7 +276,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -288,8 +289,8 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_remove_model_by_tuple(
@@ -297,7 +298,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -310,8 +311,8 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, model",
         [
-            [Registry[semver.Version](), UserV1],
-            [Registry[pendulum.Date](), UserV20250310],
+            [Registry[semver.Version, BaseModel](), UserV1],
+            [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
     def test_remove_model_by_class(
@@ -319,7 +320,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -332,15 +333,15 @@ class TestModelManagement:
     def test_remove_missing_model_raises(
         self, migration_settings: MigrationSettings
     ) -> None:
-        eng = make_engine(Registry[semver.Version](), migration_settings)
+        eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
         with pytest.raises(RegistryError, match="not registered"):
             eng.remove_model(("User", semver.Version(9, 9, 9)))
 
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
-            [Registry[pendulum.Date](), [UserV20250310, UserV20251231]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_remove_model_referenced_by_migration_raises(
@@ -348,7 +349,7 @@ class TestModelManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -384,8 +385,8 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
-            [Registry[pendulum.Date](), [UserV20250310, UserV20251231]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_store_and_get_by_versionable_pair(
@@ -393,7 +394,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -412,7 +413,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_store_and_get_by_class_pair(
@@ -420,7 +421,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -436,7 +437,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_store_and_get_by_tuple_pair(
@@ -444,7 +445,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -467,7 +468,7 @@ class TestMigrationManagement:
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
     ) -> None:
-        eng = make_engine(Registry[semver.Version](), migration_settings)
+        eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
         v_user = envelope_model(model_adapter, versioning_settings, UserV1)
         v_addr = envelope_model(model_adapter, versioning_settings, AddressV1)
         eng.store_model(v_user)
@@ -479,7 +480,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_store_duplicate_raises(
@@ -487,7 +488,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -504,7 +505,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_get_missing_raises(
@@ -512,7 +513,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -528,7 +529,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_store_non_adjacent_without_bc_raises(
@@ -536,7 +537,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -552,7 +553,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_store_non_adjacent_with_bc_gap_ok(
@@ -560,7 +561,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -586,7 +587,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_store_non_adjacent_partial_bc_gap_raises(
@@ -594,7 +595,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         """Gap with one non-bc consecutive edge rejects the skip edge."""
@@ -616,7 +617,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_store_backward_adjacent_ok(
@@ -624,7 +625,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -643,7 +644,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_remove_non_critical_ok(
@@ -651,7 +652,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -676,7 +677,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_remove_critical_raises(
@@ -684,7 +685,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -701,7 +702,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_remove_critical_with_force(
@@ -709,7 +710,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -727,7 +728,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_remove_missing_raises(
@@ -735,7 +736,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -751,7 +752,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_remove_range_critical_raises(
@@ -759,7 +760,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -777,7 +778,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_remove_range_skips_gaps(
@@ -785,7 +786,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         """Range over consecutive pairs with no edges is a no-op."""
@@ -802,7 +803,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_delete_kind_removes_all(
@@ -810,7 +811,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -833,13 +834,13 @@ class TestMigrationManagement:
     def test_delete_unknown_kind_noop(
         self, migration_settings: MigrationSettings
     ) -> None:
-        eng = make_engine(Registry[semver.Version](), migration_settings)
+        eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
         eng.delete_kind("Nope")
 
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_add_and_remove_hook(
@@ -847,7 +848,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -869,7 +870,7 @@ class TestMigrationManagement:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
         ],
     )
     def test_clear_hooks(
@@ -877,7 +878,7 @@ class TestMigrationManagement:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -899,8 +900,11 @@ class TestLookupConvenience:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
-            [Registry[pendulum.Date](), [UserV20250310, UserV20251231, UserV20260228]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
+            [
+                Registry[pendulum.Date, BaseModel](),
+                [UserV20250310, UserV20251231, UserV20260228],
+            ],
         ],
     )
     def test_contains_model_key(
@@ -908,7 +912,7 @@ class TestLookupConvenience:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -925,8 +929,8 @@ class TestLookupConvenience:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
-            [Registry[pendulum.Date](), [UserV20250310, UserV20251231]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_contains_migration_edge(
@@ -934,7 +938,7 @@ class TestLookupConvenience:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -951,7 +955,7 @@ class TestLookupConvenience:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_contains_migration_path_slice(
@@ -959,7 +963,7 @@ class TestLookupConvenience:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -978,8 +982,8 @@ class TestLookupConvenience:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2]],
-            [Registry[pendulum.Date](), [UserV20250310, UserV20251231]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_getitem_migration_edge(
@@ -987,7 +991,7 @@ class TestLookupConvenience:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -1006,7 +1010,7 @@ class TestLookupConvenience:
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version](), [UserV1, UserV2, UserV3]],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_getitem_migration_path_slice(
@@ -1014,7 +1018,7 @@ class TestLookupConvenience:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
@@ -1046,7 +1050,7 @@ class TestEntryMigrationIntegration:
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
     ) -> None:
-        registry = Registry[semver.Version]()
+        registry = Registry[semver.Version, BaseModel]()
         versions = [
             envelope_model(model_adapter, versioning_settings, UserV1),
             envelope_model(model_adapter, versioning_settings, UserV2),

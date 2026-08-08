@@ -22,6 +22,7 @@ from .models import DiscoverySettings
 from .registry import Registry
 from .types import (
     Attachable,
+    ModelBase,
     ModelKind,
     TargetResolver,
     Versionable,
@@ -199,7 +200,7 @@ class GraphBuilder(Generic[VersionValue]):
 
     def __init__(
         self,
-        registry: Registry[VersionValue],
+        registry: Registry[VersionValue, ModelBase],
         settings: DiscoverySettings,
         walker: Walker,
     ) -> None:

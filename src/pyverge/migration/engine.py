@@ -1,9 +1,7 @@
 """Migrations manager."""
 
 import bisect
-from typing import Any, Generic, Self
-
-from pydantic import BaseModel
+from typing import Any, Generic, Self, cast
 
 from .diff import PydanticDiff
 from .exceptions import (
@@ -19,6 +17,7 @@ from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
 from .types import (
     Attachable,
+    Comparable,
     DirectionViolationStrategy,
     Executor,
     Migratable,
@@ -26,6 +25,7 @@ from .types import (
     MigrationFunc,
     MigrationKeyInput,
     ModelAdapter,
+    ModelBase,
     ModelData,
     ModelKind,
     ModelVersionKey,
@@ -34,7 +34,6 @@ from .types import (
     Versionable,
     VersionMissingStrategy,
     VersionValue,
-    VModel,
 )
 from .versioning import SentinelEdge, SentinelNode, VersionEdge
 
@@ -66,7 +65,7 @@ class Engine(Generic[VersionValue]):
 
     def __init__(
         self: Self,
-        registry: Registry[VersionValue],
+        registry: Registry[VersionValue, ModelBase],
         settings: MigrationSettings,
         default_executor: Executor,
         graph_builder: GraphBuilder[VersionValue],
@@ -92,25 +91,27 @@ class Engine(Generic[VersionValue]):
         self.adapter = adapter
         self.entry_migration = entry_migration or DefaultEntryMigration()
 
-    @staticmethod
     def _resolve_model_key(
-        key: Versionable[VersionValue, VModel] | ModelVersionKey | type[BaseModel],
-    ) -> SentinelNode[VersionValue] | type[BaseModel]:
-        """Normalize a model key to the registry's strict form."""
+        self: Self,
+        key: Comparable | ModelVersionKey | type[ModelBase],
+    ) -> SentinelNode[VersionValue]:
+        """Normalize a model key to the registry's strict sentinel form."""
         if isinstance(key, tuple):
-            return SentinelNode(*key)
+            kind, value = cast(ModelVersionKey, key)
+            return SentinelNode[VersionValue](kind, value)
         if isinstance(key, SentinelNode):
-            return key
-        if isinstance(key, type) and issubclass(key, BaseModel):
-            return key
-        return SentinelNode(key.kind, key.version[1])
+            return cast(SentinelNode[VersionValue], key)
+        if isinstance(key, type) and issubclass(key, ModelBase):
+            versionable = self.registry.get_model_by_class(key)
+            return SentinelNode[VersionValue](versionable.kind, versionable.version[1])
+        return SentinelNode[VersionValue](key.kind, key.version[1])
 
     def __contains__(self, index: Any) -> bool:
         """Check membership of a model version or migration edge."""
         if isinstance(index, slice):
             try:
-                from_v = self._resolve_model_key(index.start)
-                to_v = self._resolve_model_key(index.stop)
+                from_v = self.get_model(self._resolve_model_key(index.start))
+                to_v = self.get_model(self._resolve_model_key(index.stop))
                 self.find_migration_path(from_v, to_v)
                 return True
             except (MigrationError, ModelNotFoundError, RegistryError, TypeError):
@@ -132,8 +133,6 @@ class Engine(Generic[VersionValue]):
         """Check membership of a single model key."""
         try:
             resolved = self._resolve_model_key(index)
-            if isinstance(resolved, type):
-                return self.registry.get_model_by_class(resolved) is not None
             return self.registry.get_model(resolved) is not None
         except (ModelNotFoundError, TypeError):
             return False
@@ -151,8 +150,8 @@ class Engine(Generic[VersionValue]):
     def __getitem__(self, index: Any) -> MigrationFunc | list[MigrationFunc]:
         """Select a migration function or a path of functions."""
         if isinstance(index, slice):
-            from_v = self._resolve_model_key(index.start)
-            to_v = self._resolve_model_key(index.stop)
+            from_v = self.get_model(self._resolve_model_key(index.start))
+            to_v = self.get_model(self._resolve_model_key(index.stop))
             path = self.find_migration_path(from_v, to_v)
             return [
                 self.registry.get_migration_by_edge(
@@ -189,29 +188,27 @@ class Engine(Generic[VersionValue]):
 
     def store_model(
         self: Self,
-        version: Versionable[VersionValue, VModel],
+        version: Versionable[VersionValue, ModelBase],
     ) -> Versionable:
         """Register a model version in the registry."""
         return self.registry.store_model(version)
 
     def get_model(
         self: Self,
-        key: Versionable[VersionValue, VModel] | ModelVersionKey | type[VModel],
+        key: Comparable | ModelVersionKey | type[ModelBase],
     ) -> Versionable:
         """Return the model matching *key*."""
-        resolved = self._resolve_model_key(key)
-        if isinstance(resolved, type):
-            return self.registry.get_model_by_class(resolved)
-        return self.registry.get_model(resolved)
+        return self.registry.get_model(self._resolve_model_key(key))
 
     def remove_model(
         self: Self,
-        key: Versionable[VersionValue, VModel] | ModelVersionKey | type[VModel],
+        key: Comparable | ModelVersionKey | type[ModelBase],
     ) -> None:
         """Remove a model version from the registry."""
         if isinstance(key, tuple):
-            sentinel = SentinelNode(*key)
-        elif isinstance(key, type) and issubclass(key, BaseModel):
+            kind, value = cast(ModelVersionKey, key)
+            sentinel = SentinelNode[VersionValue](kind, value)
+        elif isinstance(key, type) and issubclass(key, ModelBase):
             sentinel = self.registry.get_model_by_class(key)
         else:
             sentinel = key
@@ -220,13 +217,13 @@ class Engine(Generic[VersionValue]):
     def model_latest(
         self: Self,
         kind: ModelKind,
-    ) -> Versionable[VersionValue, VModel]:
+    ) -> Versionable[VersionValue, ModelBase]:
         """Most recent version for *kind*."""
         return self.registry.latest(kind)
 
     def find_model(
         self: Self,
-        key: ModelVersionKey | type[BaseModel] | ModelKind,
+        key: ModelVersionKey | type[ModelBase] | ModelKind,
     ) -> Versionable | None:
         """Return the model matching *key*, or ``None`` if not found."""
         try:
@@ -481,7 +478,7 @@ class Engine(Generic[VersionValue]):
         target: TargetPolicy | None = None,
         *,
         target_resolver: TargetResolver | None = None,
-        container: type[BaseModel] | None = None,
+        container: type[ModelBase] | None = None,
         version_property: str | None = None,
         depth_limit: int | None = None,
         direction: MigrationDirectionStrategy | None = None,

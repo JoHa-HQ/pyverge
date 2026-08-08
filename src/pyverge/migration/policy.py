@@ -17,19 +17,21 @@ from .exceptions import ModelNotFoundError, RegistryError
 from .registry import Registry
 from .types import (
     ModelAdapter,
+    ModelBase,
     ModelKind,
     TargetPolicy,
     TargetResolver,
     TargetSpec,
     Versionable,
     VersionValue,
-    VModel,
+    VersionValue_co,
+    VModel_co,
 )
 from .versioning import SentinelNode
 
 
 def compile_target_resolver(
-    registry: Registry[VersionValue],
+    registry: Registry[VersionValue, ModelBase],
     policy: TargetPolicy | None,
     *,
     version_property: str = "version",
@@ -73,8 +75,8 @@ def compile_target_resolver(
 
         def resolve(
             kind: ModelKind,
-            current: Versionable[VersionValue, VModel],
-        ) -> Versionable[VersionValue, VModel] | None:
+            current: Versionable[VersionValue_co, VModel_co],
+        ) -> Versionable[VersionValue_co, VModel_co] | None:
             resolver = resolvers.get(kind, fallback)
             if resolver is None:
                 return None
@@ -88,7 +90,7 @@ def compile_target_resolver(
 
 
 def compile_target_spec(
-    registry: Registry[VersionValue],
+    registry: Registry[VersionValue, ModelBase],
     spec: TargetSpec,
     *,
     version_property: str,
@@ -122,37 +124,37 @@ def compile_target_spec(
 
 def _skip_resolver(
     _kind: ModelKind,
-    _current: Versionable[VersionValue, VModel],
-) -> Versionable[VersionValue, VModel] | None:
+    _current: Versionable[VersionValue_co, VModel_co],
+) -> Versionable[VersionValue_co, VModel_co] | None:
     return None
 
 
 def _latest_resolver(
-    registry: Registry[VersionValue],
+    registry: Registry[VersionValue, ModelBase],
 ) -> TargetResolver:
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue, VModel],
-    ) -> Versionable[VersionValue, VModel] | None:
+        _current: Versionable[VersionValue_co, VModel_co],
+    ) -> Versionable[VersionValue_co, VModel_co] | None:
         return registry.latest(kind)
 
     return resolve
 
 
 def _earliest_resolver(
-    registry: Registry[VersionValue],
+    registry: Registry[VersionValue, ModelBase],
 ) -> TargetResolver:
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue, VModel],
-    ) -> Versionable[VersionValue, VModel] | None:
+        _current: Versionable[VersionValue_co, VModel_co],
+    ) -> Versionable[VersionValue_co, VModel_co] | None:
         return registry.earliest(kind)
 
     return resolve
 
 
 def _model_resolver(
-    registry: Registry[VersionValue],
+    registry: Registry[VersionValue, ModelBase],
     model_cls: type[BaseModel],
     *,
     version_property: str,
@@ -167,8 +169,8 @@ def _model_resolver(
 
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue, VModel],
-    ) -> Versionable[VersionValue, VModel] | None:
+        _current: Versionable[VersionValue_co, VModel_co],
+    ) -> Versionable[VersionValue_co, VModel_co] | None:
         if kind != target.kind:
             raise RegistryError(
                 registry.name,
@@ -181,12 +183,12 @@ def _model_resolver(
 
 
 def _versionable_resolver(
-    target: Versionable[VersionValue, VModel],
+    target: Versionable[VersionValue_co, VModel_co],
 ) -> TargetResolver:
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue, VModel],
-    ) -> Versionable[VersionValue, VModel] | None:
+        _current: Versionable[VersionValue_co, VModel_co],
+    ) -> Versionable[VersionValue_co, VModel_co] | None:
         if kind != target.kind:
             raise RegistryError(
                 "target",
@@ -199,7 +201,7 @@ def _versionable_resolver(
 
 
 def _string_resolver(
-    registry: Registry[VersionValue],
+    registry: Registry[VersionValue, ModelBase],
     value: str,
     adapter: ModelAdapter,
 ) -> TargetResolver:
@@ -220,10 +222,10 @@ def _string_resolver(
 
     def resolve(
         kind: ModelKind,
-        _current: Versionable[VersionValue, VModel],
-    ) -> Versionable[VersionValue, VModel] | None:
-        sentinel: Versionable[VersionValue, VModel] = cast(
-            Versionable[VersionValue, VModel],
+        _current: Versionable[VersionValue_co, VModel_co],
+    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        sentinel: Versionable[VersionValue_co, VModel_co] = cast(
+            Versionable[VersionValue_co, VModel_co],
             SentinelNode(kind, parsed),
         )
         return registry.get_model(sentinel)

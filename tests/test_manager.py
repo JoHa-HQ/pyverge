@@ -73,7 +73,7 @@ class TestScoping:
         assert UserManager._adapter is adapter
 
     def test_explicit_engine_used_as_is(self) -> None:
-        registry = Registry[semver.Version]()
+        registry = Registry[semver.Version, UserBaseModel]()
         engine = make_engine(registry, MigrationSettings())
         UserManager = ModelManager[semver.Version].scoped(
             PydanticModelAdapter(), engine=engine
