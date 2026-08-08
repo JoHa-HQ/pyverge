@@ -103,9 +103,7 @@ class Engine(Generic[VersionValue]):
             return cast(SentinelNode[VersionValue], key)
         if isinstance(key, type) and issubclass(key, ModelBase):
             versionable = self.registry.get_model_by_class(key)
-            return SentinelNode[VersionValue](
-                versionable.kind, versionable.version[1]
-            )
+            return SentinelNode[VersionValue](versionable.kind, versionable.version[1])
         return SentinelNode[VersionValue](key.kind, key.version[1])
 
     def __contains__(self, index: Any) -> bool:
