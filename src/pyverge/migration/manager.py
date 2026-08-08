@@ -148,14 +148,9 @@ class _ModelDescriptor:
             | ModelProxy[VersionValue, VModel]
             | Callable[[type[VModel]], type[VModel]]
         ):
-            if (
-                len(args) == 1
-                and isinstance(args[0], type)
-                and issubclass(args[0], BaseModel)
-            ):
-                model_cls = args[0]
+            def wrapper(model_cls: type[VModel]) -> type[VModel]:
                 engine = owner._engine
-                proxy = ModelProxy[VersionValue, model_cls](
+                proxy = ModelProxy[VersionValue, VModel](
                     model_cls,
                     cast(
                         VersionValue,
@@ -166,13 +161,15 @@ class _ModelDescriptor:
                 engine.store_model(proxy())
                 return model_cls
 
+            if (
+                len(args) == 1
+                and isinstance(args[0], type)
+                and issubclass(args[0], BaseModel)
+            ):
+                return wrapper(args[0])
+
             if len(args) != 0:
                 raise TypeError("manager.model expects no args or a model class")
-
-            def wrapper(model_cls: type[VModel]) -> type[VModel]:
-                engine = owner._engine
-                engine.store_model(engine.adapter.versionable(model_cls))
-                return model_cls
 
             return wrapper
 
