@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 from typing import Literal
 
 import pytest
@@ -50,6 +51,57 @@ class TestManagersCommand:
         result = runner.invoke(app, ["managers"])
         assert result.exit_code == 0
         assert "No managers configured" in result.stdout
+
+
+class TestCheckCommand:
+    def test_check_valid_payload(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        _register_manager("e2e_pkg.check", _manager_with_model())
+        data_file = tmp_path / "payload.json"
+        data_file.write_text('{"name": "Alice"}')
+
+        result = runner.invoke(
+            app,
+            [
+                "check",
+                "--data",
+                str(data_file),
+                "--schema",
+                "User",
+                "--version",
+                "1.0.0",
+                "--manager",
+                "e2e_pkg.check:manager",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Valid" in result.stdout
+
+    def test_check_invalid_payload_exits_1(
+        self, runner: CliRunner, tmp_path: Path
+    ) -> None:
+        _register_manager("e2e_pkg.check", _manager_with_model())
+        data_file = tmp_path / "payload.json"
+        data_file.write_text('{}')
+
+        result = runner.invoke(
+            app,
+            [
+                "check",
+                "--data",
+                str(data_file),
+                "--schema",
+                "User",
+                "--version",
+                "1.0.0",
+                "--manager",
+                "e2e_pkg.check:manager",
+            ],
+        )
+
+        assert result.exit_code == 1
 
 
 class TestInfoCommand:

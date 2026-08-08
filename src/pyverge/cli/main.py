@@ -10,12 +10,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ._helpers import (
-    create_example_models_file,
-    create_multi_manager_config,
-    create_single_manager_config,
     load_json_file,
-    print_next_steps,
-    write_json_file,
 )
 from .config import (
     ConfigError,
@@ -48,7 +43,7 @@ ConfigOption = Annotated[
 
 
 @app.command()
-def validate(
+def check(
     data: Annotated[
         Path, typer.Option(..., "--data", "-d", help="Path to data file (JSON)")
     ],
@@ -59,7 +54,7 @@ def validate(
     manager: ManagerOption = "default",
     config: ConfigOption = None,
 ) -> None:
-    """Validate data against a schema version."""
+    """Check a payload against a schema version."""
     try:
         mgr = resolve_manager(manager, config)
         data_dict = load_json_file(data)
@@ -75,7 +70,7 @@ def validate(
         typer.secho("✗ Validation failed", fg=typer.colors.RED)
 
         try:
-            mgr.get(schema, version).cls.model_validate(data_dict)
+            mgr.get(schema, version).model.model_validate(data_dict)
         except ValidationError as e:
             typer.secho("\nValidation errors:", fg=typer.colors.RED)
             for error in e.errors():
@@ -100,67 +95,6 @@ def validate(
     except Exception as e:
         typer.secho(f"Validation error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
-
-
-@app.command()
-def migrate(  # noqa: PLR0913
-    data: Annotated[
-        Path, typer.Option(..., "--data", "-d", help="Path to data file (JSON)")
-    ],
-    schema: Annotated[str, typer.Option(..., "--schema", "-s", help="Schema name")],
-    from_version: Annotated[
-        str, typer.Option(..., "--from", "-f", help="Source version")
-    ],
-    to_version: Annotated[str, typer.Option(..., "--to", "-t", help="Target version")],
-    output: Annotated[
-        Path | None,
-        typer.Option(..., "--output", "-o", help="Output file (default: stdout)"),
-    ] = None,
-    manager: ManagerOption = "default",
-    config: ConfigOption = None,
-) -> None:
-    """Migrate data from one schema version to another."""
-    try:
-        mgr = resolve_manager(manager, config)
-        data_dict = load_json_file(data)
-
-        migrated = mgr.migrate(data_dict, schema, from_version, to_version)
-
-        if output:
-            write_json_file(output, migrated.model_dump())
-            typer.secho(
-                f"✓ Migrated {schema} v{from_version} → v{to_version}",
-                fg=typer.colors.GREEN,
-            )
-            if manager != "default":
-                typer.echo(f"Using manager: {manager}")
-            typer.secho(f"Output written to: {output}", dim=True)
-        else:
-            typer.echo(json.dumps(migrated.model_dump(), indent=2))
-
-        raise typer.Exit(0)
-
-    except ConfigError as e:
-        typer.secho(str(e), fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except FileNotFoundError as e:
-        typer.secho(f"File not found: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except json.JSONDecodeError as e:
-        typer.secho(f"Invalid JSON in {data}: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except ValidationError as e:
-        typer.secho("Migration validation failed:", fg=typer.colors.RED)
-        for error in e.errors():
-            field = ".".join(str(loc) for loc in error["loc"])
-            typer.echo(f"  • {field}: {error['msg']}")
-        raise typer.Exit(1) from e
-    except typer.Exit:
-        raise
-    except Exception as e:
-        typer.secho(f"Migration error: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-
 
 @app.command()
 def managers(
@@ -265,93 +199,6 @@ def diff(  # noqa: PLR0913
     except Exception as e:
         typer.secho(f"Diff error: {e}", fg=typer.colors.RED)
         raise typer.Exit(1) from e
-
-
-@app.command()
-def export(
-    output: Annotated[
-        Path, typer.Option(..., "--output", "-o", help="Output directory")
-    ],
-    manager: ManagerOption = "default",
-    config: ConfigOption = None,
-) -> None:
-    """Export JSON Schema definitions.
-
-    Example:
-        pyverge export -o ./schemas
-    """
-    try:
-        mgr = resolve_manager(manager, config)
-        output.mkdir(parents=True, exist_ok=True)
-        mgr.dump_schemas(output)
-        typer.secho(
-            f"✓ Exported JSON Schema schemas to {output}/",
-            fg=typer.colors.GREEN,
-        )
-    except ConfigError as e:
-        typer.secho(str(e), fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except typer.Exit:
-        raise
-    except Exception as e:
-        typer.secho(f"Export error: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-
-
-@app.command()
-def init(
-    project_dir: Annotated[
-        Path,
-        typer.Argument(
-            ...,
-            help="Project directory",
-            default_factory=lambda: Path.cwd(),  # noqa: PLW0108
-        ),
-    ],
-    use_pyproject: Annotated[
-        bool,
-        typer.Option(
-            ...,
-            "--pyproject",
-            help="Use pyproject.toml instead of pyverge.toml",
-        ),
-    ] = False,
-    multiple: Annotated[
-        bool,
-        typer.Option(
-            ...,
-            "--multiple",
-            help="Create config for multiple managers",
-        ),
-    ] = False,
-) -> None:
-    """Initialize a pyverge project with example configuration."""
-    try:
-        project_dir = Path(project_dir)
-        project_dir.mkdir(parents=True, exist_ok=True)
-
-        create_example_models_file(project_dir / "models.py")
-
-        if multiple:
-            create_multi_manager_config(project_dir, use_pyproject)
-        else:
-            create_single_manager_config(project_dir, use_pyproject)
-
-        typer.secho("\n✓ Project initialized!", fg=typer.colors.GREEN)
-        print_next_steps(multiple)
-
-    except PermissionError as e:
-        typer.secho(f"Permission denied: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except OSError as e:
-        typer.secho(f"Failed to create project: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-    except typer.Exit:
-        raise
-    except Exception as e:
-        typer.secho(f"Initialization error: {e}", fg=typer.colors.RED)
-        raise typer.Exit(1) from e
-
 
 if __name__ == "__main__":
     app()

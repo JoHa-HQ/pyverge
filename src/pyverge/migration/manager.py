@@ -33,7 +33,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar, Generic, cast, overload
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .diff import PydanticDiff
 from .engine import Engine
@@ -504,6 +504,25 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     def list_versions(self) -> list[Versionable[VersionValue, VModel]]:
         """Return all registered versions as ``Versionable`` objects."""
         return self.registry.versions
+
+    def get(
+        self, kind: ModelKind, version: str
+    ) -> Versionable[VersionValue, VModel]:
+        """Return the registered versionable for ``kind``@``version``."""
+        return self.get_model(
+            (kind, cast(VersionValue, self.engine.adapter.of(version)))
+        )
+
+    def validate_data(
+        self, data: ModelData, kind: ModelKind, version: str
+    ) -> bool:
+        """Return ``True`` when *data* validates against ``kind``@``version``."""
+        versionable = self.get(kind, version)
+        try:
+            self.engine.adapter.validate(data, versionable.model)
+            return True
+        except ValidationError:
+            return False
 
     def diff(
         self,
