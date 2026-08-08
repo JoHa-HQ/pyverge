@@ -94,18 +94,21 @@ class Engine(Generic[VersionValue]):
         self.adapter = adapter
         self.entry_migration = entry_migration or DefaultEntryMigration()
 
-    @staticmethod
     def _resolve_model_key(
+        self: Self,
         key: Comparable | ModelVersionKey | type[BaseModel],
-    ) -> SentinelNode[VersionValue] | type[BaseModel]:
-        """Normalize a model key to the registry's strict form."""
+    ) -> SentinelNode[VersionValue]:
+        """Normalize a model key to the registry's strict sentinel form."""
         if isinstance(key, tuple):
             kind, value = cast(ModelVersionKey, key)
             return SentinelNode[VersionValue](kind, value)
         if isinstance(key, SentinelNode):
             return cast(SentinelNode[VersionValue], key)
         if isinstance(key, type) and issubclass(key, BaseModel):
-            return key
+            versionable = self.registry.get_model_by_class(key)
+            return SentinelNode[VersionValue](
+                versionable.kind, versionable.version[1]
+            )
         return SentinelNode[VersionValue](key.kind, key.version[1])
 
     def __contains__(self, index: Any) -> bool:
@@ -135,8 +138,6 @@ class Engine(Generic[VersionValue]):
         """Check membership of a single model key."""
         try:
             resolved = self._resolve_model_key(index)
-            if isinstance(resolved, type):
-                return self.registry.get_model_by_class(resolved) is not None
             return self.registry.get_model(resolved) is not None
         except (ModelNotFoundError, TypeError):
             return False
@@ -202,10 +203,7 @@ class Engine(Generic[VersionValue]):
         key: Comparable | ModelVersionKey | type[VModel],
     ) -> Versionable:
         """Return the model matching *key*."""
-        resolved = self._resolve_model_key(key)
-        if isinstance(resolved, type):
-            return self.registry.get_model_by_class(resolved)
-        return self.registry.get_model(resolved)
+        return self.registry.get_model(self._resolve_model_key(key))
 
     def remove_model(
         self: Self,
