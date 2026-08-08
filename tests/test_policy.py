@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 import semver
+from pydantic import BaseModel
 
 from pyverge.migration import (
     DiscoverySettings,
@@ -41,8 +42,8 @@ def settings() -> DiscoverySettings:
 def populated_registry(
     adapter: PydanticModelAdapter,
     settings: DiscoverySettings,
-) -> Registry[semver.Version]:
-    registry = Registry[semver.Version]()
+) -> Registry[semver.Version, BaseModel]:
+    registry = Registry[semver.Version, BaseModel]()
     register_models(
         adapter,
         registry,
@@ -61,7 +62,7 @@ class TestCompileTargetSpec:
 
     def test_skip_returns_none(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -73,7 +74,7 @@ class TestCompileTargetSpec:
 
     def test_latest_returns_highest_version(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -87,7 +88,7 @@ class TestCompileTargetSpec:
 
     def test_earliest_returns_lowest_version(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -101,7 +102,7 @@ class TestCompileTargetSpec:
 
     def test_none_defaults_to_skip(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -113,7 +114,7 @@ class TestCompileTargetSpec:
 
     def test_model_class_resolves_to_registered_versionable(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -127,7 +128,7 @@ class TestCompileTargetSpec:
 
     def test_versionable_target_used_as_is(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -143,7 +144,7 @@ class TestCompileTargetSpec:
 
     def test_unsupported_spec_raises(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
     ) -> None:
         with pytest.raises(RegistryError):
@@ -156,7 +157,7 @@ class TestCompileTargetSpec:
 
     def test_model_class_wrong_kind_raises(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -173,7 +174,7 @@ class TestCompileTargetResolver:
 
     def test_global_latest(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -187,7 +188,7 @@ class TestCompileTargetResolver:
 
     def test_global_earliest(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -201,7 +202,7 @@ class TestCompileTargetResolver:
 
     def test_global_skip(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -211,7 +212,7 @@ class TestCompileTargetResolver:
 
     def test_per_kind_override_with_wildcard(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -233,7 +234,7 @@ class TestCompileTargetResolver:
 
     def test_per_kind_pinned_version_string(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -252,7 +253,7 @@ class TestCompileTargetResolver:
 
     def test_pinned_unregistered_version_raises(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -265,7 +266,7 @@ class TestCompileTargetResolver:
 
     def test_per_kind_unknown_kind_uses_wildcard(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -281,7 +282,7 @@ class TestCompileTargetResolver:
 
     def test_per_kind_unknown_kind_without_wildcard_returns_none(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -292,7 +293,7 @@ class TestCompileTargetResolver:
 
     def test_settings_default_strategy(
         self,
-        populated_registry: Registry[semver.Version],
+        populated_registry: Registry[semver.Version, BaseModel],
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
@@ -316,6 +317,6 @@ class TestCompileTargetResolver:
         adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
     ) -> None:
-        registry = Registry[semver.Version]()
+        registry = Registry[semver.Version, BaseModel]()
         with pytest.raises(RegistryError):
             compile_target_resolver(registry, PersonV2, adapter=adapter)

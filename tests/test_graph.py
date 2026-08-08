@@ -38,7 +38,7 @@ from tests.utils import (
 
 
 def _latest_resolver(
-    registry: Registry[types.VersionValue],
+    registry: Registry[types.VersionValue, BaseModel],
 ) -> types.TargetResolver:
     def resolve(kind: types.ModelKind, current: types.Versionable) -> types.Versionable:
         return registry.latest(kind)
@@ -110,7 +110,7 @@ class TestMigrationGraph:
         "registry, models, payload",
         [
             (
-                Registry[semver.Version](),
+                Registry[semver.Version, BaseModel](),
                 [PersonV1, PersonV2, AddressV1, ContactV1],
                 {
                     "document": {
@@ -139,7 +139,7 @@ class TestMigrationGraph:
                 },
             ),
             (
-                Registry[pendulum.Date](),
+                Registry[pendulum.Date, BaseModel](),
                 [UserV20250310, UserV20251231, AddressV20240101, ContactV20240101],
                 {
                     "document": {
@@ -177,7 +177,7 @@ class TestMigrationGraph:
         self,
         model_adapter: PydanticModelAdapter,
         discovery_settings: DiscoverySettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
         payload: dict,
     ) -> None:
@@ -204,7 +204,7 @@ class TestMigrationGraph:
         "registry, models, payload",
         [
             (
-                Registry[semver.Version](),
+                Registry[semver.Version, BaseModel](),
                 [PersonV1, AddressV1, ContactV1],
                 {
                     "document": {
@@ -233,7 +233,7 @@ class TestMigrationGraph:
         self,
         model_adapter: PydanticModelAdapter,
         discovery_settings: DiscoverySettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
         payload: dict,
     ) -> None:
@@ -260,7 +260,7 @@ class TestMigrationGraph:
         "registry, models, payload, expected_roots",
         [
             (
-                Registry[semver.Version](),
+                Registry[semver.Version, BaseModel](),
                 [PersonV1, AddressV1],
                 {
                     "person": {"kind": "Person", "version": "1.0.0", "name": "Alice"},
@@ -279,7 +279,7 @@ class TestMigrationGraph:
         self,
         model_adapter: PydanticModelAdapter,
         discovery_settings: DiscoverySettings,
-        registry: Registry[types.VersionValue],
+        registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
         payload: dict[str, dict],
         expected_roots: set[tuple[str]],
@@ -299,7 +299,7 @@ class TestMigrationGraph:
         "registry, models, payload, entry_lookup, kind",
         [
             (
-                Registry[semver.Version](),
+                Registry[semver.Version, BaseModel](),
                 [PersonV1, AddressV1],
                 {
                     "document": {
@@ -347,7 +347,7 @@ class TestMigrationGraph:
         "registry, models, payload, entry_lookup",
         [
             (
-                Registry[semver.Version](),
+                Registry[semver.Version, BaseModel](),
                 [PersonV1, AddressV1],
                 {
                     "document": {
@@ -427,7 +427,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: Registry[semver.Version],
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(model_adapter, registry, settings, PersonV1, PersonV2)
 
@@ -452,7 +452,7 @@ class TestGraphBuilder:
         self,
         model_adapter: PydanticModelAdapter,
         settings: DiscoverySettings,
-        registry: Registry[semver.Version],
+        registry: Registry[semver.Version, BaseModel],
     ) -> None:
         register_models(model_adapter, registry, settings, PersonV1, PersonV2)
 
