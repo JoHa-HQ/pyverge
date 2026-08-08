@@ -169,7 +169,7 @@ class TestDefaultEntryMigration:
             hooks=entry.hooks,
             target_model=PersonV2,
         )
-        adapter.finalize = MagicMock(return_value={"version": "2.0.0", "name": "Alice"})
+        adapter.finalize = MagicMock(return_value={"version": "2.0.0", "name": "Alice"})  # ty: ignore
         strategy = DefaultEntryMigration()
 
         strategy.migrate(
@@ -183,7 +183,7 @@ class TestDefaultEntryMigration:
             on_missing_path="raise",
         ).run()
 
-        adapter.finalize.assert_called_once_with(PersonV2, {"version": "2.0.0"})
+        adapter.finalize.assert_called_once_with(PersonV2, {"version": "2.0.0"})  # ty: ignore
 
     def test_skips_on_missing_migration(
         self,

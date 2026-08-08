@@ -16,6 +16,7 @@ from .policy import compile_target_resolver
 from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
 from .types import (
+    MIGRATION_PAIR_LEN,
     Attachable,
     Comparable,
     DirectionViolationStrategy,
@@ -38,7 +39,6 @@ from .types import (
 from .versioning import SentinelEdge, SentinelNode, VersionEdge
 
 # Expected length for an endpoint-pair tuple such as ``(Versionable, Versionable)``.
-_MIGRATION_PAIR_LEN: int = 2
 
 
 class Engine(Generic[VersionValue]):
@@ -143,7 +143,7 @@ class Engine(Generic[VersionValue]):
             return True
         return (
             isinstance(index, tuple)
-            and len(index) == _MIGRATION_PAIR_LEN
+            and len(index) == MIGRATION_PAIR_LEN
             and not isinstance(index[0], str)
         )
 

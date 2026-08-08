@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 import pendulum
 import pytest
 import semver
@@ -140,4 +142,6 @@ def semver_engine(
 def date_engine(
     date_registry: Registry, migration_settings: MigrationSettings
 ) -> Engine[pendulum.DateTime]:
-    return make_engine(date_registry, migration_settings)
+    return cast(
+        Engine[pendulum.DateTime], make_engine(date_registry, migration_settings)
+    )
