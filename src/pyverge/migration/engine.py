@@ -34,7 +34,6 @@ from .types import (
     Versionable,
     VersionMissingStrategy,
     VersionValue,
-    VModel,
 )
 from .versioning import SentinelEdge, SentinelNode, VersionEdge
 
@@ -191,21 +190,21 @@ class Engine(Generic[VersionValue]):
 
     def store_model(
         self: Self,
-        version: Versionable[VersionValue, VModel],
+        version: Versionable[VersionValue, ModelBase],
     ) -> Versionable:
         """Register a model version in the registry."""
         return self.registry.store_model(version)
 
     def get_model(
         self: Self,
-        key: Comparable | ModelVersionKey | type[VModel],
+        key: Comparable | ModelVersionKey | type[ModelBase],
     ) -> Versionable:
         """Return the model matching *key*."""
         return self.registry.get_model(self._resolve_model_key(key))
 
     def remove_model(
         self: Self,
-        key: Comparable | ModelVersionKey | type[VModel],
+        key: Comparable | ModelVersionKey | type[ModelBase],
     ) -> None:
         """Remove a model version from the registry."""
         if isinstance(key, tuple):
@@ -220,7 +219,7 @@ class Engine(Generic[VersionValue]):
     def model_latest(
         self: Self,
         kind: ModelKind,
-    ) -> Versionable[VersionValue, VModel]:
+    ) -> Versionable[VersionValue, ModelBase]:
         """Most recent version for *kind*."""
         return self.registry.latest(kind)
 
