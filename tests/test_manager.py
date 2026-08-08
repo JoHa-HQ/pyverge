@@ -29,7 +29,7 @@ from pyverge.migration import (
     Registry,
     RegistryError,
 )
-from tests.examples.pydantic.base import BaseModel, UserBaseModel
+from tests.examples.pydantic.base import UserBaseModel
 from tests.examples.pydantic.chrono import (
     UserV20250310,
     UserV20251231,
