@@ -21,21 +21,21 @@ from .types import (
     Migratable,
     MigrationFunc,
     ModelKind,
-    ProviderBase_co,
+    ProviderBase,
     Transitional,
     Versionable,
-    VersionValue_co,
+    VersionValue,
     VSource_co,
     VTarget_co,
 )
 from .versioning import SentinelEdge
 
 
-class Registry(Generic[VersionValue_co, ProviderBase_co]):
+class Registry(Generic[VersionValue, ProviderBase]):
     """Ordered storage for versioned models, migrations, and hooks.
 
-    Parameterized by the version strategy (``VersionValue_co``) and the model
-    provider base (``ProviderBase_co``) it stores.  ``ProviderBase_co`` is the
+    Parameterized by the version strategy (``VersionValue``) and the model
+    provider base (``ProviderBase``) it stores.  ``ProviderBase`` is the
     provider's shared base (e.g. ``pydantic.BaseModel``); the registry
     binds version literals to concrete model classes via ``Versionable``.
     """
@@ -79,12 +79,12 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
             Per-edge lists of observer hooks fired during migration.
         """
         self._name = name or "registry"
-        self._by_versions: list[Versionable[VersionValue_co, ProviderBase_co]] = []
+        self._by_versions: list[Versionable[VersionValue, ProviderBase]] = []
         self._by_kinds: dict[
-            ModelKind, list[Versionable[VersionValue_co, ProviderBase_co]]
+            ModelKind, list[Versionable[VersionValue, ProviderBase]]
         ] = defaultdict(list)
         self._by_models: dict[
-            type[ProviderBase_co], Versionable[VersionValue_co, ProviderBase_co]
+            type[ProviderBase], Versionable[VersionValue, ProviderBase]
         ] = {}
         self._migrations: dict[ModelKind, list[Migratable]] = defaultdict(list)
         self._edges_by_version: dict[Comparable, set[Migratable]] = defaultdict(set)
@@ -97,7 +97,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
                 return self.get_model(index) is not None
             elif isinstance(index, type) and issubclass(index, BaseModel):
                 return (
-                    self.get_model_by_class(cast(type[ProviderBase_co], index))
+                    self.get_model_by_class(cast(type[ProviderBase], index))
                     is not None
                 )
             elif isinstance(index, Transitional):
@@ -109,21 +109,21 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
     def __getitem__(
         self, index: LookupKey
     ) -> (
-        Versionable[VersionValue_co, ProviderBase_co]
-        | Migratable[VersionValue_co, VSource_co, VTarget_co]
+        Versionable[VersionValue, ProviderBase]
+        | Migratable[VersionValue, VSource_co, VTarget_co]
     ):
         """Lookup by version, model class, or migration edge."""
 
         if isinstance(index, Versionable):
             return self.get_model(index)
         elif isinstance(index, type) and issubclass(index, BaseModel):
-            return self.get_model_by_class(cast(type[ProviderBase_co], index))
+            return self.get_model_by_class(cast(type[ProviderBase], index))
         elif isinstance(index, Transitional):
             return self.get_migration(index)
         raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
 
     @property
-    def versions(self: Self) -> list[Versionable[VersionValue_co, ProviderBase_co]]:
+    def versions(self: Self) -> list[Versionable[VersionValue, ProviderBase]]:
         """Registered versions in ascending order."""
         return self._by_versions
 
@@ -138,14 +138,14 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
         return list(self._migrations.keys())
 
     @property
-    def latest_version(self) -> Versionable[VersionValue_co, ProviderBase_co]:
+    def latest_version(self) -> Versionable[VersionValue, ProviderBase]:
         """The most recently registered version overall."""
         if not self._by_versions:
             raise RegistryError(self._name, "No versions registered")
         return self._by_versions[-1]
 
     def is_adjacent(
-        self, key: Transitional[VersionValue_co, VSource_co, VTarget_co]
+        self, key: Transitional[VersionValue, VSource_co, VTarget_co]
     ) -> bool:
         """True if *key* connects two neighbours in the kind's version list."""
         kind_versions = self._by_kinds[key.kind]
@@ -153,13 +153,13 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
         to_idx = bisect.bisect_left(kind_versions, key.target)
         return abs(from_idx - to_idx) == 1
 
-    def models(self: Self, kind: ModelKind | None) -> frozenset[type[ProviderBase_co]]:
+    def models(self: Self, kind: ModelKind | None) -> frozenset[type[ProviderBase]]:
         """Registered Pydantic model classes."""
         if kind is None:
-            return frozenset[type[ProviderBase_co]](
+            return frozenset[type[ProviderBase]](
                 [v.model for v in self._by_models.values()]
             )
-        return frozenset[type[ProviderBase_co]](
+        return frozenset[type[ProviderBase]](
             [v.model for v in self._by_kinds.get(kind, [])]
         )
 
@@ -178,7 +178,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def kind_versions(
         self: Self, kind: ModelKind
-    ) -> list[Versionable[VersionValue_co, ProviderBase_co]]:
+    ) -> list[Versionable[VersionValue, ProviderBase]]:
         """Registered versions for *kind*, ascending.  Empty if unknown."""
         return list(self._by_kinds.get(kind, []))
 
@@ -205,7 +205,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
         raise MigrationNotFoundError(self._name, pair)
 
     def has_migration(
-        self: Self, key: Transitional[VersionValue_co, VSource_co, VTarget_co]
+        self: Self, key: Transitional[VersionValue, VSource_co, VTarget_co]
     ) -> bool:
         """True if an edge exactly matching *key* is registered."""
         try:
@@ -215,20 +215,20 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
             return False
 
     def get_migration_by_edge(
-        self: Self, key: Transitional[VersionValue_co, VSource_co, VTarget_co]
+        self: Self, key: Transitional[VersionValue, VSource_co, VTarget_co]
     ) -> Migratable:
         """Return the edge exactly matching *key*."""
         return self._find_edge(key.kind, key.edge)
 
     def has_hooks(
-        self: Self, key: Transitional[VersionValue_co, VSource_co, VTarget_co]
+        self: Self, key: Transitional[VersionValue, VSource_co, VTarget_co]
     ) -> bool:
         """True if *key* has registered hooks."""
         return key in self._hooks
 
     def latest(
         self: Self, kind: ModelKind
-    ) -> Versionable[VersionValue_co, ProviderBase_co]:
+    ) -> Versionable[VersionValue, ProviderBase]:
         """Most recent (highest) registered version for *kind*."""
         if kind not in self._by_kinds:
             raise RegistryError(self._name, "No versions registered")
@@ -236,7 +236,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def earliest(
         self: Self, kind: ModelKind
-    ) -> Versionable[VersionValue_co, ProviderBase_co]:
+    ) -> Versionable[VersionValue, ProviderBase]:
         """Oldest (lowest) registered version for *kind*."""
         if kind not in self._by_kinds:
             raise RegistryError(self._name, "No versions registered")
@@ -250,9 +250,11 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def copy(
         self: Self, name: str | None = None
-    ) -> "Registry[VersionValue_co, ProviderBase_co]":
+    ) -> "Registry[VersionValue, ProviderBase]":
         """Return an independent shallow copy."""
-        new = Registry(name=name)
+        new = cast(
+            "Registry[VersionValue, ProviderBase]", Registry(name=name)
+        )
         new._by_versions = list(self._by_versions)
         new._by_kinds = defaultdict(
             list, {k: list(v) for k, v in self._by_kinds.items()}
@@ -269,8 +271,8 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def store_model(
         self: Self,
-        version: Versionable[VersionValue_co, ProviderBase_co],
-    ) -> Versionable[VersionValue_co, ProviderBase_co]:
+        version: Versionable[VersionValue, ProviderBase],
+    ) -> Versionable[VersionValue, ProviderBase]:
         """Register a model class at *version*."""
         if version in self._by_versions:
             raise ModelAlreadyRegisteredError(
@@ -285,7 +287,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
     def get_model(
         self: Self,
         key: Comparable,
-    ) -> Versionable[VersionValue_co, ProviderBase_co]:
+    ) -> Versionable[VersionValue, ProviderBase]:
         """Return the model matching *key*."""
         idx = bisect.bisect_left(self._by_versions, key)
         if idx < len(self._by_versions) and (model := self._by_versions[idx]) == key:
@@ -293,8 +295,8 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
         raise ModelNotFoundError(self._name, key.version)
 
     def get_model_by_class(
-        self: Self, cls: type[ProviderBase_co]
-    ) -> Versionable[VersionValue_co, ProviderBase_co]:
+        self: Self, cls: type[ProviderBase]
+    ) -> Versionable[VersionValue, ProviderBase]:
         """Return the model matching *cls*."""
         if target := self._by_models.get(cls):
             return target
@@ -329,7 +331,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
         del self._by_models[version.model]
         del self._by_versions[version_idx]
 
-    def remove_model_by_class(self: Self, cls: type[ProviderBase_co]) -> None:
+    def remove_model_by_class(self: Self, cls: type[ProviderBase]) -> None:
         """Remove a model by its class."""
         if cls not in self._by_models:
             raise ModelNotFoundError(self._name, cls)
@@ -345,7 +347,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def store_migration(
         self: Self,
-        key: Migratable[VersionValue_co, VSource_co, VTarget_co],
+        key: Migratable[VersionValue, VSource_co, VTarget_co],
     ) -> MigrationFunc:
         """Register a migration function between two versions."""
         if any(v not in self._by_versions for v in key.edge):
@@ -363,7 +365,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def get_migration(
         self,
-        key: Transitional[VersionValue_co, VSource_co, VTarget_co],
+        key: Transitional[VersionValue, VSource_co, VTarget_co],
     ) -> Migratable:
         """Return the migration for *key*."""
         if key.kind not in self._migrations:
@@ -381,7 +383,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def remove_migration(
         self: Self,
-        key: Transitional[VersionValue_co, VSource_co, VTarget_co],
+        key: Transitional[VersionValue, VSource_co, VTarget_co],
     ) -> None:
         """Remove a single migration.
 
@@ -419,7 +421,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def add_hook(
         self: Self,
-        key: Transitional[VersionValue_co, VSource_co, VTarget_co],
+        key: Transitional[VersionValue, VSource_co, VTarget_co],
         hook: Attachable,
     ) -> None:
         """Register a hook for a migration step."""
@@ -427,7 +429,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def get_hooks(
         self: Self,
-        key: Transitional[VersionValue_co, VSource_co, VTarget_co],
+        key: Transitional[VersionValue, VSource_co, VTarget_co],
     ) -> list[Attachable]:
         """Return hooks registered for a migration step.
 
@@ -439,7 +441,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def remove_hook(
         self: Self,
-        key: Transitional[VersionValue_co, VSource_co, VTarget_co],
+        key: Transitional[VersionValue, VSource_co, VTarget_co],
         hook: Attachable | None = None,
     ) -> None:
         """Remove hooks for a migration step."""
@@ -457,7 +459,7 @@ class Registry(Generic[VersionValue_co, ProviderBase_co]):
 
     def clear_hooks(
         self: Self,
-        key: Transitional[VersionValue_co, VSource_co, VTarget_co] | None = None,
+        key: Transitional[VersionValue, VSource_co, VTarget_co] | None = None,
     ) -> None:
         """Clear hooks from the registry."""
         if key is None:

@@ -41,6 +41,9 @@ VModel_co = TypeVar("VModel_co", bound=ModelBase, covariant=True)
 ProviderBase_co = TypeVar(
     "ProviderBase_co", bound=ModelBase, covariant=True, default=ModelBase
 )
+# Invariant — Registry is mutable (store/remove), so its type params must be
+# invariant even though the protocol-facing covariant variants exist above.
+ProviderBase = TypeVar("ProviderBase", bound=ModelBase, default=ModelBase)
 Renderable_co = TypeVar("Renderable_co", covariant=True)
 Container_co = TypeVar("Container_co", bound=BaseModel, covariant=True)
 
