@@ -59,28 +59,20 @@ def check(
         mgr = resolve_manager(manager, config)
         data_dict = load_json_file(data)
 
-        is_valid = mgr.validate_data(data_dict, schema, version)
+        mgr.validate_data(data_dict, schema, version)
 
-        if is_valid:
-            typer.secho(f"✓ Valid against {schema} v{version}", fg=typer.colors.GREEN)
-            if manager != "default":
-                typer.echo(f"Using manager: {manager}")
-            raise typer.Exit(0)
+        typer.secho(f"✓ Valid against {schema} v{version}", fg=typer.colors.GREEN)
+        if manager != "default":
+            typer.echo(f"Using manager: {manager}")
+        raise typer.Exit(0)
 
+    except ValidationError as e:
         typer.secho("✗ Validation failed", fg=typer.colors.RED)
-
-        try:
-            mgr.get(schema, version).model.model_validate(data_dict)
-        except ValidationError as e:
-            typer.secho("\nValidation errors:", fg=typer.colors.RED)
-            for error in e.errors():
-                field = ".".join(str(loc) for loc in error["loc"])
-                typer.echo(f"  • {field}: {error['msg']}")
-        except Exception as e:
-            typer.echo(f"\n{e}")
-
-        raise typer.Exit(1)
-
+        typer.secho("\nValidation errors:", fg=typer.colors.RED)
+        for error in e.errors():
+            field = ".".join(str(loc) for loc in error["loc"])
+            typer.echo(f"  • {field}: {error['msg']}")
+        raise typer.Exit(1) from e
     except ConfigError as e:
         typer.secho(str(e), fg=typer.colors.RED)
         raise typer.Exit(1) from e

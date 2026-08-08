@@ -33,7 +33,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, ClassVar, Generic, cast, overload
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from .diff import PydanticDiff
 from .engine import Engine
@@ -515,14 +515,13 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
 
     def validate_data(
         self, data: ModelData, kind: ModelKind, version: str
-    ) -> bool:
-        """Return ``True`` when *data* validates against ``kind``@``version``."""
+    ) -> None:
+        """Validate *data* against ``kind``@``version``.
+
+        Raises :class:`ValidationError` when the payload is invalid.
+        """
         versionable = self.get(kind, version)
-        try:
-            self.engine.adapter.validate(data, versionable.model)
-            return True
-        except ValidationError:
-            return False
+        self.engine.adapter.validate(data, versionable.model)
 
     def diff(
         self,
