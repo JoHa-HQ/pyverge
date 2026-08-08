@@ -30,18 +30,17 @@ VModel = TypeVar("VModel", bound=BaseModel)
 # Invariant — SemVer and Date are parallel strategies, so the components get separated
 VersionValue = TypeVar("VersionValue", SemVer, Date)
 
+ProviderBase = TypeVar("ProviderBase", bound=ModelBase)
+
 # TypeVar for migration source and target models
 VSource_co = TypeVar("VSource_co", bound=BaseModel, covariant=True)
 VTarget_co = TypeVar("VTarget_co", bound=BaseModel, covariant=True)
-
 # Covariant — used in protocols where VModel is output-only
 VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
 VModel_co = TypeVar("VModel_co", bound=ModelBase, covariant=True)
-
-ProviderBase_co = TypeVar("ProviderBase_co", bound=ModelBase, covariant=True)
 # Invariant — Registry is mutable (store/remove), so its type params must be
 # invariant even though the protocol-facing covariant variants exist above.
-ProviderBase = TypeVar("ProviderBase", bound=ModelBase)
+ProviderBase_co = TypeVar("ProviderBase_co", bound=ModelBase, covariant=True)
 Renderable_co = TypeVar("Renderable_co", covariant=True)
 Container_co = TypeVar("Container_co", bound=BaseModel, covariant=True)
 
