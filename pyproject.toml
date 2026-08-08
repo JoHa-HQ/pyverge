@@ -29,14 +29,12 @@ dependencies = [
   "pydantic[email,timezone]>=2.11",
   "pydantic-extra-types[phonenumbers]>=2.9",
   "semver>=3.0",
-  "pendulum>=3.2.0"
-]
-
-[project.optional-dependencies]
-telemetry = [
+  "pendulum>=3.2.0",
   "opentelemetry-distro[telemetry]>=0.65b0",
   "opentelemetry-exporter-otlp[telemetry]>=1.44.0"
 ]
+
+[project.optional-dependencies]
 cli = [
   "typer>=0.21",
   "rich>=13"
