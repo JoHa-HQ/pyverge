@@ -286,7 +286,7 @@ class TestMigrationGraph:
     ) -> None:
         register_models(model_adapter, registry, discovery_settings, *models)
 
-        builder = default_graph_builder(registry, discovery_settings)
+        builder = default_graph_builder(registry, discovery_settings, model_adapter)
         graph = builder.build(
             payload,
             target_resolver=_latest_resolver(registry),
@@ -412,7 +412,7 @@ class TestGraphBuilder:
     ) -> None:
         register_models(model_adapter, registry, settings, PersonV1)
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(payload, target_resolver=_latest_resolver(registry))
 
         assert len(graph) == 0, f"{label} should not produce entries"
@@ -431,7 +431,7 @@ class TestGraphBuilder:
     ) -> None:
         register_models(model_adapter, registry, settings, PersonV1, PersonV2)
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {"kind": "Person", "version": "1.0.0", "name": "Alice"},
             target_resolver=_latest_resolver(registry),
@@ -456,7 +456,7 @@ class TestGraphBuilder:
     ) -> None:
         register_models(model_adapter, registry, settings, PersonV1, PersonV2)
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {"kind": "Person", "version": "1.0.0", "name": "Alice"},
             target_resolver=_latest_resolver(registry),
@@ -481,7 +481,7 @@ class TestGraphBuilder:
             model_adapter, registry, settings, PersonV1, PersonV2, AddressV1, AddressV2
         )
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {
                 "document": {
@@ -519,7 +519,7 @@ class TestGraphBuilder:
             model_adapter, registry, settings, PersonV1, PersonV2, ContactV1
         )
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {
                 "document": {
@@ -553,7 +553,7 @@ class TestGraphBuilder:
     ) -> None:
         register_models(model_adapter, registry, settings, PersonV1)
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {
                 "document": {
@@ -594,7 +594,7 @@ class TestGraphBuilder:
         )
         register_models(adapter, registry, settings, _Item)
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, adapter)
         graph = builder.build(
             {"doc": {"kind": "Item", "schema_version": "1.0.0", "name": "X"}},
             target_resolver=_latest_resolver(registry),
@@ -618,7 +618,7 @@ class TestGraphBuilder:
             model_adapter, registry, settings, PersonV1, PersonV2, AddressV1, AddressV2
         )
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {
                 "document": {
@@ -670,7 +670,7 @@ class TestGraphBuilder:
         """Versioned entries deeper than max_depth raise; within limit are accepted."""
         register_models(model_adapter, registry, settings, PersonV1, AddressV1)
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         payload = {
             "kind": "Person",
             "version": "1.0.0",
@@ -709,7 +709,7 @@ class TestGraphBuilder:
         """max_depth can be overridden at build time independently of settings."""
         register_models(model_adapter, registry, settings, PersonV1, AddressV1)
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         payload = {
             "kind": "Person",
             "version": "1.0.0",
@@ -746,7 +746,7 @@ class TestGraphBuilder:
             model_adapter, registry, settings, PersonV1, PersonV2, AddressV1, AddressV2
         )
 
-        builder = default_graph_builder(registry, settings)
+        builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {
                 "document": {

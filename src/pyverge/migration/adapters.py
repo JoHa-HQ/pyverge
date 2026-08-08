@@ -8,14 +8,19 @@ provider-specific introspection APIs directly.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, cast
 
+import pendulum
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
+from semver import Version
 
 from .types import Versionable, VersionValue, VModel
 from .versioning import VersionNode
+
+logger = logging.getLogger(__name__)
 
 
 class PydanticModelAdapter:
@@ -28,6 +33,30 @@ class PydanticModelAdapter:
     ) -> None:
         self._version_property = version_property
         self._kind_property = kind_property
+
+    @classmethod
+    def of(cls, value: str) -> VersionValue:
+        """Parse a version string (mostly coming from Literal), then determine the strategy"""  # noqa: E501
+        try:
+            return cast(VersionValue, Version.parse(value))
+        except ValueError:
+            logger.debug(f"Failed to parse semver: {value!r}")
+
+        try:
+            parsed = pendulum.parse(str(value), exact=True)
+            if isinstance(parsed, pendulum.DateTime):
+                parsed = parsed.date()
+            if not isinstance(parsed, pendulum.Date):
+                raise ValueError(f"Expected date, got {parsed!r}")
+            return cast(VersionValue, parsed)
+        except ValueError:
+            logger.debug(f"Failed to parse date: {value!r}")
+
+        msg = (
+            f"Cannot parse version {value!r}. "
+            "Expected semver (e.g. '1.0.0') or ISO date (e.g. '2024-06-01')."
+        )
+        raise ValueError(msg)
 
     def _field_default(self, model_cls: type[BaseModel], name: str) -> str:
         """Return the field's default value.
@@ -117,13 +146,10 @@ class PydanticModelAdapter:
 
     def versionable(self, model_cls: type[VModel]) -> Versionable[VersionValue, VModel]:
         """Build a ``VersionNode`` wrapping *model_cls* using its encoded metadata."""
-        return cast(
-            Versionable[VersionValue, VModel],
-            VersionNode[VersionValue, VModel](
-                _model=model_cls,
-                _value=cast(VersionValue, VersionNode.of(self.version(model_cls))),
-                _kind=self.kind(model_cls),
-            ),
+        return VersionNode[VersionValue, VModel](
+            _model=model_cls,
+            _value=self.of(self.version(model_cls)),
+            _kind=self.kind(model_cls),
         )
 
     @staticmethod

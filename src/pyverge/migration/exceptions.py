@@ -3,9 +3,9 @@ from typing import Any, Self
 
 from .types import (
     MigrationKey,
+    ModelBase,
     ModelVersionKey,
     VersionValue,
-    VModel,
 )
 
 # Length of an endpoint-pair key, e.g. ``(source, target)``.
@@ -63,7 +63,7 @@ class ModelNotFoundError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        key: ModelVersionKey | type[VModel],
+        key: ModelVersionKey | type[ModelBase],
     ) -> None:
         """Initializes ModelNotFoundError."""
         self.key = key

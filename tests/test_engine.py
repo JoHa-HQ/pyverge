@@ -1066,7 +1066,9 @@ class TestEntryMigrationIntegration:
             GraphBuilder(
                 registry,
                 DiscoverySettings(),
-                CompoundKeyWalker(registry, settings=DiscoverySettings()),
+                CompoundKeyWalker(
+                    registry, settings=DiscoverySettings(), adapter=model_adapter
+                ),
             ),
             model_adapter,
             entry_migration=custom_strategy,
