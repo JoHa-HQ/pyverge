@@ -501,15 +501,23 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             },
         }
 
-    def list_versions(self) -> list[Versionable[VersionValue, VModel]]:
-        """Return all registered versions as ``Versionable`` objects."""
-        return self.registry.versions
+    def list_versions(
+        self, kind: ModelKind | None = None
+    ) -> list[Versionable[VersionValue, VModel]]:
+        """Return registered versions, optionally filtered by *kind*."""
+        if kind is None:
+            return self.registry.versions
+        return self.registry.kind_versions(kind)
 
     def get(self, kind: ModelKind, version: str) -> Versionable[VersionValue, VModel]:
         """Return the registered versionable for ``kind``@``version``."""
         return self.get_model(
             (kind, cast(VersionValue, self.engine.adapter.of(version)))
         )
+
+    def get_latest(self, kind: ModelKind) -> Versionable[VersionValue, VModel]:
+        """Return the highest registered version for *kind*."""
+        return self.engine.model_latest(kind)
 
     def validate(self, data: ModelData, kind: ModelKind, version: str) -> None:
         """Validate *data* against ``kind``@``version``.

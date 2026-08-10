@@ -117,11 +117,11 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 Items intentionally out of scope for this documentation pass, tracked here for
 follow-up:
 
-- **CLI/manager facade alignment** — the CLI calls `validate_data`, `get`,
-  `diff`, `list_models`, `list_versions`, and `dump_schemas` on a manager, and
-  `migrate(data, schema, from_version, to_version)`. The current
-  `ModelManager` does not expose these; the CLI needs a matching facade before
-  its commands work end-to-end.
+- **CLI/manager facade alignment** — `ModelManager` now exposes `get`,
+  `get_latest`, and `list_versions`. The CLI still expects `validate_data`,
+  `diff`, `list_models`, `dump_schemas`, and
+  `migrate(data, schema, from_version, to_version)` before those commands
+  work end-to-end.
 - **Additional model providers** — adapters for dataclasses, attrs, marshmallow,
   and MessagePack, mirroring `PydanticModelAdapter` behind the `ModelAdapter`
   seam.

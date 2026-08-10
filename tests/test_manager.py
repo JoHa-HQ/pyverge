@@ -23,9 +23,11 @@ from pyverge.migration import (
     MigrationHook,
     MigrationSettings,
     ModelManager,
+    ModelNotFoundError,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
+    RegistryError,
 )
 from tests.examples.pydantic.base import UserBaseModel
 from tests.examples.pydantic.chrono import (
@@ -252,6 +254,143 @@ class TestInstanceFacade:
 
         manager.migrate(_payload("1.0.0"))
         assert hook.calls == 1
+
+
+class TestLookupHelpers:
+    @pytest.mark.parametrize(
+        ("manager", "models", "versions"),
+        [
+            (semver.Version, [UserV1, UserV2], ["1.0.0", "2.0.0"]),
+            (
+                pendulum.Date,
+                [UserV20250310, UserV20251231],
+                ["2025-03-10", "2025-12-31"],
+            ),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
+    def test_get_returns_versionable(
+        self,
+        manager: type[ModelManager],
+        models: list[type[BaseModel]],
+        versions: list[str],
+    ) -> None:
+        mgr = manager()
+        for model in models:
+            mgr.store_model(model)
+
+        for model, version in zip(models, versions, strict=True):
+            assert mgr.get("User", version).model is model
+
+    @pytest.mark.parametrize(
+        ("manager", "model", "missing_version"),
+        [
+            (semver.Version, UserV1, "9.0.0"),
+            (pendulum.Date, UserV20250310, "2099-01-01"),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
+    def test_get_unknown_raises(
+        self,
+        manager: type[ModelManager],
+        model: type[BaseModel],
+        missing_version: str,
+    ) -> None:
+        mgr = manager()
+        mgr.store_model(model)
+
+        with pytest.raises(ModelNotFoundError):
+            mgr.get("User", missing_version)
+
+    @pytest.mark.parametrize(
+        ("manager", "model", "version"),
+        [
+            (semver.Version, UserV1, "1.0.0"),
+            (pendulum.Date, UserV20250310, "2025-03-10"),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
+    def test_get_kind_is_strict(
+        self,
+        manager: type[ModelManager],
+        model: type[BaseModel],
+        version: str,
+    ) -> None:
+        mgr = manager()
+        mgr.store_model(model)
+
+        with pytest.raises(ModelNotFoundError):
+            mgr.get("user", version)
+
+    @pytest.mark.parametrize(
+        ("manager", "models", "latest"),
+        [
+            (semver.Version, [UserV1, UserV2, UserV3], UserV3),
+            (pendulum.Date, [UserV20250310, UserV20251231], UserV20251231),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
+    def test_get_latest_returns_highest(
+        self,
+        manager: type[ModelManager],
+        models: list[type[BaseModel]],
+        latest: type[BaseModel],
+    ) -> None:
+        mgr = manager()
+        for model in models:
+            mgr.store_model(model)
+
+        assert mgr.get_latest("User").model is latest
+
+    @pytest.mark.parametrize(
+        ("manager", "model"),
+        [
+            (semver.Version, UserV1),
+            (pendulum.Date, UserV20250310),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
+    def test_get_latest_unknown_kind_raises(
+        self,
+        manager: type[ModelManager],
+        model: type[BaseModel],
+    ) -> None:
+        mgr = manager()
+        mgr.store_model(model)
+
+        with pytest.raises(RegistryError):
+            mgr.get_latest("Missing")
+
+    @pytest.mark.parametrize(
+        ("manager", "models", "expected"),
+        [
+            (semver.Version, [UserV3, UserV1, UserV2], [UserV1, UserV2, UserV3]),
+            (
+                pendulum.Date,
+                [UserV20251231, UserV20250310],
+                [UserV20250310, UserV20251231],
+            ),
+        ],
+        indirect=["manager"],
+        ids=["semver", "date"],
+    )
+    def test_list_versions_ascending(
+        self,
+        manager: type[ModelManager],
+        models: list[type[BaseModel]],
+        expected: list[type[BaseModel]],
+    ) -> None:
+        mgr = manager()
+        for model in models:
+            mgr.store_model(model)
+
+        assert [n.model for n in mgr.list_versions("User")] == expected
+        assert mgr.list_versions("Missing") == []
 
 
 class TestSharedEngine:
