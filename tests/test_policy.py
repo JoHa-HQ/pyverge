@@ -95,9 +95,7 @@ class TestResolverFactories:
         if expected is None:
             assert target is None
         elif expected == "target":
-            target_node = envelope_model(
-                model_adapter, discovery_settings, PersonV2
-            )
+            target_node = envelope_model(model_adapter, discovery_settings, PersonV2)
             assert target == target_node
         else:
             assert target is not None

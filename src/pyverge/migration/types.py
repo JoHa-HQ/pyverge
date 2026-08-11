@@ -78,6 +78,7 @@ MigrationKeyInput: TypeAlias = (
     | "VersionPair"
 )
 
+
 @runtime_checkable
 class Orderable(Protocol):
     """Functional aspect: total ordering + hashing + dedupe.
@@ -337,16 +338,16 @@ LookupKey: TypeAlias = (
     | type[VModel_co]
 )
 
-TargetResolver: TypeAlias = (
-    Callable[[Versionable[VersionValue_co, VModel_co]],
-             Versionable[VersionValue_co, VModel_co] | None]
-)
+TargetResolver: TypeAlias = Callable[
+    [Versionable[VersionValue_co, VModel_co]],
+    Versionable[VersionValue_co, VModel_co] | None,
+]
 
 TargetSpec: TypeAlias = (
     Versionable[VersionValue, BaseModel] | type[BaseModel] | TargetStrategy | str | None
 )
 TargetPolicy: TypeAlias = (
-    TargetSpec | dict[ModelKind | Literal['*'], TargetSpec] | TargetResolver
+    TargetSpec | dict[ModelKind | Literal["*"], TargetSpec] | TargetResolver
 )
 
 

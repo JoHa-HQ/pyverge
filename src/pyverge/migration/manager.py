@@ -467,9 +467,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             return _string_resolver(registry, spec, adapter)
 
         if isinstance(spec, type) and issubclass(spec, ModelBase):
-            return _model_resolver(
-                registry, spec, version_property=version_property
-            )
+            return _model_resolver(registry, spec, version_property=version_property)
 
         # Treat any remaining value as an explicit versionable target.  This
         # avoids an ``isinstance(spec, Versionable)`` protocol check that would
@@ -487,8 +485,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         explicitly listed.
         """
         resolvers: dict[ModelKind | Literal["*"], TargetResolver] = {
-            kind: self.compile_target_spec(spec)
-            for kind, spec in mapping.items()
+            kind: self.compile_target_spec(spec) for kind, spec in mapping.items()
         }
         return multi_target_resolver(resolvers)
 
