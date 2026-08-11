@@ -9,6 +9,7 @@ import pytest
 
 from pyverge.migration import (
     DefaultEntryMigration,
+    DiscoverySettings,
     GraphEntry,
     MigrationError,
     PydanticModelAdapter,
@@ -23,7 +24,7 @@ class TestDefaultEntryMigration:
     def source(
         self,
         model_adapter: PydanticModelAdapter,
-        discovery_settings: types.VersioningSettings,
+        discovery_settings: DiscoverySettings,
     ) -> Any:
         return envelope_model(model_adapter, discovery_settings, PersonV1)
 
@@ -31,7 +32,7 @@ class TestDefaultEntryMigration:
     def target(
         self,
         model_adapter: PydanticModelAdapter,
-        discovery_settings: types.VersioningSettings,
+        discovery_settings: DiscoverySettings,
     ) -> Any:
         return envelope_model(model_adapter, discovery_settings, PersonV2)
 
