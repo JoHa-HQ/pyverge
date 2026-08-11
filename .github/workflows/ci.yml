@@ -26,3 +26,33 @@ jobs:
         run: |
           BASE=$(git merge-base origin/main HEAD)
           uv run cz check --rev-range "$BASE..HEAD"
+      - name: Extract ticket ID from branch
+        if: github.event_name == 'pull_request'
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          TICKET_ID=$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+          echo "TICKET_ID=$TICKET_ID" >> $GITHUB_ENV
+      - name: Validate changelog (dry-run)
+        if: github.event_name == 'pull_request'
+        run: |
+          uv run cz changelog --dry-run
+  changelog:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Generate changelog
+        run: uv run cz changelog
+      - name: Commit changelog
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(${{ env.TICKET_ID }}): update CHANGELOG.md [skip ci]"
+          file_pattern: CHANGELOG.md
