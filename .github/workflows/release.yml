@@ -1,0 +1,47 @@
+name: GitHub Release
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Build package
+        run: uv run hatch build
+      - name: Generate release notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            uv run cz changelog --unreleased-version "${{ github.ref_name }}" --start-rev "$PREV_TAG" > RELEASE_NOTES.md
+          else
+            uv run cz changelog --unreleased-version "${{ github.ref_name }}" > RELEASE_NOTES.md
+          fi
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: dist/*
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trigger publish
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: Publish
+          inputs: '{"version": "${{ github.ref_name }}"}'
+          token: ${{ secrets.GITHUB_TOKEN }}
