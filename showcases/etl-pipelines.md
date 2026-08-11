@@ -17,7 +17,7 @@ once per record. Sources stay untouched; the manager produces a uniform output.
 
 1. A CSV extract contains `Customer` records at `1.0.0`.
 2. A second source yields `Customer` records already at `2.0.0`.
-3. Both are fed into the same manager configured with `target_strategy="latest"`.
+3. Both are fed into the same manager; the default `target` is `"latest"`.
 4. The manager emits records at `3.0.0` regardless of input version.
 
 ## Convergence policy
@@ -25,7 +25,7 @@ once per record. Sources stay untouched; the manager produces a uniform output.
 | Setting | Typical value | Why |
 |---------|---------------|-----|
 | `direction` | `"forward"` | Extracted data usually moves to the warehouse schema. |
-| `target_strategy` | `"latest"` | Normalize everything to the newest registered model. |
+| `target` | `"latest"` (default) | Normalize everything to the newest registered model. |
 | `on_missing_path` | `"raise"` | A broken migration should fail the job, not silently pass bad data. |
 
 ## Batch migration
@@ -54,7 +54,6 @@ CustomerManager = ModelManager[semver.Version].scoped(
     PydanticModelAdapter(),
     settings=MigrationSettings(
         direction="forward",
-        target_strategy="latest",
         on_missing_path="raise",
     ),
 )
@@ -104,7 +103,7 @@ records = [
     {"kind": "Customer", "version": "2.0.0", "id": 2, "name": "Bob", "email": None},
 ]
 
-# Each record converges to the latest registered version (target_strategy).
+# Each record converges to the latest registered version by default.
 normalized = [manager.migrate(record) for record in records]
 for record in normalized:
     assert record["version"] == "3.0.0"
@@ -113,7 +112,7 @@ for record in normalized:
 ### Abstractions used
 
 - **ModelManager** — configured once and reused per record.
-- **`target_strategy="latest"`** — defaults every entry to the newest registered
+- **Default `target="latest"`** — defaults every entry to the newest registered
   version.
 - **`executor=` per call** — `LevelParallelExecutor` parallelizes independent
   entries within a single payload.

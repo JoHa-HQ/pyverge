@@ -26,7 +26,7 @@ intentionally.
 | Setting | Typical value | Why |
 |---------|---------------|-----|
 | `direction` | `"forward"` | Devices upgrade firmware; telemetry moves to newer schemas. |
-| `target_strategy` | `"latest"` | Dashboards and storage expect the current schema. |
+| `target` | `"latest"` (default) | Dashboards and storage expect the current schema. |
 | `on_direction_violation` | `"skip"` | A newer message arriving at an older gateway can be ignored. |
 
 ## Per-fleet lag

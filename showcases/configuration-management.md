@@ -24,7 +24,7 @@ the app reverts. Target policies per config kind make this explicit.
 | Setting | Typical value | Why |
 |---------|---------------|-----|
 | `direction` | `"any"` | Configs may need forward migration or backward rollback. |
-| `target_strategy` | `"latest"` | Default to the app's current schema. |
+| `target` | `"latest"` (default) | Default to the app's current schema. |
 | `on_direction_violation` | `"raise"` | Rollback policies should be explicit, not silent. |
 
 ## Pinning and rollback
