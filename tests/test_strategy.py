@@ -6,16 +6,12 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-import semver
-from pydantic import BaseModel
 
 from pyverge.migration import (
     DefaultEntryMigration,
-    DiscoverySettings,
     GraphEntry,
     MigrationError,
     PydanticModelAdapter,
-    Registry,
     types,
 )
 from tests.examples.pydantic.semver_nested import PersonV1, PersonV2
@@ -24,28 +20,20 @@ from tests.utils import envelope_model
 
 class TestDefaultEntryMigration:
     @pytest.fixture
-    def adapter(self) -> PydanticModelAdapter:
-        return PydanticModelAdapter()
-
-    @pytest.fixture
-    def registry(self) -> Registry[semver.Version, BaseModel]:
-        return Registry[semver.Version, BaseModel]()
-
-    @pytest.fixture
-    def discovery_settings(self) -> DiscoverySettings:
-        return DiscoverySettings()
-
-    @pytest.fixture
     def source(
-        self, adapter: PydanticModelAdapter, discovery_settings: DiscoverySettings
+        self,
+        model_adapter: PydanticModelAdapter,
+        discovery_settings: types.VersioningSettings,
     ) -> Any:
-        return envelope_model(adapter, discovery_settings, PersonV1)
+        return envelope_model(model_adapter, discovery_settings, PersonV1)
 
     @pytest.fixture
     def target(
-        self, adapter: PydanticModelAdapter, discovery_settings: DiscoverySettings
+        self,
+        model_adapter: PydanticModelAdapter,
+        discovery_settings: types.VersioningSettings,
     ) -> Any:
-        return envelope_model(adapter, discovery_settings, PersonV2)
+        return envelope_model(model_adapter, discovery_settings, PersonV2)
 
     @pytest.fixture
     def entry(self, source: Any, target: Any) -> GraphEntry[Any, Any]:
@@ -63,7 +51,7 @@ class TestDefaultEntryMigration:
 
     def test_noop_when_source_equals_target(
         self,
-        adapter: PydanticModelAdapter,
+        model_adapter: PydanticModelAdapter,
         source: Any,
         execute_step: MagicMock,
     ) -> None:
@@ -75,7 +63,7 @@ class TestDefaultEntryMigration:
             entry,
             current,
             execute_step=execute_step,
-            adapter=adapter,
+            adapter=model_adapter,
             version_property="version",
             direction="any",
             on_direction_violation="raise",
@@ -87,7 +75,7 @@ class TestDefaultEntryMigration:
 
     def test_raises_on_direction_violation(
         self,
-        adapter: PydanticModelAdapter,
+        model_adapter: PydanticModelAdapter,
         entry: GraphEntry[Any, Any],
         execute_step: MagicMock,
     ) -> None:
@@ -98,7 +86,7 @@ class TestDefaultEntryMigration:
                 entry,
                 {"version": "1.0.0"},
                 execute_step=execute_step,
-                adapter=adapter,
+                adapter=model_adapter,
                 version_property="version",
                 direction="backward",
                 on_direction_violation="raise",
@@ -109,7 +97,7 @@ class TestDefaultEntryMigration:
 
     def test_skips_on_direction_violation(
         self,
-        adapter: PydanticModelAdapter,
+        model_adapter: PydanticModelAdapter,
         entry: GraphEntry[Any, Any],
         execute_step: MagicMock,
     ) -> None:
@@ -120,7 +108,7 @@ class TestDefaultEntryMigration:
             entry,
             current,
             execute_step=execute_step,
-            adapter=adapter,
+            adapter=model_adapter,
             version_property="version",
             direction="backward",
             on_direction_violation="skip",
@@ -132,7 +120,7 @@ class TestDefaultEntryMigration:
 
     def test_executes_steps(
         self,
-        adapter: PydanticModelAdapter,
+        model_adapter: PydanticModelAdapter,
         entry: GraphEntry[Any, Any],
         source: Any,
         target: Any,
@@ -145,7 +133,7 @@ class TestDefaultEntryMigration:
             entry,
             current,
             execute_step=execute_step,
-            adapter=adapter,
+            adapter=model_adapter,
             version_property="version",
             direction="any",
             on_direction_violation="raise",
@@ -157,7 +145,7 @@ class TestDefaultEntryMigration:
 
     def test_calls_adapter_finalize(
         self,
-        adapter: PydanticModelAdapter,
+        model_adapter: PydanticModelAdapter,
         entry: GraphEntry[Any, Any],
         execute_step: MagicMock,
     ) -> None:
@@ -169,25 +157,27 @@ class TestDefaultEntryMigration:
             hooks=entry.hooks,
             target_model=PersonV2,
         )
-        adapter.finalize = MagicMock(return_value={"version": "2.0.0", "name": "Alice"})  # ty: ignore
+        model_adapter.finalize = MagicMock(  # ty: ignore
+            return_value={"version": "2.0.0", "name": "Alice"}
+        )
         strategy = DefaultEntryMigration()
 
         strategy.migrate(
             finalized_entry,
             {"version": "1.0.0"},
             execute_step=execute_step,
-            adapter=adapter,
+            adapter=model_adapter,
             version_property="version",
             direction="any",
             on_direction_violation="raise",
             on_missing_path="raise",
         ).run()
 
-        adapter.finalize.assert_called_once_with(PersonV2, {"version": "2.0.0"})  # ty: ignore
+        model_adapter.finalize.assert_called_once_with(PersonV2, {"version": "2.0.0"})  # ty: ignore
 
     def test_skips_on_missing_migration(
         self,
-        adapter: PydanticModelAdapter,
+        model_adapter: PydanticModelAdapter,
         entry: GraphEntry[Any, Any],
         execute_step: MagicMock,
     ) -> None:
@@ -204,7 +194,7 @@ class TestDefaultEntryMigration:
             entry,
             current,
             execute_step=execute_step,
-            adapter=adapter,
+            adapter=model_adapter,
             version_property="version",
             direction="any",
             on_direction_violation="raise",
@@ -215,7 +205,7 @@ class TestDefaultEntryMigration:
 
     def test_raises_on_missing_migration(
         self,
-        adapter: PydanticModelAdapter,
+        model_adapter: PydanticModelAdapter,
         entry: GraphEntry[Any, Any],
         execute_step: MagicMock,
     ) -> None:
@@ -232,7 +222,7 @@ class TestDefaultEntryMigration:
                 entry,
                 {"version": "1.0.0"},
                 execute_step=execute_step,
-                adapter=adapter,
+                adapter=model_adapter,
                 version_property="version",
                 direction="any",
                 on_direction_violation="raise",

@@ -19,6 +19,7 @@ import semver
 from pydantic import BaseModel
 
 from pyverge.migration import (
+    DiscoverySettings,
     DiscoveryValidationError,
     MigrationHook,
     MigrationSettings,
@@ -45,7 +46,14 @@ from tests.examples.pydantic.semver import (
     migrate_v1_to_v2,
     migrate_v2_to_v3,
 )
-from tests.utils import make_engine
+from tests.examples.pydantic.semver_nested import (
+    AddressV1,
+    AddressV2,
+    AddressV3,
+    PersonV1,
+    PersonV2,
+)
+from tests.utils import envelope_model, make_engine
 
 
 def _payload(version: str) -> dict:
@@ -528,3 +536,146 @@ class TestMigrateWithContainer:
         }
         with pytest.raises(DiscoveryValidationError):
             UserManager().migrate(invalid, container=UserContainer)
+
+
+class TestTargetPolicy:
+    def test_default_target_latest(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        semver_manager.model(UserV1)
+        semver_manager.model(UserV2)
+        semver_manager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
+
+        result = semver_manager().migrate(_payload("1.0.0"))
+        assert result["document"]["version"] == "2.0.0"
+
+    def test_explicit_string_target(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        semver_manager.model(UserV1)
+        semver_manager.model(UserV2)
+        semver_manager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
+
+        result = semver_manager().migrate(_payload("1.0.0"), target="skip")
+        assert result["document"]["version"] == "1.0.0"
+
+    def test_per_kind_policy_with_wildcard(
+        self, semver_manager: type[ModelManager[semver.Version]]
+    ) -> None:
+        semver_manager.model(UserV1)
+        semver_manager.model(UserV2)
+        semver_manager.model(UserV3)
+        semver_manager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
+        semver_manager.migration("User", "2.0.0", "3.0.0")(migrate_v2_to_v3)
+
+        result = semver_manager().migrate(
+            _payload("1.0.0"),
+            target={"Other": "skip", "*": "latest"},
+        )
+        assert result["document"]["version"] == "3.0.0"
+
+
+@pytest.fixture
+def populated_semver_manager(
+    semver_manager: type[ModelManager[semver.Version]],
+) -> ModelManager[semver.Version]:
+    """Manager instance with the standard nested semver models registered."""
+    manager = semver_manager()
+    for model in (PersonV1, PersonV2, AddressV1, AddressV2, AddressV3):
+        manager.store_model(model)
+    return manager
+
+
+@pytest.mark.parametrize(
+    ("source_cls", "spec", "expected"),
+    [
+        pytest.param(
+            PersonV1,
+            "skip",
+            None,
+            id="skip",
+        ),
+        pytest.param(
+            PersonV1,
+            "latest",
+            ("Person", semver.VersionInfo(2, 0, 0)),
+            id="latest",
+        ),
+        pytest.param(
+            AddressV2,
+            "earliest",
+            ("Address", semver.VersionInfo(1, 0, 0)),
+            id="earliest",
+        ),
+        pytest.param(
+            PersonV1,
+            None,
+            None,
+            id="none",
+        ),
+        pytest.param(
+            PersonV1,
+            PersonV2,
+            ("Person", semver.VersionInfo(2, 0, 0)),
+            id="model-class",
+        ),
+    ],
+)
+class TestCompileTargetSpec:
+    """Unit tests for compiling a single target spec into a resolver."""
+
+    def test_compile_target_spec(  # noqa: PLR0913
+        self,
+        populated_semver_manager: ModelManager[semver.Version],
+        model_adapter: PydanticModelAdapter,
+        discovery_settings: DiscoverySettings,
+        source_cls: type[BaseModel],
+        spec: str | type[BaseModel] | None,
+        expected: tuple[str, semver.VersionInfo] | None,
+    ) -> None:
+        source = envelope_model(model_adapter, discovery_settings, source_cls)
+        resolver = populated_semver_manager.compile_target_spec(spec)
+        target = resolver(source)
+
+        if expected is None:
+            assert target is None
+        else:
+            assert target is not None
+            assert target.version == expected
+
+
+def test_versionable_target_used_as_is(
+    populated_semver_manager: ModelManager[semver.Version],
+    model_adapter: PydanticModelAdapter,
+    discovery_settings: DiscoverySettings,
+) -> None:
+    source = envelope_model(model_adapter, discovery_settings, PersonV1)
+    target_node = envelope_model(model_adapter, discovery_settings, PersonV2)
+    resolver = populated_semver_manager.compile_target_spec(target_node)
+    assert resolver(source) == target_node
+
+
+def test_unsupported_spec_raises(
+    populated_semver_manager: ModelManager[semver.Version],
+) -> None:
+    with pytest.raises(RegistryError):
+        populated_semver_manager.compile_target_spec("unknown")
+
+
+def test_model_class_wrong_kind_raises(
+    populated_semver_manager: ModelManager[semver.Version],
+    model_adapter: PydanticModelAdapter,
+    discovery_settings: DiscoverySettings,
+) -> None:
+    source = envelope_model(model_adapter, discovery_settings, AddressV1)
+    resolver = populated_semver_manager.compile_target_spec(PersonV2)
+    with pytest.raises(RegistryError):
+        resolver(source)
+
+
+def test_unregistered_model_class_raises(
+    semver_manager: type[ModelManager[semver.Version]],
+) -> None:
+    manager = semver_manager()
+    with pytest.raises(RegistryError):
+        manager.compile_target_spec(PersonV2)
