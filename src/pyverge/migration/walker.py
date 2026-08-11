@@ -96,7 +96,7 @@ class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
                     except Exception:
                         pass
                     else:
-                        target = target_resolver(source.kind, source)
+                        target = target_resolver(source)
                         if target is not None and (
                             self._direction == "any"
                             or (self._direction == "forward" and source < target)
@@ -236,7 +236,7 @@ class PydanticWalker(WalkerProtocol, Generic[VersionValue]):
                     except Exception:
                         pass
                     else:
-                        target = target_resolver(source.kind, source)
+                        target = target_resolver(source)
                         if target is not None:
                             yield (path, depth, source)
                             # Do not recurse into already-discovered entries

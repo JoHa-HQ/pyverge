@@ -78,10 +78,6 @@ MigrationKeyInput: TypeAlias = (
     | "VersionPair"
 )
 
-TargetSpec: TypeAlias = "Versionable[VersionValue, BaseModel] | type[BaseModel] | TargetStrategy | str | None"  # noqa: E501
-TargetPolicy: TypeAlias = "TargetSpec | dict[ModelKind | Literal['*'], TargetSpec]"
-
-
 @runtime_checkable
 class Orderable(Protocol):
     """Functional aspect: total ordering + hashing + dedupe.
@@ -341,13 +337,17 @@ LookupKey: TypeAlias = (
     | type[VModel_co]
 )
 
+TargetResolver: TypeAlias = (
+    Callable[[Versionable[VersionValue_co, VModel_co]],
+             Versionable[VersionValue_co, VModel_co] | None]
+)
 
-class TargetResolver(Protocol):
-    """Callable that selects a convergence target for a discovered entry."""
-
-    def __call__(
-        self, kind: ModelKind, current: Versionable[VersionValue_co, VModel_co]
-    ) -> Versionable[VersionValue_co, VModel_co] | None: ...
+TargetSpec: TypeAlias = (
+    Versionable[VersionValue, BaseModel] | type[BaseModel] | TargetStrategy | str | None
+)
+TargetPolicy: TypeAlias = (
+    TargetSpec | dict[ModelKind | Literal['*'], TargetSpec] | TargetResolver
+)
 
 
 class Walker(Protocol):

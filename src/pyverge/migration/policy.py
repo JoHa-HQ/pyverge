@@ -1,237 +1,125 @@
-"""Target policy compilation for migration graphs.
+"""Target resolver factories for migration graphs.
 
 The migration engine is deliberately agnostic about *what* target version each
-payload entry should converge to. This module turns a declarative policy (e.g.
-"latest", "earliest", an explicit version, or per-kind overrides) into a
-lightweight :class:`TargetResolver` that :class:`GraphBuilder` and the
-individual :class:`EntryMigration` strategies consume.
+payload entry should converge to. This module provides lightweight
+:class:`~pyverge.migration.types.TargetResolver` factories that
+:class:`GraphBuilder` and the individual :class:`EntryMigration` strategies
+consume.
+
+Declarative spec compilation lives in :mod:`~pyverge.migration.manager`, the
+high-level facade that turns strings, model classes, and per-kind mappings into
+resolved resolvers before invoking the engine.
 """
 
 from __future__ import annotations
 
-from typing import Literal, cast
+from typing import Literal
 
-from pydantic import BaseModel
-
-from .exceptions import ModelNotFoundError, RegistryError
+from .exceptions import RegistryError
 from .registry import Registry
 from .types import (
-    ModelAdapter,
     ModelBase,
     ModelKind,
-    TargetPolicy,
     TargetResolver,
-    TargetSpec,
     Versionable,
     VersionValue,
     VersionValue_co,
     VModel_co,
 )
-from .versioning import SentinelNode
 
 
-def compile_target_resolver(
+def skip_target_resolver(
     registry: Registry[VersionValue, ModelBase],
-    policy: TargetPolicy | None,
-    *,
-    version_property: str = "version",
-    adapter: ModelAdapter,
 ) -> TargetResolver:
-    """Build a :class:`TargetResolver` from a declarative policy.
+    """Return a resolver that always skips (returns ``None``).
 
-    The returned resolver accepts ``(kind, current)`` and returns the target
-    versionable the graph should migrate to, or ``None`` if the entry should be
-    skipped.
-
-    Policy forms:
-        * ``None`` or ``"skip"`` → skip every entry.
-        * ``"latest"`` / ``"earliest"`` → registry extreme for the kind.
-        * an explicit version string (e.g. ``"1.5.0"``) → the registered
-          version for the entry's kind.
-        * ``type[BaseModel]`` → resolve via registry to a versionable.
-        * :class:`Versionable` → use as-is.
-        * ``dict`` → per-kind override. The special key ``"*"`` is the
-          fallback for kinds not explicitly listed.
-
-    Args:
-        registry: Source of registered versions and models.
-        policy: Declarative target policy.
-        version_property: Field name used to look up model versions.
-
-    Returns:
-        A callable matching :class:`TargetResolver`.
+    *registry* is accepted to keep the factory signature uniform with
+    ``latest_target_resolver`` and ``earliest_target_resolver``; it is not
+    used by the returned resolver.
     """
-    if isinstance(policy, dict):
-        policy_dict = cast(dict[ModelKind | Literal["*"], TargetSpec], policy)
-        resolvers: dict[
-            ModelKind | Literal["*"],
-            TargetResolver,
-        ] = {
-            kind: compile_target_spec(
-                registry, spec, version_property=version_property, adapter=adapter
-            )
-            for kind, spec in policy_dict.items()
-        }
-        fallback = resolvers.pop("*", None)
 
-        def resolve(
-            kind: ModelKind,
-            current: Versionable[VersionValue_co, VModel_co],
-        ) -> Versionable[VersionValue_co, VModel_co] | None:
-            resolver = resolvers.get(kind, fallback)
-            if resolver is None:
-                return None
-            return resolver(kind, current)
-
-        return resolve
-
-    return compile_target_spec(
-        registry,
-        cast(TargetSpec, policy),
-        version_property=version_property,
-        adapter=adapter,
-    )
-
-
-def compile_target_spec(
-    registry: Registry[VersionValue, ModelBase],
-    spec: TargetSpec,
-    *,
-    version_property: str,
-    adapter: ModelAdapter,
-) -> TargetResolver:
-    """Compile a single target spec into a resolver closure."""
-    if spec is None:
-        return _skip_resolver
-
-    # Resolve string values first so we never compare a VersionNode/SentinelNode
-    # to a string (their ``__eq__`` intentionally raises for mixed types).
-    if isinstance(spec, str):
-        if spec == "skip":
-            resolver = _skip_resolver
-        elif spec == "latest":
-            resolver = _latest_resolver(registry)
-        elif spec == "earliest":
-            resolver = _earliest_resolver(registry)
-        else:
-            resolver = _string_resolver(registry, spec, adapter)
-        return resolver
-
-    if isinstance(spec, type) and issubclass(spec, ModelBase):
-        return _model_resolver(registry, spec, version_property=version_property)
-
-    # Treat any remaining value as an explicit versionable target.  This avoids
-    # an ``isinstance(spec, Versionable)`` protocol check that would trigger the
-    # strict ``__eq__`` semantics of :class:`VersionNode` / :class:`SentinelNode`.
-    return _versionable_resolver(cast(Versionable, spec))
-
-
-def _skip_resolver(
-    kind: ModelKind,
-    current: Versionable[VersionValue_co, VModel_co],
-) -> Versionable[VersionValue_co, VModel_co] | None:
-    return None
-
-
-def _latest_resolver(
-    registry: Registry[VersionValue, ModelBase],
-) -> TargetResolver:
     def resolve(
-        kind: ModelKind,
         current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
-        return registry.latest(kind)
+        return None
 
     return resolve
 
 
-def _earliest_resolver(
+def latest_target_resolver(
     registry: Registry[VersionValue, ModelBase],
 ) -> TargetResolver:
+    """Return a resolver that converges to the latest registered version per kind."""
+
     def resolve(
-        kind: ModelKind,
         current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
-        return registry.earliest(kind)
+        return registry.latest(current.kind)
 
     return resolve
 
 
-def _model_resolver(
+def earliest_target_resolver(
     registry: Registry[VersionValue, ModelBase],
-    model_cls: type[BaseModel],
-    *,
-    version_property: str,
 ) -> TargetResolver:
-    try:
-        target = registry.get_model_by_class(model_cls)
-    except ModelNotFoundError as exc:
+    """Return a resolver that converges to the earliest registered version per kind."""
+
+    def resolve(
+        current: Versionable[VersionValue_co, VModel_co],
+    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        return registry.earliest(current.kind)
+
+    return resolve
+
+
+def fixed_target_resolver(
+    registry: Registry[VersionValue, ModelBase],
+    target: Versionable[VersionValue, ModelBase],
+) -> TargetResolver:
+    """Return a resolver that always returns *target* for its kind.
+
+    The *target* is validated against *registry* immediately; a missing
+    target raises :class:`RegistryError` with source ``"target"``.
+    """
+    if not registry.has_model(target):
         raise RegistryError(
             registry.name,
-            f"Target model {model_cls.__name__} is not registered",
-        ) from exc
+            f"Target {target} is not registered",
+        )
 
     def resolve(
-        kind: ModelKind,
         current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
-        if kind != target.kind:
+        if current.kind != target.kind:
             raise RegistryError(
                 registry.name,
-                f"Target model {model_cls.__name__} belongs to kind "
-                f"{target.kind!r}, but entry kind is {kind!r}",
-            )
-        return target
-
-    return resolve
-
-
-def _versionable_resolver(
-    target: Versionable,
-) -> TargetResolver:
-    def resolve(
-        kind: ModelKind,
-        current: Versionable[VersionValue_co, VModel_co],
-    ) -> Versionable[VersionValue_co, VModel_co] | None:
-        if kind != target.kind:
-            raise RegistryError(
-                "target",
                 f"Target {target} belongs to kind {target.kind!r}, "
-                f"but entry kind is {kind!r}",
+                f"but entry kind is {current.kind!r}",
             )
         return target
 
     return resolve
 
 
-def _string_resolver(
-    registry: Registry[VersionValue, ModelBase],
-    value: str,
-    adapter: ModelAdapter,
+def multi_target_resolver(
+    resolvers: dict[ModelKind | Literal["*"], TargetResolver],
 ) -> TargetResolver:
-    """Resolve an explicit version string to a registered versionable.
+    """Compose per-kind resolvers into a single dispatcher.
 
-    The string is parsed eagerly with the adapter's version parser, which
-    understands both semver and ISO date values.  Resolving against an
-    unregistered version raises ``ModelNotFoundError``; an unparsable value
-    fails fast here.
+    The special key ``"*"`` is used as the fallback for kinds not explicitly
+    listed. The input mapping is read but not modified.
     """
-    try:
-        parsed = adapter.of(value)
-    except ValueError:
-        raise RegistryError(
-            registry.name,
-            f"Could not resolve string target {value!r} to a version",
-        ) from None
+    fallback = resolvers.get("*")
+    by_kind: dict[ModelKind, TargetResolver] = {
+        k: v for k, v in resolvers.items() if k != "*"
+    }
 
     def resolve(
-        kind: ModelKind,
         current: Versionable[VersionValue_co, VModel_co],
     ) -> Versionable[VersionValue_co, VModel_co] | None:
-        sentinel: Versionable[VersionValue_co, VModel_co] = cast(
-            Versionable[VersionValue_co, VModel_co],
-            SentinelNode(kind, parsed),
-        )
-        return registry.get_model(sentinel)
+        resolver = by_kind.get(current.kind, fallback)
+        if resolver is None:
+            return None
+        return resolver(current)
 
     return resolve
