@@ -15,6 +15,7 @@ from pyverge.migration import (
     MaxDepthExceededError,
     PydanticModelAdapter,
     Registry,
+    latest_target_resolver,
     types,
 )
 from tests.examples.pydantic.chrono import UserV20250310, UserV20251231
@@ -35,24 +36,6 @@ from tests.utils import (
     populate_graph,
     register_models,
 )
-
-
-def _latest_resolver(
-    registry: Registry[types.VersionValue, BaseModel],
-) -> types.TargetResolver:
-    def resolve(kind: types.ModelKind, current: types.Versionable) -> types.Versionable:
-        return registry.latest(kind)
-
-    return resolve
-
-
-def _fixed_resolver(
-    target: types.Versionable,
-) -> types.TargetResolver:
-    def resolve(kind: types.ModelKind, current: types.Versionable) -> types.Versionable:
-        return target
-
-    return resolve
 
 
 class TestGraphEntry:
@@ -187,7 +170,7 @@ class TestMigrationGraph:
             discovery_settings,
             *models,
             payload=payload,
-            resolver=_latest_resolver(registry),
+            resolver=latest_target_resolver(registry),
         )
         order = graph.topological_order()
         paths = [e.path for e in order]
@@ -243,7 +226,7 @@ class TestMigrationGraph:
             discovery_settings,
             *models,
             payload=payload,
-            resolver=_latest_resolver(registry),
+            resolver=latest_target_resolver(registry),
         )
         levels = graph.execution_levels()
         level_paths = [[e.path for e in level] for level in levels]
@@ -289,7 +272,7 @@ class TestMigrationGraph:
         builder = default_graph_builder(registry, discovery_settings, model_adapter)
         graph = builder.build(
             payload,
-            target_resolver=_latest_resolver(registry),
+            target_resolver=latest_target_resolver(registry),
         )
 
         roots = graph.independent_roots()
@@ -335,7 +318,7 @@ class TestMigrationGraph:
             discovery_settings,
             *models,
             payload=payload,
-            resolver=_latest_resolver(registry),
+            resolver=latest_target_resolver(registry),
         )
         entry = graph.entry_at(entry_lookup)
         assert entry is not None
@@ -381,7 +364,7 @@ class TestMigrationGraph:
             discovery_settings,
             *models,
             payload=payload,
-            resolver=_latest_resolver(registry),
+            resolver=latest_target_resolver(registry),
         )
         entry = graph.entry_at(entry_lookup)
         assert entry is None
@@ -413,7 +396,7 @@ class TestGraphBuilder:
         register_models(model_adapter, registry, settings, PersonV1)
 
         builder = default_graph_builder(registry, settings, model_adapter)
-        graph = builder.build(payload, target_resolver=_latest_resolver(registry))
+        graph = builder.build(payload, target_resolver=latest_target_resolver(registry))
 
         assert len(graph) == 0, f"{label} should not produce entries"
         assert not graph, f"{label} graph should be falsy"
@@ -434,7 +417,7 @@ class TestGraphBuilder:
         builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {"kind": "Person", "version": "1.0.0", "name": "Alice"},
-            target_resolver=_latest_resolver(registry),
+            target_resolver=latest_target_resolver(registry),
         )
 
         assert len(graph) == 1
@@ -459,7 +442,7 @@ class TestGraphBuilder:
         builder = default_graph_builder(registry, settings, model_adapter)
         graph = builder.build(
             {"kind": "Person", "version": "1.0.0", "name": "Alice"},
-            target_resolver=_latest_resolver(registry),
+            target_resolver=latest_target_resolver(registry),
         )
 
         entry = graph.entry_at(())
@@ -496,7 +479,7 @@ class TestGraphBuilder:
                     },
                 }
             },
-            target_resolver=_latest_resolver(registry),
+            target_resolver=latest_target_resolver(registry),
         )
 
         EXPECTED_ENTRIES = 2
@@ -532,7 +515,7 @@ class TestGraphBuilder:
                     ],
                 }
             },
-            target_resolver=_latest_resolver(registry),
+            target_resolver=latest_target_resolver(registry),
         )
 
         EXPECTED_ENTRIES = 3
@@ -567,7 +550,7 @@ class TestGraphBuilder:
                     "name": "Bob",
                 },
             },
-            target_resolver=_latest_resolver(registry),
+            target_resolver=latest_target_resolver(registry),
         )
 
         assert len(graph) == 1
@@ -597,7 +580,7 @@ class TestGraphBuilder:
         builder = default_graph_builder(registry, settings, adapter)
         graph = builder.build(
             {"doc": {"kind": "Item", "schema_version": "1.0.0", "name": "X"}},
-            target_resolver=_latest_resolver(registry),
+            target_resolver=latest_target_resolver(registry),
         )
 
         assert len(graph) == 1
@@ -634,7 +617,7 @@ class TestGraphBuilder:
                     },
                 }
             },
-            target_resolver=_latest_resolver(registry),
+            target_resolver=latest_target_resolver(registry),
         )
 
         EXPECTED_ENTRIES = 2
@@ -685,11 +668,13 @@ class TestGraphBuilder:
 
         if expect_error:
             with pytest.raises(MaxDepthExceededError) as exc_info:
-                builder.build(payload, target_resolver=_latest_resolver(registry))
+                builder.build(payload, target_resolver=latest_target_resolver(registry))
             assert exc_info.value.kind == "Address"
             assert exc_info.value.max_depth == 0
         else:
-            graph = builder.build(payload, target_resolver=_latest_resolver(registry))
+            graph = builder.build(
+                payload, target_resolver=latest_target_resolver(registry)
+            )
             EXPECTED_ENTRIES = 2
             assert len(graph) == EXPECTED_ENTRIES
             assert graph.entry_at(()) is not None
@@ -722,13 +707,15 @@ class TestGraphBuilder:
             },
         }
 
-        unlimited = builder.build(payload, target_resolver=_latest_resolver(registry))
+        unlimited = builder.build(
+            payload, target_resolver=latest_target_resolver(registry)
+        )
         assert unlimited.entry_at(("address",)) is not None
 
         # Per-call override to 0 raises because the nested Address is beyond it.
         with pytest.raises(MaxDepthExceededError):
             builder.build(
-                payload, target_resolver=_latest_resolver(registry), max_depth=0
+                payload, target_resolver=latest_target_resolver(registry), max_depth=0
             )
 
     @pytest.mark.parametrize(
@@ -747,6 +734,7 @@ class TestGraphBuilder:
         )
 
         builder = default_graph_builder(registry, settings, model_adapter)
+        person_target = envelope_model(model_adapter, settings, PersonV2)
         graph = builder.build(
             {
                 "document": {
@@ -761,15 +749,14 @@ class TestGraphBuilder:
                     },
                 }
             },
-            target_resolver=_fixed_resolver(
-                envelope_model(model_adapter, settings, PersonV2)
-            ),
+            target_resolver=lambda current: person_target,
         )
 
         person = graph.entry_at(("document",))
         assert person is not None
-        assert person.target == envelope_model(model_adapter, settings, PersonV2)
-        # Resolver ignored kind and returned Person for Address too — allowed.
+        assert person.target == person_target
+        # A callable resolver may ignore kind and return the same target for
+        # every entry — graph builder allows arbitrary resolver behavior.
         address = graph.entry_at(("document", "address"))
         assert address is not None
-        assert address.target == envelope_model(model_adapter, settings, PersonV2)
+        assert address.target == person_target

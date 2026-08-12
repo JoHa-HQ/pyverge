@@ -253,7 +253,7 @@ class GraphBuilder(Generic[VersionValue]):
                     version=str(source.version[1]),
                     max_depth=max_depth,
                 )
-            target = target_resolver(source.kind, source)
+            target = target_resolver(source)
             if target is None:
                 continue
             path_steps = self._resolve_migration_path(source, target)

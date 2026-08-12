@@ -8,7 +8,6 @@ from .types import (
     ExtraFieldStrategy,
     MigrationDirectionStrategy,
     MissingFieldStrategy,
-    TargetStrategy,
     ValidationMode,
 )
 
@@ -117,13 +116,5 @@ class MigrationSettings(DiscoverySettings):
         description=(
             "Number of worker threads for concurrent execution. "
             "0 = sequential. Capped at ``os.cpu_count()``."
-        ),
-    )
-    target_strategy: TargetStrategy = Field(
-        default="latest",
-        description=(
-            "Convergence target for discovered entries when no explicit "
-            "target is given. 'latest' — converge each entry to the highest "
-            "registered version for its model type. 'skip' — do not migrate."
         ),
     )
