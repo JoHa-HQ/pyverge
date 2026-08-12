@@ -4,10 +4,10 @@
 
 ```bash
 # Core library
-pip install pyverge
+pip install git+https://github.com/JoHa-HQ/pyverge.git
 
 # With CLI
-pip install "pyverge[cli]"
+pip install "git+https://github.com/JoHa-HQ/pyverge.git#egg=pyverge[cli]"
 ```
 
 The engine is provider-agnostic and works on plain dicts. The examples below

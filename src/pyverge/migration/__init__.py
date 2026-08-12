@@ -26,7 +26,13 @@ from .models import (
     MigrationSettings,
     VersioningSettings,
 )
-from .policy import compile_target_resolver, compile_target_spec
+from .policy import (
+    earliest_target_resolver,
+    fixed_target_resolver,
+    latest_target_resolver,
+    multi_target_resolver,
+    skip_target_resolver,
+)
 from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
 from .versioning import SentinelEdge, SentinelNode, VersionEdge, VersionNode
@@ -70,7 +76,11 @@ __all__ = [
     "VersionNode",
     "VersionedModelError",
     "VersioningSettings",
-    "compile_target_resolver",
     "compile_target_spec",
+    "earliest_target_resolver",
+    "fixed_target_resolver",
+    "latest_target_resolver",
+    "multi_target_resolver",
+    "skip_target_resolver",
     "types",
 ]

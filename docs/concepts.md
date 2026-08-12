@@ -1,234 +1,324 @@
 # Concepts
 
-This page outlines the building blocks of the migration engine and how they
-fit together.
+Modern data-driven systems manage a great variety of versioned data. With AI adoption, the evolution these systems have been accelerating at an exponential rate requiring a new approach to versioning of data flowing through the system.
 
-## Overview
+## The problem
 
-A migration run has three phases:
+### Versioned data evolves
 
-1. **Discovery** — walk a payload and find every dict that looks like a
-   versioned entry (a registered `(kind, version)` pair).
-2. **Planning** — build a dependency graph of those entries, resolve each one
-   to a target version, and compute the migration path.
-3. **Execution** — apply the migration steps in dependency order (children
-   before parents), optionally in parallel.
+Your application stores structured data. Over time, the schema changes: fields
+are added, removed, renamed, or retyped. Old records persist at their original
+version. New records arrive at the current version. You end up with a mixed
+population:
 
-The `ModelManager` facade wraps all of this; the individual pieces below are
-available when you need more control.
-
-## Versions
-
-A version value is either **semver** or an **ISO calendar date**:
-
-- Semver: `1.0.0`, `2.1.0-beta`, `0.1.1.dev7`
-- Date: `2024-06-01`, `2025-03-15`
-
-The strategy (semver vs. date) is inferred from the version string. Versions
-from different strategies cannot be compared.
-
-### `VersionNode`
-
-Binds a model class, a parsed version value, and a `kind` (the model family,
-e.g. `"User"` or `"Address"`). The registry treats `(kind, version)` as a
-single comparable unit.
-
-```python
-from pyverge.migration import VersionNode
-
-node = VersionNode[object](UserV1, VersionNode.of("1.0.0"), "User")
+```
+User 1.0.0: { name }
+User 2.0.0: { name, email }
+User 3.0.0: { name, email, role }
 ```
 
-### `SentinelNode`
+### Nested structures compound the problem
 
-A lightweight, value-only lookup key — carries just `(kind, version)` with no
-model binding. Used to search the registry by version string without building
-a full `VersionNode`.
+Real payloads are not flat. A `User` contains an `Address`. An `Order` contains
+`LineItem`s. Each nested piece evolves independently:
 
-## Migration edges
-
-### `VersionEdge`
-
-A directed edge connecting two versions of the same kind. Carries the `diff`
-(between the two model classes) and the migration `func`. Calling the edge
-applies the function and wraps failures in a `MigrationError`.
-
-### `SentinelEdge`
-
-A key-only edge sentinel used to look up edges in the registry without
-materializing a `Diffable`.
-
-## Registry
-
-The single source of truth for registered models, migrations, and hooks. It
-keeps:
-
-- versions in ascending order,
-- versions grouped by kind,
-- migration edges per kind,
-- an inverted index from version → referencing edges,
-- hooks per edge.
-
-Register models and migrations through the `Engine` (or the `ModelManager`
-facade) rather than directly; the registry validates adjacency and
-backward-compatibility rules.
-
-## Model providers
-
-The engine is provider-agnostic: discovery, graph planning, and execution all
-operate on plain dicts. The only place a model library is touched is the
-`ModelAdapter` seam. `PydanticModelAdapter` ships with the library; adapters
-for other providers (dataclasses, attrs, marshmallow, MessagePack, etc.)
-implement the same `ModelAdapter` protocol, and the containerless
-`CompoundKeyWalker` works with any of them.
-
-## Adapter
-
-`PydanticModelAdapter` is the only place allowed to read `version` and `kind`
-off a model class. It follows the idiomatic Pydantic pattern:
-
-```python
-class UserV1(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["1.0.0"] = "1.0.0"
+```
+User 1.0.0 {
+  Address 1.0.0 { street, city }
+}
 ```
 
-It also validates and serializes target models, so the rest of the engine
-never touches provider-specific introspection.
+Later:
 
-## Settings
+```
+User 2.0.0 {
+  Address 2.0.0 { street, city, country }
+}
+```
 
-Settings are layered:
+A single payload can contain entries at multiple versions simultaneously.
 
-- `VersioningSettings` — `kind_property` and `version_property` names.
-- `DiscoverySettings` — adds depth limits and validation mode for payload
-  discovery.
-- `MigrationSettings` — adds migration behavior: allowed `direction`
-  (`forward` / `backward` / `any`), what to do on `on_direction_violation`
-  and `on_missing_path` (`skip` / `raise`), `parallel_workers`, and the
-  default `target_strategy` (`latest` / `skip`).
+### Migration is not just transformation
 
-## Walkers
+You need to:
+- **Discover** every versioned entry in a payload (including deeply nested
+  ones).
+- **Resolve** what target version each entry should converge to (not always the
+  latest).
+- **Plan** the migration path (which intermediate versions to traverse).
+- **Order** migrations correctly (children before parents).
+- **Execute** safely (hooks, error handling, direction checks).
+- **Finalize** against the target schema (validation, coercion).
 
-Walkers scan a payload for versioned entries.
+Doing this manually is error-prone. Let's take a look at real-world scenarios.
 
-- `CompoundKeyWalker` — containerless: every dict is checked for a registered
-  `(kind, version)` pair. No structural validation. Provider-agnostic.
-- `PydanticWalker` — container-driven: validates the payload against a Pydantic
-  container model first, then visits fields whose annotations carry
-  `BaseModel` subclasses.
+## Real-world scenarios
 
-## Graph
+### MCP tool schemas
 
-`GraphBuilder` scans a payload (via a walker) and produces a
-`MigrationGraph` of `GraphEntry` objects.
+An LLM tool platform exposes hundreds of tools. Each tool has an input schema
+that evolves: a `search_weather` tool gains a `units` parameter, a
+`create_ticket` tool renames `assignee` to `owner`. Old tool-call logs persist
+at the original schema. New calls arrive at the current schema. When replaying
+logs or auditing history, every call must converge to a common version for
+analysis.
 
-A `GraphEntry` records an entry's `path` in the payload, its `source` version,
-resolved `target`, the `steps` between them, and the hooks attached to each
-step.
+**Existing approaches:**
+- Schema registry with backward-compatible changes only (Avro, Protobuf)
+- Manual version branching in tool handlers
+- Ad-hoc coercion in the LLM layer
 
-`MigrationGraph` provides:
+### Message brokers
 
-- `topological_order()` — valid migration order (children before parents),
-- `execution_levels()` — independent entries grouped into parallel waves,
-- `independent_roots()` — roots of each disjoint connected component.
+An event-driven system publishes `OrderCreated` events to Kafka. The event
+schema evolves: `price` changes from integer cents to a decimal object,
+`items` becomes a nested structure. Consumers must read old events and
+interpret them at the current schema. The broker holds a mixed population
+across partitions and retention windows.
 
-## Engine
+**Existing approaches:**
+- Schema Registry (Confluent) with compatibility rules
+- Event upcasting (Axon, EventStoreDB)
+- Consumer-side version branching
+- Dual-writing during migration windows
 
-`Engine` orchestrates everything: given a payload and a target policy it
-discovers entries, builds the graph, and delegates execution to an executor.
-The engine is direction-agnostic and can converge entries forward or backward.
+### Configuration management
 
-`manager.migrate(data, ...)` on the `ModelManager` facade delegates here.
+A SaaS app rolls out a new config schema: `feature_flags` becomes a map
+instead of a list, `theme` splits into `light_theme` and `dark_theme`. Tenant
+configs persist in the database at various versions. On each deployment, old
+configs must converge to the current schema without losing data.
 
-## Executors
+**Existing approaches:**
+- Migration scripts per tenant (Flyway, Liquibase)
+- Default-value coercion at read time
+- Versioned config documents with manual reconciliation
+- Shadow configs during rollout
 
-- `StepExecutor` — resolves and runs a single migration step (looks up the
-  edge, applies hooks, runs the function, updates the version property).
-- `SequentialExecutor` — runs entries one at a time in topological order.
-- `LevelParallelExecutor` — runs independent entries within each topological
-  level in parallel (thread pool).
+### ETL pipelines
 
-## Entry strategies
+A data warehouse ingests records from multiple sources: a legacy CRM at schema
+v1, a new API at schema v3, a partner feed at schema v2. The warehouse expects
+a uniform schema. Each source record must normalize to the target version
+before loading.
 
-`EntryMigration` is the per-entry policy: given a `GraphEntry` and its current
-data, it decides whether to migrate (direction check), runs the steps, and
-finalizes the data against the target model.
+**Existing approaches:**
+- Source-specific transformers (dbt, Airbyte)
+- Staging tables with manual normalization
+- Schema-on-read (Delta Lake, Iceberg)
+- Custom ETL scripts per source
 
-`DefaultEntryMigration` is the built-in implementation.
+### IoT telemetry
 
-## Target policies
+Sensor gateways buffer telemetry during network outages. When connectivity
+returns, the gateway uploads a batch of readings collected over hours. The
+cloud schema may have advanced in the meantime: `temperature` gains a `unit`
+field, `location` becomes a structured object. The ingestion pipeline must
+converge all readings to the current schema for dashboards and alerts.
 
-The engine is deliberately agnostic about *what* each entry should converge
-to. `compile_target_resolver(registry, policy)` turns a declarative policy
-into a resolver:
+**Existing approaches:**
+- Gateway-side schema embedding (each payload carries its schema)
+- Time-windowed schema versions in the pipeline
+- Fallback defaults for missing fields
+- Replay-only pipelines for historical data
 
-- `None` or `"skip"` — skip every entry,
-- `"latest"` / `"earliest"` — registry extreme for the kind,
-- a version string (e.g. `"1.5.0"`) — the registered version for the entry's kind,
-- a model class — the registered version of that model,
-- a `Versionable` — use as-is,
-- a `dict` — per-kind overrides, with `"*"` as the fallback.
+## The solution
+
+### Philosophy
+
+Schema evolution is inevitable. Data persists longer than code. The goal is not
+to prevent version drift, but to embrace it: treat every piece of data as
+belonging to a versioned family, and provide a systematic way to converge
+mixed populations to a desired target.
+
+### The challenge
+
+Across MCP tools, message brokers, configuration management, ETL pipelines, and
+IoT telemetry, the same challenges appear:
+
+- **Discovery** — finding every versioned entry in a nested, heterogeneous
+  payload without manual enumeration.
+- **Target selection** — not every entry should migrate to the latest version;
+  some are pinned, some are tenant-specific, some are legacy-only.
+- **Ordering** — nested entries must migrate before their parents, but manual
+  dependency tracking is error-prone.
+- **Execution** — migrations must be safe (hooks, error handling, direction
+  checks) and efficient (parallel where possible).
+- **Finalization** — migrated data must validate against the target schema.
+
+Existing solutions address pieces of this puzzle but leave gaps: schema
+registries enforce compatibility but don't migrate data; event upcasting works
+for events but not arbitrary payloads; migration scripts require manual
+ordering; ETL transformers are source-specific.
+
+### The pyverge approach
+
+**Convergent migration.** The engine treats each entry independently. Given a
+source version and a target version, it finds the registered migration path and
+executes it. Entries converge to their targets regardless of where they
+started.
+
+**Dependency graph.** Nested entries are dependencies: a parent migration may
+assume its children are already at the target version. The engine builds a
+graph that captures this containment relationship and migrates in topological
+order (children first).
+
+**Policy-driven targets.** Not every entry migrates to the latest version. Some
+legacy data is pinned to an older schema. Some tenants are on a different
+track. The library accepts a declarative **target policy** and compiles it into
+a resolver that answers, for each entry: *"what version should this converge
+to?"*
+
+**Provider-agnostic core.** Discovery, planning, and execution operate on plain
+dicts. The only place a model library (Pydantic, dataclasses, etc.) is touched
+is at the adapter seam. You can swap adapters without changing the engine.
+
+The engine treats each entry independently. Given a source version and a target
+version, it finds the registered migration path and executes it. Entries
+converge to their targets regardless of where they started.
+
+### Dependency graph
+
+Nested entries are dependencies: a parent migration may assume its children are
+already at the target version. The engine builds a graph that captures this
+containment relationship and migrates in topological order (children first).
+
+### Policy-driven targets
+
+Not every entry migrates to the latest version. Some legacy data is pinned to
+an older schema. Some tenants are on a different track. The library accepts a
+declarative **target policy** and compiles it into a resolver that answers, for
+each entry: *"what version should this converge to?"*
+
+### Provider-agnostic core
+
+Discovery, planning, and execution operate on plain dicts. The only place a
+model library (Pydantic, dataclasses, etc.) is touched is at the adapter seam.
+You can swap adapters without changing the engine.
+
+## Execution flow
+
+```mermaid
+flowchart LR
+    subgraph Input
+        P[Payload with mixed versions]
+        TP[Target policy]
+    end
+
+    P --> W[Walker discovers entries]
+    TP --> R[TargetResolver]
+    W --> GB[GraphBuilder]
+    R --> GB
+    GB --> G[MigrationGraph]
+    G --> EX[Executor]
+    EX --> REG[(Registry)]
+    EX --> OUT[Migrated payload]
+```
+
+## Execution flow
+
+The library automates the entire flow:
+
+1. **Discover** every versioned entry in the payload (including deeply nested
+   ones).
+2. **Resolve** the target version for each entry based on the policy.
+3. **Plan** the migration path and ordering (children before parents).
+4. **Execute** migrations safely with hooks and error handling.
+5. **Finalize** each entry against the target schema.
+
+
+For every discovered entry the engine asks the resolver for a target, then
+asks the registry for a migration path. The decision chain looks like this:
+
+```mermaid
+flowchart TD
+    A[Discover versioned entry] --> B{source == target?}
+    B -->|yes| C[No-op]
+    B -->|no| D{Path exists in registry?}
+    D -->|no| E[Missing path: skip / raise]
+    D -->|yes| F{Direction allows migration?}
+    F -->|no| G[Direction violation: skip / raise]
+    F -->|yes| H[Execute steps in path order]
+    H --> I[Finalize data against target model]
+    C --> J[Migrated entry]
+    E --> J
+    G --> J
+    I --> J
+```
+
+### Concrete example
+
+A payload with two entries at different versions:
+
+```mermaid
+flowchart LR
+    subgraph Payload
+        PU["User 1.0.0"]
+        PA["Address 1.0.0"]
+    end
+
+    subgraph Resolution
+        RU["target: User 3.0.0"]
+        RA["target: Address 2.0.0"]
+    end
+
+    subgraph Paths
+        PU -->|1.0.0 -> 2.0.0| U2["User 2.0.0"]
+        U2 -->|2.0.0 -> 3.0.0| RU
+        PA -->|1.0.0 -> 2.0.0| RA
+    end
+
+    Payload --> Resolution
+```
+
+The walker finds both entries. The resolver picks targets. The graph builder
+computes paths. The executor runs `Address 1.0.0 -> 2.0.0` first (child), then
+`User 1.0.0 -> 2.0.0 -> 3.0.0` (parent).
+
+## Target policy
+
+A target policy answers one question for every discovered entry: *"what version
+should this entry converge to?"* The policy is compiled into a lightweight
+`TargetResolver` before the engine sees it.
+
+```mermaid
+flowchart TD
+    subgraph Declarative forms
+        A[None / skip]
+        B[latest / earliest]
+        C[explicit version string]
+        D[model class or Versionable]
+        E[per-kind mapping with wildcard]
+    end
+
+    Declarative forms -->|compile| R[TargetResolver]
+    R -->|per entry| T[Target version]
+    T --> Engine
+```
+
+| Form | Meaning |
+| ---- | ------- |
+| `None` or `"skip"` | Leave every entry unchanged. |
+| `"latest"` / `"earliest"` | Converge to the registry extreme for the entry's kind. |
+| version string (e.g. `"1.5.0"`) | Converge to the registered version matching the entry's kind. |
+| model class or `Versionable` | Converge to the exact registered version represented by that class or node. |
+| `dict` | Per-kind overrides; `"*"` is the fallback for any unlisted kind. |
+| callable `TargetResolver` | External decision system; returned as-is. |
+
+Per-kind mappings are useful when different model families in the same payload
+need different convergence rules:
 
 ```python
-from pyverge.migration import compile_target_resolver
-
-resolver = compile_target_resolver(
-    registry,
-    {"LegacySensor": "1.5.0", "*": "latest"},
+manager.migrate(
+    data,
+    target={
+        "LegacySensor": "1.5.0",  # pin legacy data explicitly
+        "*": "latest",             # everything else moves forward
+    },
 )
 ```
 
-## Diff
-
-`PydanticDiff` computes the differences between two model versions: added,
-removed, and modified fields, with queryable predicates (e.g.
-`has_type_changes`, `is_added_required`) and pluggable rendering.
-
-`JsonPatchRender` renders the diff as an RFC 6902 JSON Patch.
-
-```python
-from pyverge.migration import PydanticDiff
-
-diff = PydanticDiff.from_pair(v1, v2)  # v1, v2 are VersionNode instances
-patch = diff.render()                  # JsonPatchRender
-```
-
-## Hooks
-
-Hooks are read-only observers fired before, after, and on error for each
-migration step.
-
-- `MigrationHook` — base class with no-op defaults; subclass and override
-  `before_migrate`, `after_migrate`, and `on_error`.
-- `OTELHook` — records each migration as an OpenTelemetry span (requires the
-  `telemetry` extra).
-
-## Manager
-
-`ModelManager[strategy].scoped(adapter=..., settings=...)` builds a configured
-manager class, where *strategy* is the version strategy (`semver.Version`,
-`pendulum.Date`). Models, migrations, and hooks are registered with the class
-decorators `@Manager.model()`, `@Manager.migration(...)`, and `@Manager.hook(...)`
-at class level; instantiate the class for the runtime facade.
-
-```python
-UserManager = ModelManager[semver.Version].scoped(
-    PydanticModelAdapter(),
-    settings=MigrationSettings(),
-)
-
-@UserManager.model()
-class UserV1(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["1.0.0"] = "1.0.0"
-    name: str
-    email: str
-```
-
-## Exceptions
-
-The module raises typed exceptions for the common failure modes:
-`ModelNotFoundError`, `MigrationNotFoundError`, `MigrationAlreadyRegisteredError`,
-`ModelAlreadyRegisteredError`, `MigrationError`, `MaxDepthExceededError`, and
-`RegistryError`.
+> **Policy** — The migration engine is deliberately agnostic about what target
+> version each payload entry should converge to. This module provides
+> lightweight `TargetResolver` factories that the graph builder and the
+> individual entry-migration strategies consume.

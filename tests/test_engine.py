@@ -1,5 +1,3 @@
-"""Tests for MigrationEngine — pass and fail cases, fully parametrized."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -30,6 +28,7 @@ from pyverge.migration import (
     SequentialExecutor,
     VersioningSettings,
     VersionNode,
+    latest_target_resolver,
     types,
 )
 from tests.examples.pydantic.chrono import (
@@ -1081,7 +1080,10 @@ class TestEntryMigrationIntegration:
             engine.store_model(v)
         engine.store_migration((versions[0], versions[1]), lambda d: d)
 
-        result = engine.migrate({"kind": "User", "version": "1.0.0", "name": "Alice"})
+        result = engine.migrate(
+            {"kind": "User", "version": "1.0.0", "name": "Alice"},
+            target=latest_target_resolver(engine.registry),
+        )
 
         assert result == {"custom": True}
         assert custom_strategy.migrate.call_count == 1

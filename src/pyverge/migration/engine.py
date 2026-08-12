@@ -12,7 +12,6 @@ from .exceptions import (
 )
 from .graph import GraphBuilder
 from .models import MigrationSettings
-from .policy import compile_target_resolver
 from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
 from .types import (
@@ -30,7 +29,6 @@ from .types import (
     ModelData,
     ModelKind,
     ModelVersionKey,
-    TargetPolicy,
     TargetResolver,
     Versionable,
     VersionMissingStrategy,
@@ -475,9 +473,8 @@ class Engine(Generic[VersionValue]):
     def migrate(
         self: Self,
         data: ModelData,
-        target: TargetPolicy = None,
+        target: TargetResolver,
         *,
-        target_resolver: TargetResolver | None = None,
         container: type[ModelBase] | None = None,
         version_property: str | None = None,
         depth_limit: int | None = None,
@@ -487,7 +484,10 @@ class Engine(Generic[VersionValue]):
         executor: Executor | None = None,
         entry_migration: EntryMigration[VersionValue] | None = None,
     ) -> ModelData:
-        """Converge every versioned entry in *data* to match the policy."""
+        """Converge every versioned entry in *data* to match the target.
+
+        *target* must be a callable ``(current) -> Versionable | None``.
+        """
         effective_direction = direction or self.settings.direction
         effective_on_direction_violation = (
             on_direction_violation or self.settings.on_direction_violation
@@ -495,18 +495,10 @@ class Engine(Generic[VersionValue]):
         effective_on_missing = on_version_not_found or self.settings.on_missing_path
         vp = version_property or self.settings.version_property
 
-        if target_resolver is None:
-            target_resolver = compile_target_resolver(
-                self.registry,
-                target or self.settings.target_strategy,
-                version_property=vp,
-                adapter=self.adapter,
-            )
-
         graph = self.graph_builder.build(
             data,
             container=container,
-            target_resolver=target_resolver,
+            target_resolver=target,
             max_depth=depth_limit,
         )
 

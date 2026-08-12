@@ -18,6 +18,11 @@ involved, wrap a real driver in a thin adapter.
 - [IoT Telemetry](iot-telemetry.md) — converging firmware-specific device payloads
 - [MQTT / IoT Streaming](mqtt-iot.md) — converge-and-forward telemetry gateway (projected)
 
+## HTTP APIs & LLM tools
+
+- [HTTP APIs (httpx transport)](http-apis.md) — converging request/response payloads around a versioned API (projected)
+- [LLM Tool Schemas (MCP SDK & FastMCP)](llm-tools.md) — converging tool-call arguments across MCP SDK and FastMCP (projected)
+
 ## What's glue vs. engine
 
 | Concern | Where it lives |

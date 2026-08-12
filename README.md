@@ -13,13 +13,10 @@ etc.) plug in the same way.
 
 ```bash
 # Core library (versioned registry, migration engine, diffing)
-pip install pyverge
+pip install git+https://github.com/JoHa-HQ/pyverge.git
 
 # With CLI (init, validate, migrate, diff, export commands)
-pip install "pyverge[cli]"
-
-# With OpenTelemetry migration hooks
-pip install "pyverge[telemetry]"
+pip install "git+https://github.com/JoHa-HQ/pyverge.git#egg=pyverge[cli]"
 ```
 
 Development dependencies are managed as a dependency group; install them with

@@ -43,8 +43,8 @@ from tests.utils import (
 def _latest_resolver(
     registry: Registry[types.VersionValue, BaseModel],
 ) -> types.TargetResolver:
-    def resolve(kind: types.ModelKind, current: types.Versionable) -> types.Versionable:
-        return registry.latest(kind)
+    def resolve(current: types.Versionable) -> types.Versionable:
+        return registry.latest(current.kind)
 
     return resolve
 
@@ -126,7 +126,7 @@ def test_executor_returns_new_payload(
         }
     }
 
-    result = eng.migrate(payload)
+    result = eng.migrate(payload, target=_latest_resolver(eng.registry))
 
     # Original payload is untouched
     assert payload["document"]["version"] == "1.0.0"
@@ -177,7 +177,7 @@ def test_executor_noop_when_source_is_target(
         }
     }
 
-    result = eng.migrate(payload)
+    result = eng.migrate(payload, target=_latest_resolver(eng.registry))
 
     assert result["document"]["version"] == "2.0.0"
     assert result["document"]["address"]["version"] == "2.0.0"
@@ -283,7 +283,7 @@ def test_sequential_executor_runs_in_topological_order(
         }
     }
 
-    eng.migrate(payload)
+    eng.migrate(payload, target=_latest_resolver(eng.registry))
 
     # Address is nested inside Person, so it must run before Person.
     assert order == ["address", "person"]
@@ -319,7 +319,7 @@ def test_executor_propagates_migration_error(
     }
 
     with pytest.raises(MigrationError, match="Migration failed"):
-        eng.migrate(payload)
+        eng.migrate(payload, target=_latest_resolver(eng.registry))
 
 
 @pytest.mark.parametrize("registry", [semver.Version], indirect=True)
@@ -350,6 +350,6 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
         }
     }
 
-    result = eng.migrate(payload)
+    result = eng.migrate(payload, target=_latest_resolver(eng.registry))
     assert result["document"]["version"] == "2.0.0"
     assert result["document"]["address"]["version"] == "2.0.0"

@@ -31,15 +31,23 @@ Example:
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any, ClassVar, Generic, cast, overload
+from typing import Any, ClassVar, Generic, Literal, cast, overload
 
 from pydantic import BaseModel
 
 from .diff import PydanticDiff
 from .engine import Engine
+from .exceptions import ModelNotFoundError, RegistryError
 from .executor import SequentialExecutor
 from .graph import GraphBuilder
 from .models import MigrationSettings
+from .policy import (
+    earliest_target_resolver,
+    fixed_target_resolver,
+    latest_target_resolver,
+    multi_target_resolver,
+    skip_target_resolver,
+)
 from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
 from .types import (
@@ -55,15 +63,78 @@ from .types import (
     ModelVersionKey,
     TargetPolicy,
     TargetResolver,
+    TargetSpec,
     TContainer,
     Versionable,
     VersionMissingStrategy,
     VersionValue,
+    VersionValue_co,
     VModel,
+    VModel_co,
     Walker,
 )
-from .versioning import VersionNode
+from .versioning import SentinelNode, VersionNode
 from .walker import CompoundKeyWalker
+
+
+def _model_resolver(
+    registry: Registry[VersionValue, ModelBase],
+    model_cls: type[BaseModel],
+    *,
+    version_property: str,
+) -> TargetResolver:
+    try:
+        target = registry.get_model_by_class(model_cls)
+    except ModelNotFoundError as exc:
+        raise RegistryError(
+            registry.name,
+            f"Target model {model_cls.__name__} is not registered",
+        ) from exc
+
+    def resolve(
+        current: Versionable[VersionValue_co, VModel_co],
+    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        if current.kind != target.kind:
+            raise RegistryError(
+                registry.name,
+                f"Target model {model_cls.__name__} belongs to kind "
+                f"{target.kind!r}, but entry kind is {current.kind!r}",
+            )
+        return target
+
+    return resolve
+
+
+def _string_resolver(
+    registry: Registry[VersionValue, ModelBase],
+    value: str,
+    adapter: ModelAdapter,
+) -> TargetResolver:
+    """Resolve an explicit version string to a registered versionable.
+
+    The string is parsed eagerly with the adapter's version parser, which
+    understands both semver and ISO date values.  Resolving against an
+    unregistered version raises ``ModelNotFoundError``; an unparsable value
+    fails fast here.
+    """
+    try:
+        parsed = adapter.of(value)
+    except ValueError:
+        raise RegistryError(
+            registry.name,
+            f"Could not resolve string target {value!r} to a version",
+        ) from None
+
+    def resolve(
+        current: Versionable[VersionValue_co, VModel_co],
+    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        sentinel: Versionable[VersionValue_co, VModel_co] = cast(
+            Versionable[VersionValue_co, VModel_co],
+            SentinelNode(current.kind, parsed),
+        )
+        return registry.get_model(sentinel)
+
+    return resolve
 
 
 def _resolve_migration_key(
@@ -362,6 +433,87 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         scoped_manager = type(cls.__name__, (cls,), namespace)
         return scoped_manager
 
+    def compile_target_spec(self, spec: TargetSpec) -> TargetResolver:
+        """Compile a single declarative target spec into a resolver closure.
+
+        Spec forms:
+            * ``None`` or ``"skip"`` → skip every entry.
+            * ``"latest"`` / ``"earliest"`` → registry extreme for the kind.
+            * a version string (e.g. ``"1.5.0"``) → the registered version.
+            * a model class → the registered version of that model.
+            * a :class:`Versionable` → use as-is.
+        """
+        registry = self.engine.registry
+        adapter = self.engine.adapter
+        version_property = self.engine.settings.version_property
+
+        if spec is None:
+            return skip_target_resolver(registry)
+
+        # Resolve string values first so we never compare a VersionNode/
+        # SentinelNode to a string (their ``__eq__`` intentionally raises for
+        # mixed types).
+        if isinstance(spec, str):
+            named_resolvers: dict[
+                str,
+                Callable[[Registry[VersionValue, ModelBase]], TargetResolver],
+            ] = {
+                "skip": skip_target_resolver,
+                "latest": latest_target_resolver,
+                "earliest": earliest_target_resolver,
+            }
+            if spec in named_resolvers:
+                return named_resolvers[spec](registry)
+            return _string_resolver(registry, spec, adapter)
+
+        if isinstance(spec, type) and issubclass(spec, ModelBase):
+            return _model_resolver(registry, spec, version_property=version_property)
+
+        # Treat any remaining value as an explicit versionable target.  This
+        # avoids an ``isinstance(spec, Versionable)`` protocol check that would
+        # trigger the strict ``__eq__`` semantics of :class:`VersionNode` /
+        # :class:`SentinelNode`.
+        return fixed_target_resolver(registry, cast(Versionable, spec))
+
+    def _resolve_kind_mapping(
+        self,
+        mapping: dict[ModelKind | Literal["*"], TargetSpec],
+    ) -> TargetResolver:
+        """Compile a per-kind target mapping into a single resolver.
+
+        The special key ``"*"`` is used as the fallback for kinds not
+        explicitly listed.
+        """
+        resolvers: dict[ModelKind | Literal["*"], TargetResolver] = {
+            kind: self.compile_target_spec(spec) for kind, spec in mapping.items()
+        }
+        return multi_target_resolver(resolvers)
+
+    def _resolve_target_policy(
+        self,
+        target: TargetPolicy,
+    ) -> TargetResolver:
+        """Normalize a high-level target policy into a single resolver.
+
+        Strings, model classes, versionables, ``None``, dict policies and
+        existing callables are all compiled into one ``TargetResolver``.
+        """
+        if isinstance(target, type) and issubclass(target, ModelBase):
+            return self.compile_target_spec(target)
+
+        if isinstance(target, dict):
+            return self._resolve_kind_mapping(
+                cast(dict[ModelKind | Literal["*"], TargetSpec], target)
+            )
+
+        if isinstance(target, str):
+            return self.compile_target_spec(target)
+
+        if callable(target):
+            return cast(TargetResolver, target)
+
+        return self.compile_target_spec(cast(TargetSpec, target))
+
     def store_model(
         self,
         key: type[VModel],
@@ -422,9 +574,8 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     def migrate(
         self,
         data: ModelData,
-        target: TargetPolicy | None = None,
+        target: TargetPolicy = "latest",
         *,
-        target_resolver: TargetResolver | None = None,
         container: type[TContainer],
         version_property: str | None = None,
         depth_limit: int | None = None,
@@ -439,9 +590,8 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     def migrate(
         self,
         data: ModelData,
-        target: TargetPolicy | None = None,
+        target: TargetPolicy = "latest",
         *,
-        target_resolver: TargetResolver | None = None,
         container: None = None,
         version_property: str | None = None,
         depth_limit: int | None = None,
@@ -455,9 +605,8 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     def migrate(  # noqa: PLR0913
         self,
         data: ModelData,
-        target: TargetPolicy | None = None,
+        target: TargetPolicy = "latest",
         *,
-        target_resolver: TargetResolver | None = None,
         container: type[TContainer] | None = None,
         version_property: str | None = None,
         depth_limit: int | None = None,
@@ -469,13 +618,17 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     ) -> ModelData | TContainer:
         """Migrate *data* to the configured target policy.
 
+        *target* accepts a declarative spec (string, model class, versionable,
+        ``None``/``"skip"``), a per-kind mapping, or an existing callable
+        resolver. Defaults to ``"latest"``.
+
         When *container* is given, the migrated payload is validated against it
         and a typed container instance is returned instead of a dict.
         """
+        resolved_target = self._resolve_target_policy(target)
         migrated = self.engine.migrate(
             data,
-            target=target,
-            target_resolver=target_resolver,
+            target=resolved_target,
             container=container,
             version_property=version_property,
             depth_limit=depth_limit,

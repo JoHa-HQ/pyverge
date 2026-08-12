@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 import pendulum
 import pytest
@@ -18,7 +18,7 @@ from pyverge.migration import (
     VersioningSettings,
 )
 from pyverge.migration.types import Walker
-from tests.utils import make_engine
+from tests.utils import make_engine, register_models
 
 
 @pytest.fixture
@@ -129,6 +129,24 @@ def manager(
         return request.getfixturevalue("chrono_manager")
     else:
         raise ValueError(f"Unsupported manager strategy: {request.param}")
+
+
+@pytest.fixture
+def populated_registry(
+    request: pytest.FixtureRequest,
+    model_adapter: PydanticModelAdapter,
+    discovery_settings: DiscoverySettings,
+) -> Registry[Any, BaseModel]:
+    """Indirect fixture: build a registry populated with the requested models.
+
+    Parametrize with ``(version_type, models)`` where *version_type* is
+    ``semver.Version`` or ``pendulum.Date`` and *models* is a tuple of model
+    classes to register.
+    """
+    version_type, models = request.param
+    registry = Registry[version_type, BaseModel]()
+    register_models(model_adapter, registry, discovery_settings, *models)
+    return registry
 
 
 @pytest.fixture
