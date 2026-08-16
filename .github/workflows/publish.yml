@@ -1,23 +1,26 @@
 name: Publish
 
 on:
-  workflow_call:
-    inputs:
-      version:
-        required: true
-        type: string
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+      - '[0-9]+.[0-9]+.[0-9]+-*'
 
 env:
   UV_FROZEN: "1"
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"

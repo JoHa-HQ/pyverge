@@ -25,17 +25,37 @@ jobs:
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
+      - name: Extract ticket ID from commits
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found. Aborting."
+            exit 1
+          fi
+          TICKET_ID=$(git log "$PREV_TAG"..HEAD --pretty=format:"%s" | grep -oE "#[0-9]+" | head -1)
+          if [ -z "$TICKET_ID" ]; then
+            echo "No ticket ID found in commits. Aborting."
+            exit 1
+          fi
+          echo "TICKET_ID=$TICKET_ID" >> "$GITHUB_ENV"
+          echo "ticket_id=$TICKET_ID"
+      - name: Generate changelog
+        run: uv run cz changelog
+      - name: Commit changelog
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(${{ env.TICKET_ID }}): update CHANGELOG.md [skip ci]"
+          file_pattern: CHANGELOG.md
       - name: Create version tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           VERSION=$(uv run cz bump --check-consistency --yes --dry-run | grep "tag to create:" | awk '{print $NF}')
-          if [ -n "$VERSION" ]; then
-            git tag -a "$VERSION" -m "Release $VERSION"
-            git push origin "$VERSION"
-            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          else
-            echo "No version bump needed"
-            echo "version=none" >> "$GITHUB_OUTPUT"
+          if [ -z "$VERSION" ]; then
+            echo "No version bump detected. Aborting."
+            exit 1
           fi
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
         id: tag

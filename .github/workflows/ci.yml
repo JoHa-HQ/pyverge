@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
@@ -38,23 +39,3 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           uv run cz changelog --dry-run
-  changelog:
-    needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: astral-sh/setup-uv@v10.0.1
-        with:
-          python-version: "3.11"
-      - run: uv sync --group dev --all-extras
-      - name: Generate changelog
-        run: uv run cz changelog
-      - name: Commit changelog
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(${{ env.TICKET_ID }}): update CHANGELOG.md [skip ci]"
-          file_pattern: CHANGELOG.md
