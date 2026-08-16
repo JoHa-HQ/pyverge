@@ -40,6 +40,7 @@ repos:
       - id: actionlint
         stages: [pre-commit]
         types: [yaml]
+        pass_filenames: true
 ci:
   skip:
     - commitizen
