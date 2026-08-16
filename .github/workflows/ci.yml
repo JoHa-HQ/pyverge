@@ -13,10 +13,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
@@ -32,6 +32,7 @@ jobs:
           BRANCH="${{ github.head_ref }}"
           TICKET_ID=$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' | head -1)
           echo "TICKET_ID=$TICKET_ID" >> $GITHUB_ENV
+
       - name: Validate changelog (dry-run)
         if: github.event_name == 'pull_request'
         run: |
@@ -41,11 +42,11 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
@@ -54,5 +55,5 @@ jobs:
       - name: Commit changelog
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore(${{ env.TICKET_ID }}): update CHANGELOG.md [skip ci]"
+          commit_message: "chore: update CHANGELOG.md [skip ci]"
           file_pattern: CHANGELOG.md

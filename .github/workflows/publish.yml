@@ -17,11 +17,11 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.11"
-      - run: uv sync --extra dev
+      - run: uv sync --group dev --all-extras
       - run: uv run hatch build
       - name: Publish to GitHub Packages
         run: |

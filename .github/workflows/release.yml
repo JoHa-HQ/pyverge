@@ -14,10 +14,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
@@ -32,7 +32,7 @@ jobs:
             uv run cz changelog --unreleased-version "${{ github.ref_name }}" > RELEASE_NOTES.md
           fi
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: RELEASE_NOTES.md
           files: dist/*
