@@ -28,9 +28,10 @@ jobs:
           uv run cz check --rev-range "$BASE..HEAD"
       - name: Extract ticket ID from branch
         if: github.event_name == 'pull_request'
+        env:
+          branch: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
-          TICKET_ID=$(echo "$BRANCH" | grep -oE '[A-Z]+-[0-9]+' | head -1)
+          TICKET_ID=$(echo "$branch" | grep -oE '[A-Z]+-[0-9]+' | head -1)
           echo "TICKET_ID=$TICKET_ID" >> $GITHUB_ENV
 
       - name: Validate changelog (dry-run)
