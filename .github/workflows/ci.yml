@@ -56,5 +56,5 @@ jobs:
       - name: Commit changelog
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: update CHANGELOG.md [skip ci]"
+          commit_message: "chore(${{ env.TICKET_ID }}): update CHANGELOG.md [skip ci]"
           file_pattern: CHANGELOG.md
