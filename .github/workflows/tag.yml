@@ -9,18 +9,18 @@ on:
     branches:
       - main
 
-permissions:
-  contents: write
-
 jobs:
   tag:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ github.token }}
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
@@ -59,3 +59,29 @@ jobs:
           git push origin "$VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
         id: tag
+      - name: Build package
+        run: uv run hatch build
+      - name: Generate release notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null)
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found. Aborting."
+            exit 1
+          fi
+          uv run cz changelog --unreleased-version "${{ steps.tag.outputs.version }}" --start-rev "$PREV_TAG" > RELEASE_NOTES.md
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: RELEASE_NOTES.md
+          files: dist/*
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Publish to GitHub Packages
+        run: |
+          uv publish \
+            --index-url https://maven.pkg.github.com/${{ github.repository }} \
+            --username ${{ github.actor }} \
+            --password ${{ github.token }}
+        env:
+          UV_PUBLISH_PASSWORD: ${{ github.token }}
