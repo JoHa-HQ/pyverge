@@ -39,6 +39,7 @@ repos:
     hooks:
       - id: actionlint
         stages: [pre-commit]
+        files: ^\.github/workflows/.*\.ya?ml$
 ci:
   skip:
     - commitizen
