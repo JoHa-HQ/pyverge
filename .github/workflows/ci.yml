@@ -31,8 +31,8 @@ jobs:
         env:
           branch: ${{ github.head_ref }}
         run: |
-          TICKET_ID=$(echo "$branch" | grep -oE '[A-Z]+-[0-9]+' | head -1)
-          echo "TICKET_ID=$TICKET_ID" >> $GITHUB_ENV
+          TICKET_ID=$(echo "$branch" | grep -oE "[A-Z]+-[0-9]+" | head -1)
+          echo "TICKET_ID=$TICKET_ID" >> "$GITHUB_ENV"
 
       - name: Validate changelog (dry-run)
         if: github.event_name == 'pull_request'

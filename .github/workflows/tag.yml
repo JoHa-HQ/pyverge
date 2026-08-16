@@ -33,9 +33,9 @@ jobs:
           if [ -n "$VERSION" ]; then
             git tag -a "$VERSION" -m "Release $VERSION"
             git push origin "$VERSION"
-            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           else
             echo "No version bump needed"
-            echo "version=none" >> $GITHUB_OUTPUT
+            echo "version=none" >> "$GITHUB_OUTPUT"
           fi
         id: tag
