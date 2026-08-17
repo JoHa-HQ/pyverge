@@ -31,8 +31,8 @@ jobs:
       - run: uv sync --group dev --all-extras
       - run: uv build
       - name: Publish to GitHub Packages
-        run: |
-          uv publish \
-            --index-url https://maven.pkg.github.com/${{ github.repository }} \
-            --username ${{ github.actor }} \
-            --password ${{ github.token }}
+        env:
+          UV_PUBLISH_URL: https://maven.pkg.github.com/${{ github.repository }}
+          UV_PUBLISH_USERNAME: ${{ github.actor }}
+          UV_PUBLISH_PASSWORD: ${{ github.token }}
+        run: uv publish dist/*
