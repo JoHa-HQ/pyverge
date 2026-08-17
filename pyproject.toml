@@ -45,7 +45,7 @@ pyverge = "pyverge.cli.main:app"
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-tag_format = "$version"
+tag_format = "v$version"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/pyverge/_version.py"
