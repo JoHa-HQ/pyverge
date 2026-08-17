@@ -42,7 +42,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          uv run cz bump --yes --changelog --bump-message "chore(${{ env.TICKET_ID }}): release $new_version [skip ci]"
+          uv run cz bump --yes --changelog --bump-message "chore(${{ env.TICKET_ID }}): release \$new_version [skip ci]"
           VERSION=$(git describe --tags --abbrev=0)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "next_version=$VERSION"
