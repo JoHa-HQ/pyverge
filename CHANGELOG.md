@@ -1,3 +1,9 @@
+## v0.1.3 (2026-08-17)
+
+### Fix
+
+- **#42**: escape $new_version in cz bump message
+
 ## v0.1.2 (2026-08-18)
 
 ### Fix
