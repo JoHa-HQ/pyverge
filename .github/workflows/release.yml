@@ -51,7 +51,7 @@ jobs:
       - name: Build package
         run: uv build
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: dist
           path: dist/
@@ -76,21 +76,20 @@ jobs:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           name: dist
           path: dist/
       - name: Generate release notes
         run: uv run cz changelog "${{ needs.tag.outputs.version }}" > RELEASE_NOTES.md
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ needs.tag.outputs.version }}
-          body_path: RELEASE_NOTES.md
-          files: dist/*
-          generate_release_notes: false
         env:
-          GITHUB_TOKEN: ${{ secrets.PUBLISHING_PAT }}
+          GH_TOKEN: ${{ secrets.PUBLISHING_PAT }}
+        run: |
+          gh release create "${{ needs.tag.outputs.version }}" \
+            --title "Release ${{ needs.tag.outputs.version }}" \
+            --notes-file RELEASE_NOTES.md \
+            dist/*
 
   publish:
     needs: [tag, release]
@@ -109,7 +108,7 @@ jobs:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           name: dist
           path: dist/
