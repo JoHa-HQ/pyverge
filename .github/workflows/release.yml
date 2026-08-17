@@ -2,22 +2,82 @@ name: GitHub Release
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-*'
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
 
-permissions:
-  contents: write
-  packages: write
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
+  tag:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
+          token: ${{ github.token }}
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Extract ticket ID from latest commit
+        run: |
+          TICKET_ID=$(git log -1 --pretty=format:"%s" | grep -oE "#[0-9]+" | head -1)
+          if [ -z "$TICKET_ID" ]; then
+            echo "No ticket ID found in latest commit. Aborting."
+            exit 1
+          fi
+          echo "TICKET_ID=$TICKET_ID" >> "$GITHUB_ENV"
+          echo "ticket_id=$TICKET_ID"
+      - name: Determine next version
+        id: version
+        run: |
+          VERSION=$(uv run cz bump --check-consistency --dry-run | grep "tag to create:" | awk '{print $NF}')
+          if [ -z "$VERSION" ]; then
+            echo "No version bump detected. Aborting."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "next_version=$VERSION"
+      - name: Generate changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^)
+          uv run cz changelog --unreleased-version "${{ steps.version.outputs.version }}" --start-rev "$PREV_TAG"
+      - name: Commit changelog
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(${{ env.TICKET_ID }}): update CHANGELOG.md [skip ci]"
+          file_pattern: CHANGELOG.md
+      - name: Create version tag
+        id: tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
+          git push origin "${{ steps.version.outputs.version }}"
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+  release:
+    needs: tag
+    if: ${{ needs.tag.outputs.version != 'none' && needs.tag.outputs.version != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.tag.outputs.version }}
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
@@ -26,23 +86,38 @@ jobs:
         run: uv run hatch build
       - name: Generate release notes
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -n "$PREV_TAG" ]; then
-            uv run cz changelog --unreleased-version "${{ github.ref_name }}" --start-rev "$PREV_TAG" > RELEASE_NOTES.md
-          else
-            uv run cz changelog --unreleased-version "${{ github.ref_name }}" > RELEASE_NOTES.md
-          fi
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^)
+          uv run cz changelog --unreleased-version "${{ needs.tag.outputs.version }}" --start-rev "$PREV_TAG" > RELEASE_NOTES.md
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ needs.tag.outputs.version }}
           body_path: RELEASE_NOTES.md
           files: dist/*
           generate_release_notes: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Trigger publish
-        uses: benc-uk/workflow-dispatch@v1
+          GITHUB_TOKEN: ${{ github.token }}
+
+  publish:
+    needs: [tag, release]
+    if: ${{ needs.tag.outputs.version != 'none' && needs.tag.outputs.version != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7.0.1
         with:
-          workflow: Publish
-          inputs: '{"version": "${{ github.ref_name }}"}'
-          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          ref: ${{ needs.tag.outputs.version }}
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - run: uv run hatch build
+      - name: Publish to GitHub Packages
+        run: |
+          uv publish \
+            --index-url https://maven.pkg.github.com/${{ github.repository }} \
+            --username ${{ github.actor }} \
+            --password ${{ github.token }}

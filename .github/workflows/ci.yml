@@ -9,6 +9,10 @@ on:
 env:
   UV_FROZEN: "1"
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -16,7 +20,6 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
@@ -27,14 +30,6 @@ jobs:
         run: |
           BASE=$(git merge-base origin/main HEAD)
           uv run cz check --rev-range "$BASE..HEAD"
-      - name: Extract ticket ID from branch
-        if: github.event_name == 'pull_request'
-        env:
-          branch: ${{ github.head_ref }}
-        run: |
-          TICKET_ID=$(echo "$branch" | grep -oE "[A-Z]+-[0-9]+" | head -1)
-          echo "TICKET_ID=$TICKET_ID" >> "$GITHUB_ENV"
-
       - name: Validate changelog (dry-run)
         if: github.event_name == 'pull_request'
         run: |
