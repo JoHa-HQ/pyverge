@@ -1,0 +1,93 @@
+name: GitHub Release
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.PUBLISHING_PAT }}
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Extract ticket ID from latest commit
+        run: |
+          TICKET_ID=$(git log -1 --pretty=format:"%s" | grep -oE "#[0-9]+" | head -1)
+          if [ -z "$TICKET_ID" ]; then
+            echo "No ticket ID found in latest commit. Aborting."
+            exit 1
+          fi
+          echo "TICKET_ID=$TICKET_ID" >> "$GITHUB_ENV"
+          echo "ticket_id=$TICKET_ID"
+      - name: Bump version, changelog, and tag
+        id: version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          uv run cz bump --yes --changelog --bump-message "chore(#${{ env.TICKET_ID }}): release {version} [skip ci]"
+          VERSION=$(git describe --tags --abbrev=0)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "next_version=$VERSION"
+          git push origin HEAD
+          git push origin "$VERSION"
+      - name: Build package
+        run: uv build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+  release:
+    needs: tag
+    if: ${{ needs.tag.outputs.version != 'none' && needs.tag.outputs.version != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.tag.outputs.version }}
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Generate release notes
+        run: uv run cz changelog "${{ needs.tag.outputs.version }}" > RELEASE_NOTES.md
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.tag.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.PUBLISHING_PAT }}

@@ -3,28 +3,36 @@ name: Publish
 on:
   push:
     tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
-      - '[0-9]+.[0-9]+.[0-9]+-*'
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
 
 env:
   UV_FROZEN: "1"
 
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
-      - run: uv sync --extra dev
-      - run: uv run hatch build
+      - run: uv sync --group dev --all-extras
+      - run: uv build
       - name: Publish to GitHub Packages
         run: |
           uv publish \
             --index-url https://maven.pkg.github.com/${{ github.repository }} \
             --username ${{ github.actor }} \
-            --password ${{ secrets.GITHUB_TOKEN }}
+            --password ${{ github.token }}

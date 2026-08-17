@@ -13,10 +13,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
@@ -26,3 +26,7 @@ jobs:
         run: |
           BASE=$(git merge-base origin/main HEAD)
           uv run cz check --rev-range "$BASE..HEAD"
+      - name: Validate changelog (dry-run)
+        if: github.event_name == 'pull_request'
+        run: |
+          uv run cz changelog --dry-run
