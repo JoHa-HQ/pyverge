@@ -47,21 +47,12 @@ jobs:
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "next_version=$VERSION"
-      - name: Generate changelog
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^)
-          uv run cz changelog --unreleased-version "${{ steps.version.outputs.version }}" --start-rev "$PREV_TAG"
-      - name: Commit changelog
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(${{ env.TICKET_ID }}): update CHANGELOG.md [skip ci]"
-          file_pattern: CHANGELOG.md
-      - name: Create version tag
-        id: tag
+      - name: Bump version, changelog, and tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.version.outputs.version }}" -m "Release ${{ steps.version.outputs.version }}"
+          uv run cz bump --yes --changelog --bump-message "chore(${{ env.TICKET_ID }}): release {version} [skip ci]"
+          git push origin HEAD
           git push origin "${{ steps.version.outputs.version }}"
     outputs:
       version: ${{ steps.version.outputs.version }}
