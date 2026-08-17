@@ -42,12 +42,35 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Remember the previous tag so we can list the changes in this release
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
           uv run cz bump --yes --changelog --bump-message "chore(${{ env.TICKET_ID }}): release \$new_version [skip ci]"
+
           VERSION=$(git describe --tags --abbrev=0)
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "next_version=$VERSION"
+
+          # Build a human-readable list of changes since the previous release
+          if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$VERSION" ]; then
+            FEATURES=$(git log --no-merges --pretty=format:"- %s" "$PREV_TAG..HEAD~1" || true)
+          else
+            FEATURES="No previous tag found."
+          fi
+          [ -z "$FEATURES" ] && FEATURES="- No conventional changes since last release."
+
+          # Amend the release commit so it actually describes what was deployed
+          git commit --amend \
+            -m "chore(${{ env.TICKET_ID }}): release $VERSION [skip ci]" \
+            -m "Features deployed:" \
+            -m "$FEATURES"
+
+          # Move the lightweight version tag to the amended commit
+          git tag -f "$VERSION"
+
           git push origin HEAD
-          git push origin "$VERSION"
+          git push origin "$VERSION" --force
       - name: Build package
         run: uv build
       - name: Upload build artifacts
