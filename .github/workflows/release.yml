@@ -97,7 +97,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -112,9 +111,8 @@ jobs:
         with:
           name: dist
           path: dist/
-      - name: Publish to GitHub Packages
+      - name: Publish to PyPI
         env:
-          UV_PUBLISH_URL: https://maven.pkg.github.com/${{ github.repository }}
-          UV_PUBLISH_USERNAME: ${{ github.actor }}
-          UV_PUBLISH_PASSWORD: ${{ github.token }}
+          UV_PUBLISH_URL: https://upload.pypi.org/legacy/
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: uv publish dist/*
