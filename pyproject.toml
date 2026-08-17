@@ -4,7 +4,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-  "python-semantic-release>=10.5",
   "pytest>=8.3",
   "ruff>=0.9",
   "toml-sort>=0.24",
@@ -77,15 +76,3 @@ select = ["E", "F", "I", "PL", "UP", "RUF"]
 "tests/test_engine.py" = ["PLR0913"]
 "tests/test_graph.py" = ["PLR0913"]
 "tests/test_version_property.py" = ["PLR0913"]
-
-[tool.semantic_release]
-branch = "main"
-commit_message = "chore(release): {version} [skip ci]"
-tag_format = "{version}"
-upload_to_vcs_release = true
-
-[tool.semantic_release.changelog]
-default_templates = {release_heading = "## [{version}] - {datetime}"}
-
-[tool.semantic_release.remote]
-type = "github"
