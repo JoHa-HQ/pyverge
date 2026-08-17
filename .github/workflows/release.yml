@@ -87,9 +87,7 @@ jobs:
           name: dist
           path: dist/
       - name: Generate release notes
-        run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^)
-          uv run cz changelog --unreleased-version "${{ needs.tag.outputs.version }}" --start-rev "$PREV_TAG" > RELEASE_NOTES.md
+        run: uv run cz changelog "${{ needs.tag.outputs.version }}" > RELEASE_NOTES.md
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
