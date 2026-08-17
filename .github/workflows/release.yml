@@ -54,6 +54,14 @@ jobs:
           uv run cz bump --yes --changelog --bump-message "chore(${{ env.TICKET_ID }}): release {version} [skip ci]"
           git push origin HEAD
           git push origin "${{ steps.version.outputs.version }}"
+      - name: Build package
+        run: uv run hatch build
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
     outputs:
       version: ${{ steps.version.outputs.version }}
 
@@ -73,8 +81,11 @@ jobs:
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
-      - name: Build package
-        run: uv run hatch build
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - name: Generate release notes
         run: |
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^)
@@ -105,7 +116,11 @@ jobs:
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
-      - run: uv run hatch build
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
       - name: Publish to GitHub Packages
         run: |
           uv publish \
