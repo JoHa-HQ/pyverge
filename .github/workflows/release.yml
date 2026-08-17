@@ -91,3 +91,31 @@ jobs:
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.PUBLISHING_PAT }}
+
+  publish:
+    needs: [tag, release]
+    if: ${{ needs.tag.outputs.version != 'none' && needs.tag.outputs.version != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.tag.outputs.version }}
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to GitHub Packages
+        env:
+          UV_PUBLISH_URL: https://maven.pkg.github.com/${{ github.repository }}
+          UV_PUBLISH_USERNAME: ${{ github.actor }}
+          UV_PUBLISH_PASSWORD: ${{ github.token }}
+        run: uv publish dist/*
