@@ -1,3 +1,14 @@
+## v0.2.0 (2026-08-18)
+
+### Feat
+
+- **#42**: include deployed changes in release commit body
+
+### Fix
+
+- **#42**: publish release artifacts to PyPI
+- **#42**: migrate release workflow from Node 20 actions
+
 ## v0.1.3 (2026-08-17)
 
 ### Fix
