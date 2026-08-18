@@ -461,6 +461,31 @@ class TestMigrationManagement:
         eng.store_migration(key, _migrate)
         assert eng.get_migration(key) is _migrate
 
+    def test_store_and_get_accepts_all_migration_key_forms(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        migration_settings: MigrationSettings,
+    ) -> None:
+        registry = Registry[semver.Version, BaseModel]()
+        eng = make_engine(registry, migration_settings)
+        v1 = envelope_model(model_adapter, versioning_settings, UserV1)
+        v2 = envelope_model(model_adapter, versioning_settings, UserV2)
+        eng.store_model(v1)
+        eng.store_model(v2)
+
+        def migrate(data: dict) -> dict:
+            return data
+
+        for key in (
+            (v1, v2),
+            (UserV1, UserV2),
+            (v1.version, v2.version),
+        ):
+            eng.store_migration(key, migrate)
+            assert eng.get_migration(key) is migrate
+            eng.remove_migration(key, force=True)
+
     def test_store_across_kinds_raises(
         self,
         model_adapter: PydanticModelAdapter,
