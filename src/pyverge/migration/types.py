@@ -72,12 +72,6 @@ MissingFieldStrategy: TypeAlias = Literal["raise", "skip"]
 ExtraFieldStrategy: TypeAlias = Literal["raise", "ignore"]
 TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]
 
-MigrationKeyInput: TypeAlias = (
-    tuple[ModelVersionKey, ModelVersionKey]
-    | tuple[type[BaseModel], type[BaseModel]]
-    | "VersionPair"
-)
-
 
 @runtime_checkable
 class Orderable(Protocol):
@@ -331,6 +325,12 @@ class ModelAdapter(Protocol):
 VersionPair: TypeAlias = tuple[
     Versionable[VersionValue_co, VModel_co], Versionable[VersionValue_co, VModel_co]
 ]
+
+MigrationKeyInput: TypeAlias = (
+    tuple[ModelVersionKey, ModelVersionKey]
+    | tuple[type[BaseModel], type[BaseModel]]
+    | VersionPair
+)
 
 LookupKey: TypeAlias = (
     Versionable[VersionValue_co, VModel_co]
