@@ -461,11 +461,23 @@ class TestMigrationManagement:
         eng.store_migration(key, _migrate)
         assert eng.get_migration(key) is _migrate
 
+    @pytest.mark.parametrize(
+        "make_key",
+        [
+            pytest.param(lambda v1, v2, m1, m2: (v1, v2), id="versionable_pair"),
+            pytest.param(lambda v1, v2, m1, m2: (m1, m2), id="class_pair"),
+            pytest.param(
+                lambda v1, v2, m1, m2: (v1.version, v2.version),
+                id="model_version_key_pair",
+            ),
+        ],
+    )
     def test_store_and_get_accepts_all_migration_key_forms(
         self,
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
         migration_settings: MigrationSettings,
+        make_key: Any,
     ) -> None:
         registry = Registry[semver.Version, BaseModel]()
         eng = make_engine(registry, migration_settings)
@@ -474,17 +486,14 @@ class TestMigrationManagement:
         eng.store_model(v1)
         eng.store_model(v2)
 
-        def migrate(data: dict) -> dict:
+        key: types.MigrationKeyInput = make_key(v1, v2, UserV1, UserV2)
+
+        def _migrate(data: dict) -> dict:
             return data
 
-        for key in (
-            (v1, v2),
-            (UserV1, UserV2),
-            (v1.version, v2.version),
-        ):
-            eng.store_migration(key, migrate)
-            assert eng.get_migration(key) is migrate
-            eng.remove_migration(key, force=True)
+        eng.store_migration(key, _migrate)
+        assert eng.get_migration(key) is _migrate
+        eng.remove_migration(key, force=True)
 
     def test_store_across_kinds_raises(
         self,
