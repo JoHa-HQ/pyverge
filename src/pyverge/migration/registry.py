@@ -77,9 +77,18 @@ class Registry(Generic[VersionValue, ProviderBase]):
         self._by_models: dict[
             type[ProviderBase], Versionable[VersionValue, ProviderBase]
         ] = {}
-        self._migrations: dict[ModelKind, list[Migratable]] = defaultdict(list)
-        self._edges_by_version: dict[Comparable, set[Migratable]] = defaultdict(set)
-        self._hooks: dict[Transitional, list[Attachable]] = defaultdict(list)
+        self._migrations: dict[
+            ModelKind,
+            list[Migratable[VersionValue, ProviderBase, ProviderBase]],
+        ] = defaultdict(list)
+        self._edges_by_version: dict[
+            Comparable[VersionValue],
+            set[Migratable[VersionValue, ProviderBase, ProviderBase]],
+        ] = defaultdict(set)
+        self._hooks: dict[
+            Transitional[VersionValue, ProviderBase, ProviderBase],
+            list[Attachable],
+        ] = defaultdict(list)
 
     def __contains__(self, index: LookupKey) -> bool:
         try:
@@ -190,6 +199,14 @@ class Registry(Generic[VersionValue, ProviderBase]):
             return True
         except MigrationNotFoundError:
             return False
+
+    def is_critical_edge(
+        self: Self, key: Transitional[VersionValue, VSource_co, VTarget_co]
+    ) -> bool:
+        idx = bisect.bisect_left(self._migrations[key.kind], key)
+        return len(self._migrations[key.kind]) > 2 and (  # noqa: PLR2004
+            idx > 0 or idx < len(self._migrations[key.kind]) - 1
+        )
 
     def get_migration_by_edge(
         self: Self, key: Transitional[VersionValue, VSource_co, VTarget_co]

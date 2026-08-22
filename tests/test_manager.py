@@ -30,6 +30,7 @@ from pyverge.migration import (
     Registry,
     RegistryError,
 )
+from pyverge.migration.types import ManagerMigrationKeyInput, VersionValue, VModel
 from tests.examples.pydantic.base import UserBaseModel
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -262,6 +263,42 @@ class TestInstanceFacade:
 
         manager.migrate(_payload("1.0.0"))
         assert hook.calls == 1
+
+    @pytest.mark.parametrize(
+        ("manager", "models", "key"),
+        [
+            (semver.Version, [UserV1, UserV2], ("User", "1.0.0", "2.0.0")),
+            (semver.Version, [UserV1, UserV2], (UserV1, UserV2)),
+            (
+                pendulum.Date,
+                [UserV20250310, UserV20251231],
+                ("User", "2025-03-10", "2025-12-31"),
+            ),
+            (
+                pendulum.Date,
+                [UserV20250310, UserV20251231],
+                (UserV20250310, UserV20251231),
+            ),
+        ],
+        indirect=["manager"],
+        ids=["semver-str", "semver-model", "date-str", "date-model"],
+    )
+    def test_store_and_get_accepts_all_migration_key_forms(
+        self,
+        manager: type[ModelManager[VersionValue]],
+        models: list[type[BaseModel]],
+        key: ManagerMigrationKeyInput[VModel],
+    ) -> None:
+        mgr = manager()
+        for model in models:
+            mgr.store_model(model)
+
+        def _migrate(data: dict) -> dict:
+            return data
+
+        mgr.store_migration(key, _migrate)
+        assert mgr.get_migration(key) is _migrate
+        mgr.remove_migration(key)
 
 
 class TestLookupHelpers:

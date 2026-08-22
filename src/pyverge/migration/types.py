@@ -326,12 +326,6 @@ VersionPair: TypeAlias = tuple[
     Versionable[VersionValue_co, VModel_co], Versionable[VersionValue_co, VModel_co]
 ]
 
-MigrationKeyInput: TypeAlias = (
-    tuple[ModelVersionKey, ModelVersionKey]
-    | tuple[type[BaseModel], type[BaseModel]]
-    | VersionPair
-)
-
 LookupKey: TypeAlias = (
     Versionable[VersionValue_co, VModel_co]
     | Migratable[VersionValue_co, VSource_co, VTarget_co]
@@ -343,11 +337,30 @@ TargetResolver: TypeAlias = Callable[
     Versionable[VersionValue_co, VModel_co] | None,
 ]
 
+EngineMigrationKeyInput: TypeAlias = (
+    tuple[ModelVersionKey[VersionValue], ModelVersionKey[VersionValue]]
+    | tuple[type[BaseModel], type[BaseModel]]
+    | VersionPair[VersionValue_co, VModel_co]
+)
+
+ManagerMigrationKeyInput: TypeAlias = (
+    tuple[type[VModel_co], type[VModel_co]] | tuple[str, str, str]
+)
+
+# Backward-compatible alias for the engine-level key accepted by ``Engine``.
+MigrationKeyInput: TypeAlias = EngineMigrationKeyInput
+
 TargetSpec: TypeAlias = (
-    Versionable[VersionValue, BaseModel] | type[BaseModel] | TargetStrategy | str | None
+    Versionable[VersionValue_co, VModel_co]
+    | type[VModel_co]
+    | TargetStrategy
+    | str
+    | None
 )
 TargetPolicy: TypeAlias = (
-    TargetSpec | dict[ModelKind | Literal["*"], TargetSpec] | TargetResolver
+    TargetSpec[VersionValue_co, VModel_co]
+    | dict[ModelKind | Literal["*"], TargetSpec[VersionValue_co, VModel_co]]
+    | TargetResolver[VersionValue_co, VModel_co]
 )
 
 
@@ -355,16 +368,16 @@ class Walker(Protocol):
     """Protocol for schema-aware payload discovery."""
 
     @property
-    def registry(self) -> Registry[VersionValue, ModelBase]: ...
+    def registry(self) -> Registry[VersionValue_co, VModel_co]: ...
 
     def discover(
         self,
         data: dict[str, Any],
         *,
         container: type[Any] | None = None,
-        target_resolver: TargetResolver,
+        target_resolver: TargetResolver[VersionValue_co, VModel_co],
         max_depth: int = -1,
-    ) -> Iterator[Entry]: ...
+    ) -> Iterator[Entry[VersionValue_co]]: ...
 
 
 class RunnableMigration(Protocol):
@@ -379,10 +392,10 @@ class Executor(Protocol):
     def run(
         self,
         data: ModelData,
-        graph: MigrationGraph,
+        graph: MigrationGraph[VersionValue_co],
         *,
-        registry: Registry[VersionValue, ModelBase],
-        entry_migration: EntryMigration,
+        registry: Registry[VersionValue_co, VModel_co],
+        entry_migration: EntryMigration[VersionValue_co],
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,

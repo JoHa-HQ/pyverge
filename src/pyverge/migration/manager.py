@@ -54,6 +54,7 @@ from .types import (
     Attachable,
     DirectionViolationStrategy,
     Executor,
+    ManagerMigrationKeyInput,
     MigrationDirectionStrategy,
     MigrationFunc,
     ModelAdapter,
@@ -135,31 +136,6 @@ def _string_resolver(
         return registry.get_model(sentinel)
 
     return resolve
-
-
-def _resolve_migration_key(
-    engine: Engine[VersionValue],
-    key: tuple[type[VModel], type[VModel]] | tuple[str, str, str],
-) -> tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]:
-    """Resolve a migration key to a ``Versionable`` pair via the engine.
-
-    Accepts a model class pair ``(SrcModel, TgtModel)`` or an explicit
-    ``(kind, source_version, target_version)`` string triple.
-    """
-    if isinstance(key, tuple) and isinstance(key[0], str):
-        kind, source_version, target_version = cast(tuple[str, str, str], key)
-        source_key: ModelVersionKey = (
-            kind,
-            cast(VersionValue, engine.adapter.of(source_version)),
-        )
-        target_key: ModelVersionKey = (
-            kind,
-            cast(VersionValue, engine.adapter.of(target_version)),
-        )
-    else:
-        source_cls, target_cls = cast(tuple[type[VModel], type[VModel]], key)
-        source_key, target_key = source_cls, target_cls
-    return engine.get_model(source_key), engine.get_model(target_key)
 
 
 class ModelProxy(Generic[VersionValue, VModel]):
@@ -275,7 +251,7 @@ class _MigrationDescriptor:
             def wrapper(func: MigrationFunc) -> MigrationFunc:
                 engine = owner._engine
                 engine.store_migration(
-                    _resolve_migration_key(engine, args),
+                    owner._resolve_migration_key(args),
                     func,
                     backward_compatible=backward_compatible,
                 )
@@ -312,14 +288,10 @@ class _HookDescriptor:
             hook: Attachable,
         ) -> Callable[[type[VModel]], type[VModel]]:
             def wrapper(marker: type[VModel]) -> type[VModel]:
-                engine = getattr(owner, "_engine", None)
-                if engine is None:
-                    raise TypeError(
-                        "ModelManager requires a strategy. Use ModelManager.scoped(...)"
-                    )
+                engine = owner._engine
                 engine.add_hook(
-                    _resolve_migration_key(
-                        engine, (kind, source_version, target_version)
+                    owner._resolve_migration_key(
+                        (kind, source_version, target_version)
                     ),
                     hook,
                 )
@@ -514,6 +486,31 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
 
         return self.compile_target_spec(cast(TargetSpec, target))
 
+    @classmethod
+    def _resolve_migration_key(
+        cls,
+        key: ManagerMigrationKeyInput[VModel],
+    ) -> tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]:
+        """Resolve a migration key to a ``Versionable`` pair via the engine.
+
+        Accepts a model class pair ``(SrcModel, TgtModel)`` or an explicit
+        ``(kind, source_version, target_version)`` string triple.
+        """
+        if isinstance(key[0], str):
+            kind, source_version, target_version = cast(tuple[str, str, str], key)
+            source_key: ModelVersionKey[VersionValue] = (
+                kind,
+                cast(VersionValue, cls._engine.adapter.of(source_version)),
+            )
+            target_key: ModelVersionKey[VersionValue] = (
+                kind,
+                cast(VersionValue, cls._engine.adapter.of(target_version)),
+            )
+            return cls._engine.get_model(source_key), cls._engine.get_model(target_key)
+
+        source_cls, target_cls = cast(tuple[type[VModel], type[VModel]], key)
+        return cls._engine.get_model(source_cls), cls._engine.get_model(target_cls)
+
     def store_model(
         self,
         key: type[VModel],
@@ -523,11 +520,11 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         Accepts a raw model class (converted to a ``Versionable`` by the
         adapter) or a pre-built ``VersionNode``.
         """
-        return self.engine.store_model(self.engine.adapter.versionable(key))
+        return self.engine.store_model(self._engine.adapter.versionable(key))
 
     def store_migration(
         self,
-        key: tuple[type[VModel], type[VModel]] | tuple[str, str, str],
+        key: ManagerMigrationKeyInput[VModel],
         func: MigrationFunc,
         *,
         backward_compatible: bool = False,
@@ -538,14 +535,28 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         ``(kind, source_version, target_version)`` string triple.
         """
         return self.engine.store_migration(
-            _resolve_migration_key(self.engine, key),
+            self._resolve_migration_key(key),
             func,
             backward_compatible=backward_compatible,
         )
 
+    def remove_migration(
+        self,
+        key: ManagerMigrationKeyInput[VModel],
+    ) -> None:
+        """Remove a migration from the instance engine."""
+        self.engine.remove_migration(self._resolve_migration_key(key))
+
+    def get_migration(
+        self,
+        key: ManagerMigrationKeyInput[VModel],
+    ) -> MigrationFunc:
+        """Return a registered migration function."""
+        return self.engine.get_migration(self._resolve_migration_key(key))
+
     def add_hook(
         self,
-        key: tuple[type[VModel], type[VModel]] | tuple[str, str, str],
+        key: ManagerMigrationKeyInput[VModel],
         hook: Attachable,
     ) -> None:
         """Register a hook through the instance engine.
@@ -553,22 +564,13 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         Accepts a model class pair ``(SrcModel, TgtModel)`` or an explicit
         ``(kind, source_version, target_version)`` string triple.
         """
-        self.engine.add_hook(_resolve_migration_key(self.engine, key), hook)
+        self.engine.add_hook(self._resolve_migration_key(key), hook)
 
     def get_model(
         self, key: tuple[ModelKind, VersionValue] | type[VModel]
     ) -> Versionable[VersionValue, VModel]:
         """Return a registered model version."""
         return self.engine.get_model(key)
-
-    def get_migration(
-        self,
-        key: (
-            tuple[ModelVersionKey, ModelVersionKey] | tuple[type[VModel], type[VModel]]
-        ),
-    ) -> MigrationFunc:
-        """Return a registered migration function."""
-        return self.engine.get_migration(key)
 
     @overload
     def migrate(
