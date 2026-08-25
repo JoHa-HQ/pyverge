@@ -411,58 +411,6 @@ class TestMigrationManagement:
         eng.store_migration((versions[0], versions[1]), _migrate)
         assert eng.get_migration((versions[0], versions[1])) is _migrate
 
-    @pytest.mark.parametrize(
-        "registry, models",
-        [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-        ],
-    )
-    def test_store_and_get_by_class_pair(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        for m in models:
-            eng.store_model(envelope_model(model_adapter, versioning_settings, m))
-
-        def _migrate(data: dict) -> dict:
-            return data
-
-        eng.store_migration((models[0], models[1]), _migrate)
-        assert eng.get_migration((models[0], models[1])) is _migrate
-
-    @pytest.mark.parametrize(
-        "registry, models",
-        [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-        ],
-    )
-    def test_store_and_get_by_tuple_pair(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            eng.store_model(v)
-
-        def _migrate(data: dict) -> dict:
-            return data
-
-        key = (versions[0].version, versions[1].version)
-        eng.store_migration(key, _migrate)
-        assert eng.get_migration(key) is _migrate
-
     def test_store_across_kinds_raises(
         self,
         model_adapter: PydanticModelAdapter,
@@ -528,18 +476,9 @@ class TestMigrationManagement:
             eng.get_migration((versions[0], versions[1]))
 
     @pytest.mark.parametrize(
-        "registry, models, key",
+        "registry, models",
         [
-            [
-                Registry[semver.Version, BaseModel](),
-                [UserV1, UserV2, UserV3],
-                (UserV2, UserV3),
-            ],
-            [
-                Registry[semver.Version, BaseModel](),
-                [UserV1, UserV2, UserV3],
-                (UserV1, UserV2),
-            ],
+            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
         ],
     )
     def test_remove_non_critical_ok(
@@ -549,7 +488,6 @@ class TestMigrationManagement:
         migration_settings: MigrationSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
-        key: tuple[type[types.VModel], type[types.VModel]],
     ) -> None:
         eng = make_engine(registry, migration_settings)
         versions = [
@@ -561,7 +499,7 @@ class TestMigrationManagement:
         for pair in pairwise(versions):
             eng.store_migration(pair, lambda d: d, backward_compatible=True)
 
-        eng.remove_migration(key)
+        eng.remove_migration((versions[0], versions[1]))
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -755,7 +693,7 @@ class TestMigrationManagement:
 
         key = SentinelEdge.from_pair(versions[0], versions[1])
         hook = MigrationHook()
-        eng.add_hook((versions[0].version, versions[1].version), hook)
+        eng.add_hook((versions[0], versions[1]), hook)
         assert registry.has_hooks(registry.get_migration_by_edge(key))
 
         eng.remove_hook((versions[0], versions[1]), hook)
@@ -843,8 +781,8 @@ class TestLookupConvenience:
             eng.store_model(v)
         eng.store_migration((versions[0], versions[1]), lambda d: d)
 
-        assert (versions[0].version, versions[1].version) in eng
-        assert (versions[1].version, versions[0].version) not in eng
+        assert (versions[0], versions[1]) in eng
+        assert (versions[1], versions[0]) not in eng
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -899,7 +837,7 @@ class TestLookupConvenience:
             return {"migrated": True}
 
         eng.store_migration((versions[0], versions[1]), _migrate)
-        assert eng[(versions[0].version, versions[1].version)] is _migrate
+        assert eng[(versions[0], versions[1])] is _migrate
 
     @pytest.mark.parametrize(
         "registry, models",

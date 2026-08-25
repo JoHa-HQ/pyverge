@@ -19,7 +19,6 @@ from .types import (
     Attachable,
     Comparable,
     DirectionViolationStrategy,
-    EngineMigrationKeyInput,
     Executor,
     Migratable,
     MigrationDirectionStrategy,
@@ -32,6 +31,7 @@ from .types import (
     TargetResolver,
     Versionable,
     VersionMissingStrategy,
+    VersionPair,
     VersionValue,
 )
 from .versioning import SentinelEdge, SentinelNode, VersionEdge
@@ -122,8 +122,8 @@ class Engine(Generic[VersionValue]):
         if not self._is_migration_pair(index):
             return False
         try:
-            pair = self._resolve_migration_key(index)
-            return self.registry.has_migration(SentinelEdge.from_pair(*pair))
+            edge_key = self._resolve_migration_edge_key(index)
+            return self.registry.has_migration(edge_key)
         except (MigrationNotFoundError, ModelNotFoundError, RegistryError, TypeError):
             return False
 
@@ -136,13 +136,14 @@ class Engine(Generic[VersionValue]):
             return False
 
     def _is_migration_pair(self, index: Any) -> bool:
-        """Return ``True`` when *index* looks like a migration endpoint pair."""
+        """Return ``True`` when *index* is a migration edge lookup key."""
         if isinstance(index, SentinelEdge):
             return True
         return (
             isinstance(index, tuple)
             and len(index) == MIGRATION_PAIR_LEN
-            and not isinstance(index[0], str)
+            and isinstance(index[0], Versionable)
+            and isinstance(index[1], Versionable)
         )
 
     def __getitem__(self, index: Any) -> MigrationFunc | list[MigrationFunc]:
@@ -159,30 +160,29 @@ class Engine(Generic[VersionValue]):
             ]
 
         if self._is_migration_pair(index):
-            pair = self._resolve_migration_key(index)
-            return self.registry.get_migration_by_edge(
-                SentinelEdge.from_pair(*pair)
-            ).func
+            edge_key = self._resolve_migration_edge_key(index)
+            return self.registry.get_migration_by_edge(edge_key).func
 
         raise RegistryError(
             self.registry.name, f"Unsupported index type: {type(index)}"
         )
 
-    def _resolve_migration_key(
+    def _resolve_migration_edge_key(
         self: Self,
-        key: EngineMigrationKeyInput,
-    ) -> tuple[Versionable, Versionable]:
-        """Normalize a migration key to a strict ``Versionable`` pair."""
-        from_ref, to_ref = key
-        return self.get_model(from_ref), self.get_model(to_ref)
+        index: SentinelEdge | VersionPair[VersionValue, ModelBase],
+    ) -> SentinelEdge:
+        """Normalize a migration lookup key to a sentinel edge."""
+        if isinstance(index, SentinelEdge):
+            return index
+        return SentinelEdge.from_pair(*index)
 
     def _resolve_edge(
         self: Self,
-        key: EngineMigrationKeyInput,
+        key: VersionPair[VersionValue, ModelBase],
     ) -> tuple[tuple[Versionable, Versionable], Migratable]:
-        """Normalize *key* and fetch the registered edge."""
-        pair = self._resolve_migration_key(key)
-        return pair, self.registry.get_migration_by_edge(SentinelEdge.from_pair(*pair))
+        """Fetch the registered edge for a resolved version pair."""
+        # pair = self._resolve_migration_key(key)
+        return key, self.registry.get_migration_by_edge(SentinelEdge.from_pair(*key))
 
     def store_model(
         self: Self,
@@ -233,14 +233,14 @@ class Engine(Generic[VersionValue]):
 
     def store_migration(
         self: Self,
-        key: EngineMigrationKeyInput,
+        key: VersionPair[VersionValue, ModelBase],
         func: MigrationFunc,
         *,
         backward_compatible: bool = False,
     ) -> MigrationFunc:
         """Register a migration with adjacency and backward-compat validation."""
         registry = self.registry
-        v_from, v_to = self._resolve_migration_key(key)
+        v_from, v_to = key
 
         if v_from.kind != v_to.kind:
             raise RegistryError(
@@ -266,7 +266,7 @@ class Engine(Generic[VersionValue]):
 
     def get_migration(
         self: Self,
-        key: EngineMigrationKeyInput,
+        key: VersionPair[VersionValue, ModelBase],
     ) -> MigrationFunc:
         """Return the migration function for *key*."""
         _, edge = self._resolve_edge(key)
@@ -274,7 +274,7 @@ class Engine(Generic[VersionValue]):
 
     def remove_migration(
         self: Self,
-        key: EngineMigrationKeyInput,
+        key: VersionPair[VersionValue, ModelBase],
         *,
         force: bool = False,
     ) -> None:
@@ -427,7 +427,7 @@ class Engine(Generic[VersionValue]):
 
     def add_hook(
         self: Self,
-        key: EngineMigrationKeyInput,
+        key: VersionPair[VersionValue, ModelBase],
         hook: Attachable,
     ) -> None:
         """Register a hook for a migration step."""
@@ -436,7 +436,7 @@ class Engine(Generic[VersionValue]):
 
     def remove_hook(
         self: Self,
-        key: EngineMigrationKeyInput,
+        key: VersionPair[VersionValue, ModelBase],
         hook: Attachable | None = None,
     ) -> None:
         """Remove hooks for a migration step."""
@@ -445,7 +445,7 @@ class Engine(Generic[VersionValue]):
 
     def clear_hooks(
         self: Self,
-        key: EngineMigrationKeyInput | None = None,
+        key: VersionPair[VersionValue, ModelBase] | None = None,
     ) -> None:
         """Clear hooks from the registry."""
         if key is None:

@@ -337,18 +337,11 @@ TargetResolver: TypeAlias = Callable[
     Versionable[VersionValue_co, VModel_co] | None,
 ]
 
-EngineMigrationKeyInput: TypeAlias = (
-    tuple[ModelVersionKey[VersionValue], ModelVersionKey[VersionValue]]
-    | tuple[type[BaseModel], type[BaseModel]]
-    | VersionPair[VersionValue_co, VModel_co]
-)
 
 ManagerMigrationKeyInput: TypeAlias = (
     tuple[type[VModel_co], type[VModel_co]] | tuple[str, str, str]
 )
 
-# Backward-compatible alias for the engine-level key accepted by ``Engine``.
-MigrationKeyInput: TypeAlias = EngineMigrationKeyInput
 
 TargetSpec: TypeAlias = (
     Versionable[VersionValue_co, VModel_co]
