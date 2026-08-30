@@ -19,6 +19,7 @@ from .types import (
     Comparable,
     DirectionViolationStrategy,
     Executor,
+    Migratable,
     MigrationDirectionStrategy,
     MigrationFunc,
     ModelAdapter,
@@ -26,6 +27,7 @@ from .types import (
     ModelData,
     ModelKind,
     TargetResolver,
+    Transitional,
     Versionable,
     VersionMissingStrategy,
     VersionPair,
@@ -175,14 +177,14 @@ class Engine(Generic[VersionValue]):
         key: Comparable[VersionValue],
     ) -> Versionable[VersionValue, ModelBase]:
         """Return the model matching *key*."""
-        return self.registry.get_model(self._resolve_model_key(key))
+        return self.registry.get_model(key)
 
     def remove_model(
         self: Self,
         key: Comparable[VersionValue],
     ) -> None:
         """Remove a model version from the registry."""
-        self.registry.remove_model(self._resolve_model_key(key))
+        self.registry.remove_model(key)
 
     def model_latest(
         self: Self,
@@ -235,14 +237,14 @@ class Engine(Generic[VersionValue]):
 
     def get_migration(
         self: Self,
-        key: SentinelEdge,
-    ) -> MigrationFunc:
-        """Return the migration function for *key*."""
-        return self.registry.get_migration_by_edge(key).func
+        key: Transitional[VersionValue, ModelBase, ModelBase],
+    ) -> Migratable:
+        """Return the registered migration for *key*."""
+        return self.registry.get_migration_by_edge(key)
 
     def remove_migration(
         self: Self,
-        key: SentinelEdge,
+        key: Transitional[VersionValue, ModelBase, ModelBase],
         *,
         force: bool = False,
     ) -> None:
@@ -395,7 +397,7 @@ class Engine(Generic[VersionValue]):
 
     def add_hook(
         self: Self,
-        key: SentinelEdge,
+        key: Transitional[VersionValue, ModelBase, ModelBase],
         hook: Attachable,
     ) -> None:
         """Register a hook for a migration step."""
@@ -404,7 +406,7 @@ class Engine(Generic[VersionValue]):
 
     def remove_hook(
         self: Self,
-        key: SentinelEdge,
+        key: Transitional[VersionValue, ModelBase, ModelBase],
         hook: Attachable | None = None,
     ) -> None:
         """Remove hooks for a migration step."""
@@ -413,7 +415,7 @@ class Engine(Generic[VersionValue]):
 
     def clear_hooks(
         self: Self,
-        key: SentinelEdge | None = None,
+        key: Transitional[VersionValue, ModelBase, ModelBase] | None = None,
     ) -> None:
         """Clear hooks from the registry."""
         if key is None:

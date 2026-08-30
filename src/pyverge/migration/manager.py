@@ -55,6 +55,7 @@ from .types import (
     DirectionViolationStrategy,
     Executor,
     ManagerMigrationKeyInput,
+    Migratable,
     MigrationDirectionStrategy,
     MigrationFunc,
     ModelAdapter,
@@ -548,7 +549,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
     def get_migration(
         self,
         key: ManagerMigrationKeyInput[VModel],
-    ) -> MigrationFunc:
+    ) -> Migratable[VersionValue, VModel, VModel]:
         """Return a registered migration function."""
         pair = self._resolve_migration_key(key)
         return self.engine.get_migration(SentinelEdge.from_pair(*pair))

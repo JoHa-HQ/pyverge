@@ -320,7 +320,7 @@ class TestMigrationManagement:
 
         eng.store_migration((versions[0], versions[1]), _migrate)
         edge = SentinelEdge.from_pair(versions[0], versions[1])
-        assert eng.get_migration(edge) is _migrate
+        assert eng.get_migration(edge).func is _migrate
 
     def test_store_across_kinds_raises(
         self,

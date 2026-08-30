@@ -297,7 +297,7 @@ class TestInstanceFacade:
             return data
 
         mgr.store_migration(key, _migrate)
-        assert mgr.get_migration(key) is _migrate
+        assert mgr.get_migration(key).func is _migrate
         mgr.remove_migration(key)
 
 
