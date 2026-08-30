@@ -79,14 +79,14 @@ class Registry(Generic[VersionValue, ProviderBase]):
         ] = {}
         self._migrations: dict[
             ModelKind,
-            list[Migratable[VersionValue, ProviderBase, ProviderBase]],
+            list[Migratable[VersionValue, ModelBase, ModelBase]],
         ] = defaultdict(list)
         self._edges_by_version: dict[
             Comparable[VersionValue],
-            set[Migratable[VersionValue, ProviderBase, ProviderBase]],
+            set[Migratable[VersionValue, ModelBase, ModelBase]],
         ] = defaultdict(set)
         self._hooks: dict[
-            Transitional[VersionValue, ProviderBase, ProviderBase],
+            Transitional[VersionValue, ModelBase, ModelBase],
             list[Attachable],
         ] = defaultdict(list)
 

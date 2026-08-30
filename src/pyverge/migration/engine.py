@@ -15,19 +15,16 @@ from .models import MigrationSettings
 from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
 from .types import (
-    MIGRATION_PAIR_LEN,
     Attachable,
     Comparable,
     DirectionViolationStrategy,
     Executor,
-    Migratable,
     MigrationDirectionStrategy,
     MigrationFunc,
     ModelAdapter,
     ModelBase,
     ModelData,
     ModelKind,
-    ModelVersionKey,
     TargetResolver,
     Versionable,
     VersionMissingStrategy,
@@ -35,8 +32,6 @@ from .types import (
     VersionValue,
 )
 from .versioning import SentinelEdge, SentinelNode, VersionEdge
-
-# Expected length for an endpoint-pair tuple such as ``(Versionable, Versionable)``.
 
 
 class Engine(Generic[VersionValue]):
@@ -91,11 +86,11 @@ class Engine(Generic[VersionValue]):
 
     def _resolve_model_key(
         self: Self,
-        key: Comparable | ModelVersionKey | type[ModelBase],
+        key: Any,
     ) -> SentinelNode[VersionValue]:
         """Normalize a model key to the registry's strict sentinel form."""
         if isinstance(key, tuple):
-            kind, value = cast(ModelVersionKey, key)
+            kind, value = key
             return SentinelNode[VersionValue](kind, value)
         if isinstance(key, SentinelNode):
             return cast(SentinelNode[VersionValue], key)
@@ -119,12 +114,20 @@ class Engine(Generic[VersionValue]):
 
     def _contains_migration(self, index: Any) -> bool:
         """Check membership of a single migration edge key."""
-        if not self._is_migration_pair(index):
-            return False
         try:
-            edge_key = self._resolve_migration_edge_key(index)
+            edge_key = (
+                index
+                if isinstance(index, SentinelEdge)
+                else SentinelEdge.from_pair(*index)
+            )
             return self.registry.has_migration(edge_key)
-        except (MigrationNotFoundError, ModelNotFoundError, RegistryError, TypeError):
+        except (
+            MigrationNotFoundError,
+            ModelNotFoundError,
+            RegistryError,
+            TypeError,
+            AttributeError,
+        ):
             return False
 
     def _contains_model_key(self, index: Any) -> bool:
@@ -134,17 +137,6 @@ class Engine(Generic[VersionValue]):
             return self.registry.get_model(resolved) is not None
         except (ModelNotFoundError, TypeError):
             return False
-
-    def _is_migration_pair(self, index: Any) -> bool:
-        """Return ``True`` when *index* is a migration edge lookup key."""
-        if isinstance(index, SentinelEdge):
-            return True
-        return (
-            isinstance(index, tuple)
-            and len(index) == MIGRATION_PAIR_LEN
-            and isinstance(index[0], Versionable)
-            and isinstance(index[1], Versionable)
-        )
 
     def __getitem__(self, index: Any) -> MigrationFunc | list[MigrationFunc]:
         """Select a migration function or a path of functions."""
@@ -159,30 +151,17 @@ class Engine(Generic[VersionValue]):
                 for src, dst in path
             ]
 
-        if self._is_migration_pair(index):
-            edge_key = self._resolve_migration_edge_key(index)
+        if isinstance(index, (SentinelEdge, tuple)):
+            edge_key = (
+                index
+                if isinstance(index, SentinelEdge)
+                else SentinelEdge.from_pair(*index)
+            )
             return self.registry.get_migration_by_edge(edge_key).func
 
         raise RegistryError(
             self.registry.name, f"Unsupported index type: {type(index)}"
         )
-
-    def _resolve_migration_edge_key(
-        self: Self,
-        index: SentinelEdge | VersionPair[VersionValue, ModelBase],
-    ) -> SentinelEdge:
-        """Normalize a migration lookup key to a sentinel edge."""
-        if isinstance(index, SentinelEdge):
-            return index
-        return SentinelEdge.from_pair(*index)
-
-    def _resolve_edge(
-        self: Self,
-        key: VersionPair[VersionValue, ModelBase],
-    ) -> tuple[tuple[Versionable, Versionable], Migratable]:
-        """Fetch the registered edge for a resolved version pair."""
-        # pair = self._resolve_migration_key(key)
-        return key, self.registry.get_migration_by_edge(SentinelEdge.from_pair(*key))
 
     def store_model(
         self: Self,
@@ -193,24 +172,17 @@ class Engine(Generic[VersionValue]):
 
     def get_model(
         self: Self,
-        key: Comparable[VersionValue] | ModelVersionKey[VersionValue] | type[ModelBase],
+        key: Comparable[VersionValue],
     ) -> Versionable[VersionValue, ModelBase]:
         """Return the model matching *key*."""
         return self.registry.get_model(self._resolve_model_key(key))
 
     def remove_model(
         self: Self,
-        key: Comparable[VersionValue] | ModelVersionKey[VersionValue] | type[ModelBase],
+        key: Comparable[VersionValue],
     ) -> None:
         """Remove a model version from the registry."""
-        if isinstance(key, tuple):
-            kind, value = cast(ModelVersionKey, key)
-            sentinel = SentinelNode[VersionValue](kind, value)
-        elif isinstance(key, type) and issubclass(key, ModelBase):
-            sentinel = self.registry.get_model_by_class(key)
-        else:
-            sentinel = key
-        self.registry.remove_model(sentinel)
+        self.registry.remove_model(self._resolve_model_key(key))
 
     def model_latest(
         self: Self,
@@ -221,15 +193,12 @@ class Engine(Generic[VersionValue]):
 
     def find_model(
         self: Self,
-        key: ModelVersionKey[VersionValue] | type[ModelBase] | ModelKind,
-    ) -> Versionable[VersionValue, ModelBase] | None:
-        """Return the model matching *key*, or ``None`` if not found."""
-        try:
-            if isinstance(key, str):
-                return self.registry.latest(key)
-            return self.get_model(key)
-        except (ModelNotFoundError, RegistryError, ValueError):
-            return None
+        key: Comparable[VersionValue] | ModelKind,
+    ) -> Versionable[VersionValue, ModelBase]:
+        """Return the model matching *key*."""
+        if isinstance(key, str):
+            return self.registry.latest(key)
+        return self.get_model(key)
 
     def store_migration(
         self: Self,
@@ -266,32 +235,31 @@ class Engine(Generic[VersionValue]):
 
     def get_migration(
         self: Self,
-        key: VersionPair[VersionValue, ModelBase],
+        key: SentinelEdge,
     ) -> MigrationFunc:
         """Return the migration function for *key*."""
-        _, edge = self._resolve_edge(key)
-        return edge.func
+        return self.registry.get_migration_by_edge(key).func
 
     def remove_migration(
         self: Self,
-        key: VersionPair[VersionValue, ModelBase],
+        key: SentinelEdge,
         *,
         force: bool = False,
     ) -> None:
         """Remove a single migration."""
-        pair, edge = self._resolve_edge(key)
+        edge = self.registry.get_migration_by_edge(key)
 
         if not force:
-            if not self.registry.is_adjacent(SentinelEdge.from_pair(*pair)):
+            if not self.registry.is_adjacent(key):
                 raise RegistryError(
                     self.registry.name,
-                    f"Cannot remove migration {pair[0]}→{pair[1]}: "
+                    f"Cannot remove migration {key.source}→{key.target}: "
                     "it is not adjacent to any other version.",
                 )
-            if self.registry.is_critical_edge(SentinelEdge.from_pair(*pair)):
+            if self.registry.is_critical_edge(key):
                 raise RegistryError(
                     self.registry.name,
-                    f"Cannot remove critical migration {pair[0]}→{pair[1]}. "
+                    f"Cannot remove critical migration {key.source}→{key.target}. "
                     "It is on the critical path. Use force=True to override.",
                 )
 
@@ -427,31 +395,31 @@ class Engine(Generic[VersionValue]):
 
     def add_hook(
         self: Self,
-        key: VersionPair[VersionValue, ModelBase],
+        key: SentinelEdge,
         hook: Attachable,
     ) -> None:
         """Register a hook for a migration step."""
-        _, edge = self._resolve_edge(key)
+        edge = self.registry.get_migration_by_edge(key)
         self.registry.add_hook(edge, hook)
 
     def remove_hook(
         self: Self,
-        key: VersionPair[VersionValue, ModelBase],
+        key: SentinelEdge,
         hook: Attachable | None = None,
     ) -> None:
         """Remove hooks for a migration step."""
-        _, edge = self._resolve_edge(key)
+        edge = self.registry.get_migration_by_edge(key)
         self.registry.remove_hook(edge, hook)
 
     def clear_hooks(
         self: Self,
-        key: VersionPair[VersionValue, ModelBase] | None = None,
+        key: SentinelEdge | None = None,
     ) -> None:
         """Clear hooks from the registry."""
         if key is None:
             self.registry.clear_hooks()
         else:
-            _, edge = self._resolve_edge(key)
+            edge = self.registry.get_migration_by_edge(key)
             self.registry.clear_hooks(edge)
 
     def migrate(

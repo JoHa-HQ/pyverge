@@ -61,7 +61,6 @@ from .types import (
     ModelBase,
     ModelData,
     ModelKind,
-    ModelVersionKey,
     TargetPolicy,
     TargetResolver,
     TargetSpec,
@@ -74,7 +73,7 @@ from .types import (
     VModel_co,
     Walker,
 )
-from .versioning import SentinelNode, VersionNode
+from .versioning import SentinelEdge, SentinelNode, VersionNode
 from .walker import CompoundKeyWalker
 
 
@@ -289,12 +288,10 @@ class _HookDescriptor:
         ) -> Callable[[type[VModel]], type[VModel]]:
             def wrapper(marker: type[VModel]) -> type[VModel]:
                 engine = owner._engine
-                engine.add_hook(
-                    owner._resolve_migration_key(
-                        (kind, source_version, target_version)
-                    ),
-                    hook,
+                pair = owner._resolve_migration_key(
+                    (kind, source_version, target_version)
                 )
+                engine.add_hook(SentinelEdge.from_pair(*pair), hook)
                 return marker
 
             return wrapper
@@ -498,18 +495,18 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         """
         if isinstance(key[0], str):
             kind, source_version, target_version = cast(tuple[str, str, str], key)
-            source_key: ModelVersionKey[VersionValue] = (
-                kind,
-                cast(VersionValue, cls._engine.adapter.of(source_version)),
+            source_val = cast(VersionValue, cls._engine.adapter.of(source_version))
+            target_val = cast(VersionValue, cls._engine.adapter.of(target_version))
+            return (
+                cls._engine.get_model(SentinelNode(kind, source_val)),
+                cls._engine.get_model(SentinelNode(kind, target_val)),
             )
-            target_key: ModelVersionKey[VersionValue] = (
-                kind,
-                cast(VersionValue, cls._engine.adapter.of(target_version)),
-            )
-            return cls._engine.get_model(source_key), cls._engine.get_model(target_key)
 
         source_cls, target_cls = cast(tuple[type[VModel], type[VModel]], key)
-        return cls._engine.get_model(source_cls), cls._engine.get_model(target_cls)
+        return (
+            cls._engine.registry.get_model_by_class(source_cls),
+            cls._engine.registry.get_model_by_class(target_cls),
+        )
 
     def store_model(
         self,
@@ -545,14 +542,16 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         key: ManagerMigrationKeyInput[VModel],
     ) -> None:
         """Remove a migration from the instance engine."""
-        self.engine.remove_migration(self._resolve_migration_key(key))
+        pair = self._resolve_migration_key(key)
+        self.engine.remove_migration(SentinelEdge.from_pair(*pair))
 
     def get_migration(
         self,
         key: ManagerMigrationKeyInput[VModel],
     ) -> MigrationFunc:
         """Return a registered migration function."""
-        return self.engine.get_migration(self._resolve_migration_key(key))
+        pair = self._resolve_migration_key(key)
+        return self.engine.get_migration(SentinelEdge.from_pair(*pair))
 
     def add_hook(
         self,
@@ -564,13 +563,17 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         Accepts a model class pair ``(SrcModel, TgtModel)`` or an explicit
         ``(kind, source_version, target_version)`` string triple.
         """
-        self.engine.add_hook(self._resolve_migration_key(key), hook)
+        pair = self._resolve_migration_key(key)
+        self.engine.add_hook(SentinelEdge.from_pair(*pair), hook)
 
     def get_model(
         self, key: tuple[ModelKind, VersionValue] | type[VModel]
     ) -> Versionable[VersionValue, VModel]:
         """Return a registered model version."""
-        return self.engine.get_model(key)
+        if isinstance(key, tuple):
+            kind, value = key
+            return self.engine.get_model(SentinelNode(kind, value))
+        return self.engine.get_model(self.engine.registry.get_model_by_class(key))
 
     @overload
     def migrate(
