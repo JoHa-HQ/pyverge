@@ -505,8 +505,8 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
 
         source_cls, target_cls = cast(tuple[type[VModel], type[VModel]], key)
         return (
-            cls._engine.registry.get_model_by_class(source_cls),
-            cls._engine.registry.get_model_by_class(target_cls),
+            cls._engine.get_model_by_class(source_cls),
+            cls._engine.get_model_by_class(target_cls),
         )
 
     def store_model(
@@ -574,7 +574,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         if isinstance(key, tuple):
             kind, value = key
             return self.engine.get_model(SentinelNode(kind, value))
-        return self.engine.get_model(self.engine.registry.get_model_by_class(key))
+        return self.engine.get_model_by_class(key)
 
     @overload
     def migrate(

@@ -1,7 +1,7 @@
 """Migrations manager."""
 
 import bisect
-from typing import Any, Generic, Self, cast
+from typing import Any, Generic, Self, cast, overload
 
 from .diff import PydanticDiff
 from .exceptions import (
@@ -140,16 +140,20 @@ class Engine(Generic[VersionValue]):
         except (ModelNotFoundError, TypeError):
             return False
 
-    def __getitem__(self, index: Any) -> MigrationFunc | list[MigrationFunc]:
-        """Select a migration function or a path of functions."""
+    @overload
+    def __getitem__(self, index: slice) -> list[Migratable]: ...
+
+    @overload
+    def __getitem__(self, index: SentinelEdge | tuple) -> Migratable: ...
+
+    def __getitem__(self, index: Any) -> Migratable | list[Migratable]:
+        """Select a migration or a path of migrations."""
         if isinstance(index, slice):
             from_v = self.get_model(self._resolve_model_key(index.start))
             to_v = self.get_model(self._resolve_model_key(index.stop))
             path = self.find_migration_path(from_v, to_v)
             return [
-                self.registry.get_migration_by_edge(
-                    SentinelEdge.from_pair(src, dst)
-                ).func
+                self.registry.get_migration_by_edge(SentinelEdge.from_pair(src, dst))
                 for src, dst in path
             ]
 
@@ -159,7 +163,7 @@ class Engine(Generic[VersionValue]):
                 if isinstance(index, SentinelEdge)
                 else SentinelEdge.from_pair(*index)
             )
-            return self.registry.get_migration_by_edge(edge_key).func
+            return self.registry.get_migration_by_edge(edge_key)
 
         raise RegistryError(
             self.registry.name, f"Unsupported index type: {type(index)}"
@@ -178,6 +182,13 @@ class Engine(Generic[VersionValue]):
     ) -> Versionable[VersionValue, ModelBase]:
         """Return the model matching *key*."""
         return self.registry.get_model(key)
+
+    def get_model_by_class(
+        self: Self,
+        cls: type[ModelBase],
+    ) -> Versionable[VersionValue, ModelBase]:
+        """Return the model matching the Pydantic class *cls*."""
+        return self.registry.get_model_by_class(cls)
 
     def remove_model(
         self: Self,

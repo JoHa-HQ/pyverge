@@ -749,7 +749,7 @@ class TestLookupConvenience:
             return {"migrated": True}
 
         eng.store_migration((versions[0], versions[1]), _migrate)
-        assert eng[(versions[0], versions[1])] is _migrate
+        assert eng[(versions[0], versions[1])].func is _migrate
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -782,7 +782,7 @@ class TestLookupConvenience:
         eng.store_migration((versions[1], versions[2]), _migrate_23)
 
         path = eng[slice(versions[0].version, versions[2].version)]
-        assert path == [_migrate_12, _migrate_23]
+        assert [e.func for e in path] == [_migrate_12, _migrate_23]
 
 
 class TestEntryMigrationIntegration:
