@@ -1,3 +1,9 @@
+## v0.2.1 (2026-08-31)
+
+### Fix
+
+- **#44**: define MigrationKeyInput after VersionPair (#45)
+
 ## v0.2.0 (2026-08-18)
 
 ### Feat
