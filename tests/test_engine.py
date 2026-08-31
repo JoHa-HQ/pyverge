@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import pairwise
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -37,6 +38,7 @@ from tests.examples.pydantic.chrono import (
     UserV20260228,
 )
 from tests.examples.pydantic.semver import (
+    UserV011Dev7,
     UserV1,
     UserV2,
     UserV3,
@@ -66,47 +68,6 @@ class TestModelManagement:
             [Registry[pendulum.Date, BaseModel](), UserV20250310],
         ],
     )
-    def test_store_and_get_model_by_tuple(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        version = envelope_model(model_adapter, versioning_settings, model)
-        eng.store_model(version)
-
-        assert eng.get_model(version.version).model is model
-
-    @pytest.mark.parametrize(
-        "registry, model",
-        [
-            [Registry[semver.Version, BaseModel](), UserV1],
-            [Registry[pendulum.Date, BaseModel](), UserV20250310],
-        ],
-    )
-    def test_get_model_by_class(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        eng.store_model(envelope_model(model_adapter, versioning_settings, model))
-
-        assert eng.get_model(model).model is model
-
-    @pytest.mark.parametrize(
-        "registry, model",
-        [
-            [Registry[semver.Version, BaseModel](), UserV1],
-            [Registry[pendulum.Date, BaseModel](), UserV20250310],
-        ],
-    )
     def test_get_model_by_versionable(
         self,
         model_adapter: PydanticModelAdapter,
@@ -124,10 +85,13 @@ class TestModelManagement:
     @pytest.mark.parametrize(
         "registry, key",
         [
-            [Registry[semver.Version, BaseModel](), ("User", semver.Version(9, 9, 9))],
+            [
+                Registry[semver.Version, BaseModel](),
+                SentinelNode("User", semver.Version(9, 9, 9)),
+            ],
             [
                 Registry[pendulum.Date, BaseModel](),
-                ("User", pendulum.Date(2099, 1, 1)),
+                SentinelNode("User", pendulum.Date(2099, 1, 1)),
             ],
         ],
     )
@@ -135,7 +99,7 @@ class TestModelManagement:
         self,
         migration_settings: MigrationSettings,
         registry: Registry[types.VersionValue, BaseModel],
-        key: types.ModelVersionKey,
+        key: SentinelNode,
     ) -> None:
         eng = make_engine(registry, migration_settings)
         with pytest.raises(ModelNotFoundError):
@@ -222,24 +186,16 @@ class TestModelManagement:
         version = envelope_model(model_adapter, versioning_settings, model)
         eng.store_model(version)
 
-        found = eng.find_model(version.version)
-        assert found is not None
+        found = eng.find_model(version)
         assert found.model is model
 
-    @pytest.mark.parametrize(
-        "registry, key",
-        [
-            [Registry[semver.Version, BaseModel](), ("User", semver.Version(9, 9, 9))],
-        ],
-    )
-    def test_find_model_miss_returns_none(
+    def test_find_model_miss_raises(
         self,
         migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        key: types.ModelVersionKey,
     ) -> None:
-        eng = make_engine(registry, migration_settings)
-        assert eng.find_model(key) is None
+        eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
+        with pytest.raises(ModelNotFoundError):
+            eng.find_model(SentinelNode("User", semver.Version(9, 9, 9)))
 
     @pytest.mark.parametrize(
         "registry, model",
@@ -285,56 +241,12 @@ class TestModelManagement:
         eng.remove_model(version)
         assert SentinelNode.from_version(version) not in registry
 
-    @pytest.mark.parametrize(
-        "registry, model",
-        [
-            [Registry[semver.Version, BaseModel](), UserV1],
-            [Registry[pendulum.Date, BaseModel](), UserV20250310],
-        ],
-    )
-    def test_remove_model_by_tuple(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        version = envelope_model(model_adapter, versioning_settings, model)
-        eng.store_model(version)
-
-        eng.remove_model(version.version)
-        assert SentinelNode.from_version(version) not in registry
-
-    @pytest.mark.parametrize(
-        "registry, model",
-        [
-            [Registry[semver.Version, BaseModel](), UserV1],
-            [Registry[pendulum.Date, BaseModel](), UserV20250310],
-        ],
-    )
-    def test_remove_model_by_class(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        version = envelope_model(model_adapter, versioning_settings, model)
-        eng.store_model(version)
-
-        eng.remove_model(model)
-        assert SentinelNode.from_version(version) not in registry
-
     def test_remove_missing_model_raises(
         self, migration_settings: MigrationSettings
     ) -> None:
         eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
-        with pytest.raises(RegistryError, match="not registered"):
-            eng.remove_model(("User", semver.Version(9, 9, 9)))
+        with pytest.raises(RegistryError):
+            eng.remove_model(SentinelNode("User", semver.Version(9, 9, 9)))
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -407,59 +319,8 @@ class TestMigrationManagement:
             return data
 
         eng.store_migration((versions[0], versions[1]), _migrate)
-        assert eng.get_migration((versions[0], versions[1])) is _migrate
-
-    @pytest.mark.parametrize(
-        "registry, models",
-        [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-        ],
-    )
-    def test_store_and_get_by_class_pair(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        for m in models:
-            eng.store_model(envelope_model(model_adapter, versioning_settings, m))
-
-        def _migrate(data: dict) -> dict:
-            return data
-
-        eng.store_migration((models[0], models[1]), _migrate)
-        assert eng.get_migration((models[0], models[1])) is _migrate
-
-    @pytest.mark.parametrize(
-        "registry, models",
-        [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-        ],
-    )
-    def test_store_and_get_by_tuple_pair(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            eng.store_model(v)
-
-        def _migrate(data: dict) -> dict:
-            return data
-
-        key = (versions[0].version, versions[1].version)
-        eng.store_migration(key, _migrate)
-        assert eng.get_migration(key) is _migrate
+        edge = SentinelEdge.from_pair(versions[0], versions[1])
+        assert eng.get_migration(edge).func is _migrate
 
     def test_store_across_kinds_raises(
         self,
@@ -523,122 +384,7 @@ class TestMigrationManagement:
             eng.store_model(v)
 
         with pytest.raises(MigrationNotFoundError):
-            eng.get_migration((versions[0], versions[1]))
-
-    @pytest.mark.parametrize(
-        "registry, models",
-        [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
-        ],
-    )
-    def test_store_non_adjacent_without_bc_raises(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            eng.store_model(v)
-
-        with pytest.raises(RegistryError, match="not adjacent"):
-            eng.store_migration((versions[0], versions[2]), lambda d: d)
-
-    @pytest.mark.parametrize(
-        "registry, models",
-        [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
-        ],
-    )
-    def test_store_non_adjacent_with_bc_gap_ok(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            eng.store_model(v)
-
-        eng.store_migration(
-            (versions[0], versions[1]), lambda d: d, backward_compatible=True
-        )
-        eng.store_migration(
-            (versions[1], versions[2]), lambda d: d, backward_compatible=True
-        )
-
-        def _skip(data: dict) -> dict:
-            return data
-
-        eng.store_migration((versions[0], versions[2]), _skip)
-        assert eng.get_migration((versions[0], versions[2])) is _skip
-
-    @pytest.mark.parametrize(
-        "registry, models",
-        [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
-        ],
-    )
-    def test_store_non_adjacent_partial_bc_gap_raises(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
-    ) -> None:
-        """Gap with one non-bc consecutive edge rejects the skip edge."""
-        eng = make_engine(registry, migration_settings)
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            eng.store_model(v)
-
-        eng.store_migration(
-            (versions[0], versions[1]), lambda d: d, backward_compatible=True
-        )
-        eng.store_migration((versions[1], versions[2]), lambda d: d)
-
-        with pytest.raises(RegistryError, match="not adjacent"):
-            eng.store_migration((versions[0], versions[2]), lambda d: d)
-
-    @pytest.mark.parametrize(
-        "registry, models",
-        [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-        ],
-    )
-    def test_store_backward_adjacent_ok(
-        self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
-        migration_settings: MigrationSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
-    ) -> None:
-        eng = make_engine(registry, migration_settings)
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            eng.store_model(v)
-
-        def _down(data: dict) -> dict:
-            return data
-
-        eng.store_migration((versions[1], versions[0]), _down)
-        assert eng.get_migration((versions[1], versions[0])) is _down
+            eng.get_migration(SentinelEdge.from_pair(versions[0], versions[1]))
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -661,22 +407,18 @@ class TestMigrationManagement:
         for v in versions:
             eng.store_model(v)
 
-        eng.store_migration(
-            (versions[0], versions[1]), lambda d: d, backward_compatible=True
-        )
-        eng.store_migration(
-            (versions[1], versions[2]), lambda d: d, backward_compatible=True
-        )
-        eng.store_migration((versions[0], versions[2]), lambda d: d)
+        for pair in pairwise(versions):
+            eng.store_migration(pair, lambda d: d, backward_compatible=True)
 
-        eng.remove_migration((versions[0], versions[2]))
-        with pytest.raises(MigrationNotFoundError):
-            eng.get_migration((versions[0], versions[2]))
+        eng.remove_migration(SentinelEdge.from_pair(versions[0], versions[1]))
 
     @pytest.mark.parametrize(
         "registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            [
+                Registry[semver.Version, BaseModel](),
+                [UserV011Dev7, UserV1, UserV2, UserV3],
+            ],
         ],
     )
     def test_remove_critical_raises(
@@ -693,10 +435,12 @@ class TestMigrationManagement:
         ]
         for v in versions:
             eng.store_model(v)
-        eng.store_migration((versions[0], versions[1]), lambda d: d)
+
+        for pair in pairwise(versions):
+            eng.store_migration(pair, lambda d: d)
 
         with pytest.raises(RegistryError, match="critical"):
-            eng.remove_migration((versions[0], versions[1]))
+            eng.remove_migration(SentinelEdge.from_pair(versions[1], versions[2]))
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -720,9 +464,10 @@ class TestMigrationManagement:
             eng.store_model(v)
         eng.store_migration((versions[0], versions[1]), lambda d: d)
 
-        eng.remove_migration((versions[0], versions[1]), force=True)
+        edge = SentinelEdge.from_pair(versions[0], versions[1])
+        eng.remove_migration(edge, force=True)
         with pytest.raises(MigrationNotFoundError):
-            eng.get_migration((versions[0], versions[1]))
+            eng.get_migration(edge)
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -746,7 +491,7 @@ class TestMigrationManagement:
             eng.store_model(v)
 
         with pytest.raises(MigrationNotFoundError):
-            eng.remove_migration((versions[0], versions[1]))
+            eng.remove_migration(SentinelEdge.from_pair(versions[0], versions[1]))
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -860,10 +605,10 @@ class TestMigrationManagement:
 
         key = SentinelEdge.from_pair(versions[0], versions[1])
         hook = MigrationHook()
-        eng.add_hook((versions[0].version, versions[1].version), hook)
+        eng.add_hook(SentinelEdge.from_pair(versions[0], versions[1]), hook)
         assert registry.has_hooks(registry.get_migration_by_edge(key))
 
-        eng.remove_hook((versions[0], versions[1]), hook)
+        eng.remove_hook(SentinelEdge.from_pair(versions[0], versions[1]), hook)
         assert not registry.has_hooks(registry.get_migration_by_edge(key))
 
     @pytest.mark.parametrize(
@@ -888,7 +633,7 @@ class TestMigrationManagement:
             eng.store_model(v)
         eng.store_migration((versions[0], versions[1]), lambda d: d)
 
-        eng.add_hook((versions[0], versions[1]), MigrationHook())
+        eng.add_hook(SentinelEdge.from_pair(versions[0], versions[1]), MigrationHook())
         eng.clear_hooks()
         assert not registry._hooks
 
@@ -948,8 +693,8 @@ class TestLookupConvenience:
             eng.store_model(v)
         eng.store_migration((versions[0], versions[1]), lambda d: d)
 
-        assert (versions[0].version, versions[1].version) in eng
-        assert (versions[1].version, versions[0].version) not in eng
+        assert (versions[0], versions[1]) in eng
+        assert (versions[1], versions[0]) not in eng
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -1004,7 +749,7 @@ class TestLookupConvenience:
             return {"migrated": True}
 
         eng.store_migration((versions[0], versions[1]), _migrate)
-        assert eng[(versions[0].version, versions[1].version)] is _migrate
+        assert eng[(versions[0], versions[1])].func is _migrate
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -1037,7 +782,7 @@ class TestLookupConvenience:
         eng.store_migration((versions[1], versions[2]), _migrate_23)
 
         path = eng[slice(versions[0].version, versions[2].version)]
-        assert path == [_migrate_12, _migrate_23]
+        assert [e.func for e in path] == [_migrate_12, _migrate_23]
 
 
 class TestEntryMigrationIntegration:
