@@ -182,30 +182,28 @@ class SentinelNode(Generic[VersionValue_co]):
 @total_ordering
 @dataclass(frozen=True, slots=True)
 class VersionEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
-    """A directed migration edge connecting two versions of the same kind."""
+    """A directed migration edge connecting two versions of the same kind.
 
+    Holds its ``source``/``target`` endpoints and the ``diff`` computed for
+    the transition between them.
+    """
+
+    source: Versionable[VersionValue_co, VSource_co]
+    target: Versionable[VersionValue_co, VTarget_co]
     diff: Diffable[VersionValue_co]
     func: MigrationFunc
 
     @property
     def kind(self) -> ModelKind:
-        return self.diff.kind
+        return self.source.kind
 
     @property
     def key(self) -> MigrationKey:
-        return self.diff.edge
+        return (self.source, self.target)
 
     @property
     def edge(self) -> MigrationKey:
-        return self.diff.edge
-
-    @property
-    def source(self) -> Versionable[VersionValue_co, VSource_co]:
-        return self.diff.source
-
-    @property
-    def target(self) -> Versionable[VersionValue_co, VTarget_co]:
-        return self.diff.target
+        return (self.source, self.target)
 
     def __call__(self, data: ModelData) -> ModelData:
         try:
@@ -220,19 +218,19 @@ class VersionEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
 
     def __lt__(self, other: object) -> bool:
         if isinstance(other, (VersionEdge, SentinelEdge)):
-            return self.diff.edge < other.edge
+            return self.edge < other.edge
         return NotImplemented
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, (VersionEdge, SentinelEdge)):
-            return self.diff.edge == other.edge
+            return self.edge == other.edge
         return NotImplemented
 
     def __hash__(self) -> int:
-        return hash(self.diff.edge)
+        return hash(self.edge)
 
     def __str__(self) -> str:
-        return f"VersionEdge({self.diff.source}→{self.diff.target})"
+        return f"VersionEdge({self.source}→{self.target})"
 
 
 @total_ordering

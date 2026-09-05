@@ -197,6 +197,8 @@ class TestStepExecutor:
         register_models(model_adapter, registry, discovery_settings, PersonV1, PersonV2)
 
         edge = VersionEdge(
+            source=envelope_model(model_adapter, discovery_settings, PersonV1),
+            target=envelope_model(model_adapter, discovery_settings, PersonV2),
             diff=PydanticDiff.from_pair(
                 source=envelope_model(model_adapter, discovery_settings, PersonV1),
                 target=envelope_model(model_adapter, discovery_settings, PersonV2),

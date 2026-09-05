@@ -236,6 +236,8 @@ class Engine(Generic[VersionValue]):
             )
 
         edge = VersionEdge(
+            source=v_from,
+            target=v_to,
             diff=PydanticDiff.from_pair(
                 source=v_from,
                 target=v_to,
