@@ -1,3 +1,9 @@
+## v0.3.0 (2026-09-05)
+
+### Feat
+
+- **#46**:  enrich version edge with source and target objects (#47)
+
 ## v0.2.1 (2026-08-31)
 
 ### Fix
