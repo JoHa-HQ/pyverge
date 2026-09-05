@@ -35,7 +35,6 @@ from typing import Any, ClassVar, Generic, Literal, cast, overload
 
 from pydantic import BaseModel
 
-from .adapters import PydanticDiff
 from .engine import Engine
 from .exceptions import ModelNotFoundError, RegistryError
 from .executor import SequentialExecutor
@@ -52,6 +51,7 @@ from .registry import Registry
 from .strategy import DefaultEntryMigration, EntryMigration
 from .types import (
     Attachable,
+    Diffable,
     DirectionViolationStrategy,
     Executor,
     ManagerMigrationKeyInput,
@@ -691,7 +691,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         kind: ModelKind,
         from_version: str,
         to_version: str,
-    ) -> PydanticDiff[VersionValue, VModel, VModel]:
+    ) -> Diffable[VersionValue]:
         """Build a diff between two versions of *kind*."""
         source = self.get_model(
             (kind, cast(VersionValue, self.engine.adapter.of(from_version)))
@@ -699,4 +699,4 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         target = self.get_model(
             (kind, cast(VersionValue, self.engine.adapter.of(to_version)))
         )
-        return PydanticDiff.from_pair(source=source, target=target)
+        return self.engine.adapter.diff(source, target)
