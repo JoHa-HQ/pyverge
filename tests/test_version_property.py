@@ -3,14 +3,18 @@ from __future__ import annotations
 import operator
 from typing import Literal
 
+import pendulum
 import pytest
+import semver
 from pendulum import Date
 from pydantic import BaseModel
 from semver import Version
 
 from pyverge.migration import (
+    Diff,
     PydanticDiff,
     PydanticModelAdapter,
+    Registry,
     VersioningSettings,
     types,
 )
@@ -30,7 +34,7 @@ from tests.examples.pydantic.semver import (
     UserV200Beta1,
 )
 from tests.examples.pydantic.semver_nested import AddressV1, AddressV2
-from tests.utils import edge_from_models, envelope_model
+from tests.utils import edge_from_models, envelope_model, meta_versionable
 
 
 class TestParse:
@@ -765,3 +769,27 @@ class TestPydanticDiff:
 
         diff = PydanticDiff.from_pair(source=source, target=target)
         assert diff.edge == (source, target)
+
+    @pytest.mark.parametrize(
+        "registry, version",
+        [
+            [Registry[semver.Version, BaseModel](), "0.1.0"],
+            [Registry[pendulum.Date, BaseModel](), "2024-01-01"],
+        ],
+    )
+    def test_meta_endpoint_produces_empty_diff(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        version: str,
+    ) -> None:
+        """A meta endpoint yields a plain Diff with empty predicates."""
+        meta = meta_versionable(model_adapter, "User", version)
+        real = envelope_model(model_adapter, versioning_settings, UserV1)
+
+        diff = model_adapter.diff(meta, real)
+        assert isinstance(diff, Diff)
+        assert not diff.has_additions
+        assert not diff.has_removals
+        assert not diff.has_modifications
