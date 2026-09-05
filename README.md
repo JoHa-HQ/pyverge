@@ -96,6 +96,7 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 ## Features
 
 - **Versioned model registry** — decorator-based registration with semver or ISO date versioning
+- **Meta versions** — register a version by `(kind, version)` alone, with no concrete model, for patch-delta chains against a single latest model
 - **Provider adapters** — pluggable `ModelAdapter`; Pydantic ships today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
 - **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
 - **Target policies** — converge to `latest`, `earliest`, a pinned version, or per-kind overrides
@@ -106,7 +107,13 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 ## Documentation
 
 - [Getting Started](docs/getting-started.md)
+- [Registration](docs/registration.md)
 - [Concepts](docs/concepts.md)
+- [Execution Flow](docs/execution-flow.md)
+- [Target Policy](docs/target-policy.md)
+- [Meta Versions](docs/meta-versions.md)
+- [Inspecting and Diffing](docs/diffing.md)
+- [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)
 
 ## Plan
