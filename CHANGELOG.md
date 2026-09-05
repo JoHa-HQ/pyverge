@@ -1,3 +1,9 @@
+## v0.4.0 (2026-09-05)
+
+### Feat
+
+- **#48**: introduce meta versioning models (#49)
+
 ## v0.3.0 (2026-09-05)
 
 ### Feat
