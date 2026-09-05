@@ -32,7 +32,7 @@ from tests.examples.pydantic.semver import (
     UserV3,
     UserV200Beta1,
 )
-from tests.utils import edge_from_models, envelope_model
+from tests.utils import edge_from_models, envelope_model, meta_versionable
 
 
 class TestModel:
@@ -307,6 +307,63 @@ class TestModel:
             registry.get_model(SentinelNode.from_version(version))
 
     @pytest.mark.parametrize(
+        "registry, version",
+        [
+            [Registry[semver.Version, BaseModel](), "0.1.0"],
+            [Registry[pendulum.Date, BaseModel](), "2024-01-01"],
+        ],
+    )
+    def test_meta_version_registers(
+        self,
+        model_adapter: PydanticModelAdapter,
+        registry: Registry[types.VersionValue, BaseModel],
+        version: str,
+    ) -> None:
+        """A meta version registers by (kind, version) with no concrete model."""
+        meta = meta_versionable(model_adapter, "User", version)
+        registry.store_model(meta)
+
+        assert registry.get_model(SentinelNode.from_version(meta)).model is None
+        assert registry.models("User") == frozenset()
+
+    @pytest.mark.parametrize(
+        "registry, meta_versions, real_models, expected",
+        [
+            (
+                Registry[semver.Version, BaseModel](),
+                ["0.1.0", "0.2.0"],
+                [UserV1],
+                ["0.1.0", "0.2.0", "1.0.0"],
+            ),
+            (
+                Registry[pendulum.Date, BaseModel](),
+                ["2024-01-01"],
+                [UserV20250310],
+                ["2024-01-01", "2025-03-10"],
+            ),
+        ],
+    )
+    def test_meta_and_real_versions_order_together(  # noqa: PLR0913
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        meta_versions: list[str],
+        real_models: list[type[types.VModel_co]],
+        expected: list[str],
+    ) -> None:
+        """Meta and real versions order together by version value within a kind."""
+        for v in meta_versions:
+            registry.store_model(meta_versionable(model_adapter, "User", v))
+        for cls in real_models:
+            registry.store_model(
+                envelope_model(model_adapter, versioning_settings, cls)
+            )
+
+        versions = [str(v.version[1]) for v in registry.kind_versions("User")]
+        assert versions == expected
+
+    @pytest.mark.parametrize(
         "registry, model",
         [
             [Registry[semver.Version, BaseModel](), UserV1],
@@ -441,8 +498,8 @@ class TestMigration:
             fake_key = edge_from_models(
                 model_adapter,
                 versioning_settings,
-                versions[0]._model,
-                versions[1]._model,
+                UserV1,
+                UserV2,
                 func=lambda data: data,
             )
             registry.get_migration(SentinelEdge.from_version_edge(fake_key))

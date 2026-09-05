@@ -36,6 +36,19 @@ def envelope_model(
     )
 
 
+def meta_versionable(
+    adapter: types.ModelAdapter,
+    kind: str,
+    version: str,
+) -> VersionNode[types.VersionValue, BaseModel]:
+    """Build a meta version: a ``(kind, version)`` pair with no concrete model."""
+    return VersionNode[types.VersionValue, BaseModel](
+        _model=None,
+        _value=cast(types.VersionValue, adapter.of(version)),
+        _kind=kind,
+    )
+
+
 def edge_from_models(
     adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
