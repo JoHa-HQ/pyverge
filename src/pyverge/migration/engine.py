@@ -3,7 +3,7 @@
 import bisect
 from typing import Any, Generic, Self, cast, overload
 
-from .diff import PydanticDiff
+from .adapters import PydanticDiff
 from .exceptions import (
     MigrationError,
     MigrationNotFoundError,

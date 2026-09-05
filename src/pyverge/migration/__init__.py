@@ -1,6 +1,5 @@
 from . import types
-from .adapters import PydanticModelAdapter
-from .diff import PydanticDiff
+from .adapters import PydanticDiff, PydanticModelAdapter
 from .engine import Engine
 from .exceptions import (
     DiscoveryError,

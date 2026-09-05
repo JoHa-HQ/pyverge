@@ -35,7 +35,7 @@ from typing import Any, ClassVar, Generic, Literal, cast, overload
 
 from pydantic import BaseModel
 
-from .diff import PydanticDiff
+from .adapters import PydanticDiff
 from .engine import Engine
 from .exceptions import ModelNotFoundError, RegistryError
 from .executor import SequentialExecutor
