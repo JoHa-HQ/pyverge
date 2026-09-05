@@ -11,7 +11,6 @@ from semver import Version
 from pyverge.migration import (
     PydanticDiff,
     PydanticModelAdapter,
-    VersionEdge,
     VersioningSettings,
     types,
 )
@@ -31,7 +30,7 @@ from tests.examples.pydantic.semver import (
     UserV200Beta1,
 )
 from tests.examples.pydantic.semver_nested import AddressV1, AddressV2
-from tests.utils import envelope_model
+from tests.utils import edge_from_models, envelope_model
 
 
 class TestParse:
@@ -338,10 +337,15 @@ class TestMigrationEdge:
 
         source = envelope_model(model_adapter, versioning_settings, source_model)
         target = envelope_model(model_adapter, versioning_settings, target_model)
-        diff = PydanticDiff.from_pair(source, target)
-        edge = VersionEdge(diff, func=lambda d: d)
-        assert edge.source is source
-        assert edge.target is target
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source_model,
+            target_model,
+            func=lambda d: d,
+        )
+        assert edge.source == source
+        assert edge.target == target
 
     @pytest.mark.parametrize(
         "source_model, target_model",
@@ -380,11 +384,14 @@ class TestMigrationEdge:
         target_model: type[types.VModel],
     ) -> None:
         """The kind property returns the source's kind."""
-        source = envelope_model(model_adapter, versioning_settings, source_model)
-        target = envelope_model(model_adapter, versioning_settings, target_model)
-        diff = PydanticDiff.from_pair(source, target)
-        edge = VersionEdge(diff, func=lambda d: d)
-        assert edge.kind == diff.source.kind
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source_model,
+            target_model,
+            func=lambda d: d,
+        )
+        assert edge.kind == edge.source.kind
 
     @pytest.mark.parametrize(
         ("source_model", "target_model", "expected_str"),
@@ -407,10 +414,13 @@ class TestMigrationEdge:
         expected_str: str,
     ) -> None:
         """String representation shows source→target."""
-        source = envelope_model(model_adapter, versioning_settings, source_model)
-        target = envelope_model(model_adapter, versioning_settings, target_model)
-        diff = PydanticDiff.from_pair(source, target)
-        edge = VersionEdge(diff, func=lambda d: d)
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source_model,
+            target_model,
+            func=lambda d: d,
+        )
         assert str(edge) == expected_str
 
     @pytest.mark.parametrize(
@@ -447,19 +457,11 @@ class TestMigrationEdge:
         op: str,
     ) -> None:
         """MigrationEdge comparison follows (source, target) tuple ordering."""
-        left = VersionEdge(
-            diff=PydanticDiff.from_pair(
-                envelope_model(model_adapter, versioning_settings, left_src),
-                envelope_model(model_adapter, versioning_settings, left_tgt),
-            ),
-            func=lambda d: d,
+        left = edge_from_models(
+            model_adapter, versioning_settings, left_src, left_tgt, func=lambda d: d
         )
-        right = VersionEdge(
-            diff=PydanticDiff.from_pair(
-                envelope_model(model_adapter, versioning_settings, right_src),
-                envelope_model(model_adapter, versioning_settings, right_tgt),
-            ),
-            func=lambda d: d,
+        right = edge_from_models(
+            model_adapter, versioning_settings, right_src, right_tgt, func=lambda d: d
         )
         comp = getattr(operator, op)
         assert comp(left, right)
@@ -476,30 +478,28 @@ class TestMigrationEdge:
         self,
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
-        nodes: tuple[type[types.VModel], type[types.VModel]],
+        nodes: list[tuple[type[types.VModel], type[types.VModel]]],
         op: str,
     ) -> None:
         """Edges with the same source and target have the same hash."""
         comp = getattr(operator, op)
+        left_src, left_tgt = nodes[0]
+        right_src, right_tgt = nodes[1]
         hashes = [
             hash(e)
             for e in [
-                VersionEdge(
-                    diff=PydanticDiff.from_pair(
-                        *[
-                            envelope_model(model_adapter, versioning_settings, el)
-                            for el in nodes[0]  # ty: ignore
-                        ]
-                    ),
+                edge_from_models(
+                    model_adapter,
+                    versioning_settings,
+                    left_src,
+                    left_tgt,
                     func=lambda d: d,
                 ),
-                VersionEdge(
-                    diff=PydanticDiff.from_pair(
-                        *[
-                            envelope_model(model_adapter, versioning_settings, el)
-                            for el in nodes[1]  # ty: ignore
-                        ]
-                    ),
+                edge_from_models(
+                    model_adapter,
+                    versioning_settings,
+                    right_src,
+                    right_tgt,
                     func=lambda d: {"x": 1},
                 ),
             ]
@@ -532,13 +532,7 @@ class TestMigrationEdge:
     ) -> None:
         """MigrationEdge can be stored in a set; duplicates collapse."""
         edges = {
-            VersionEdge(
-                diff=PydanticDiff.from_pair(
-                    envelope_model(model_adapter, versioning_settings, s),
-                    envelope_model(model_adapter, versioning_settings, t),
-                ),
-                func=lambda d: d,
-            )
+            edge_from_models(model_adapter, versioning_settings, s, t, func=lambda d: d)
             for s, t in zip(source_model, target_model)
         }
         assert len(edges) == expected
@@ -559,14 +553,14 @@ class TestMigrationEdge:
         target_model: type[types.VModel],
     ) -> None:
         """is_forward is True when source < target."""
-        source = envelope_model(model_adapter, versioning_settings, source_model)
-        target = envelope_model(model_adapter, versioning_settings, target_model)
-        diff = PydanticDiff.from_pair(
-            source=source,
-            target=target,
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source_model,
+            target_model,
+            func=lambda d: d,
         )
-        edge = VersionEdge(diff=diff, func=lambda d: d)
-        assert edge.diff.is_forward == (source < target)
+        assert edge.diff.is_forward == (edge.source < edge.target)
 
     @pytest.mark.parametrize(
         "source_model, target_model",
@@ -584,14 +578,14 @@ class TestMigrationEdge:
         target_model: type[types.VModel],
     ) -> None:
         """is_backward is True when source > target."""
-        source = envelope_model(model_adapter, versioning_settings, source_model)
-        target = envelope_model(model_adapter, versioning_settings, target_model)
-        diff = PydanticDiff.from_pair(
-            source=source,
-            target=target,
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source_model,
+            target_model,
+            func=lambda d: d,
         )
-        edge = VersionEdge(diff=diff, func=lambda d: d)
-        assert edge.diff.is_backward == (source > target)
+        assert edge.diff.is_backward == (edge.source > edge.target)
 
     def test_func_stored(
         self,
@@ -599,16 +593,13 @@ class TestMigrationEdge:
         versioning_settings: VersioningSettings,
     ) -> None:
         """The migration function is stored as edge.func."""
-        source = envelope_model(model_adapter, versioning_settings, UserV1)
-        target = envelope_model(model_adapter, versioning_settings, UserV2)
 
         def _migrate(data: dict) -> dict:
             data["migrated"] = True
             return data
 
-        edge = VersionEdge(
-            diff=PydanticDiff.from_pair(source, target),
-            func=_migrate,
+        edge = edge_from_models(
+            model_adapter, versioning_settings, UserV1, UserV2, func=_migrate
         )
         assert edge.func is _migrate
 
@@ -618,16 +609,13 @@ class TestMigrationEdge:
         versioning_settings: VersioningSettings,
     ) -> None:
         """Calling the edge delegates to the stored migration function."""
-        source = envelope_model(model_adapter, versioning_settings, UserV1)
-        target = envelope_model(model_adapter, versioning_settings, UserV2)
 
         def _migrate(data: dict) -> dict:
             data["migrated"] = True
             return data
 
-        edge = VersionEdge(
-            diff=PydanticDiff.from_pair(source, target),
-            func=_migrate,
+        edge = edge_from_models(
+            model_adapter, versioning_settings, UserV1, UserV2, func=_migrate
         )
         result = edge({"version": "1.0.0"})
         assert result["migrated"] is True
@@ -638,16 +626,13 @@ class TestMigrationEdge:
         versioning_settings: VersioningSettings,
     ) -> None:
         """Calling the edge is identical to calling edge.func directly."""
-        source = envelope_model(model_adapter, versioning_settings, UserV1)
-        target = envelope_model(model_adapter, versioning_settings, UserV2)
 
         def _migrate(data: dict) -> dict:
             data["age"] = None
             return data
 
-        edge = VersionEdge(
-            diff=PydanticDiff.from_pair(source, target),
-            func=_migrate,
+        edge = edge_from_models(
+            model_adapter, versioning_settings, UserV1, UserV2, func=_migrate
         )
         data = {"version": "1.0.0", "name": "Alice"}
         assert edge(data) == edge.func(data)

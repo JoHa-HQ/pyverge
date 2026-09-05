@@ -1,6 +1,5 @@
 from . import types
-from .adapters import PydanticModelAdapter
-from .diff import PydanticDiff
+from .adapters import PydanticDiff, PydanticModelAdapter
 from .engine import Engine
 from .exceptions import (
     DiscoveryError,
@@ -34,6 +33,7 @@ from .policy import (
     skip_target_resolver,
 )
 from .registry import Registry
+from .render import JsonPatchRender
 from .strategy import DefaultEntryMigration, EntryMigration
 from .versioning import SentinelEdge, SentinelNode, VersionEdge, VersionNode
 from .walker import CompoundKeyWalker, PydanticWalker
@@ -49,6 +49,7 @@ __all__ = [
     "EntryMigration",
     "GraphBuilder",
     "GraphEntry",
+    "JsonPatchRender",
     "LevelParallelExecutor",
     "MaxDepthExceededError",
     "MigrationAlreadyRegisteredError",

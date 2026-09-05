@@ -50,6 +50,8 @@ def edge_from_models(
     source = envelope_model(adapter, versioning_settings, source_cls)
     target = envelope_model(adapter, versioning_settings, target_cls)
     return VersionEdge(
+        source=source,
+        target=target,
         diff=PydanticDiff.from_pair(
             source=source,
             target=target,
