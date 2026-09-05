@@ -154,10 +154,10 @@ class Registry(Generic[VersionValue, ProviderBase]):
     def models(self: Self, kind: ModelKind | None) -> frozenset[type[ProviderBase]]:
         if kind is None:
             return frozenset[type[ProviderBase]](
-                [v.model for v in self._by_models.values()]
+                [v.model for v in self._by_models.values() if v.model is not None]
             )
         return frozenset[type[ProviderBase]](
-            [v.model for v in self._by_kinds.get(kind, [])]
+            [v.model for v in self._by_kinds.get(kind, []) if v.model is not None]
         )
 
     def migrations(self: Self, kind: ModelKind) -> list[Migratable]:
@@ -263,7 +263,8 @@ class Registry(Generic[VersionValue, ProviderBase]):
                 registry_name=self._name,
                 version=version.version,
             )
-        self._by_models[version.model] = version
+        if version.model is not None:
+            self._by_models[version.model] = version
         bisect.insort_left(self._by_versions, version)
         bisect.insort_left(self._by_kinds[version.version[0]], version)
         return version
@@ -309,7 +310,8 @@ class Registry(Generic[VersionValue, ProviderBase]):
         version = self._by_versions[version_idx]
 
         del self._by_kinds[key.kind][kind_idx]
-        del self._by_models[version.model]
+        if version.model is not None:
+            del self._by_models[version.model]
         del self._by_versions[version_idx]
 
     def remove_model_by_class(self: Self, cls: type[ProviderBase]) -> None:

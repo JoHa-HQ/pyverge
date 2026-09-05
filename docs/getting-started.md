@@ -14,7 +14,7 @@ The engine is provider-agnostic and works on plain dicts. The examples below
 use the shipped Pydantic adapter; adapters for other model libraries plug in
 the same way.
 
-## Quick Start
+## Minimal example
 
 ```python
 from typing import Literal
@@ -70,73 +70,12 @@ migrated = manager.migrate(
 `migrate()` converges the payload to the configured target policy (by default
 `latest`, the most recently registered version of each kind).
 
-## Registration Patterns
+## Next steps
 
-### Lazy registration
-
-Define model classes first and register them later, either at the class level
-or on a manager instance. This keeps schema definition separate from runtime
-wiring and makes testing easier.
-
-```python
-from typing import Literal
-
-import semver
-from pydantic import BaseModel
-
-from pyverge.migration import (
-    MigrationSettings,
-    ModelManager,
-    PydanticModelAdapter,
-)
-
-UserManager = ModelManager[semver.Version].scoped(
-    PydanticModelAdapter(),
-    settings=MigrationSettings(),
-)
-
-
-class UserV1(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["1.0.0"] = "1.0.0"
-    name: str
-    email: str
-
-
-class UserV2(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["2.0.0"] = "2.0.0"
-    name: str
-    email: str
-    age: int | None = None
-
-
-def add_age(data: dict) -> dict:
-    data["age"] = None
-    return data
-
-
-# Class-level registration (preferred) — no instance needed.
-UserManager.model()(UserV1)
-UserManager.model()(UserV2)
-UserManager.migration("User", "1.0.0", "2.0.0")(add_age)
-
-# Instance-level registration (alternative) — use a separate manager class.
-OtherManager = ModelManager[semver.Version].scoped(
-    PydanticModelAdapter(),
-    settings=MigrationSettings(),
-)
-manager = OtherManager()
-manager.store_model(UserV1)
-manager.store_model(UserV2)
-manager.store_migration((UserV1, UserV2), add_age)
-```
-
-Class-level and instance-level registration are alternatives — an instance shares
-its class's registry, so registering the same model through both would raise
-`ModelAlreadyRegisteredError`.
-
-## Next Steps
-
-- Read the [concepts](concepts.md) page to understand the building blocks.
-- See the [showcases](../showcases/README.md) for end-to-end examples.
+- [Registration](registration.md) — decorator vs. lazy registration, class-level vs. instance-level.
+- [Inspecting and diffing](diffing.md) — lookup helpers and version diffs.
+- [Meta versions](meta-versions.md) — version chains without concrete models.
+- [Target policy](target-policy.md) — declarative convergence rules.
+- [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
+- [Concepts](concepts.md) — the problem and the approach.
+- [Showcases](../showcases/README.md) — end-to-end examples.

@@ -14,12 +14,10 @@ from pyverge.migration import (
     MigrationError,
     MigrationNotFoundError,
     MigrationSettings,
-    PydanticDiff,
     PydanticModelAdapter,
     Registry,
     SequentialExecutor,
     StepExecutor,
-    VersionEdge,
     types,
 )
 from tests.examples.pydantic.semver_nested import (
@@ -34,6 +32,7 @@ from tests.examples.pydantic.semver_nested import (
 )
 from tests.utils import (
     default_graph_builder,
+    edge_from_models,
     envelope_model,
     make_engine,
     register_models,
@@ -196,13 +195,11 @@ class TestStepExecutor:
     ) -> None:
         register_models(model_adapter, registry, discovery_settings, PersonV1, PersonV2)
 
-        edge = VersionEdge(
-            source=envelope_model(model_adapter, discovery_settings, PersonV1),
-            target=envelope_model(model_adapter, discovery_settings, PersonV2),
-            diff=PydanticDiff.from_pair(
-                source=envelope_model(model_adapter, discovery_settings, PersonV1),
-                target=envelope_model(model_adapter, discovery_settings, PersonV2),
-            ),
+        edge = edge_from_models(
+            model_adapter,
+            discovery_settings,
+            PersonV1,
+            PersonV2,
             func=lambda d: {"version": "2.0.0", "name": d.get("name")},
         )
         registry.store_migration(edge)

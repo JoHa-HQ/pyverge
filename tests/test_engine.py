@@ -29,6 +29,7 @@ from pyverge.migration import (
     SequentialExecutor,
     VersioningSettings,
     VersionNode,
+    fixed_target_resolver,
     latest_target_resolver,
     types,
 )
@@ -44,7 +45,7 @@ from tests.examples.pydantic.semver import (
     UserV3,
 )
 from tests.examples.pydantic.semver_nested import AddressV1
-from tests.utils import edge_from_models, envelope_model, make_engine
+from tests.utils import edge_from_models, envelope_model, make_engine, meta_versionable
 
 # Alias for compatibility with existing test references
 ModelVersion = VersionNode
@@ -336,6 +337,143 @@ class TestMigrationManagement:
 
         with pytest.raises(RegistryError, match="across kinds"):
             eng.store_migration((v_user, v_addr), lambda d: d)
+
+    @pytest.mark.parametrize(
+        "registry, meta_versions, real_model, expected_version",
+        [
+            [
+                Registry[semver.Version, BaseModel](),
+                ["0.1.0", "0.2.0"],
+                UserV1,
+                "1.0.0",
+            ],
+            [
+                Registry[pendulum.Date, BaseModel](),
+                ["2024-01-01", "2024-02-01"],
+                UserV20250310,
+                "2025-03-10",
+            ],
+        ],
+    )
+    def test_meta_chain_forward_migrates_to_latest(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        meta_versions: list[str],
+        real_model: type[types.VModel],
+        expected_version: str,
+    ) -> None:
+        """A meta chain hooks stored (kind, version) pairs and converges forward."""
+        eng = make_engine(registry, migration_settings)
+        metas = [meta_versionable(model_adapter, "User", v) for v in meta_versions]
+        real = eng.adapter.versionable(real_model)
+        for v in metas:
+            eng.store_model(v)
+        eng.store_model(real)
+        for src, dst in zip(metas, [*metas[1:], real]):
+            eng.store_migration(
+                (src, dst), lambda d: {**d, "version": str(dst.version[1])}
+            )
+
+        result = eng.migrate(
+            {
+                "kind": "User",
+                "version": meta_versions[0],
+                "name": "Alice",
+                "email": "a@b.c",
+                "role": "user",
+            },
+            target=latest_target_resolver(registry),
+        )
+        assert result["version"] == expected_version
+
+    @pytest.mark.parametrize(
+        "registry, meta_versions, real_model",
+        [
+            [Registry[semver.Version, BaseModel](), ["0.1.0", "0.2.0"], UserV1],
+            [
+                Registry[pendulum.Date, BaseModel](),
+                ["2024-01-01", "2024-02-01"],
+                UserV20250310,
+            ],
+        ],
+    )
+    def test_meta_chain_backward_via_swapped_spec(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        meta_versions: list[str],
+        real_model: type[types.VModel],
+    ) -> None:
+        """Backward migration across a meta chain uses swapped-spec reverse edges."""
+        eng = make_engine(registry, migration_settings)
+        metas = [meta_versionable(model_adapter, "User", v) for v in meta_versions]
+        real = eng.adapter.versionable(real_model)
+        for v in metas:
+            eng.store_model(v)
+        eng.store_model(real)
+        for src, dst in zip(metas, [*metas[1:], real]):
+            eng.store_migration(
+                (src, dst), lambda d: {**d, "version": str(dst.version[1])}
+            )
+        for src, dst in zip([*metas[1:], real], metas):
+            eng.store_migration(
+                (src, dst), lambda d: {**d, "version": str(dst.version[1])}
+            )
+
+        result = eng.migrate(
+            {
+                "kind": "User",
+                "version": str(real.version[1]),
+                "name": "Alice",
+                "email": "a@b.c",
+                "role": "user",
+            },
+            target=fixed_target_resolver(registry, metas[0]),
+            direction="backward",
+        )
+        assert result["version"] == meta_versions[0]
+
+    @pytest.mark.parametrize(
+        "registry, meta_versions, real_model",
+        [
+            [Registry[semver.Version, BaseModel](), ["0.1.0", "0.2.0"], UserV1],
+        ],
+    )
+    def test_meta_chain_backward_missing_reverse_edge_raises(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        meta_versions: list[str],
+        real_model: type[types.VModel],
+    ) -> None:
+        """Backward migration raises when a reverse edge is missing."""
+        eng = make_engine(registry, migration_settings)
+        metas = [meta_versionable(model_adapter, "User", v) for v in meta_versions]
+        real = eng.adapter.versionable(real_model)
+        for v in metas:
+            eng.store_model(v)
+        eng.store_model(real)
+        for src, dst in zip(metas, [*metas[1:], real]):
+            eng.store_migration(
+                (src, dst), lambda d: {**d, "version": str(dst.version[1])}
+            )
+
+        with pytest.raises(MigrationNotFoundError):
+            eng.migrate(
+                {
+                    "kind": "User",
+                    "version": str(real.version[1]),
+                    "name": "Alice",
+                    "email": "a@b.c",
+                    "role": "user",
+                },
+                target=fixed_target_resolver(registry, metas[0]),
+                direction="backward",
+            )
 
     @pytest.mark.parametrize(
         "registry, models",

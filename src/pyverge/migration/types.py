@@ -320,6 +320,13 @@ class ModelAdapter(Protocol):
     def versionable(
         self, model_cls: type[VModel_co]
     ) -> Versionable[VersionValue_co, VModel_co]: ...
+    def diff(
+        self,
+        source: Versionable[VersionValue_co, VModel_co],
+        target: Versionable[VersionValue_co, VModel_co],
+        *,
+        is_backward_compatible: bool = False,
+    ) -> Diffable[VersionValue_co]: ...
 
 
 VersionPair: TypeAlias = tuple[

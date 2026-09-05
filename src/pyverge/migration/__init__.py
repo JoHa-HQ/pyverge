@@ -1,5 +1,6 @@
 from . import types
 from .adapters import PydanticDiff, PydanticModelAdapter
+from .diff import Diff
 from .engine import Engine
 from .exceptions import (
     DiscoveryError,
@@ -41,6 +42,7 @@ from .walker import CompoundKeyWalker, PydanticWalker
 __all__ = [
     "CompoundKeyWalker",
     "DefaultEntryMigration",
+    "Diff",
     "DiscoveryError",
     "DiscoverySettings",
     "DiscoveryValidationError",

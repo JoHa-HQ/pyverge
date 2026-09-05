@@ -33,11 +33,13 @@ from .types import (
 class VersionNode(Generic[VersionValue_co, VModel_co]):
     """A model version that can be either semver or ISO date.
 
-    Optionally carries the Pydantic model class so the registry can
-    treat ``(version, kind)`` as a single comparable unit.
+    Optionally carries the model class so the registry can treat
+    ``(version, kind)`` as a single comparable unit.  A ``None`` model
+    denotes a meta version: a ``(kind, version)`` pair with no concrete
+    model content.
     """
 
-    _model: type[VModel_co]
+    _model: type[VModel_co] | None
     _value: VersionValue_co
     _kind: ModelKind
 
@@ -46,7 +48,7 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
         return type(self._value)
 
     @property
-    def model(self) -> type[VModel_co]:
+    def model(self) -> type[VModel_co] | None:
         return self._model
 
     @property
@@ -101,7 +103,8 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
         return f"{self._kind}:{self._value}"
 
     def __repr__(self) -> str:
-        return f"VersionNode[{self.strategy.__name__}, {self.model.__name__}]({self._value}, {self._kind})"  # noqa: E501
+        model = self.model.__name__ if self.model is not None else "meta"
+        return f"VersionNode[{self.strategy.__name__}, {model}]({self._value}, {self._kind})"  # noqa: E501
 
 
 @total_ordering

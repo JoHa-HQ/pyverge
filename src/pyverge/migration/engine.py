@@ -3,7 +3,6 @@
 import bisect
 from typing import Any, Generic, Self, cast, overload
 
-from .adapters import PydanticDiff
 from .exceptions import (
     MigrationError,
     MigrationNotFoundError,
@@ -238,9 +237,9 @@ class Engine(Generic[VersionValue]):
         edge = VersionEdge(
             source=v_from,
             target=v_to,
-            diff=PydanticDiff.from_pair(
-                source=v_from,
-                target=v_to,
+            diff=self.adapter.diff(
+                v_from,
+                v_to,
                 is_backward_compatible=backward_compatible,
             ),
             func=func,
