@@ -46,9 +46,9 @@
   Managers in
   e2e_pkg.man
      agers   
-  ┏━━━━━━━━━┓
-  ┃ Name    ┃
-  ┡━━━━━━━━━┩
+  ┌─────────┐
+  │ Name    │
+  ├─────────┤
   │ manager │
   └─────────┘
   
