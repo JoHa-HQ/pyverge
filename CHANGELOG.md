@@ -1,3 +1,9 @@
+## v0.5.0 (2026-09-06)
+
+### Feat
+
+- **#50**: introduce json declarative models and migrations. introduce codecov (#51)
+
 ## v0.4.0 (2026-09-05)
 
 ### Feat
