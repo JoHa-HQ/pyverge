@@ -1,4 +1,4 @@
-from typing import cast
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -9,6 +9,7 @@ from pyverge.migration import (
     Engine,
     EntryMigration,
     GraphBuilder,
+    JsonSchemaModelAdapter,
     MigrationGraph,
     MigrationSettings,
     PydanticDiff,
@@ -25,14 +26,20 @@ from pyverge.migration import (
 def envelope_model(
     adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
-    model_cls: type[types.VModel_co],
-) -> VersionNode[types.VersionValue, types.VModel_co]:
-    version = adapter.of(adapter.version(model_cls))
-    kind = adapter.kind(model_cls)
-    return VersionNode[types.VersionValue, types.VModel_co](
-        _model=model_cls,
-        _value=cast(types.VersionValue, version),
-        _kind=kind,
+    model_cls: type[types.VModel_co] | dict[str, Any],
+) -> VersionNode[types.VersionValue, BaseModel]:
+    """Build a versionable from a model class or a JSON schema.
+
+    A JSON schema document is materialized into a Pydantic model first; a
+    model class is wrapped directly.
+    """
+    if isinstance(model_cls, dict):
+        model = cast(JsonSchemaModelAdapter, adapter).to_pydantic(model_cls)
+    else:
+        model = model_cls
+    return cast(
+        VersionNode[types.VersionValue, BaseModel],
+        adapter.versionable(model),
     )
 
 
@@ -52,16 +59,20 @@ def meta_versionable(
 def edge_from_models(
     adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
-    source_cls: type[types.VModel_co],
-    target_cls: type[types.VModel_co],
+    source_model: type[types.VModel_co] | dict[str, Any],
+    target_model: type[types.VModel_co] | dict[str, Any],
     *,
     func: types.MigrationFunc,
     backward_compatible: bool = False,
-) -> VersionEdge[types.VersionValue, types.VModel_co, types.VModel_co]:
-    """Build a VersionEdge by wrapping two model classes through
-    ``envelope_model`` and computing a ``PydanticDiff``."""
-    source = envelope_model(adapter, versioning_settings, source_cls)
-    target = envelope_model(adapter, versioning_settings, target_cls)
+) -> VersionEdge[types.VersionValue, BaseModel, BaseModel]:
+    """Build a VersionEdge from model classes or JSON schemas.
+
+    *source_model*/*target_model* are either Pydantic model classes or JSON
+    schema documents; the JSON schema is materialized into a Pydantic model by
+    the adapter at runtime.
+    """
+    source = envelope_model(adapter, versioning_settings, source_model)
+    target = envelope_model(adapter, versioning_settings, target_model)
     return VersionEdge(
         source=source,
         target=target,

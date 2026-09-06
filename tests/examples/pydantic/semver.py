@@ -1,24 +1,7 @@
-"""Class-level registration pattern (preferred).
-
-Demonstrates static schema definition separated from dynamic runtime configuration.
-Static registrations (models, migrations) happen at class level without instantiation.
-Dynamic configuration (version_property, hooks) happens at runtime via instantiation.
-
-Benefits:
-- Clean separation of static schema from runtime config
-- No instance needed at import time
-- Better for production code where schema is fixed
-- Defers instantiation until needed
-"""
-
 from enum import StrEnum
 from typing import Annotated, Literal
 
 from tests.examples.pydantic.base import BaseModel, Field, UserBaseModel
-
-# from pyverge.migration import MigrationSettings, ModelManager
-
-# SemverManager = ModelManager[Version, MigrationSettings()]
 
 
 class Role(StrEnum):
@@ -113,3 +96,24 @@ def migrate_v2_to_v3(data: dict) -> dict:
     data["age"] = data.get("age", 0)
     data["status"] = "active"
     return data
+
+
+class InvalidBetaModel(UserBaseModel):
+    """Invalid semver: prerelease without a version number."""
+
+    name: str
+    version: Literal["beta.7"] = "beta.7"
+
+
+class InvalidAlphaModel(UserBaseModel):
+    """Invalid semver: too many version segments."""
+
+    name: str
+    version: Literal["0.0.0.alpha7"] = "0.0.0.alpha7"
+
+
+class InvalidTimeModel(UserBaseModel):
+    """Invalid date: a time-of-day, not a calendar date."""
+
+    name: str
+    version: Literal["15:15:20.000Z"] = "15:15:20.000Z"

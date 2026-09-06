@@ -1,70 +1,29 @@
-"""Provider-specific model adapters.
-
-A :class:`ModelAdapter` is the only place allowed to know how a model
-class encodes its ``version`` and ``kind``.  The rest of the migration
-machinery works with :class:`Versionable` objects and never touches
-provider-specific introspection APIs directly.
-"""
-
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Self, cast
+from typing import Any, Self
 
-import pendulum
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
-from semver import Version
 
-from ..diff import Diff
-from ..types import (
+from pyverge.migration.diff import Diff
+from pyverge.migration.types import (
     Versionable,
     VersionValue,
     VModel,
     VSource_co,
     VTarget_co,
 )
-from ..versioning import VersionNode
+from pyverge.migration.versioning import VersionNode
+
+from .base import BaseModelAdapter
 
 logger = logging.getLogger(__name__)
 
 
-class PydanticModelAdapter:
-    """Adapter for Pydantic ``BaseModel`` subclasses."""
-
-    def __init__(
-        self,
-        version_property: str = "version",
-        kind_property: str = "kind",
-    ) -> None:
-        self._version_property = version_property
-        self._kind_property = kind_property
-
-    @classmethod
-    def of(cls, value: str) -> VersionValue:
-        """Parse a version string (mostly coming from Literal), then determine the strategy"""  # noqa: E501
-        try:
-            return cast(VersionValue, Version.parse(value))
-        except ValueError:
-            logger.debug(f"Failed to parse semver: {value!r}")
-
-        try:
-            parsed = pendulum.parse(str(value), exact=True)
-            if isinstance(parsed, pendulum.DateTime):
-                parsed = parsed.date()
-            if not isinstance(parsed, pendulum.Date):
-                raise ValueError(f"Expected date, got {parsed!r}")
-            return cast(VersionValue, parsed)
-        except ValueError:
-            logger.debug(f"Failed to parse date: {value!r}")
-
-        msg = (
-            f"Cannot parse version {value!r}. "
-            "Expected semver (e.g. '1.0.0') or ISO date (e.g. '2024-06-01')."
-        )
-        raise ValueError(msg)
+class PydanticModelAdapter(BaseModelAdapter):
 
     def _field_default(self, model_cls: type[BaseModel], name: str) -> str:
         """Return the field's default value.

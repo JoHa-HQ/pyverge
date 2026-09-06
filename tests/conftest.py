@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from pyverge.migration import (
     DiscoverySettings,
     Engine,
+    JsonSchemaModelAdapter,
     MigrationSettings,
     ModelManager,
     PydanticModelAdapter,
@@ -33,11 +34,33 @@ def versioning_settings(
 
 
 @pytest.fixture
-def model_adapter(versioning_settings: VersioningSettings) -> PydanticModelAdapter:
+def pydantic_model_adapter(
+    versioning_settings: VersioningSettings,
+) -> PydanticModelAdapter:
     return PydanticModelAdapter(
         version_property=versioning_settings.version_property,
         kind_property=versioning_settings.kind_property,
     )
+
+
+@pytest.fixture
+def json_model_adapter(
+    versioning_settings: VersioningSettings,
+) -> JsonSchemaModelAdapter:
+    return JsonSchemaModelAdapter(
+        version_property=versioning_settings.version_property,
+        kind_property=versioning_settings.kind_property,
+    )
+
+
+@pytest.fixture
+def model_adapter(
+    request: pytest.FixtureRequest,
+) -> PydanticModelAdapter | JsonSchemaModelAdapter:
+    provider = getattr(request, "param", "pydantic")
+    if provider == "json":
+        return request.getfixturevalue("json_model_adapter")
+    return request.getfixturevalue("pydantic_model_adapter")
 
 
 @pytest.fixture

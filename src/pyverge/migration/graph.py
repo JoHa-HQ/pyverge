@@ -262,7 +262,7 @@ class GraphBuilder(Generic[VersionValue]):
                 edge = SentinelEdge.from_pair(src, dst)
                 hooks = self._registry.get_hooks(edge)
                 hook_sets.append(tuple(hooks))
-            target_model = target.model if isinstance(target.model, type) else None
+            target_model = target.model
             entries.append(
                 GraphEntry(
                     path=prefix,
