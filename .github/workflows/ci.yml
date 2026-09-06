@@ -51,4 +51,5 @@ jobs:
           files: coverage.xml
           fail_ci_if_error: true
           version: v0.8.1
-          disable_verify: true
+        env:
+          CODECOV_DISABLE_VERIFY: "true"
