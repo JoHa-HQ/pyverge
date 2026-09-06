@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from itertools import pairwise
 from typing import Any
 from unittest.mock import MagicMock
@@ -15,6 +16,7 @@ from pyverge.migration import (
     Engine,
     EntryMigration,
     GraphBuilder,
+    JsonPatchMigration,
     MigrationAlreadyRegisteredError,
     MigrationHook,
     MigrationNotFoundError,
@@ -339,21 +341,43 @@ class TestMigrationManagement:
             eng.store_migration((v_user, v_addr), lambda d: d)
 
     @pytest.mark.parametrize(
-        "registry, meta_versions, real_model, expected_version",
+        "registry, meta_versions, real_model, expected_version, func_factory",
         [
             [
                 Registry[semver.Version, BaseModel](),
                 ["0.1.0", "0.2.0"],
                 UserV1,
                 "1.0.0",
+                lambda from_v, to_v: lambda d, to=to_v: {**d, "version": to},
             ],
             [
                 Registry[pendulum.Date, BaseModel](),
                 ["2024-01-01", "2024-02-01"],
                 UserV20250310,
                 "2025-03-10",
+                lambda from_v, to_v: lambda d, to=to_v: {**d, "version": to},
+            ],
+            [
+                Registry[semver.Version, BaseModel](),
+                ["0.1.0", "0.2.0"],
+                UserV1,
+                "1.0.0",
+                lambda from_v, to_v: JsonPatchMigration(
+                    {
+                        "from": from_v,
+                        "to": to_v,
+                        "ops": [
+                            {
+                                "op": "replace",
+                                "path": "/version",
+                                "value": to_v,
+                            }
+                        ],
+                    }
+                ),
             ],
         ],
+        ids=["semver-callable", "date-callable", "semver-jsonpatch"],
     )
     def test_meta_chain_forward_migrates_to_latest(
         self,
@@ -363,8 +387,13 @@ class TestMigrationManagement:
         meta_versions: list[str],
         real_model: type[types.VModel],
         expected_version: str,
+        func_factory: Callable,
     ) -> None:
-        """A meta chain hooks stored (kind, version) pairs and converges forward."""
+        """A meta chain hooks stored (kind, version) pairs and converges forward.
+
+        The migration func is built either as a Python callable or as a
+        declarative :class:`JsonPatchMigration` spec.
+        """
         eng = make_engine(registry, migration_settings)
         metas = [meta_versionable(model_adapter, "User", v) for v in meta_versions]
         real = eng.adapter.versionable(real_model)
@@ -372,9 +401,8 @@ class TestMigrationManagement:
             eng.store_model(v)
         eng.store_model(real)
         for src, dst in zip(metas, [*metas[1:], real]):
-            eng.store_migration(
-                (src, dst), lambda d: {**d, "version": str(dst.version[1])}
-            )
+            func = func_factory(str(src.version[1]), str(dst.version[1]))
+            eng.store_migration((src, dst), func)
 
         result = eng.migrate(
             {

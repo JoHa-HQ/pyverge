@@ -1,5 +1,11 @@
+from pyverge.adapters import (
+    JsonPatchMigration,
+    JsonSchemaModelAdapter,
+    PydanticDiff,
+    PydanticModelAdapter,
+)
+
 from . import types
-from .adapters import PydanticDiff, PydanticModelAdapter
 from .diff import Diff
 from .engine import Engine
 from .exceptions import (
@@ -51,7 +57,9 @@ __all__ = [
     "EntryMigration",
     "GraphBuilder",
     "GraphEntry",
+    "JsonPatchMigration",
     "JsonPatchRender",
+    "JsonSchemaModelAdapter",
     "LevelParallelExecutor",
     "MaxDepthExceededError",
     "MigrationAlreadyRegisteredError",

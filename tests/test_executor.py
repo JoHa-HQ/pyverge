@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 import semver
 from pydantic import BaseModel
@@ -10,6 +12,7 @@ from pyverge.migration import (
     DefaultEntryMigration,
     DiscoverySettings,
     Engine,
+    JsonPatchMigration,
     LevelParallelExecutor,
     MigrationError,
     MigrationNotFoundError,
@@ -290,15 +293,27 @@ def test_sequential_executor_runs_in_topological_order(
 
 @pytest.mark.parametrize("registry", [semver.Version], indirect=True)
 @pytest.mark.parametrize("discovery", [DiscoverySettings()])
+@pytest.mark.parametrize(
+    "func_factory",
+    [
+        lambda: lambda data: (_ for _ in ()).throw(RuntimeError("boom")),
+        lambda: JsonPatchMigration(
+            {
+                "from": "1.0.0",
+                "to": "2.0.0",
+                "ops": [{"op": "test", "path": "/type", "value": "X"}],
+            }
+        ),
+    ],
+    ids=["python-callable", "jsonpatch-spec"],
+)
 def test_executor_propagates_migration_error(
     model_adapter: PydanticModelAdapter,
     registry: Registry[semver.Version, BaseModel],
     discovery: DiscoverySettings,
+    func_factory: Callable,
 ) -> None:
     register_models(model_adapter, registry, discovery, PersonV1, PersonV2)
-
-    def _broken(data: dict) -> dict:
-        raise RuntimeError("boom")
 
     eng = make_engine(registry, MigrationSettings())
     eng.store_migration(
@@ -306,7 +321,7 @@ def test_executor_propagates_migration_error(
             envelope_model(model_adapter, discovery, PersonV1),
             envelope_model(model_adapter, discovery, PersonV2),
         ),
-        _broken,
+        func_factory(),
     )
 
     payload = {
