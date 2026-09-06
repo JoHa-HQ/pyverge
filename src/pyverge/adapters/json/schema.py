@@ -2,7 +2,7 @@
 
 :class:`JsonSchemaModelAdapter` converts a JSON Schema document (a plain dict)
 into a Pydantic model via ``datamodel-code-generator`` and registers that model
-with the engine.  The adapter interface operates on ``type[BaseModel]`` only —
+with the engine.  The adapter interface operates on ``type[ModelBase]`` only —
 the same contract as :class:`PydanticModelAdapter` — so the engine never sees
 JSON Schema semantics.
 """
@@ -20,6 +20,7 @@ from pydantic_core import PydanticUndefined
 from pyverge.adapters.base import BaseModelAdapter
 from pyverge.migration.diff import Diff
 from pyverge.migration.types import (
+    ModelBase,
     Versionable,
     VersionValue,
     VModel,
@@ -43,11 +44,11 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
         kind_property: str = "kind",
     ) -> None:
         super().__init__(version_property, kind_property)
-        self._cache: dict[str, type[BaseModel]] = {}
+        self._cache: dict[str, type[ModelBase]] = {}
 
     def to_pydantic(
         self, document: dict[str, Any], *, class_name: str = "Model"
-    ) -> type[BaseModel]:
+    ) -> type[ModelBase]:
         """Materialize a Pydantic model from a schema document, cached by content."""
         key = json.dumps(document, sort_keys=True)
         if key not in self._cache:
@@ -61,7 +62,7 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             self._cache[key] = namespace[class_name]
         return self._cache[key]
 
-    def _field_default(self, model_cls: type[BaseModel], name: str) -> str:
+    def _field_default(self, model_cls: type[ModelBase], name: str) -> str:
         """Return the field's default value, mirroring the Pydantic adapter."""
         field_info: FieldInfo | None = model_cls.model_fields.get(name)
         if field_info is None:
@@ -71,14 +72,14 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             return ""
         return default if isinstance(default, str) else str(default)
 
-    def version(self, model_cls: type[BaseModel]) -> str:
+    def version(self, model_cls: type[ModelBase]) -> str:
         return self._field_default(model_cls, self._version_property)
 
-    def kind(self, model_cls: type[BaseModel]) -> str:
+    def kind(self, model_cls: type[ModelBase]) -> str:
         return self._field_default(model_cls, self._kind_property)
 
     def finalize(
-        self, target_model: type[BaseModel], data: dict[str, Any]
+        self, target_model: type[ModelBase], data: dict[str, Any]
     ) -> dict[str, Any]:
         """Apply model defaults and validate/serialize via the Pydantic model."""
         return target_model.model_validate(data).model_dump(by_alias=True)
@@ -86,7 +87,7 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
     def validate(
         self,
         data: dict[str, Any],
-        container: type[BaseModel],
+        container: type[ModelBase],
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
@@ -95,7 +96,7 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             return container.model_validate(data, strict=True).model_dump(by_alias=True)
         return container.model_validate(data).model_dump(by_alias=True)
 
-    def resolve_model(self, annotation: Any) -> type[BaseModel] | None:
+    def resolve_model(self, annotation: Any) -> type[ModelBase] | None:
         """Return the first concrete ``BaseModel`` subclass inside *annotation*."""
         if isinstance(annotation, type) and issubclass(annotation, BaseModel):
             return annotation
@@ -110,8 +111,8 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
         return None
 
     def field_model(
-        self, parent_model: type[BaseModel], field_name: str
-    ) -> type[BaseModel] | None:
+        self, parent_model: type[ModelBase], field_name: str
+    ) -> type[ModelBase] | None:
         """Return the model class for *field_name* on the Pydantic model, if any."""
         field_info = parent_model.model_fields.get(field_name)
         if field_info is None:
@@ -126,12 +127,15 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
         A JSON schema document is materialized into a Pydantic model first;
         an already-materialized model is used as-is.
         """
+        model: type[VModel]
         if isinstance(model_cls, dict):
-            model_cls = cast(type[VModel], self.to_pydantic(model_cls))
+            model = cast(type[VModel], self.to_pydantic(model_cls))
+        else:
+            model = model_cls
         return VersionNode[VersionValue, VModel](
-            _model=model_cls,
-            _value=self.of(self.version(model_cls)),
-            _kind=self.kind(model_cls),
+            _model=model,
+            _value=self.of(self.version(model)),
+            _kind=self.kind(model),
         )
 
     def diff(

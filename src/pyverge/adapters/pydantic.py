@@ -10,6 +10,7 @@ from pydantic_core import PydanticUndefined
 
 from pyverge.migration.diff import Diff
 from pyverge.migration.types import (
+    ModelBase,
     Versionable,
     VersionValue,
     VModel,
@@ -24,8 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class PydanticModelAdapter(BaseModelAdapter):
-
-    def _field_default(self, model_cls: type[BaseModel], name: str) -> str:
+    def _field_default(self, model_cls: type[ModelBase], name: str) -> str:
         """Return the field's default value.
 
         Follows the idiomatic Pydantic pattern of declaring the value as a
@@ -43,14 +43,14 @@ class PydanticModelAdapter(BaseModelAdapter):
 
         return default if isinstance(default, str) else str(default)
 
-    def version(self, model_cls: type[BaseModel]) -> str:
+    def version(self, model_cls: type[ModelBase]) -> str:
         return self._field_default(model_cls, self._version_property)
 
-    def kind(self, model_cls: type[BaseModel]) -> str:
+    def kind(self, model_cls: type[ModelBase]) -> str:
         return self._field_default(model_cls, self._kind_property)
 
     def finalize(
-        self, target_model: type[BaseModel], data: dict[str, Any]
+        self, target_model: type[ModelBase], data: dict[str, Any]
     ) -> dict[str, Any]:
         """Apply target-model defaults and validate/serialize the model."""
         result = dict(data)
@@ -72,7 +72,7 @@ class PydanticModelAdapter(BaseModelAdapter):
     def validate(
         self,
         data: dict[str, Any],
-        container: type[BaseModel],
+        container: type[ModelBase],
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
@@ -81,7 +81,7 @@ class PydanticModelAdapter(BaseModelAdapter):
             return container.model_validate(data, strict=True).model_dump(by_alias=True)
         return container.model_validate(data).model_dump(by_alias=True)
 
-    def resolve_model(self, annotation: Any) -> type[BaseModel] | None:
+    def resolve_model(self, annotation: Any) -> type[ModelBase] | None:
         """Return the first concrete ``BaseModel`` subclass inside *annotation*.
 
         Handles direct types, ``Optional[T]``, ``list[T]``, and ``Union`` forms.
@@ -103,8 +103,8 @@ class PydanticModelAdapter(BaseModelAdapter):
         return None
 
     def field_model(
-        self, parent_model: type[BaseModel], field_name: str
-    ) -> type[BaseModel] | None:
+        self, parent_model: type[ModelBase], field_name: str
+    ) -> type[ModelBase] | None:
         """Return the model class for *field_name* on *parent_model*, if any."""
         field_info = parent_model.model_fields.get(field_name)
         if field_info is None:
