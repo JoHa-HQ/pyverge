@@ -1,6 +1,4 @@
-from typing import cast
-
-from pydantic import BaseModel
+from typing import Any, cast
 
 from pyverge.migration import (
     CompoundKeyWalker,
@@ -9,6 +7,7 @@ from pyverge.migration import (
     Engine,
     EntryMigration,
     GraphBuilder,
+    JsonSchemaModelAdapter,
     MigrationGraph,
     MigrationSettings,
     PydanticDiff,
@@ -25,14 +24,20 @@ from pyverge.migration import (
 def envelope_model(
     adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
-    model_cls: type[types.VModel_co],
-) -> VersionNode[types.VersionValue, types.VModel_co]:
-    version = adapter.of(adapter.version(model_cls))
-    kind = adapter.kind(model_cls)
-    return VersionNode[types.VersionValue, types.VModel_co](
-        _model=model_cls,
-        _value=cast(types.VersionValue, version),
-        _kind=kind,
+    model_cls: type[types.VModel_co] | dict[str, Any],
+) -> VersionNode[types.VersionValue, types.ModelBase]:
+    """Build a versionable from a model class or a JSON schema.
+
+    A JSON schema document is materialized into a Pydantic model first; a
+    model class is wrapped directly.
+    """
+    if isinstance(model_cls, dict):
+        model = cast(JsonSchemaModelAdapter, adapter).to_pydantic(model_cls)
+    else:
+        model = model_cls
+    return cast(
+        VersionNode[types.VersionValue, types.ModelBase],
+        adapter.versionable(model),
     )
 
 
@@ -40,9 +45,9 @@ def meta_versionable(
     adapter: types.ModelAdapter,
     kind: str,
     version: str,
-) -> VersionNode[types.VersionValue, BaseModel]:
+) -> VersionNode[types.VersionValue, types.ModelBase]:
     """Build a meta version: a ``(kind, version)`` pair with no concrete model."""
-    return VersionNode[types.VersionValue, BaseModel](
+    return VersionNode[types.VersionValue, types.ModelBase](
         _model=None,
         _value=cast(types.VersionValue, adapter.of(version)),
         _kind=kind,
@@ -52,16 +57,20 @@ def meta_versionable(
 def edge_from_models(
     adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
-    source_cls: type[types.VModel_co],
-    target_cls: type[types.VModel_co],
+    source_model: type[types.VModel_co] | dict[str, Any],
+    target_model: type[types.VModel_co] | dict[str, Any],
     *,
     func: types.MigrationFunc,
     backward_compatible: bool = False,
-) -> VersionEdge[types.VersionValue, types.VModel_co, types.VModel_co]:
-    """Build a VersionEdge by wrapping two model classes through
-    ``envelope_model`` and computing a ``PydanticDiff``."""
-    source = envelope_model(adapter, versioning_settings, source_cls)
-    target = envelope_model(adapter, versioning_settings, target_cls)
+) -> VersionEdge[types.VersionValue, types.ModelBase, types.ModelBase]:
+    """Build a VersionEdge from model classes or JSON schemas.
+
+    *source_model*/*target_model* are either Pydantic model classes or JSON
+    schema documents; the JSON schema is materialized into a Pydantic model by
+    the adapter at runtime.
+    """
+    source = envelope_model(adapter, versioning_settings, source_model)
+    target = envelope_model(adapter, versioning_settings, target_model)
     return VersionEdge(
         source=source,
         target=target,
@@ -76,7 +85,7 @@ def edge_from_models(
 
 def register_models(
     adapter: types.ModelAdapter,
-    registry: Registry[types.VersionValue, BaseModel],
+    registry: Registry[types.VersionValue, types.ModelBase],
     settings: VersioningSettings,
     *models: type[types.VModel_co],
 ) -> None:
@@ -85,7 +94,7 @@ def register_models(
 
 
 def default_graph_builder(
-    registry: Registry[types.VersionValue, BaseModel],
+    registry: Registry[types.VersionValue, types.ModelBase],
     settings: DiscoverySettings,
     adapter: types.ModelAdapter,
 ) -> GraphBuilder[types.VersionValue]:
@@ -98,7 +107,7 @@ def default_graph_builder(
 
 
 def make_engine(
-    registry: Registry[types.VersionValue, BaseModel],
+    registry: Registry[types.VersionValue, types.ModelBase],
     settings: MigrationSettings,
     adapter: types.ModelAdapter | None = None,
     entry_migration: EntryMigration[types.VersionValue] | None = None,
@@ -123,7 +132,7 @@ def make_engine(
 
 def populate_graph(
     adapter: types.ModelAdapter,
-    registry: Registry[types.VersionValue, BaseModel],
+    registry: Registry[types.VersionValue, types.ModelBase],
     discovery_settings: DiscoverySettings,
     *models: type[types.VModel_co],
     payload: dict,

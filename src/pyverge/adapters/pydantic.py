@@ -1,72 +1,31 @@
-"""Provider-specific model adapters.
-
-A :class:`ModelAdapter` is the only place allowed to know how a model
-class encodes its ``version`` and ``kind``.  The rest of the migration
-machinery works with :class:`Versionable` objects and never touches
-provider-specific introspection APIs directly.
-"""
-
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Self, cast
+from typing import Any, Self
 
-import pendulum
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
-from semver import Version
 
-from ..diff import Diff
-from ..types import (
+from pyverge.migration.diff import Diff
+from pyverge.migration.types import (
+    ModelBase,
     Versionable,
     VersionValue,
     VModel,
     VSource_co,
     VTarget_co,
 )
-from ..versioning import VersionNode
+from pyverge.migration.versioning import VersionNode
+
+from .base import BaseModelAdapter
 
 logger = logging.getLogger(__name__)
 
 
-class PydanticModelAdapter:
-    """Adapter for Pydantic ``BaseModel`` subclasses."""
-
-    def __init__(
-        self,
-        version_property: str = "version",
-        kind_property: str = "kind",
-    ) -> None:
-        self._version_property = version_property
-        self._kind_property = kind_property
-
-    @classmethod
-    def of(cls, value: str) -> VersionValue:
-        """Parse a version string (mostly coming from Literal), then determine the strategy"""  # noqa: E501
-        try:
-            return cast(VersionValue, Version.parse(value))
-        except ValueError:
-            logger.debug(f"Failed to parse semver: {value!r}")
-
-        try:
-            parsed = pendulum.parse(str(value), exact=True)
-            if isinstance(parsed, pendulum.DateTime):
-                parsed = parsed.date()
-            if not isinstance(parsed, pendulum.Date):
-                raise ValueError(f"Expected date, got {parsed!r}")
-            return cast(VersionValue, parsed)
-        except ValueError:
-            logger.debug(f"Failed to parse date: {value!r}")
-
-        msg = (
-            f"Cannot parse version {value!r}. "
-            "Expected semver (e.g. '1.0.0') or ISO date (e.g. '2024-06-01')."
-        )
-        raise ValueError(msg)
-
-    def _field_default(self, model_cls: type[BaseModel], name: str) -> str:
+class PydanticModelAdapter(BaseModelAdapter):
+    def _field_default(self, model_cls: type[ModelBase], name: str) -> str:
         """Return the field's default value.
 
         Follows the idiomatic Pydantic pattern of declaring the value as a
@@ -84,14 +43,14 @@ class PydanticModelAdapter:
 
         return default if isinstance(default, str) else str(default)
 
-    def version(self, model_cls: type[BaseModel]) -> str:
+    def version(self, model_cls: type[ModelBase]) -> str:
         return self._field_default(model_cls, self._version_property)
 
-    def kind(self, model_cls: type[BaseModel]) -> str:
+    def kind(self, model_cls: type[ModelBase]) -> str:
         return self._field_default(model_cls, self._kind_property)
 
     def finalize(
-        self, target_model: type[BaseModel], data: dict[str, Any]
+        self, target_model: type[ModelBase], data: dict[str, Any]
     ) -> dict[str, Any]:
         """Apply target-model defaults and validate/serialize the model."""
         result = dict(data)
@@ -113,7 +72,7 @@ class PydanticModelAdapter:
     def validate(
         self,
         data: dict[str, Any],
-        container: type[BaseModel],
+        container: type[ModelBase],
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
@@ -122,7 +81,7 @@ class PydanticModelAdapter:
             return container.model_validate(data, strict=True).model_dump(by_alias=True)
         return container.model_validate(data).model_dump(by_alias=True)
 
-    def resolve_model(self, annotation: Any) -> type[BaseModel] | None:
+    def resolve_model(self, annotation: Any) -> type[ModelBase] | None:
         """Return the first concrete ``BaseModel`` subclass inside *annotation*.
 
         Handles direct types, ``Optional[T]``, ``list[T]``, and ``Union`` forms.
@@ -144,8 +103,8 @@ class PydanticModelAdapter:
         return None
 
     def field_model(
-        self, parent_model: type[BaseModel], field_name: str
-    ) -> type[BaseModel] | None:
+        self, parent_model: type[ModelBase], field_name: str
+    ) -> type[ModelBase] | None:
         """Return the model class for *field_name* on *parent_model*, if any."""
         field_info = parent_model.model_fields.get(field_name)
         if field_info is None:

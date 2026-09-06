@@ -6,9 +6,12 @@ machinery works with :class:`Versionable` objects and never touches
 provider-specific introspection APIs directly.
 """
 
+from .json import JsonPatchMigration, JsonSchemaModelAdapter
 from .pydantic import PydanticDiff, PydanticModelAdapter
 
 __all__ = [
+    "JsonPatchMigration",
+    "JsonSchemaModelAdapter",
     "PydanticDiff",
     "PydanticModelAdapter",
 ]

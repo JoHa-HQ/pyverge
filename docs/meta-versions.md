@@ -26,7 +26,7 @@ against the real target model at the end of the chain.
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import VersionNode
+from pyverge.migration import JsonPatchMigration, VersionNode
 
 # Register a meta version: (kind, version) with no model.
 meta = VersionNode[semver.Version, BaseModel](
@@ -37,7 +37,16 @@ meta = VersionNode[semver.Version, BaseModel](
 manager.store_model(meta)
 
 # Register a migration from the meta version to a real model.
-manager.store_migration((meta, UserV1), lambda d: {**d, "version": "1.0.0"})
+manager.store_migration(
+    (meta, UserV1),
+    JsonPatchMigration(
+        {
+            "from": "0.1.0",
+            "to": "1.0.0",
+            "ops": [{"op": "replace", "path": "/version", "value": "1.0.0"}],
+        }
+    ),
+)
 ```
 
 ## Backward migration

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import copy
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Generic
 
 from .exceptions import MigrationError, MigrationNotFoundError
 from .graph import GraphEntry, MigrationGraph
+from .path import get_at as _get_at_path
+from .path import set_at as _set_at_path
 from .registry import Registry
 from .steps import ExplicitStep
 from .types import (
@@ -211,32 +213,3 @@ def _run_task(
         on_direction_violation=on_direction_violation,
         on_missing_path=on_missing_path,
     ).run()
-
-
-def _get_at_path(
-    data: ModelData,
-    path: tuple[str | int, ...],
-) -> ModelData:
-    """Return the value at *path* inside *data*."""
-    if not path:
-        return data
-    current: Any = data
-    for step in path:
-        current = current[step]
-    return current
-
-
-def _set_at_path(
-    data: ModelData,
-    path: tuple[str | int, ...],
-    value: ModelData,
-) -> None:
-    """Write *value* into *data* at *path*, mutating *data* in place."""
-    if not path:
-        data.clear()
-        data.update(value)
-        return
-    current: Any = data
-    for step in path[:-1]:
-        current = current[step]
-    current[path[-1]] = value

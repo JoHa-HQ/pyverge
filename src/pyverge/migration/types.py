@@ -49,7 +49,7 @@ JsonValue: TypeAlias = JsonPrimities | dict[str, JsonPrimities] | list[JsonPrimi
 JsonSchema: TypeAlias = dict[str, JsonValue]
 JsonSchemaMode = Literal["validation", "serialization"]
 JsonSchemaDefinitions: TypeAlias = dict[str, JsonValue]
-JsonSchemaGenerator: TypeAlias = Callable[[type[BaseModel]], JsonSchema]
+JsonSchemaGenerator: TypeAlias = Callable[[type[ModelBase]], JsonSchema]
 SchemaTransformer = Callable[[JsonSchema], JsonSchema]
 
 RenderingFormat = Literal["json-patch"]
@@ -313,10 +313,10 @@ class ModelAdapter(Protocol):
         *,
         strict: bool = False,
     ) -> dict[str, Any]: ...
-    def resolve_model(self, annotation: Any) -> type[BaseModel] | None: ...
+    def resolve_model(self, annotation: Any) -> type[ModelBase] | None: ...
     def field_model(
         self, parent_model: type[Any], field_name: str
-    ) -> type[BaseModel] | None: ...
+    ) -> type[ModelBase] | None: ...
     def versionable(
         self, model_cls: type[VModel_co]
     ) -> Versionable[VersionValue_co, VModel_co]: ...

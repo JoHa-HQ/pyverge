@@ -1,24 +1,3 @@
-"""Nested versioned models — Person with Address and Contacts.
-
-Structure tree::
-
-    PersonContainer
-    └── document: Person (discriminator="version")
-        ├── PersonV1 (version="1.0.0")
-        │   ├── name: str
-        │   └── address: Address
-        │       ├── AddressV1 (version="1.0.0"): street, city
-        │       └── AddressV2 (version="2.0.0"): +country?, +postal_code?
-        │
-        └── PersonV2 (version="2.0.0")
-            ├── name: str
-            ├── address: Address   (same discriminated union)
-            ├── contacts: list[Contact]
-            │   ├── ContactV1 (version="1.0.0"): phone
-            │   └── ContactV2 (version="2.0.0"): +email?, +preferred="phone"
-            └── AddressV3 (version="3.0.0"): +region?
-"""
-
 from typing import Annotated, Literal
 
 from tests.examples.pydantic.base import (

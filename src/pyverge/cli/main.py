@@ -4,6 +4,7 @@ from typing import Annotated
 
 import typer
 from pydantic import ValidationError
+from rich import box
 from rich.console import Console
 from rich.table import Table
 
@@ -84,7 +85,7 @@ def managers(
     try:
         names = list_managers_from_module(module)
 
-        table = Table(title=f"Managers in {module}")
+        table = Table(title=f"Managers in {module}", box=box.SQUARE)
         table.add_column("Name", style="cyan")
 
         for name in sorted(names):
