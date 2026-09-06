@@ -11,8 +11,8 @@ pip install "git+https://github.com/JoHa-HQ/pyverge.git#egg=pyverge[cli]"
 ```
 
 The engine is provider-agnostic and works on plain dicts. The examples below
-use the shipped Pydantic adapter; adapters for other model libraries plug in
-the same way.
+use the shipped Pydantic adapter; a JSON Schema adapter is also available, and
+adapters for other model libraries plug in the same way.
 
 ## Minimal example
 
@@ -70,10 +70,64 @@ migrated = manager.migrate(
 `migrate()` converges the payload to the configured target policy (by default
 `latest`, the most recently registered version of each kind).
 
+## JSON Schema models
+
+Models can also be defined as JSON Schema documents. The adapter materializes
+each schema into a Pydantic model at registration time, so the engine sees the
+same `ModelAdapter` contract:
+
+```python
+from pyverge.migration import (
+    JsonSchemaModelAdapter,
+    MigrationSettings,
+    ModelManager,
+)
+
+UserManager = ModelManager[semver.Version].scoped(
+    JsonSchemaModelAdapter(),
+    settings=MigrationSettings(),
+)
+
+user_schema = {
+    "kind": "User",
+    "version": "1.0.0",
+    "type": "object",
+    "properties": {
+        "kind": {"type": "string", "default": "User"},
+        "version": {"type": "string", "default": "1.0.0"},
+        "name": {"type": "string"},
+    },
+}
+
+UserManager.model()(UserManager.adapter.to_pydantic(user_schema))
+```
+
+## Declarative migrations
+
+A migration can be expressed as an RFC 6902 JSON Patch op list instead of a
+Python callable:
+
+```python
+from pyverge.migration import JsonPatchMigration
+
+migration = JsonPatchMigration(
+    {
+        "from": "1.0.0",
+        "to": "2.0.0",
+        "ops": [{"op": "add", "path": "/age", "value": None}],
+    }
+)
+manager.store_migration(("User", "1.0.0", "2.0.0"), migration)
+```
+
+Core ops (`add`, `remove`, `replace`, `move`, `copy`, `test`) follow RFC 6902;
+extended ops (`set_default`, `coerce`, `map`, `split`) are schema-aware
+conveniences.
+
 ## Next steps
 
 - [Registration](registration.md) — decorator vs. lazy registration, class-level vs. instance-level.
-- [Inspecting and diffing](diffing.md) — lookup helpers and version diffs.
+- [Common usage patterns](diffing.md) — lookup, validation, diffing, hooks.
 - [Meta versions](meta-versions.md) — version chains without concrete models.
 - [Target policy](target-policy.md) — declarative convergence rules.
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.

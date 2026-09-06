@@ -5,9 +5,9 @@ models, define migrations between versions, and converge payloads to a target
 schema at runtime.
 
 The engine is provider-agnostic: it works on plain dicts and only touches a
-model library through the `ModelAdapter` seam. A Pydantic adapter ships today;
-adapters for other providers (dataclasses, attrs, marshmallow, MessagePack,
-etc.) plug in the same way.
+model library through the `ModelAdapter` seam. Pydantic and JSON Schema
+adapters ship today; adapters for other providers (dataclasses, attrs,
+marshmallow, MessagePack, etc.) plug in the same way.
 
 ## Installation
 
@@ -97,7 +97,8 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 
 - **Versioned model registry** — decorator-based registration with semver or ISO date versioning
 - **Meta versions** — register a version by `(kind, version)` alone, with no concrete model, for patch-delta chains against a single latest model
-- **Provider adapters** — pluggable `ModelAdapter`; Pydantic ships today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
+- **Provider adapters** — pluggable `ModelAdapter`; Pydantic and JSON Schema ship today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
+- **Declarative migrations** — express a migration as an RFC 6902 JSON Patch op list (plus `set_default`/`coerce`/`map`/`split`), compiled into a `MigrationFunc` via `JsonPatchMigration`
 - **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
 - **Target policies** — converge to `latest`, `earliest`, a pinned version, or per-kind overrides
 - **Executors** — sequential or level-parallel batch convergence
@@ -112,7 +113,7 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 - [Execution Flow](docs/execution-flow.md)
 - [Target Policy](docs/target-policy.md)
 - [Meta Versions](docs/meta-versions.md)
-- [Inspecting and Diffing](docs/diffing.md)
+- [Common Usage Patterns](docs/diffing.md)
 - [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)
 
@@ -127,8 +128,7 @@ follow-up:
   `migrate(data, schema, from_version, to_version)` before those commands
   work end-to-end.
 - **Additional model providers** — adapters for dataclasses, attrs, marshmallow,
-  and MessagePack, mirroring `PydanticModelAdapter` behind the `ModelAdapter`
-  seam.
+  and MessagePack
 - **Real-source integrations** — `showcases/` projects wiring for document
   storage (converge on read), Kafka consumers, RabbitMQ/streams workers, and
   MQTT/IoT gateways on the high-level `ModelManager` API, with thin adapters
