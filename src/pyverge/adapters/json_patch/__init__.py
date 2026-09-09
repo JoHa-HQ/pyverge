@@ -1,7 +1,8 @@
-"""JSON migration providers.
+"""RFC 6902 JSON Patch migration format.
 
-JSON Schema model adapter (:mod:`.schema`) and RFC 6902 JSON Patch migration
-executor (:mod:`.migration`).
+The executable :class:`JsonPatch` (:mod:`.patch`) and the declarative
+:class:`JsonPatchMigration` spec wrapper (:mod:`.migration`).  Discovery
+consumes a :class:`JsonPatch` directly to build a :class:`Diff`.
 """
 
 from .migration import JsonPatchMigration
@@ -13,13 +14,11 @@ from .patch import (
     SplitOperation,
 )
 from .pointer import Pointer
-from .schema import JsonSchemaModelAdapter
 
 __all__ = [
     "CoerceOperation",
     "JsonPatch",
     "JsonPatchMigration",
-    "JsonSchemaModelAdapter",
     "MapOperation",
     "Pointer",
     "SetDefaultOperation",

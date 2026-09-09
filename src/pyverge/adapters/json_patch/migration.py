@@ -1,39 +1,24 @@
-"""RFC 6902 JSON Patch migration executor, backed by the ``jsonpatch`` library.
+"""Declarative JSON Patch migration spec adapter.
 
-A declarative migration is a JSON document::
-
-    {
-      "from": "0.1.0",
-      "to": "0.2.0",
-      "ops": [
-        {"op": "add", "path": "/tags", "value": []},
-        {"op": "test", "path": "/type", "value": "X"},
-        {"op": "move", "from": "/old", "to": "/new"},
-        {"op": "map", "path": "/status", "mapping": {"applied": 3, "rejected": 4}}
-      ]
-    }
-
-Core ops (``add``, ``remove``, ``replace``, ``move``, ``copy``, ``test``) are
-delegated to :mod:`jsonpatch`, the reference RFC 6902 implementation.  Extended
-ops are schema-aware conveniences layered on top: ``set_default``, ``coerce``,
-``map``, ``split``.
+Compile a declarative spec document into an executable RFC 6902
+:class:`JsonPatch`.  :class:`JsonPatchMigration` is a migration-format
+adapter: it builds a :class:`JsonPatch` — the actual migration function — and
+is itself not callable.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from pyverge.core.types import ModelData
-
 from .patch import JsonPatch
 
 
 class JsonPatchMigration:
-    """Executes a declarative migration spec over a payload.
+    """Compile a declarative migration spec into a :class:`JsonPatch`.
 
-    Compiles the spec's ops into a single :class:`JsonPatch` once in the
-    constructor; each call applies the whole patch in one pass.  The input
-    payload is never mutated — :mod:`jsonpatch` returns a new document.
+    The spec's ops are translated to RFC 6902 form once and wrapped in a
+    :class:`JsonPatch`.  The resulting patch (``.patch``) is the executable
+    migration: applying it never mutates the input payload.
     """
 
     def __init__(self, spec: dict[str, Any]) -> None:
@@ -64,6 +49,7 @@ class JsonPatchMigration:
                 translated.append(op)
         return translated
 
-    def __call__(self, data: ModelData) -> ModelData:
-        """Apply the whole patch to the payload in one pass."""
-        return self._patch.apply(data)
+    @property
+    def patch(self) -> JsonPatch:
+        """The compiled executable JSON Patch."""
+        return self._patch

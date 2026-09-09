@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from pyverge.core.diff import Diff
+from pyverge.adapters.base import BaseModelAdapter
 from pyverge.core.types import (
+    Diffable,
     ModelBase,
     Versionable,
     VersionValue,
@@ -18,8 +19,7 @@ from pyverge.core.types import (
     VTarget_co,
 )
 from pyverge.core.versioning import VersionNode
-
-from .base import BaseModelAdapter
+from pyverge.reflection.diff import Diff
 
 logger = logging.getLogger(__name__)
 
@@ -111,12 +111,30 @@ class PydanticModelAdapter(BaseModelAdapter):
             return None
         return self.resolve_model(field_info.annotation)
 
-    def versionable(self, model_cls: type[VModel]) -> Versionable[VersionValue, VModel]:
-        """Build a ``VersionNode`` wrapping *model_cls* using its encoded metadata."""
+    def versionable(
+        self,
+        model_cls: type[VModel] | None,
+        *,
+        kind: str | None = None,
+        version: str | None = None,
+    ) -> Versionable[VersionValue, VModel]:
+        """Build a ``VersionNode`` wrapping *model_cls* using its encoded metadata.
+
+        With ``None`` as the model, a meta node (no concrete model) is built
+        from *kind* and *version* strings.
+        """
+        if model_cls is not None:
+            return VersionNode[VersionValue, VModel](
+                _model=model_cls,
+                _value=self.of(self.version(model_cls)),
+                _kind=self.kind(model_cls),
+            )
+        if kind is None or version is None:
+            raise ValueError("kind and version are required for a meta versionable")
         return VersionNode[VersionValue, VModel](
-            _model=model_cls,
-            _value=self.of(self.version(model_cls)),
-            _kind=self.kind(model_cls),
+            _model=None,
+            _value=self.of(version),
+            _kind=kind,
         )
 
     def diff(
@@ -153,6 +171,45 @@ class PydanticModelAdapter(BaseModelAdapter):
         if origin is not None and type(None) in args:
             return True
         return False
+
+    def materialize(
+        self,
+        anchor: type[ModelBase],
+        diff: Diffable[VersionValue],
+        version: VersionValue,
+    ) -> type[ModelBase]:
+        """Materialize a model for *version* from an *anchor* and a *diff*.
+
+        The anchor's fields are copied, fields removed by the diff are dropped,
+        and fields added by the diff are appended with their recorded type and
+        default.  The ``version`` field is pinned to the reconstructed version.
+        """
+        fields: dict[str, Any] = {}
+        for name, field_info in anchor.model_fields.items():
+            if name in diff.removed_fields:
+                continue
+            if name == self._version_property:
+                fields[name] = (Literal[str], str(version))
+                continue
+            fields[name] = (field_info.annotation, field_info)
+        for name in diff.added_fields:
+            if name in fields:
+                continue
+            info = diff.added_field_info.get(name, {})
+            annotation = info.get("type")
+            if annotation is None:
+                annotation = Any
+            default = info.get("default")
+            if info.get("required"):
+                fields[name] = (annotation, ...)
+            elif default is not None:
+                fields[name] = (annotation, default)
+            else:
+                fields[name] = (annotation, None)
+        return create_model(
+            f"{anchor.__name__}V{str(version).replace('.', '_')}",
+            **fields,
+        )
 
 
 @dataclass(frozen=True)

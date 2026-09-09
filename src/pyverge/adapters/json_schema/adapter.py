@@ -18,8 +18,8 @@ from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from pyverge.adapters.base import BaseModelAdapter
-from pyverge.core.diff import Diff
 from pyverge.core.types import (
+    Diffable,
     ModelBase,
     Versionable,
     VersionValue,
@@ -28,6 +28,7 @@ from pyverge.core.types import (
     VTarget_co,
 )
 from pyverge.core.versioning import VersionNode
+from pyverge.reflection.diff import Diff
 
 
 class JsonSchemaModelAdapter(BaseModelAdapter):
@@ -120,13 +121,27 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
         return self.resolve_model(field_info.annotation)
 
     def versionable(
-        self, model_cls: type[VModel] | dict[str, Any]
+        self,
+        model_cls: type[VModel] | dict[str, Any] | None,
+        *,
+        kind: str | None = None,
+        version: str | None = None,
     ) -> Versionable[VersionValue, VModel]:
         """Build a ``VersionNode`` wrapping the schema's Pydantic model.
 
         A JSON schema document is materialized into a Pydantic model first;
-        an already-materialized model is used as-is.
+        an already-materialized model is used as-is.  With ``None`` as the
+        model, a meta node (no concrete model) is built from *kind* and
+        *version* strings.
         """
+        if model_cls is None:
+            if kind is None or version is None:
+                raise ValueError("kind and version are required for a meta versionable")
+            return VersionNode[VersionValue, VModel](
+                _model=None,
+                _value=self.of(version),
+                _kind=kind,
+            )
         model: type[VModel]
         if isinstance(model_cls, dict):
             model = cast(type[VModel], self.to_pydantic(model_cls))
@@ -161,6 +176,70 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             target,
             is_backward_compatible=is_backward_compatible,
         )
+
+    def materialize(
+        self,
+        anchor: type[ModelBase],
+        diff: Diffable[VersionValue],
+        version: VersionValue,
+    ) -> type[ModelBase]:
+        """Materialize a schema model for *version* from an *anchor* and a *diff*.
+
+        The anchor's JSON Schema document is rebuilt: removed fields are
+        dropped from ``properties``/``required``, added fields are appended
+        with their recorded type/default, and the ``version`` default is
+        pinned to the reconstructed version.  The document is then
+        re-materialized into a Pydantic model.
+        """
+        document = anchor.model_json_schema()
+        properties = document.setdefault("properties", {})
+        required = document.get("required", [])
+
+        for name in diff.removed_fields:
+            properties.pop(name, None)
+            if name in required:
+                required.remove(name)
+
+        for name in diff.added_fields:
+            if name in properties:
+                continue
+            info = diff.added_field_info.get(name, {})
+            prop: dict[str, Any] = {}
+            annotation = info.get("type")
+            if annotation is not None:
+                prop["type"] = _json_type(annotation)
+            default = info.get("default")
+            if default is not None:
+                prop["default"] = default
+            if info.get("required"):
+                if name not in required:
+                    required.append(name)
+            properties[name] = prop
+
+        if self._version_property in properties:
+            properties[self._version_property]["default"] = str(version)
+
+        return self.to_pydantic(
+            document, class_name=f"ModelV{str(version).replace('.', '')}"
+        )
+
+
+def _json_type(annotation: Any) -> str:
+    """Map a Python annotation to a JSON Schema type name."""
+    if annotation is bool:
+        return "boolean"
+    if annotation is int:
+        return "integer"
+    if annotation is float:
+        return "number"
+    if annotation is str:
+        return "string"
+    origin = getattr(annotation, "__origin__", None)
+    if origin is list:
+        return "array"
+    if origin is dict:
+        return "object"
+    return "string"
 
 
 def _pydantic_diff_pair(
