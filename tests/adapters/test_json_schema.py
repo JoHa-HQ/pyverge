@@ -5,12 +5,14 @@ from __future__ import annotations
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
+from pyverge.core import (
     Diff,
-    JsonSchemaModelAdapter,
     MigrationSettings,
-    Registry,
     VersionNode,
+)
+from pyverge.migration import (
+    JsonSchemaModelAdapter,
+    Registry,
     latest_target_resolver,
 )
 from tests.utils import make_engine

@@ -35,21 +35,9 @@ from typing import Any, ClassVar, Generic, Literal, cast, overload
 
 from pydantic import BaseModel
 
-from .engine import Engine
-from .exceptions import ModelNotFoundError, RegistryError
-from .executor import SequentialExecutor
-from .graph import GraphBuilder
-from .models import MigrationSettings
-from .policy import (
-    earliest_target_resolver,
-    fixed_target_resolver,
-    latest_target_resolver,
-    multi_target_resolver,
-    skip_target_resolver,
-)
-from .registry import Registry
-from .strategy import DefaultEntryMigration, EntryMigration
-from .types import (
+from pyverge.core.exceptions import ModelNotFoundError, RegistryError
+from pyverge.core.settings import MigrationSettings
+from pyverge.core.types import (
     Attachable,
     Diffable,
     DirectionViolationStrategy,
@@ -74,7 +62,20 @@ from .types import (
     VModel_co,
     Walker,
 )
-from .versioning import SentinelEdge, SentinelNode, VersionNode
+from pyverge.core.versioning import SentinelEdge, SentinelNode, VersionNode
+
+from .engine import Engine
+from .executor import SequentialExecutor
+from .graph import GraphBuilder
+from .policy import (
+    earliest_target_resolver,
+    fixed_target_resolver,
+    latest_target_resolver,
+    multi_target_resolver,
+    skip_target_resolver,
+)
+from .registry import Registry
+from .strategy import DefaultEntryMigration, EntryMigration
 from .walker import CompoundKeyWalker
 
 

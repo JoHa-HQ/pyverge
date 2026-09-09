@@ -10,30 +10,32 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
-    CompoundKeyWalker,
+from pyverge.core import (
     DiscoverySettings,
-    Engine,
-    EntryMigration,
-    GraphBuilder,
-    JsonPatchMigration,
     MigrationAlreadyRegisteredError,
     MigrationHook,
     MigrationNotFoundError,
     MigrationSettings,
     ModelAlreadyRegisteredError,
     ModelNotFoundError,
-    PydanticModelAdapter,
-    Registry,
     RegistryError,
     SentinelEdge,
     SentinelNode,
-    SequentialExecutor,
     VersioningSettings,
     VersionNode,
+    types,
+)
+from pyverge.migration import (
+    CompoundKeyWalker,
+    Engine,
+    EntryMigration,
+    GraphBuilder,
+    JsonPatchMigration,
+    PydanticModelAdapter,
+    Registry,
+    SequentialExecutor,
     fixed_target_resolver,
     latest_target_resolver,
-    types,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,

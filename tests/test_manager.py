@@ -18,19 +18,21 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
+from pyverge.core import (
     DiscoverySettings,
     DiscoveryValidationError,
     MigrationHook,
     MigrationSettings,
-    ModelManager,
     ModelNotFoundError,
+    RegistryError,
+)
+from pyverge.core.types import ManagerMigrationKeyInput, VersionValue, VModel
+from pyverge.migration import (
+    ModelManager,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
-    RegistryError,
 )
-from pyverge.migration.types import ManagerMigrationKeyInput, VersionValue, VModel
 from tests.examples.pydantic.base import UserBaseModel
 from tests.examples.pydantic.chrono import (
     UserV20250310,

@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from pyverge.migration.diff import Diff
-from pyverge.migration.types import (
+from pyverge.core.diff import Diff
+from pyverge.core.types import (
     ModelBase,
     Versionable,
     VersionValue,
@@ -17,7 +17,7 @@ from pyverge.migration.types import (
     VSource_co,
     VTarget_co,
 )
-from pyverge.migration.versioning import VersionNode
+from pyverge.core.versioning import VersionNode
 
 from .base import BaseModelAdapter
 

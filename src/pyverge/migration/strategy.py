@@ -11,9 +11,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generic, Protocol, runtime_checkable
 
-from .exceptions import MigrationError
-from .graph import GraphEntry
-from .types import (
+from pyverge.core.exceptions import MigrationError
+from pyverge.core.types import (
     DirectionViolationStrategy,
     MigrationDirectionStrategy,
     ModelBase,
@@ -23,8 +22,10 @@ from .types import (
     VersionValue,
 )
 
+from .graph import GraphEntry
+
 if TYPE_CHECKING:
-    from .types import ModelAdapter
+    from pyverge.core.types import ModelAdapter
 
 
 @runtime_checkable

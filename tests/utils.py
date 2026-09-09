@@ -1,23 +1,25 @@
 from typing import Any, cast
 
+from pyverge.core import (
+    DiscoverySettings,
+    MigrationSettings,
+    VersionEdge,
+    VersioningSettings,
+    VersionNode,
+    types,
+)
 from pyverge.migration import (
     CompoundKeyWalker,
     DefaultEntryMigration,
-    DiscoverySettings,
     Engine,
     EntryMigration,
     GraphBuilder,
     JsonSchemaModelAdapter,
     MigrationGraph,
-    MigrationSettings,
     PydanticDiff,
     PydanticModelAdapter,
     Registry,
     SequentialExecutor,
-    VersionEdge,
-    VersioningSettings,
-    VersionNode,
-    types,
 )
 
 

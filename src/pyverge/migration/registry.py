@@ -3,14 +3,14 @@ from collections import defaultdict
 from itertools import chain
 from typing import Generic, Self, cast
 
-from .exceptions import (
+from pyverge.core.exceptions import (
     MigrationAlreadyRegisteredError,
     MigrationNotFoundError,
     ModelAlreadyRegisteredError,
     ModelNotFoundError,
     RegistryError,
 )
-from .types import (
+from pyverge.core.types import (
     Attachable,
     Comparable,
     LookupKey,
@@ -25,11 +25,40 @@ from .types import (
     VSource_co,
     VTarget_co,
 )
-from .versioning import SentinelEdge
+from pyverge.core.versioning import SentinelEdge
 
 
 class Registry(Generic[VersionValue, ProviderBase]):
-    """Ordered storage for versioned models, migrations, and hooks."""
+    """Ordered storage for versioned models, migrations, and hooks.
+
+    >>> from typing import Literal
+    >>> import semver
+    >>> from pydantic import BaseModel
+    >>> from pyverge.migration import PydanticModelAdapter, Registry
+    >>> adapter = PydanticModelAdapter()
+    >>> class UserV1(BaseModel):
+    ...     kind: Literal["User"] = "User"
+    ...     version: Literal["1.0.0"] = "1.0.0"
+    ...     name: str
+    >>> class UserV2(BaseModel):
+    ...     kind: Literal["User"] = "User"
+    ...     version: Literal["2.0.0"] = "2.0.0"
+    ...     name: str
+    ...     age: int | None = None
+    >>> registry = Registry[semver.Version, BaseModel]()
+    >>> v1 = adapter.versionable(UserV1)
+    >>> v2 = adapter.versionable(UserV2)
+    >>> _ = registry.store_model(v1)
+    >>> _ = registry.store_model(v2)
+    >>> registry.get_model(v1).model is UserV1
+    True
+    >>> registry.versions == sorted([v1, v2])
+    True
+    >>> registry.latest("User").model is UserV2
+    True
+    >>> v1 in registry
+    True
+    """
 
     def __init__(self: Self, *, name: str | None = None) -> None:
         """Create a named registry.

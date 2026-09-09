@@ -64,7 +64,7 @@ source = "vcs"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80 --doctest-modules"
 
 [tool.ruff]
 target-version = "py311"
@@ -83,6 +83,8 @@ max-complexity = 10
 "src/pyverge/migration/strategy.py" = ["PLR0913"]
 "src/pyverge/migration/walker.py" = ["C901", "PLR0912", "PLR0913"]
 "src/pyverge/migration/types.py" = ["PLR0913"]
+"src/pyverge/core/types.py" = ["PLR0913"]
+"src/pyverge/migration/discovery.py" = ["C901", "PLR0912"]
 "tests/utils.py" = ["PLR0913"]
 "tests/test_engine.py" = ["PLR0913"]
 "tests/test_graph.py" = ["PLR0913"]

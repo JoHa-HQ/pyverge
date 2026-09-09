@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pyverge.migration.types import ModelData
+from pyverge.core.types import ModelData
 
 from .patch import JsonPatch
 

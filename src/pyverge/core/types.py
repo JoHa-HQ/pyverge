@@ -18,9 +18,9 @@ from pydantic import BaseModel
 from semver import Version as SemVer
 
 if TYPE_CHECKING:
-    from .graph import MigrationGraph
-    from .registry import Registry
-    from .strategy import EntryMigration
+    from pyverge.migration.graph import MigrationGraph
+    from pyverge.migration.registry import Registry
+    from pyverge.migration.strategy import EntryMigration
 
 ModelBase: TypeAlias = BaseModel
 

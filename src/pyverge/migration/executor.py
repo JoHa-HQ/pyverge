@@ -4,13 +4,11 @@ import copy
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from typing import TYPE_CHECKING, Generic
 
-from .exceptions import MigrationError, MigrationNotFoundError
-from .graph import GraphEntry, MigrationGraph
-from .path import get_at as _get_at_path
-from .path import set_at as _set_at_path
-from .registry import Registry
-from .steps import ExplicitStep
-from .types import (
+from pyverge.core.exceptions import MigrationError, MigrationNotFoundError
+from pyverge.core.path import get_at as _get_at_path
+from pyverge.core.path import set_at as _set_at_path
+from pyverge.core.steps import ExplicitStep
+from pyverge.core.types import (
     Attachable,
     DirectionViolationStrategy,
     Executor,
@@ -25,7 +23,10 @@ from .types import (
     VSource_co,
     VTarget_co,
 )
-from .versioning import SentinelEdge
+from pyverge.core.versioning import SentinelEdge
+
+from .graph import GraphEntry, MigrationGraph
+from .registry import Registry
 
 if TYPE_CHECKING:
     from .strategy import EntryMigration

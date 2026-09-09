@@ -7,19 +7,26 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
+from pyverge.core import (
     DiscoverySettings,
+    MigrationSettings,
+    VersioningSettings,
+)
+from pyverge.core.types import Walker
+from pyverge.migration import (
     Engine,
     JsonSchemaModelAdapter,
-    MigrationSettings,
     ModelManager,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
-    VersioningSettings,
 )
-from pyverge.migration.types import Walker
 from tests.utils import make_engine, register_models
+
+# Example model modules are imported by tests, not collected as tests.  With
+# ``--doctest-modules`` their basenames (e.g. ``semver.py``) collide with
+# installed packages, so exclude them from collection.
+collect_ignore_glob = ["examples/**"]
 
 
 @pytest.fixture
