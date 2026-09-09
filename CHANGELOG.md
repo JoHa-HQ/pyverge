@@ -1,3 +1,9 @@
+## v0.6.0 (2026-09-09)
+
+### Feat
+
+- **#52**: decouple core related parts (#53)
+
 ## v0.5.0 (2026-09-06)
 
 ### Feat
