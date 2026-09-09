@@ -3,17 +3,14 @@
 import bisect
 from typing import Any, Generic, Self, cast, overload
 
-from .exceptions import (
+from pyverge.core.exceptions import (
     MigrationError,
     MigrationNotFoundError,
     ModelNotFoundError,
     RegistryError,
 )
-from .graph import GraphBuilder
-from .models import MigrationSettings
-from .registry import Registry
-from .strategy import DefaultEntryMigration, EntryMigration
-from .types import (
+from pyverge.core.settings import MigrationSettings
+from pyverge.core.types import (
     Attachable,
     Comparable,
     DirectionViolationStrategy,
@@ -32,7 +29,11 @@ from .types import (
     VersionPair,
     VersionValue,
 )
-from .versioning import SentinelEdge, SentinelNode, VersionEdge
+from pyverge.core.versioning import SentinelEdge, SentinelNode, VersionEdge
+
+from .graph import GraphBuilder
+from .registry import Registry
+from .strategy import DefaultEntryMigration, EntryMigration
 
 
 class Engine(Generic[VersionValue]):

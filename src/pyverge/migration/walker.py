@@ -7,10 +7,9 @@ from typing import Any, Generic
 
 from pydantic import BaseModel
 
-from .exceptions import DiscoveryValidationError, MaxDepthExceededError
-from .models import DiscoverySettings
-from .registry import Registry
-from .types import (
+from pyverge.core.exceptions import DiscoveryValidationError, MaxDepthExceededError
+from pyverge.core.settings import DiscoverySettings
+from pyverge.core.types import (
     Entry,
     MigrationDirectionStrategy,
     ModelAdapter,
@@ -18,10 +17,12 @@ from .types import (
     TargetResolver,
     VersionValue,
 )
-from .types import (
+from pyverge.core.types import (
     Walker as WalkerProtocol,
 )
-from .versioning import SentinelNode
+from pyverge.core.versioning import SentinelNode
+
+from .registry import Registry
 
 
 class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):

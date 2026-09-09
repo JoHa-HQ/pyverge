@@ -7,13 +7,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pyverge.core import (
+    DiscoverySettings,
+    MigrationError,
+    types,
+)
 from pyverge.migration import (
     DefaultEntryMigration,
-    DiscoverySettings,
     GraphEntry,
-    MigrationError,
     PydanticModelAdapter,
-    types,
 )
 from tests.examples.pydantic.semver_nested import PersonV1, PersonV2
 from tests.utils import envelope_model

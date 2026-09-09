@@ -8,20 +8,22 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
-    DefaultEntryMigration,
+from pyverge.core import (
     DiscoverySettings,
-    Engine,
-    JsonPatchMigration,
-    LevelParallelExecutor,
     MigrationError,
     MigrationNotFoundError,
     MigrationSettings,
+    types,
+)
+from pyverge.migration import (
+    DefaultEntryMigration,
+    Engine,
+    JsonPatchMigration,
+    LevelParallelExecutor,
     PydanticModelAdapter,
     Registry,
     SequentialExecutor,
     StepExecutor,
-    types,
 )
 from tests.examples.pydantic.semver_nested import (
     AddressV1,

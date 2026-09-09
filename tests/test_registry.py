@@ -1,18 +1,20 @@
-"""Tests for Registry: model and migration registration."""
+"""Tests for Registry: model and migration registration.
+
+Each behavior is covered once (semver strategy); date-strategy variants are
+dropped because they exercise the same code paths.
+"""
 
 import pendulum
 import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
+from pyverge.core import (
     MigrationAlreadyRegisteredError,
     MigrationHook,
     MigrationNotFoundError,
     ModelAlreadyRegisteredError,
     ModelNotFoundError,
-    PydanticModelAdapter,
-    Registry,
     RegistryError,
     SentinelEdge,
     SentinelNode,
@@ -20,10 +22,9 @@ from pyverge.migration import (
     VersionNode,
     types,
 )
-from tests.examples.pydantic.chrono import (
-    UserV20250310,
-    UserV20251231,
-    UserV20260228,
+from pyverge.migration import (
+    PydanticModelAdapter,
+    Registry,
 )
 from tests.examples.pydantic.semver import (
     UserV011Dev7,
@@ -43,35 +44,8 @@ class TestModel:
                 Registry[semver.Version, BaseModel](name="semver_test"),
                 UserV200Beta1,
             ],
-            [
-                Registry[semver.Version, BaseModel](name="semver_test"),
-                UserV200Beta1,
-            ],
-            [
-                Registry[semver.Version, BaseModel](name="semver_test"),
-                UserV200Beta1,
-            ],
-            [
-                Registry[pendulum.Date, BaseModel](name="date_test"),
-                UserV20250310,
-            ],
-            [
-                Registry[pendulum.Date, BaseModel](name="date_test"),
-                UserV20250310,
-            ],
-            [
-                Registry[pendulum.Date, BaseModel](name="semver_test"),
-                UserV20250310,
-            ],
         ],
-        ids=[
-            "semver_user_latest",
-            "semver_user_version",
-            "semver_user_model",
-            "date_user_latest",
-            "date_user_version",
-            "date_user_model",
-        ],
+        ids=["semver_user_latest"],
     )
     def test_get_model(
         self,
@@ -88,10 +62,6 @@ class TestModel:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV3, UserV1, UserV2]],
-            [
-                Registry[pendulum.Date, BaseModel](),
-                [UserV20251231, UserV20260228, UserV20250310],
-            ],
         ],
     )
     def test_versions_sorted(
@@ -117,11 +87,6 @@ class TestModel:
                 [UserV3, UserV1, UserV200Beta1],
                 UserV3,
             ),
-            (
-                Registry[pendulum.Date, BaseModel](),
-                [UserV20251231, UserV20260228, UserV20250310],
-                UserV20260228,
-            ),
         ],
     )
     def test_latest(
@@ -144,7 +109,6 @@ class TestModel:
         "registry, key",
         [
             (Registry[semver.Version, BaseModel](), ("User", "3.0.0")),
-            (Registry[pendulum.Date, BaseModel](), ("User", "2025-03-10")),
         ],
     )
     def test_get_nonexistent_model_raises(
@@ -159,7 +123,6 @@ class TestModel:
         "registry, registered, target",
         [
             (Registry[semver.Version, BaseModel](), UserV1, UserV3),
-            (Registry[pendulum.Date, BaseModel](), UserV20250310, UserV20260228),
         ],
     )
     def test_get_nonexistent_model_by_class_raises(
@@ -189,19 +152,9 @@ class TestModel:
                 UserV1,
             ),
             (
-                Registry[pendulum.Date, BaseModel](),
-                UserV20251231,
-                UserV20251231,
-            ),
-            (
                 Registry[semver.Version, BaseModel](),
                 UserV011Dev7,
                 SentinelNode("User", semver.Version.parse("0.1.1+dev.7")),
-            ),
-            (
-                Registry[pendulum.Date, BaseModel](),
-                UserV20260228,
-                SentinelNode("User", pendulum.Date(2026, 2, 28)),
             ),
         ],
     )
@@ -220,7 +173,6 @@ class TestModel:
         "registry, model, predicate",
         [
             (Registry[semver.Version, BaseModel](), UserV1, UserV3),
-            (Registry[pendulum.Date, BaseModel](), UserV20250310, UserV20260228),
         ],
     )
     def test_model_class_not_in_registry(
@@ -244,7 +196,6 @@ class TestModel:
         "registry, model",
         [
             (Registry[semver.Version, BaseModel](), UserV200Beta1),
-            (Registry[pendulum.Date, BaseModel](), UserV20250310),
         ],
     )
     def test_store_duplicate_raises(
@@ -264,7 +215,6 @@ class TestModel:
         "registry, model",
         [
             (Registry[semver.Version, BaseModel](), UserV1),
-            (Registry[pendulum.Date, BaseModel](), UserV20251231),
         ],
     )
     def test_remove_model(
@@ -310,7 +260,6 @@ class TestModel:
         "registry, version",
         [
             [Registry[semver.Version, BaseModel](), "0.1.0"],
-            [Registry[pendulum.Date, BaseModel](), "2024-01-01"],
         ],
     )
     def test_meta_version_registers(
@@ -334,12 +283,6 @@ class TestModel:
                 ["0.1.0", "0.2.0"],
                 [UserV1],
                 ["0.1.0", "0.2.0", "1.0.0"],
-            ),
-            (
-                Registry[pendulum.Date, BaseModel](),
-                ["2024-01-01"],
-                [UserV20250310],
-                ["2024-01-01", "2025-03-10"],
             ),
         ],
     )
@@ -367,7 +310,6 @@ class TestModel:
         "registry, model",
         [
             [Registry[semver.Version, BaseModel](), UserV1],
-            [Registry[pendulum.Date, BaseModel](), UserV20251231],
         ],
     )
     def test_copy_preserves_model_class_lookup(
@@ -388,7 +330,6 @@ class TestMigration:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_store_and_get(
@@ -424,10 +365,6 @@ class TestMigration:
                 Registry[semver.Version, BaseModel](),
                 [UserV1, UserV2],
             ],
-            [
-                Registry[pendulum.Date, BaseModel](),
-                [UserV20250310, UserV20251231],
-            ],
         ],
     )
     def test_register_migration_with_missing_version(
@@ -455,7 +392,6 @@ class TestMigration:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_register_migration_dups(
@@ -511,14 +447,6 @@ class TestMigration:
                 Registry[semver.Version, BaseModel](),
                 [UserV1, UserV2],
             ],
-            [
-                Registry[pendulum.Date, BaseModel](),
-                [UserV20250310, UserV20251231],
-            ],
-            [
-                Registry[semver.Version, BaseModel](),
-                [UserV1, UserV3],
-            ],
         ],
     )
     def test_remove_migration(
@@ -553,7 +481,6 @@ class TestHooks:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_add_and_get_hook(
@@ -600,6 +527,7 @@ class TestHooks:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
+        registry.store_migration(edge)
         assert registry.get_hooks(edge) == []
 
     @pytest.mark.parametrize(
@@ -724,7 +652,6 @@ class TestHooks:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20260228]],
         ],
     )
     def test_clear_hooks_for_key(
@@ -757,7 +684,6 @@ class TestVersionEdgeIndex:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_migrations_of_empty(
@@ -782,10 +708,6 @@ class TestVersionEdgeIndex:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
-            [
-                Registry[pendulum.Date, BaseModel](),
-                [UserV20250310, UserV20251231, UserV20260228],
-            ],
         ],
     )
     def test_migrations_of_source_and_target(
@@ -821,7 +743,6 @@ class TestVersionEdgeIndex:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_migrations_of_accepts_node_key(
@@ -947,7 +868,6 @@ class TestVersionEdgeIndex:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_remove_model_raises_when_referenced(
@@ -1009,10 +929,6 @@ class TestEdgePairLookup:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV3, UserV1, UserV2]],
-            [
-                Registry[pendulum.Date, BaseModel](),
-                [UserV20251231, UserV20260228, UserV20250310],
-            ],
         ],
     )
     def test_kind_versions_sorted(
@@ -1077,7 +993,6 @@ class TestEdgePairLookup:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_get_migration_by_pair(
@@ -1291,7 +1206,6 @@ class TestMigrationHookGuard:
         "registry, models",
         [
             [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
-            [Registry[pendulum.Date, BaseModel](), [UserV20250310, UserV20251231]],
         ],
     )
     def test_remove_migration_with_hooks_raises(

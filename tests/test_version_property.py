@@ -5,9 +5,11 @@ from typing import Any
 
 import pytest
 
+from pyverge.core import (
+    VersioningSettings,
+)
 from pyverge.migration import (
     PydanticModelAdapter,
-    VersioningSettings,
 )
 from tests.examples.json import (
     ADDRESS_V1_0_0,

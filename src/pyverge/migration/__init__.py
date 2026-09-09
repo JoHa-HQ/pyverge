@@ -4,34 +4,42 @@ from pyverge.adapters import (
     PydanticDiff,
     PydanticModelAdapter,
 )
-
-from . import types
-from .diff import Diff
-from .engine import Engine
-from .exceptions import (
+from pyverge.core import (
+    Diff,
     DiscoveryError,
+    DiscoverySettings,
     DiscoveryValidationError,
     EngineError,
+    ExplicitStep,
+    JsonPatchRender,
     MaxDepthExceededError,
     MigrationAlreadyRegisteredError,
     MigrationError,
+    MigrationHook,
     MigrationMissingFieldError,
     MigrationNotFoundError,
     MigrationPathIntegrityError,
+    MigrationSettings,
     ModelAlreadyRegisteredError,
     ModelNotFoundError,
+    OTELHook,
+    Path,
     RegistryError,
+    SentinelEdge,
+    SentinelNode,
+    VersionEdge,
     VersionedModelError,
+    VersioningSettings,
+    VersionNode,
+    get_at,
+    set_at,
+    types,
 )
+
+from .engine import Engine
 from .executor import LevelParallelExecutor, SequentialExecutor, StepExecutor
 from .graph import GraphBuilder, GraphEntry, MigrationGraph
-from .hooks import MigrationHook, OTELHook
 from .manager import ModelManager
-from .models import (
-    DiscoverySettings,
-    MigrationSettings,
-    VersioningSettings,
-)
 from .policy import (
     earliest_target_resolver,
     fixed_target_resolver,
@@ -40,9 +48,7 @@ from .policy import (
     skip_target_resolver,
 )
 from .registry import Registry
-from .render import JsonPatchRender
 from .strategy import DefaultEntryMigration, EntryMigration
-from .versioning import SentinelEdge, SentinelNode, VersionEdge, VersionNode
 from .walker import CompoundKeyWalker, PydanticWalker
 
 __all__ = [
@@ -55,6 +61,7 @@ __all__ = [
     "Engine",
     "EngineError",
     "EntryMigration",
+    "ExplicitStep",
     "GraphBuilder",
     "GraphEntry",
     "JsonPatchMigration",
@@ -74,6 +81,7 @@ __all__ = [
     "ModelManager",
     "ModelNotFoundError",
     "OTELHook",
+    "Path",
     "PydanticDiff",
     "PydanticModelAdapter",
     "PydanticWalker",
@@ -90,8 +98,10 @@ __all__ = [
     "compile_target_spec",
     "earliest_target_resolver",
     "fixed_target_resolver",
+    "get_at",
     "latest_target_resolver",
     "multi_target_resolver",
+    "set_at",
     "skip_target_resolver",
     "types",
 ]

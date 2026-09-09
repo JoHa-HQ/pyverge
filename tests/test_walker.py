@@ -10,20 +10,22 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
-    CompoundKeyWalker,
+from pyverge.core import (
     DiscoverySettings,
     DiscoveryValidationError,
-    Engine,
     MaxDepthExceededError,
     MigrationSettings,
+    types,
+)
+from pyverge.migration import (
+    CompoundKeyWalker,
+    Engine,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
     fixed_target_resolver,
     latest_target_resolver,
     skip_target_resolver,
-    types,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,

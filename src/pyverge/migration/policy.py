@@ -15,9 +15,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from .exceptions import RegistryError
-from .registry import Registry
-from .types import (
+from pyverge.core.exceptions import RegistryError
+from pyverge.core.types import (
     ModelBase,
     ModelKind,
     TargetResolver,
@@ -26,6 +25,8 @@ from .types import (
     VersionValue_co,
     VModel_co,
 )
+
+from .registry import Registry
 
 
 def skip_target_resolver(

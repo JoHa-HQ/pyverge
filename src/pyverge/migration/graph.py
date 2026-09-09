@@ -17,10 +17,9 @@ from typing import Any, Generic
 
 from pydantic import BaseModel
 
-from .exceptions import MaxDepthExceededError, RegistryError
-from .models import DiscoverySettings
-from .registry import Registry
-from .types import (
+from pyverge.core.exceptions import MaxDepthExceededError, RegistryError
+from pyverge.core.settings import DiscoverySettings
+from pyverge.core.types import (
     Attachable,
     ModelBase,
     ModelKind,
@@ -30,7 +29,9 @@ from .types import (
     VModel_co,
     Walker,
 )
-from .versioning import SentinelEdge
+from pyverge.core.versioning import SentinelEdge
+
+from .registry import Registry
 
 
 @dataclass(frozen=True, slots=True)

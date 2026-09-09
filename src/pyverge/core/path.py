@@ -37,6 +37,8 @@ def get_at(data: ModelData, path: tuple[str | int, ...]) -> Any:
 def set_at(data: ModelData, path: tuple[str | int, ...], value: Any) -> None:
     """Write *value* at *path*, mutating *data* in place."""
     if not path:
+        if value is data:
+            return
         data.clear()
         data.update(value)
         return

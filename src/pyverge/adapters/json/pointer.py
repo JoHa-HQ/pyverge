@@ -11,7 +11,7 @@ from typing import Any
 
 import jsonpointer
 
-from pyverge.migration.types import ModelData
+from pyverge.core.types import ModelData
 
 
 class Pointer(tuple[str | int, ...]):

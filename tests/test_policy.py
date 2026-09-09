@@ -9,12 +9,14 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
+from pyverge.core import (
     DiscoverySettings,
-    PydanticModelAdapter,
-    Registry,
     RegistryError,
     VersionNode,
+)
+from pyverge.migration import (
+    PydanticModelAdapter,
+    Registry,
     earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,

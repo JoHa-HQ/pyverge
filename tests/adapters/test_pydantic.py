@@ -7,13 +7,15 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import (
+from pyverge.core import (
     Diff,
+    VersioningSettings,
+    types,
+)
+from pyverge.migration import (
     PydanticDiff,
     PydanticModelAdapter,
     Registry,
-    VersioningSettings,
-    types,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,
