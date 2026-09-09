@@ -87,9 +87,9 @@ class Engine(Generic[VersionValue]):
         self.default_executor = default_executor
         self.adapter = adapter
         self.entry_migration = entry_migration or DefaultEntryMigration()
-        self.discovery: DiffDiscovery[
-            VersionValue, JsonPatch | MigrationFunc
-        ] = CompositeDiffDiscovery()
+        self.discovery: DiffDiscovery[VersionValue, JsonPatch | MigrationFunc] = (
+            CompositeDiffDiscovery()
+        )
 
     def _resolve_model_key(
         self: Self,

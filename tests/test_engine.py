@@ -364,19 +364,21 @@ class TestMigrationManagement:
                 ["0.1.0", "0.2.0"],
                 UserV1,
                 "1.0.0",
-                lambda from_v, to_v: JsonPatchMigration(
-                    {
-                        "from": from_v,
-                        "to": to_v,
-                        "ops": [
-                            {
-                                "op": "replace",
-                                "path": "/version",
-                                "value": to_v,
-                            }
-                        ],
-                    }
-                ).patch,
+                lambda from_v, to_v: (
+                    JsonPatchMigration(
+                        {
+                            "from": from_v,
+                            "to": to_v,
+                            "ops": [
+                                {
+                                    "op": "replace",
+                                    "path": "/version",
+                                    "value": to_v,
+                                }
+                            ],
+                        }
+                    ).patch
+                ),
             ],
         ],
         ids=["semver-callable", "date-callable", "semver-jsonpatch"],

@@ -338,6 +338,7 @@ class ModelAdapter(Protocol):
         is built from *kind* and *version* strings.
         """
         ...
+
     def diff(
         self,
         source: Versionable[VersionValue_co, VModel_co],
