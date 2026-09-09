@@ -17,7 +17,7 @@ from __future__ import annotations
 import ast
 import inspect
 import textwrap
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Generic, Protocol, runtime_checkable
 
 from pyverge.adapters.json_patch import JsonPatch
 from pyverge.core.types import (
@@ -49,7 +49,7 @@ class DiffDiscovery(Protocol[VersionValue, MigrationFunc_co]):
     ) -> Diff[VersionValue, VSource_co, VTarget_co]: ...
 
 
-class JsonPatchDiffDiscovery:
+class JsonPatchDiffDiscovery(Generic[VersionValue]):
     """Discover a :class:`Diff` from an RFC 6902 :class:`JsonPatch`.
 
     Reads the patch operations and maps them onto the diff predicates:
@@ -104,7 +104,7 @@ class JsonPatchDiffDiscovery:
         )
 
 
-class CallableDiffDiscovery:
+class CallableDiffDiscovery(Generic[VersionValue]):
     """Discover a :class:`Diff` from a Python callable migration.
 
     Parses the function's source AST and collects the keys written into the
@@ -183,7 +183,7 @@ class CallableDiffDiscovery:
         )
 
 
-class CompositeDiffDiscovery:
+class CompositeDiffDiscovery(Generic[VersionValue]):
     """Dispatch to a format-specific strategy based on the migration type.
 
     A :class:`JsonPatch` is read by :class:`JsonPatchDiffDiscovery`; anything

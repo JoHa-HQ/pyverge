@@ -287,13 +287,12 @@ class Engine(Generic[VersionValue]):
         if self.settings.on_missing_model != "reconstruct":
             raise ModelNotFoundError(
                 registry.name,
-                f"Cannot register migration: endpoint {endpoint} is not registered "
-                "and on_missing_model is not 'reconstruct'",
+                endpoint.version,
             )
         if other.model is None:
             raise ModelNotFoundError(
                 registry.name,
-                f"Cannot reconstruct {endpoint}: neither endpoint has a model",
+                endpoint.version,
             )
 
         self.reconstruct(other, endpoint, func)

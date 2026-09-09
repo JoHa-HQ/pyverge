@@ -1,7 +1,9 @@
 """Model version diff: pure data with queryable predicates and pluggable rendering."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Any, Generic, Self
+from typing import Any, Generic
 
 from pyverge.core.render import JsonPatchRender
 from pyverge.core.types import (
@@ -111,7 +113,7 @@ class Diff(Generic[VersionValue, VSource_co, VTarget_co]):
         """Render this diff using the configured strategy."""
         return self.renderer(self)
 
-    def inverted(self) -> Self:
+    def inverted(self) -> Diff[VersionValue, VSource_co, VTarget_co]:
         """Return the inverse diff: added/removed fields swap.
 
         Used to reconstruct a version from an anchor when the migration edge

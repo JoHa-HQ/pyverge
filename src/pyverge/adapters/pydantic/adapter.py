@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal, Self
+from typing import Any, Self
 
 from pydantic import BaseModel, create_model
 from pydantic.fields import FieldInfo
@@ -185,11 +185,9 @@ class PydanticModelAdapter(BaseModelAdapter):
         default.  The ``version`` field is pinned to the reconstructed version.
         """
         fields: dict[str, Any] = {}
+        fields[self._version_property] = (str, str(version))
         for name, field_info in anchor.model_fields.items():
-            if name in diff.removed_fields:
-                continue
-            if name == self._version_property:
-                fields[name] = (Literal[str], str(version))
+            if name == self._version_property or name in diff.removed_fields:
                 continue
             fields[name] = (field_info.annotation, field_info)
         for name in diff.added_fields:
