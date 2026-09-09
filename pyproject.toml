@@ -34,7 +34,7 @@ dependencies = [
   "opentelemetry-exporter-otlp[telemetry]>=1.44.0",
   "jsonpatch>=1.33",
   "jsonschema>=4.26.0",
-  "datamodel-code-generator>=0.76.2"
+  "datamodel-code-generator>=0.76.2",
 ]
 
 [project.optional-dependencies]
@@ -64,7 +64,7 @@ source = "vcs"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80 --doctest-modules"
 
 [tool.ruff]
 target-version = "py311"
