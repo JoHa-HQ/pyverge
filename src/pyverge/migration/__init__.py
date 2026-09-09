@@ -5,7 +5,6 @@ from pyverge.adapters import (
     PydanticModelAdapter,
 )
 from pyverge.core import (
-    Diff,
     DiscoveryError,
     DiscoverySettings,
     DiscoveryValidationError,
@@ -35,6 +34,13 @@ from pyverge.core import (
     set_at,
     types,
 )
+from pyverge.reflection import (
+    CallableDiffDiscovery,
+    CompositeDiffDiscovery,
+    Diff,
+    DiffDiscovery,
+    JsonPatchDiffDiscovery,
+)
 
 from .engine import Engine
 from .executor import LevelParallelExecutor, SequentialExecutor, StepExecutor
@@ -52,9 +58,12 @@ from .strategy import DefaultEntryMigration, EntryMigration
 from .walker import CompoundKeyWalker, PydanticWalker
 
 __all__ = [
+    "CallableDiffDiscovery",
+    "CompositeDiffDiscovery",
     "CompoundKeyWalker",
     "DefaultEntryMigration",
     "Diff",
+    "DiffDiscovery",
     "DiscoveryError",
     "DiscoverySettings",
     "DiscoveryValidationError",
@@ -64,6 +73,7 @@ __all__ = [
     "ExplicitStep",
     "GraphBuilder",
     "GraphEntry",
+    "JsonPatchDiffDiscovery",
     "JsonPatchMigration",
     "JsonPatchRender",
     "JsonSchemaModelAdapter",

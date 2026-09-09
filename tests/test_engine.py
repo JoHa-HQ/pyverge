@@ -376,7 +376,7 @@ class TestMigrationManagement:
                             }
                         ],
                     }
-                ),
+                ).patch,
             ],
         ],
         ids=["semver-callable", "date-callable", "semver-jsonpatch"],
@@ -804,6 +804,83 @@ class TestMigrationManagement:
         eng.add_hook(SentinelEdge.from_pair(versions[0], versions[1]), MigrationHook())
         eng.clear_hooks()
         assert not registry._hooks
+
+
+class TestReflection:
+    """Engine reconstructs missing models implicitly on migration registration."""
+
+    def test_reconstructs_missing_model_on_store_migration(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+    ) -> None:
+        settings = migration_settings.model_copy(
+            update={"on_missing_model": "reconstruct"}
+        )
+        registry = Registry[semver.Version, BaseModel]()
+        eng = make_engine(registry, settings, adapter=model_adapter)
+        real = eng.adapter.versionable(UserV2)
+        eng.store_model(real)
+        meta = meta_versionable(model_adapter, "User", "1.0.0")
+
+        eng.store_migration(
+            (meta, real),
+            JsonPatchMigration(
+                {
+                    "from": "1.0.0",
+                    "to": "2.0.0",
+                    "ops": [{"op": "add", "path": "/age", "value": None}],
+                }
+            ).patch,
+        )
+
+        reconstructed = eng.get_model(SentinelNode("User", semver.Version(1, 0, 0)))
+        assert reconstructed.model is not None
+        fields = reconstructed.model.model_fields
+        assert "name" in fields
+        assert "age" not in fields
+        assert fields["version"].default == "1.0.0"
+
+    def test_reconstructs_with_callable_migration(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+    ) -> None:
+        settings = migration_settings.model_copy(
+            update={"on_missing_model": "reconstruct"}
+        )
+        registry = Registry[semver.Version, BaseModel]()
+        eng = make_engine(registry, settings, adapter=model_adapter)
+        real = eng.adapter.versionable(UserV2)
+        eng.store_model(real)
+        meta = meta_versionable(model_adapter, "User", "1.0.0")
+
+        def add_age(data: dict) -> dict:
+            return {**data, "age": None}
+
+        eng.store_migration((meta, real), add_age)
+
+        reconstructed = eng.get_model(SentinelNode("User", semver.Version(1, 0, 0)))
+        assert reconstructed.model is not None
+        assert "age" not in reconstructed.model.model_fields
+
+    def test_skips_reconstruction_when_disabled(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+    ) -> None:
+        settings = migration_settings.model_copy(update={"on_missing_model": "skip"})
+        registry = Registry[semver.Version, BaseModel]()
+        eng = make_engine(registry, settings, adapter=model_adapter)
+        real = eng.adapter.versionable(UserV2)
+        eng.store_model(real)
+        meta = meta_versionable(model_adapter, "User", "1.0.0")
+        eng.store_model(meta)
+
+        eng.store_migration((meta, real), lambda d: {**d, "age": None})
+
+        stored = eng.get_model(SentinelNode("User", semver.Version(1, 0, 0)))
+        assert stored.model is None
 
 
 class TestLookupConvenience:

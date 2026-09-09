@@ -110,6 +110,16 @@ class MigrationSettings(DiscoverySettings):
             "'raise' — fail before any migration."
         ),
     )
+    on_missing_model: Literal["reconstruct", "raise", "skip"] = Field(
+        default="raise",
+        description=(
+            "What to do when a migration endpoint has no concrete model. "
+            "'reconstruct' — rebuild the missing model from the anchor and the "
+            "migration diffs via reflection before storing the migration. "
+            "'raise' — fail. "
+            "'skip' — leave the version model-less."
+        ),
+    )
     parallel_workers: int = Field(
         default=0,
         ge=0,

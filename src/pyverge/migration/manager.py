@@ -35,6 +35,7 @@ from typing import Any, ClassVar, Generic, Literal, cast, overload
 
 from pydantic import BaseModel
 
+from pyverge.adapters.json_patch import JsonPatchMigration
 from pyverge.core.exceptions import ModelNotFoundError, RegistryError
 from pyverge.core.settings import MigrationSettings
 from pyverge.core.types import (
@@ -253,7 +254,7 @@ class _MigrationDescriptor:
                 engine = owner._engine
                 engine.store_migration(
                     owner._resolve_migration_key(args),
-                    func,
+                    owner._resolve_migration(func),
                     backward_compatible=backward_compatible,
                 )
                 return func
@@ -490,24 +491,28 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         cls,
         key: ManagerMigrationKeyInput[VModel],
     ) -> tuple[Versionable[VersionValue, VModel], Versionable[VersionValue, VModel]]:
-        """Resolve a migration key to a ``Versionable`` pair via the engine.
+        """Wrap a migration key into a ``Versionable`` pair, without validation.
 
         Accepts a model class pair ``(SrcModel, TgtModel)`` or an explicit
-        ``(kind, source_version, target_version)`` string triple.
+        ``(kind, source_version, target_version)`` string triple.  The models
+        are wrapped as-is — registration and reconstruction are the engine's
+        responsibility.
         """
         if isinstance(key[0], str):
             kind, source_version, target_version = cast(tuple[str, str, str], key)
-            source_val = cast(VersionValue, cls._engine.adapter.of(source_version))
-            target_val = cast(VersionValue, cls._engine.adapter.of(target_version))
             return (
-                cls._engine.get_model(SentinelNode(kind, source_val)),
-                cls._engine.get_model(SentinelNode(kind, target_val)),
+                cls._engine.adapter.versionable(
+                    None, kind=kind, version=source_version
+                ),
+                cls._engine.adapter.versionable(
+                    None, kind=kind, version=target_version
+                ),
             )
 
         source_cls, target_cls = cast(tuple[type[VModel], type[VModel]], key)
         return (
-            cls._engine.get_model_by_class(source_cls),
-            cls._engine.get_model_by_class(target_cls),
+            cls._engine.adapter.versionable(source_cls),
+            cls._engine.adapter.versionable(target_cls),
         )
 
     def store_model(
@@ -535,9 +540,23 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         """
         return self.engine.store_migration(
             self._resolve_migration_key(key),
-            func,
+            self._resolve_migration(func),
             backward_compatible=backward_compatible,
         )
+
+    @classmethod
+    def _resolve_migration(
+        cls,
+        func: MigrationFunc,
+    ) -> MigrationFunc:
+        """Normalize a migration to an executable ``MigrationFunc``.
+
+        A ``JsonPatchMigration`` adapter is unwrapped to its compiled
+        :class:`JsonPatch`; anything callable is passed through.
+        """
+        if isinstance(func, JsonPatchMigration):
+            return func.patch
+        return func
 
     def remove_migration(
         self,

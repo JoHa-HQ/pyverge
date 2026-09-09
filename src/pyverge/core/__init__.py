@@ -5,7 +5,6 @@ This package holds the provider-agnostic building blocks used by the
 dependencies on the rest of the library — everything else depends on it.
 """
 
-from .diff import Diff
 from .exceptions import (
     DiscoveryError,
     DiscoveryValidationError,
@@ -29,7 +28,6 @@ from .steps import ExplicitStep
 from .versioning import SentinelEdge, SentinelNode, VersionEdge, VersionNode
 
 __all__ = [
-    "Diff",
     "DiscoveryError",
     "DiscoverySettings",
     "DiscoveryValidationError",

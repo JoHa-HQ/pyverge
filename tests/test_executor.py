@@ -305,7 +305,7 @@ def test_sequential_executor_runs_in_topological_order(
                 "to": "2.0.0",
                 "ops": [{"op": "test", "path": "/type", "value": "X"}],
             }
-        ),
+        ).patch,
     ],
     ids=["python-callable", "jsonpatch-spec"],
 )

@@ -9,7 +9,7 @@ from pyverge.migration import JsonPatchMigration
 
 
 def _migrate(ops: list[dict], data: dict) -> dict:
-    return JsonPatchMigration({"from": "0.1.0", "to": "0.2.0", "ops": ops})(data)
+    return JsonPatchMigration({"from": "0.1.0", "to": "0.2.0", "ops": ops}).patch(data)
 
 
 class TestCoreOps:

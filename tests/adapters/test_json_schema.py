@@ -6,11 +6,11 @@ import semver
 from pydantic import BaseModel
 
 from pyverge.core import (
-    Diff,
     MigrationSettings,
     VersionNode,
 )
 from pyverge.migration import (
+    Diff,
     JsonSchemaModelAdapter,
     Registry,
     latest_target_resolver,

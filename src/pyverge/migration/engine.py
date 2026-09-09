@@ -3,6 +3,7 @@
 import bisect
 from typing import Any, Generic, Self, cast, overload
 
+from pyverge.adapters.json_patch import JsonPatch
 from pyverge.core.exceptions import (
     MigrationError,
     MigrationNotFoundError,
@@ -30,6 +31,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import SentinelEdge, SentinelNode, VersionEdge
+from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
 
 from .graph import GraphBuilder
 from .registry import Registry
@@ -85,6 +87,9 @@ class Engine(Generic[VersionValue]):
         self.default_executor = default_executor
         self.adapter = adapter
         self.entry_migration = entry_migration or DefaultEntryMigration()
+        self.discovery: DiffDiscovery[
+            VersionValue, JsonPatch | MigrationFunc
+        ] = CompositeDiffDiscovery()
 
     def _resolve_model_key(
         self: Self,
@@ -220,7 +225,13 @@ class Engine(Generic[VersionValue]):
         *,
         backward_compatible: bool = False,
     ) -> MigrationFunc:
-        """Register a migration with adjacency and backward-compat validation."""
+        """Register a migration with adjacency and backward-compat validation.
+
+        Endpoints without a concrete model are reconstructed from the other
+        endpoint's model when ``settings.on_missing_model == "reconstruct"``;
+        otherwise ``ModelNotFoundError`` is raised.  The migration edge is
+        stored only after both endpoints have models.
+        """
         registry = self.registry
         v_from, v_to = key
 
@@ -229,24 +240,83 @@ class Engine(Generic[VersionValue]):
                 registry.name,
                 f"Cannot register migration across kinds: {v_from.kind} != {v_to.kind}",
             )
-        if not registry.is_adjacent(SentinelEdge.from_pair(v_from, v_to)):
+
+        resolved_from = self._resolve(v_from, other=v_to, func=func)
+        resolved_to = self._resolve(v_to, other=v_from, func=func)
+
+        if not registry.is_adjacent(SentinelEdge.from_pair(resolved_from, resolved_to)):
             raise RegistryError(
                 registry.name,
                 f"Cannot register migration with skip versions: {v_from}→{v_to}",
             )
 
         edge = VersionEdge(
-            source=v_from,
-            target=v_to,
+            source=resolved_from,
+            target=resolved_to,
             diff=self.adapter.diff(
-                v_from,
-                v_to,
+                resolved_from,
+                resolved_to,
                 is_backward_compatible=backward_compatible,
             ),
             func=func,
         )
         registry.store_migration(edge)
+
         return func
+
+    def _resolve(
+        self: Self,
+        endpoint: Versionable[VersionValue, ModelBase],
+        *,
+        other: Versionable[VersionValue, ModelBase],
+        func: MigrationFunc,
+    ) -> Versionable[VersionValue, ModelBase]:
+        """Return *endpoint*, reconstructing it when it is not registered.
+
+        A registered endpoint (including a registered meta node) is returned
+        as-is.  An unregistered endpoint is reconstructed from *other*'s model
+        when ``settings.on_missing_model == "reconstruct"``; otherwise
+        ``ModelNotFoundError`` is raised.
+        """
+        registry = self.registry
+        try:
+            return registry.get_model(endpoint)
+        except ModelNotFoundError:
+            pass
+
+        if self.settings.on_missing_model != "reconstruct":
+            raise ModelNotFoundError(
+                registry.name,
+                f"Cannot register migration: endpoint {endpoint} is not registered "
+                "and on_missing_model is not 'reconstruct'",
+            )
+        if other.model is None:
+            raise ModelNotFoundError(
+                registry.name,
+                f"Cannot reconstruct {endpoint}: neither endpoint has a model",
+            )
+
+        self.reconstruct(other, endpoint, func)
+        return registry.get_model(endpoint)
+
+    def reconstruct(
+        self: Self,
+        anchor: Versionable[VersionValue, ModelBase],
+        target: Versionable[VersionValue, ModelBase],
+        migration: JsonPatch | MigrationFunc,
+    ) -> None:
+        """Reconstruct and store a missing model for *target*.
+
+        Applies the migration's diff to the *anchor* model via the provider
+        adapter and stores the resulting model at *target*'s version.  The
+        diff is applied forward when the anchor predates the target and
+        inverted when it is the newer endpoint.
+        """
+        diff = self.discovery.discover(migration, anchor, target)
+        if anchor.version > target.version:
+            diff = diff.inverted()
+        model = self.adapter.materialize(anchor.model, diff, target.version[1])
+        self.registry.store_model(self.adapter.versionable(model))
 
     def get_migration(
         self: Self,
