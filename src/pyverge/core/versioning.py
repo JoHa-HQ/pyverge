@@ -19,7 +19,6 @@ from .types import (
     MigrationKey,
     ModelData,
     ModelKind,
-    ModelVersionKey,
     Versionable,
     VersionValue_co,
     VModel_co,
@@ -60,7 +59,7 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
         return self._kind
 
     def __lt__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, SentinelNode)):
+        if not isinstance(other, VersionNode):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
@@ -73,7 +72,7 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
         return self.version < other_c.version
 
     def __eq__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, SentinelNode)):
+        if not isinstance(other, VersionNode):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
@@ -85,7 +84,7 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
         return self.version == other_c.version
 
     def __gt__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, SentinelNode)):
+        if not isinstance(other, VersionNode):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
             )
@@ -105,81 +104,6 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
     def __repr__(self) -> str:
         model = self.model.__name__ if self.model is not None else "meta"
         return f"VersionNode[{self.strategy.__name__}, {model}]({self._value}, {self._kind})"  # noqa: E501
-
-
-@total_ordering
-@dataclass(frozen=True, slots=True)
-class SentinelNode(Generic[VersionValue_co]):
-    """Lightweight value-only sentinel for searching across versions.
-
-    Carries no model binding — only the version value — so the registry
-    can search by version string without constructing a full VersionedModel.
-    """
-
-    _kind: ModelKind
-    _value: VersionValue_co
-
-    @classmethod
-    def from_version(cls, version: VersionNode) -> Self:
-        return cls(version._kind, version._value)
-
-    @property
-    def strategy(self) -> type[VersionValue_co]:
-        return type(self._value)
-
-    @property
-    def kind(self) -> ModelKind:
-        return self._kind
-
-    @property
-    def version(self) -> ModelVersionKey:
-        return (self._kind, self._value)
-
-    @property
-    def model(self) -> None:
-        return None
-
-    def __lt__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, SentinelNode)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        other_c = cast(Comparable[VersionValue_co], other)
-        return self.version < other_c.version
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, SentinelNode)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        other_c = cast(Comparable[VersionValue_co], other)
-        return self.version == other_c.version
-
-    def __gt__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, SentinelNode)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        other_c = cast(Comparable[VersionValue_co], other)
-        return self.version > other_c.version
-
-    def __hash__(self) -> int:
-        return hash((self._kind, self._value))
-
-    def __str__(self) -> str:
-        return f"{self._kind}:{self._value}"
 
 
 @total_ordering

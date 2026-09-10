@@ -25,7 +25,7 @@ from .path import Path, get_at, set_at
 from .render import JsonPatchRender
 from .settings import DiscoverySettings, MigrationSettings, VersioningSettings
 from .steps import ExplicitStep
-from .versioning import SentinelEdge, SentinelNode, VersionEdge, VersionNode
+from .versioning import SentinelEdge, VersionEdge, VersionNode
 
 __all__ = [
     "DiscoveryError",
@@ -48,7 +48,6 @@ __all__ = [
     "Path",
     "RegistryError",
     "SentinelEdge",
-    "SentinelNode",
     "VersionEdge",
     "VersionNode",
     "VersionedModelError",

@@ -102,7 +102,7 @@ class Orderable(Protocol):
 class Comparable(Orderable, Protocol[VersionValue_co]):
     """Version identity aspect: ``strategy`` + ``version``, plus ordering.
 
-    Implemented by :class:`VersionNode` and :class:`SentinelNode`.
+    Implemented by :class:`VersionNode`.
     """
 
     @property
@@ -116,8 +116,8 @@ class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co, VModel_
     """Protocol for a model version that always binds a model.
 
     Adds a required ``model`` binding on top of :class:`Comparable`.  Shared
-    by :class:`VersionNode`.  Lightweight sentinels (:class:`SentinelNode`)
-    are orderable but model-less, so they satisfy :class:`Comparable` only.
+    by :class:`VersionNode`.  A model-less node (``_model=None``) is orderable
+    and satisfies :class:`Comparable`.
     """
 
     @property

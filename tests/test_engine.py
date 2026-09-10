@@ -20,7 +20,6 @@ from pyverge.core import (
     ModelNotFoundError,
     RegistryError,
     SentinelEdge,
-    SentinelNode,
     VersioningSettings,
     VersionNode,
     types,
@@ -61,7 +60,7 @@ class TestModelManagement:
 
     Engine policy = key normalization (``(kind, value)`` tuple |
     model class | ``Versionable``) over the registry's strict
-    ``SentinelNode`` API.  Structural invariants (duplicate,
+    ``VersionNode`` API.  Structural invariants (duplicate,
     referenced-by-migration) are enforced by the registry and
     must propagate unchanged.
     """
@@ -92,11 +91,13 @@ class TestModelManagement:
         [
             [
                 Registry[semver.Version, BaseModel](),
-                SentinelNode("User", semver.Version(9, 9, 9)),
+                VersionNode(_model=None, _value=semver.Version(9, 9, 9), _kind="User"),
             ],
             [
                 Registry[pendulum.Date, BaseModel](),
-                SentinelNode("User", pendulum.Date(2099, 1, 1)),
+                VersionNode(
+                    _model=None, _value=pendulum.Date(2099, 1, 1), _kind="User"
+                ),
             ],
         ],
     )
@@ -104,7 +105,7 @@ class TestModelManagement:
         self,
         migration_settings: MigrationSettings,
         registry: Registry[types.VersionValue, BaseModel],
-        key: SentinelNode,
+        key: VersionNode,
     ) -> None:
         eng = make_engine(registry, migration_settings)
         with pytest.raises(ModelNotFoundError):
@@ -200,7 +201,9 @@ class TestModelManagement:
     ) -> None:
         eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
         with pytest.raises(ModelNotFoundError):
-            eng.find_model(SentinelNode("User", semver.Version(9, 9, 9)))
+            eng.find_model(
+                VersionNode(_model=None, _value=semver.Version(9, 9, 9), _kind="User")
+            )
 
     @pytest.mark.parametrize(
         "registry, model",
@@ -244,14 +247,16 @@ class TestModelManagement:
         eng.store_model(version)
 
         eng.remove_model(version)
-        assert SentinelNode.from_version(version) not in registry
+        assert version not in registry
 
     def test_remove_missing_model_raises(
         self, migration_settings: MigrationSettings
     ) -> None:
         eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
         with pytest.raises(RegistryError):
-            eng.remove_model(SentinelNode("User", semver.Version(9, 9, 9)))
+            eng.remove_model(
+                VersionNode(_model=None, _value=semver.Version(9, 9, 9), _kind="User")
+            )
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -739,7 +744,7 @@ class TestMigrationManagement:
         eng.delete_kind(versions[0].kind)
 
         for v in versions:
-            assert SentinelNode.from_version(v) not in registry
+            assert v not in registry
         assert (
             registry.has_migration(SentinelEdge.from_pair(versions[0], versions[1]))
             is False
@@ -836,7 +841,9 @@ class TestReflection:
             ).patch,
         )
 
-        reconstructed = eng.get_model(SentinelNode("User", semver.Version(1, 0, 0)))
+        reconstructed = eng.get_model(
+            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
+        )
         assert reconstructed.model is not None
         fields = reconstructed.model.model_fields
         assert "name" in fields
@@ -862,7 +869,9 @@ class TestReflection:
 
         eng.store_migration((meta, real), add_age)
 
-        reconstructed = eng.get_model(SentinelNode("User", semver.Version(1, 0, 0)))
+        reconstructed = eng.get_model(
+            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
+        )
         assert reconstructed.model is not None
         assert "age" not in reconstructed.model.model_fields
 
@@ -881,7 +890,9 @@ class TestReflection:
 
         eng.store_migration((meta, real), lambda d: {**d, "age": None})
 
-        stored = eng.get_model(SentinelNode("User", semver.Version(1, 0, 0)))
+        stored = eng.get_model(
+            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
+        )
         assert stored.model is None
 
 

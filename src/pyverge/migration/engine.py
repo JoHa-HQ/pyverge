@@ -30,7 +30,7 @@ from pyverge.core.types import (
     VersionPair,
     VersionValue,
 )
-from pyverge.core.versioning import SentinelEdge, SentinelNode, VersionEdge
+from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
 from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
 
 from .graph import GraphBuilder
@@ -94,17 +94,25 @@ class Engine(Generic[VersionValue]):
     def _resolve_model_key(
         self: Self,
         key: Any,
-    ) -> SentinelNode[VersionValue]:
-        """Normalize a model key to the registry's strict sentinel form."""
+    ) -> VersionNode[VersionValue, ModelBase]:
+        """Normalize a model key to a version node form."""
         if isinstance(key, tuple):
             kind, value = key
-            return SentinelNode[VersionValue](kind, value)
-        if isinstance(key, SentinelNode):
-            return cast(SentinelNode[VersionValue], key)
+            return VersionNode[VersionValue, ModelBase](
+                _model=None, _value=value, _kind=kind
+            )
+        if isinstance(key, VersionNode):
+            return cast(VersionNode[VersionValue, ModelBase], key)
         if isinstance(key, type) and issubclass(key, ModelBase):
             versionable = self.registry.get_model_by_class(key)
-            return SentinelNode[VersionValue](versionable.kind, versionable.version[1])
-        return SentinelNode[VersionValue](key.kind, key.version[1])
+            return VersionNode[VersionValue, ModelBase](
+                _model=None,
+                _value=versionable.version[1],
+                _kind=versionable.kind,
+            )
+        return VersionNode[VersionValue, ModelBase](
+            _model=None, _value=key.version[1], _kind=key.kind
+        )
 
     def __contains__(self, index: Any) -> bool:
         """Check membership of a model version or migration edge."""

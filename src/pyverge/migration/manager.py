@@ -63,7 +63,7 @@ from pyverge.core.types import (
     VModel_co,
     Walker,
 )
-from pyverge.core.versioning import SentinelEdge, SentinelNode, VersionNode
+from pyverge.core.versioning import SentinelEdge, VersionNode
 
 from .engine import Engine
 from .executor import SequentialExecutor
@@ -133,7 +133,9 @@ def _string_resolver(
     ) -> Versionable[VersionValue_co, VModel_co] | None:
         sentinel: Versionable[VersionValue_co, VModel_co] = cast(
             Versionable[VersionValue_co, VModel_co],
-            SentinelNode(current.kind, parsed),
+            VersionNode[VersionValue_co, VModel_co](
+                _model=None, _value=parsed, _kind=current.kind
+            ),
         )
         return registry.get_model(sentinel)
 
@@ -423,7 +425,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
             return skip_target_resolver(registry)
 
         # Resolve string values first so we never compare a VersionNode/
-        # SentinelNode to a string (their ``__eq__`` intentionally raises for
+        # VersionNode to a string (their ``__eq__`` intentionally raises for
         # mixed types).
         if isinstance(spec, str):
             named_resolvers: dict[
@@ -444,7 +446,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         # Treat any remaining value as an explicit versionable target.  This
         # avoids an ``isinstance(spec, Versionable)`` protocol check that would
         # trigger the strict ``__eq__`` semantics of :class:`VersionNode` /
-        # :class:`SentinelNode`.
+        # :class:`VersionNode`.
         return fixed_target_resolver(registry, cast(Versionable, spec))
 
     def _resolve_kind_mapping(
@@ -593,7 +595,11 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         """Return a registered model version."""
         if isinstance(key, tuple):
             kind, value = key
-            return self.engine.get_model(SentinelNode(kind, value))
+            return self.engine.get_model(
+                VersionNode[VersionValue, VModel](
+                    _model=None, _value=value, _kind=kind
+                )
+            )
         return self.engine.get_model_by_class(key)
 
     @overload
