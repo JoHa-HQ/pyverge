@@ -1,3 +1,9 @@
+## v0.7.0 (2026-09-10)
+
+### Feat
+
+- **#54**: introduce model reflection. update the docs. reffactor tests (#55)
+
 ## v0.6.0 (2026-09-09)
 
 ### Feat
