@@ -596,9 +596,7 @@ class ModelManager(Generic[VersionValue], metaclass=_ManagerMeta):
         if isinstance(key, tuple):
             kind, value = key
             return self.engine.get_model(
-                VersionNode[VersionValue, VModel](
-                    _model=None, _value=value, _kind=kind
-                )
+                VersionNode[VersionValue, VModel](_model=None, _value=value, _kind=kind)
             )
         return self.engine.get_model_by_class(key)
 

@@ -698,10 +698,7 @@ class TestVersionEdgeIndex:
         for v in versions:
             registry.store_model(v)
 
-        assert (
-            registry.migrations_of(versions[0])
-            == frozenset()
-        )
+        assert registry.migrations_of(versions[0]) == frozenset()
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -797,9 +794,7 @@ class TestVersionEdgeIndex:
 
         registry.remove_migration(SentinelEdge.from_version_edge(e1))
 
-        assert registry.migrations_of(versions[0]) == (
-            frozenset()
-        )
+        assert registry.migrations_of(versions[0]) == (frozenset())
         assert registry.migrations_of(versions[1]) == {e2}
 
     @pytest.mark.parametrize(
@@ -827,9 +822,7 @@ class TestVersionEdgeIndex:
         registry.store_migration(edge)
         registry.clear_migrations()
 
-        assert registry.migrations_of(versions[0]) == (
-            frozenset()
-        )
+        assert registry.migrations_of(versions[0]) == (frozenset())
 
     @pytest.mark.parametrize(
         "registry, models",
