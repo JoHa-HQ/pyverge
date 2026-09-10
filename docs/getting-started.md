@@ -105,7 +105,8 @@ UserManager.model()(UserManager.adapter.to_pydantic(user_schema))
 ## Declarative migrations
 
 A migration can be expressed as an RFC 6902 JSON Patch op list instead of a
-Python callable:
+Python callable. `JsonPatchMigration` compiles the spec into an executable
+`JsonPatch` (a `MigrationFunc`):
 
 ```python
 from pyverge.migration import JsonPatchMigration
@@ -120,9 +121,9 @@ migration = JsonPatchMigration(
 manager.store_migration(("User", "1.0.0", "2.0.0"), migration)
 ```
 
-Core ops (`add`, `remove`, `replace`, `move`, `copy`, `test`) follow RFC 6902;
-extended ops (`set_default`, `coerce`, `map`, `split`) are schema-aware
-conveniences.
+The manager unwraps the compiled patch automatically. Core ops (`add`,
+`remove`, `replace`, `move`, `copy`, `test`) follow RFC 6902; extended ops
+(`set_default`, `coerce`, `map`, `split`) are schema-aware conveniences.
 
 ## Next steps
 

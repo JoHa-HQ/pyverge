@@ -20,6 +20,45 @@ Because a meta version has no schema, migration edges touching one produce
 **empty diffs** and skip validation/finalization. The engine only validates
 against the real target model at the end of the chain.
 
+## Materializing a meta version
+
+A meta version can be materialized into a concrete model automatically. When
+`on_missing_model="reconstruct"` is set, registering a migration whose endpoint
+has no model reconstructs it from the other endpoint's model and the
+migration's diff:
+
+```python
+from pyverge.migration import MigrationSettings
+
+UserManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
+    settings=MigrationSettings(on_missing_model="reconstruct"),
+)
+manager = UserManager()
+
+# Register the real model, then a migration from an unregistered version.
+manager.store_model(UserV2)
+manager.store_migration(
+    ("User", "1.0.0", "2.0.0"),
+    JsonPatchMigration(
+        {
+            "from": "1.0.0",
+            "to": "2.0.0",
+            "ops": [{"op": "add", "path": "/age", "value": None}],
+        }
+    ),
+)
+
+# The 1.0.0 model is reconstructed from UserV2 minus the added field.
+v1 = manager.get("User", "1.0.0")
+assert v1.model is not None  # fields: kind, version, name
+```
+
+The reconstructed model is stored in the registry in place of the meta node,
+so it can be validated against, introspected, or served with a
+version-accurate schema. With the default `on_missing_model="raise"`, an
+unregistered endpoint raises `ModelNotFoundError`.
+
 ## Registering a meta version
 
 ```python

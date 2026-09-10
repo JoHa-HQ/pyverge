@@ -297,13 +297,21 @@ class Engine(Generic[VersionValue]):
                 registry.name,
                 endpoint.version,
             )
-        if other.model is None:
+
+        try:
+            anchor = registry.get_model(other)
+        except ModelNotFoundError:
+            raise ModelNotFoundError(
+                registry.name,
+                endpoint.version,
+            )
+        if anchor.model is None:
             raise ModelNotFoundError(
                 registry.name,
                 endpoint.version,
             )
 
-        self.reconstruct(other, endpoint, func)
+        self.reconstruct(anchor, endpoint, func)
         return registry.get_model(endpoint)
 
     def reconstruct(
