@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from tests.examples.pydantic.base import BaseModel, Field, UserBaseModel
+from .base import BaseModel, Field, UserBaseModel
 
 
 class Role(StrEnum):

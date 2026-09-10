@@ -83,3 +83,72 @@ PersonContainer
 The walker discovers every versioned entry at any depth. The graph builder
 orders them so children migrate before their parents: `Address` and `Contact`
 entries converge first, then the enclosing `Person`.
+
+## Migrating a nested payload
+
+A container model drives schema-guided discovery. Register the container and
+its versioned models, then migrate a nested payload:
+
+```python
+from pyverge.migration import (
+    MigrationSettings,
+    ModelManager,
+    PydanticModelAdapter,
+    PydanticWalker,
+)
+
+UserManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
+    settings=MigrationSettings(),
+    walker=PydanticWalker(
+        registry,
+        settings=MigrationSettings(),
+        adapter=PydanticModelAdapter(),
+    ),
+)
+
+# Register versioned models (PersonV1, PersonV2, AddressV1, AddressV2, ...)
+# and their migrations, then migrate a nested payload:
+migrated = manager.migrate(
+    {
+        "document": {
+            "kind": "Person",
+            "version": "1.0.0",
+            "name": "Alice",
+            "address": {"kind": "Address", "version": "1.0.0", "street": "Main"},
+        }
+    },
+    container=PersonContainer,
+)
+```
+
+The walker discovers `Address 1.0.0` and `Person 1.0.0`, converges the address
+first, then the person — so the parent migration never sees stale children.
+
+## Executors
+
+The engine runs the migration graph with an executor. The default is
+sequential (topological order, one entry at a time). For throughput on large
+payloads, enable level-parallel execution — independent entries within each
+topological level run concurrently:
+
+```python
+from pyverge.migration import MigrationSettings
+
+UserManager = ModelManager[semver.Version].scoped(
+    PydanticModelAdapter(),
+    settings=MigrationSettings(parallel_workers=4),
+)
+```
+
+`parallel_workers` caps the thread pool per execution wave (`0` = sequential,
+capped at `os.cpu_count()`). Entries in the same wave are independent, so
+parallelism is safe: children always finish before their parents.
+
+You can also inject a custom executor per call:
+
+```python
+from pyverge.migration import LevelParallelExecutor
+
+manager.migrate(payload, executor=LevelParallelExecutor(max_workers=4))
+```

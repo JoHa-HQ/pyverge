@@ -5,7 +5,6 @@ This package holds the provider-agnostic building blocks used by the
 dependencies on the rest of the library — everything else depends on it.
 """
 
-from .diff import Diff
 from .exceptions import (
     DiscoveryError,
     DiscoveryValidationError,
@@ -26,10 +25,9 @@ from .path import Path, get_at, set_at
 from .render import JsonPatchRender
 from .settings import DiscoverySettings, MigrationSettings, VersioningSettings
 from .steps import ExplicitStep
-from .versioning import SentinelEdge, SentinelNode, VersionEdge, VersionNode
+from .versioning import SentinelEdge, VersionEdge, VersionNode
 
 __all__ = [
-    "Diff",
     "DiscoveryError",
     "DiscoverySettings",
     "DiscoveryValidationError",
@@ -50,7 +48,6 @@ __all__ = [
     "Path",
     "RegistryError",
     "SentinelEdge",
-    "SentinelNode",
     "VersionEdge",
     "VersionNode",
     "VersionedModelError",

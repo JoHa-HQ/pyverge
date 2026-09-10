@@ -15,6 +15,13 @@ theme:
 nav:
   - Home: getting-started.md
   - Concepts: concepts.md
+  - Registration: registration.md
+  - Model Reflection: reflection.md
+  - Execution Flow: execution-flow.md
+  - Target Policy: target-policy.md
+  - Telemetry & Hooks: telemetry.md
+  - Common Usage Patterns: usage.md
+  - Scenarios: scenarios.md
 
 markdown_extensions:
   - pymdownx.highlight

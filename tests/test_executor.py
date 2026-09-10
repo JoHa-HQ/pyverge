@@ -299,12 +299,14 @@ def test_sequential_executor_runs_in_topological_order(
     "func_factory",
     [
         lambda: lambda data: (_ for _ in ()).throw(RuntimeError("boom")),
-        lambda: JsonPatchMigration(
-            {
-                "from": "1.0.0",
-                "to": "2.0.0",
-                "ops": [{"op": "test", "path": "/type", "value": "X"}],
-            }
+        lambda: (
+            JsonPatchMigration(
+                {
+                    "from": "1.0.0",
+                    "to": "2.0.0",
+                    "ops": [{"op": "test", "path": "/type", "value": "X"}],
+                }
+            ).patch
         ),
     ],
     ids=["python-callable", "jsonpatch-spec"],

@@ -20,7 +20,6 @@ from pyverge.core import (
     ModelNotFoundError,
     RegistryError,
     SentinelEdge,
-    SentinelNode,
     VersioningSettings,
     VersionNode,
     types,
@@ -61,7 +60,7 @@ class TestModelManagement:
 
     Engine policy = key normalization (``(kind, value)`` tuple |
     model class | ``Versionable``) over the registry's strict
-    ``SentinelNode`` API.  Structural invariants (duplicate,
+    ``VersionNode`` API.  Structural invariants (duplicate,
     referenced-by-migration) are enforced by the registry and
     must propagate unchanged.
     """
@@ -92,11 +91,13 @@ class TestModelManagement:
         [
             [
                 Registry[semver.Version, BaseModel](),
-                SentinelNode("User", semver.Version(9, 9, 9)),
+                VersionNode(_model=None, _value=semver.Version(9, 9, 9), _kind="User"),
             ],
             [
                 Registry[pendulum.Date, BaseModel](),
-                SentinelNode("User", pendulum.Date(2099, 1, 1)),
+                VersionNode(
+                    _model=None, _value=pendulum.Date(2099, 1, 1), _kind="User"
+                ),
             ],
         ],
     )
@@ -104,7 +105,7 @@ class TestModelManagement:
         self,
         migration_settings: MigrationSettings,
         registry: Registry[types.VersionValue, BaseModel],
-        key: SentinelNode,
+        key: VersionNode,
     ) -> None:
         eng = make_engine(registry, migration_settings)
         with pytest.raises(ModelNotFoundError):
@@ -200,7 +201,9 @@ class TestModelManagement:
     ) -> None:
         eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
         with pytest.raises(ModelNotFoundError):
-            eng.find_model(SentinelNode("User", semver.Version(9, 9, 9)))
+            eng.find_model(
+                VersionNode(_model=None, _value=semver.Version(9, 9, 9), _kind="User")
+            )
 
     @pytest.mark.parametrize(
         "registry, model",
@@ -244,14 +247,16 @@ class TestModelManagement:
         eng.store_model(version)
 
         eng.remove_model(version)
-        assert SentinelNode.from_version(version) not in registry
+        assert version not in registry
 
     def test_remove_missing_model_raises(
         self, migration_settings: MigrationSettings
     ) -> None:
         eng = make_engine(Registry[semver.Version, BaseModel](), migration_settings)
         with pytest.raises(RegistryError):
-            eng.remove_model(SentinelNode("User", semver.Version(9, 9, 9)))
+            eng.remove_model(
+                VersionNode(_model=None, _value=semver.Version(9, 9, 9), _kind="User")
+            )
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -364,18 +369,20 @@ class TestMigrationManagement:
                 ["0.1.0", "0.2.0"],
                 UserV1,
                 "1.0.0",
-                lambda from_v, to_v: JsonPatchMigration(
-                    {
-                        "from": from_v,
-                        "to": to_v,
-                        "ops": [
-                            {
-                                "op": "replace",
-                                "path": "/version",
-                                "value": to_v,
-                            }
-                        ],
-                    }
+                lambda from_v, to_v: (
+                    JsonPatchMigration(
+                        {
+                            "from": from_v,
+                            "to": to_v,
+                            "ops": [
+                                {
+                                    "op": "replace",
+                                    "path": "/version",
+                                    "value": to_v,
+                                }
+                            ],
+                        }
+                    ).patch
                 ),
             ],
         ],
@@ -737,7 +744,7 @@ class TestMigrationManagement:
         eng.delete_kind(versions[0].kind)
 
         for v in versions:
-            assert SentinelNode.from_version(v) not in registry
+            assert v not in registry
         assert (
             registry.has_migration(SentinelEdge.from_pair(versions[0], versions[1]))
             is False
@@ -804,6 +811,89 @@ class TestMigrationManagement:
         eng.add_hook(SentinelEdge.from_pair(versions[0], versions[1]), MigrationHook())
         eng.clear_hooks()
         assert not registry._hooks
+
+
+class TestReflection:
+    """Engine reconstructs missing models implicitly on migration registration."""
+
+    def test_reconstructs_missing_model_on_store_migration(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+    ) -> None:
+        settings = migration_settings.model_copy(
+            update={"on_missing_model": "reconstruct"}
+        )
+        registry = Registry[semver.Version, BaseModel]()
+        eng = make_engine(registry, settings, adapter=model_adapter)
+        real = eng.adapter.versionable(UserV2)
+        eng.store_model(real)
+        meta = meta_versionable(model_adapter, "User", "1.0.0")
+
+        eng.store_migration(
+            (meta, real),
+            JsonPatchMigration(
+                {
+                    "from": "1.0.0",
+                    "to": "2.0.0",
+                    "ops": [{"op": "add", "path": "/age", "value": None}],
+                }
+            ).patch,
+        )
+
+        reconstructed = eng.get_model(
+            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
+        )
+        assert reconstructed.model is not None
+        fields = reconstructed.model.model_fields
+        assert "name" in fields
+        assert "age" not in fields
+        assert fields["version"].default == "1.0.0"
+
+    def test_reconstructs_with_callable_migration(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+    ) -> None:
+        settings = migration_settings.model_copy(
+            update={"on_missing_model": "reconstruct"}
+        )
+        registry = Registry[semver.Version, BaseModel]()
+        eng = make_engine(registry, settings, adapter=model_adapter)
+        real = eng.adapter.versionable(UserV2)
+        eng.store_model(real)
+        meta = meta_versionable(model_adapter, "User", "1.0.0")
+
+        def add_age(data: dict) -> dict:
+            return {**data, "age": None}
+
+        eng.store_migration((meta, real), add_age)
+
+        reconstructed = eng.get_model(
+            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
+        )
+        assert reconstructed.model is not None
+        assert "age" not in reconstructed.model.model_fields
+
+    def test_skips_reconstruction_when_disabled(
+        self,
+        model_adapter: PydanticModelAdapter,
+        migration_settings: MigrationSettings,
+    ) -> None:
+        settings = migration_settings.model_copy(update={"on_missing_model": "skip"})
+        registry = Registry[semver.Version, BaseModel]()
+        eng = make_engine(registry, settings, adapter=model_adapter)
+        real = eng.adapter.versionable(UserV2)
+        eng.store_model(real)
+        meta = meta_versionable(model_adapter, "User", "1.0.0")
+        eng.store_model(meta)
+
+        eng.store_migration((meta, real), lambda d: {**d, "age": None})
+
+        stored = eng.get_model(
+            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
+        )
+        assert stored.model is None
 
 
 class TestLookupConvenience:

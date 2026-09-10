@@ -8,11 +8,11 @@ import semver
 from pydantic import BaseModel
 
 from pyverge.core import (
-    Diff,
     VersioningSettings,
     types,
 )
 from pyverge.migration import (
+    Diff,
     PydanticDiff,
     PydanticModelAdapter,
     Registry,

@@ -38,6 +38,13 @@ VTarget_co = TypeVar("VTarget_co", bound=BaseModel, covariant=True)
 # Covariant — used in protocols where VModel is output-only
 VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
 VModel_co = TypeVar("VModel_co", bound=ModelBase, covariant=True)
+# Migration-format covariance — any callable `(ModelData) -> ModelData`
+# (plain fn or JsonPatch) satisfies the bound.
+MigrationFunc_co = TypeVar(
+    "MigrationFunc_co",
+    bound="Callable[[ModelData], ModelData]",
+    covariant=True,
+)
 # Invariant — Registry is mutable (store/remove), so its type params must be
 # invariant even though the protocol-facing covariant variants exist above.
 ProviderBase_co = TypeVar("ProviderBase_co", bound=ModelBase, covariant=True)
@@ -95,7 +102,7 @@ class Orderable(Protocol):
 class Comparable(Orderable, Protocol[VersionValue_co]):
     """Version identity aspect: ``strategy`` + ``version``, plus ordering.
 
-    Implemented by :class:`VersionNode` and :class:`SentinelNode`.
+    Implemented by :class:`VersionNode`.
     """
 
     @property
@@ -109,8 +116,8 @@ class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co, VModel_
     """Protocol for a model version that always binds a model.
 
     Adds a required ``model`` binding on top of :class:`Comparable`.  Shared
-    by :class:`VersionNode`.  Lightweight sentinels (:class:`SentinelNode`)
-    are orderable but model-less, so they satisfy :class:`Comparable` only.
+    by :class:`VersionNode`.  A model-less node (``_model=None``) is orderable
+    and satisfies :class:`Comparable`.
     """
 
     @property
@@ -318,8 +325,20 @@ class ModelAdapter(Protocol):
         self, parent_model: type[Any], field_name: str
     ) -> type[ModelBase] | None: ...
     def versionable(
-        self, model_cls: type[VModel_co]
-    ) -> Versionable[VersionValue_co, VModel_co]: ...
+        self,
+        model_cls: type[VModel_co] | None,
+        *,
+        kind: str | None = None,
+        version: str | None = None,
+    ) -> Versionable[VersionValue_co, VModel_co]:
+        """Wrap a model class into a versionable, or build a meta versionable.
+
+        With a model class, the node carries it and ``version``/``kind`` are
+        read from the class.  With ``None``, a meta node (no concrete model)
+        is built from *kind* and *version* strings.
+        """
+        ...
+
     def diff(
         self,
         source: Versionable[VersionValue_co, VModel_co],
@@ -327,6 +346,20 @@ class ModelAdapter(Protocol):
         *,
         is_backward_compatible: bool = False,
     ) -> Diffable[VersionValue_co]: ...
+
+    def materialize(
+        self,
+        anchor: type[ModelBase],
+        diff: Diffable[VersionValue_co],
+        version: VersionValue_co,
+    ) -> type[ModelBase]:
+        """Materialize a model for *version* from an *anchor* and a *diff*.
+
+        The anchor is the nearest version with a concrete model; the diff
+        describes the structural change between the anchor and the version to
+        materialize.  The returned model conforms to this provider.
+        """
+        ...
 
 
 VersionPair: TypeAlias = tuple[

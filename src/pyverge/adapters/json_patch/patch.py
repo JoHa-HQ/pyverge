@@ -142,7 +142,9 @@ class JsonPatch(jsonpatch.JsonPatch):
     """RFC 6902 JSON Patch extended with schema-aware ops.
 
     Registers the extended ops in the ``operations`` mapping so a single
-    :meth:`apply` pass handles core and extended ops together.
+    :meth:`apply` pass handles core and extended ops together.  Because it is
+    callable as ``(ModelData) -> ModelData``, a :class:`JsonPatch` is itself a
+    migration function.
     """
 
     operations = jsonpatch.MappingProxyType(
@@ -154,3 +156,7 @@ class JsonPatch(jsonpatch.JsonPatch):
             "split": SplitOperation,
         }
     )
+
+    def __call__(self, data: ModelData) -> ModelData:
+        """Apply the whole patch to the payload in one pass."""
+        return self.apply(data)

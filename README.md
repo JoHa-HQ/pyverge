@@ -93,10 +93,24 @@ pyverge managers      # List available managers from configuration
 Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 `pyproject.toml`), pointing at the module that defines your manager.
 
+```toml
+# pyverge.toml
+[managers]
+user = "myapp.models:UserManager"
+```
+
+```bash
+pyverge info          # List registered models and versions
+pyverge validate data.json --manager user --version 1.0.0
+pyverge migrate data.json --manager user --to latest
+pyverge diff --manager user --from 1.0.0 --to 2.0.0
+pyverge export --manager user --version 2.0.0 > schema.json
+```
+
 ## Features
 
 - **Versioned model registry** — decorator-based registration with semver or ISO date versioning
-- **Meta versions** — register a version by `(kind, version)` alone, with no concrete model, for patch-delta chains against a single latest model
+- **Model reflection** — when a migration endpoint has no concrete model, the engine reconstructs it from the other endpoint's model and the migration diff (`on_missing_model="reconstruct"`), so every version in a chain is materializable
 - **Provider adapters** — pluggable `ModelAdapter`; Pydantic and JSON Schema ship today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
 - **Declarative migrations** — express a migration as an RFC 6902 JSON Patch op list (plus `set_default`/`coerce`/`map`/`split`), compiled into a `MigrationFunc` via `JsonPatchMigration`
 - **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
@@ -112,8 +126,9 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 - [Concepts](docs/concepts.md)
 - [Execution Flow](docs/execution-flow.md)
 - [Target Policy](docs/target-policy.md)
-- [Meta Versions](docs/meta-versions.md)
-- [Common Usage Patterns](docs/diffing.md)
+- [Model Reflection](docs/reflection.md)
+- [Telemetry & Hooks](docs/telemetry.md)
+- [Common Usage Patterns](docs/usage.md)
 - [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)
 

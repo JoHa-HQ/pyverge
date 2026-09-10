@@ -105,7 +105,8 @@ UserManager.model()(UserManager.adapter.to_pydantic(user_schema))
 ## Declarative migrations
 
 A migration can be expressed as an RFC 6902 JSON Patch op list instead of a
-Python callable:
+Python callable. `JsonPatchMigration` compiles the spec into an executable
+`JsonPatch` (a `MigrationFunc`):
 
 ```python
 from pyverge.migration import JsonPatchMigration
@@ -120,16 +121,46 @@ migration = JsonPatchMigration(
 manager.store_migration(("User", "1.0.0", "2.0.0"), migration)
 ```
 
-Core ops (`add`, `remove`, `replace`, `move`, `copy`, `test`) follow RFC 6902;
-extended ops (`set_default`, `coerce`, `map`, `split`) are schema-aware
-conveniences.
+The manager unwraps the compiled patch automatically. Core ops (`add`,
+`remove`, `replace`, `move`, `copy`, `test`) follow RFC 6902; extended ops
+(`set_default`, `coerce`, `map`, `split`) are schema-aware conveniences.
+
+## Date versioning
+
+Versions can also be ISO calendar dates instead of semver. Use
+`pendulum.Date` as the version strategy:
+
+```python
+import pendulum
+from typing import Literal
+
+from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+
+UserManager = ModelManager[pendulum.Date].scoped(
+    PydanticModelAdapter(),
+    settings=MigrationSettings(),
+)
+
+
+@UserManager.model()
+class UserV20250310(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["2025-03-10"] = "2025-03-10"
+    name: str
+    email: str
+```
+
+The engine orders date versions chronologically and migrates across them the
+same way as semver. Version strings are parsed by the adapter, which
+understands both formats.
 
 ## Next steps
 
 - [Registration](registration.md) — decorator vs. lazy registration, class-level vs. instance-level.
-- [Common usage patterns](diffing.md) — lookup, validation, diffing, hooks.
-- [Meta versions](meta-versions.md) — version chains without concrete models.
+- [Common usage patterns](usage.md) — lookup, validation, diffing, hooks.
+- [Model Reflection](reflection.md) — materialize missing versions from an anchor and migration diffs.
 - [Target policy](target-policy.md) — declarative convergence rules.
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
+- [Telemetry & Hooks](telemetry.md) — observability via hooks and OpenTelemetry.
 - [Concepts](concepts.md) — the problem and the approach.
 - [Showcases](../showcases/README.md) — end-to-end examples.

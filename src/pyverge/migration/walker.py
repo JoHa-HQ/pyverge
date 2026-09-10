@@ -20,7 +20,7 @@ from pyverge.core.types import (
 from pyverge.core.types import (
     Walker as WalkerProtocol,
 )
-from pyverge.core.versioning import SentinelNode
+from pyverge.core.versioning import VersionNode
 
 from .registry import Registry
 
@@ -79,7 +79,9 @@ class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
             is_versioned = False
             if isinstance(kind, str) and isinstance(version_str, str):
                 try:
-                    sentinel = SentinelNode(kind, self._adapter.of(version_str))
+                    sentinel = VersionNode(
+                        _model=None, _value=self._adapter.of(version_str), _kind=kind
+                    )
                 except Exception:
                     sentinel = None
                 if sentinel is not None and self._registry.has_model(sentinel):
@@ -228,7 +230,9 @@ class PydanticWalker(WalkerProtocol, Generic[VersionValue]):
             version_str = value.get(vp)
             if isinstance(kind, str) and isinstance(version_str, str):
                 try:
-                    sentinel = SentinelNode(kind, self._adapter.of(version_str))
+                    sentinel = VersionNode(
+                        _model=None, _value=self._adapter.of(version_str), _kind=kind
+                    )
                 except Exception:
                     sentinel = None
                 if sentinel is not None and self._registry.has_model(sentinel):

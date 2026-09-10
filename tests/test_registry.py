@@ -17,7 +17,6 @@ from pyverge.core import (
     ModelNotFoundError,
     RegistryError,
     SentinelEdge,
-    SentinelNode,
     VersioningSettings,
     VersionNode,
     types,
@@ -56,7 +55,7 @@ class TestModel:
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, model)
         registry.store_model(version)
-        assert registry.get_model(SentinelNode.from_version(version)).model is model
+        assert registry.get_model(version).model is model
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -117,7 +116,7 @@ class TestModel:
         key: types.ModelVersionKey,
     ) -> None:
         with pytest.raises(ModelNotFoundError, match="not found"):
-            registry.get_model(SentinelNode(*key))
+            registry.get_model(VersionNode(_model=None, _value=key[1], _kind=key[0]))
 
     @pytest.mark.parametrize(
         "registry, registered, target",
@@ -138,9 +137,7 @@ class TestModel:
         )
         with pytest.raises(ModelNotFoundError):
             registry.get_model(
-                SentinelNode.from_version(
-                    envelope_model(model_adapter, versioning_settings, target)
-                )
+                envelope_model(model_adapter, versioning_settings, target)
             )
 
     @pytest.mark.parametrize(
@@ -154,7 +151,11 @@ class TestModel:
             (
                 Registry[semver.Version, BaseModel](),
                 UserV011Dev7,
-                SentinelNode("User", semver.Version.parse("0.1.1+dev.7")),
+                VersionNode(
+                    _model=None,
+                    _value=semver.Version.parse("0.1.1+dev.7"),
+                    _kind="User",
+                ),
             ),
         ],
     )
@@ -226,7 +227,7 @@ class TestModel:
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, model)
         registry.store_model(version)
-        assert SentinelNode.from_version(version) in registry
+        assert version in registry
         registry.remove_model(version)
         with pytest.raises(ModelNotFoundError):
             registry.get_model(version)
@@ -239,9 +240,7 @@ class TestModel:
         registry = Registry[semver.Version, BaseModel]()
         with pytest.raises(RegistryError, match="is not registered"):
             registry.remove_model(
-                SentinelNode.from_version(
-                    envelope_model(model_adapter, versioning_settings, UserV1)
-                )
+                envelope_model(model_adapter, versioning_settings, UserV1)
             )
 
     def test_registry_model_cleanup(
@@ -254,7 +253,7 @@ class TestModel:
         registry.store_model(version)
         registry.clear_models()
         with pytest.raises(ModelNotFoundError):
-            registry.get_model(SentinelNode.from_version(version))
+            registry.get_model(version)
 
     @pytest.mark.parametrize(
         "registry, version",
@@ -272,7 +271,7 @@ class TestModel:
         meta = meta_versionable(model_adapter, "User", version)
         registry.store_model(meta)
 
-        assert registry.get_model(SentinelNode.from_version(meta)).model is None
+        assert registry.get_model(meta).model is None
         assert registry.models("User") == frozenset()
 
     @pytest.mark.parametrize(
@@ -699,10 +698,7 @@ class TestVersionEdgeIndex:
         for v in versions:
             registry.store_model(v)
 
-        assert (
-            registry.migrations_of(SentinelNode.from_version(versions[0]))
-            == frozenset()
-        )
+        assert registry.migrations_of(versions[0]) == frozenset()
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -732,12 +728,12 @@ class TestVersionEdgeIndex:
         registry.store_migration(e1)
         registry.store_migration(e2)
 
-        assert registry.migrations_of(SentinelNode.from_version(versions[0])) == {e1}
-        assert registry.migrations_of(SentinelNode.from_version(versions[1])) == {
+        assert registry.migrations_of(versions[0]) == {e1}
+        assert registry.migrations_of(versions[1]) == {
             e1,
             e2,
         }
-        assert registry.migrations_of(SentinelNode.from_version(versions[2])) == {e2}
+        assert registry.migrations_of(versions[2]) == {e2}
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -752,7 +748,7 @@ class TestVersionEdgeIndex:
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        """VersionNode and SentinelNode keys hit the same bucket."""
+        """VersionNode keys hit the same bucket."""
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
@@ -765,7 +761,7 @@ class TestVersionEdgeIndex:
         registry.store_migration(edge)
 
         assert registry.migrations_of(versions[0]) == registry.migrations_of(
-            SentinelNode.from_version(versions[0])
+            versions[0]
         )
 
     @pytest.mark.parametrize(
@@ -798,10 +794,8 @@ class TestVersionEdgeIndex:
 
         registry.remove_migration(SentinelEdge.from_version_edge(e1))
 
-        assert registry.migrations_of(SentinelNode.from_version(versions[0])) == (
-            frozenset()
-        )
-        assert registry.migrations_of(SentinelNode.from_version(versions[1])) == {e2}
+        assert registry.migrations_of(versions[0]) == (frozenset())
+        assert registry.migrations_of(versions[1]) == {e2}
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -828,9 +822,7 @@ class TestVersionEdgeIndex:
         registry.store_migration(edge)
         registry.clear_migrations()
 
-        assert registry.migrations_of(SentinelNode.from_version(versions[0])) == (
-            frozenset()
-        )
+        assert registry.migrations_of(versions[0]) == (frozenset())
 
     @pytest.mark.parametrize(
         "registry, models",
@@ -857,7 +849,7 @@ class TestVersionEdgeIndex:
         registry.store_migration(edge)
 
         clone = registry.copy()
-        key = SentinelNode.from_version(versions[0])
+        key = versions[0]
         assert clone.migrations_of(key) == registry.migrations_of(key)
 
         clone.remove_migration(SentinelEdge.from_version_edge(edge))
@@ -889,7 +881,7 @@ class TestVersionEdgeIndex:
         registry.store_migration(edge)
 
         with pytest.raises(RegistryError, match="referenced by migrations") as exc:
-            registry.remove_model(SentinelNode.from_version(versions[0]))
+            registry.remove_model(versions[0])
         assert "→" in str(exc.value)
 
     @pytest.mark.parametrize(
@@ -917,9 +909,9 @@ class TestVersionEdgeIndex:
         registry.store_migration(edge)
         registry.remove_migration(SentinelEdge.from_version_edge(edge))
 
-        registry.remove_model(SentinelNode.from_version(versions[0]))
+        registry.remove_model(versions[0])
         with pytest.raises(ModelNotFoundError):
-            registry.get_model(SentinelNode.from_version(versions[0]))
+            registry.get_model(versions[0])
 
 
 class TestEdgePairLookup:
@@ -978,12 +970,12 @@ class TestEdgePairLookup:
         key13 = SentinelEdge.from_pair(versions[0], versions[2])
         assert registry.has_migration(key12) is True
         assert registry.has_migration(key13) is False
-        # SentinelNode endpoints hit the same index entry
+        # VersionNode endpoints hit the same index entry
         assert (
             registry.has_migration(
                 SentinelEdge.from_pair(
-                    SentinelNode.from_version(versions[0]),
-                    SentinelNode.from_version(versions[1]),
+                    versions[0],
+                    versions[1],
                 )
             )
             is True

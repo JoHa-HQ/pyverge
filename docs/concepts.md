@@ -105,14 +105,16 @@ to?"*
 dicts. The only place a model library (Pydantic, dataclasses, etc.) is touched
 is at the adapter seam. You can swap adapters without changing the engine.
 
-**Meta versions.** A version can be registered by its `(kind, version)` pair
-alone, with no concrete model. This lets a version chain be represented as
-declarative patches against a single latest model — e.g. git-versioned JSON
-specs where only the latest schema is kept. See [meta versions](meta-versions.md).
+**Model reflection.** A version chain can be represented as declarative patches
+against a single latest model — e.g. git-versioned JSON specs where only the
+latest schema is kept. With `on_missing_model="reconstruct"`, the engine
+materializes every missing version from the anchor model and the migration
+diffs, so no historical model needs to be registered by hand. See
+[model reflection](reflection.md).
 
 ## Next steps
 
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
 - [Target policy](target-policy.md) — declarative convergence rules.
-- [Meta versions](meta-versions.md) — version chains without concrete models.
+- [Model Reflection](reflection.md) — materialize missing versions from an anchor and migration diffs.
 - [Real-world scenarios](scenarios.md) — where this applies.
