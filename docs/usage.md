@@ -56,3 +56,6 @@ manager.store_migration(
 ```python
 manager.add_hook(("User", "1.0.0", "2.0.0"), MyHook())
 ```
+
+Hooks observe migrations before, after, and on error — for logging, metrics,
+auditing, or OpenTelemetry tracing. See [Telemetry & Hooks](telemetry.md).

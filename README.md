@@ -93,6 +93,20 @@ pyverge managers      # List available managers from configuration
 Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 `pyproject.toml`), pointing at the module that defines your manager.
 
+```toml
+# pyverge.toml
+[managers]
+user = "myapp.models:UserManager"
+```
+
+```bash
+pyverge info          # List registered models and versions
+pyverge validate data.json --manager user --version 1.0.0
+pyverge migrate data.json --manager user --to latest
+pyverge diff --manager user --from 1.0.0 --to 2.0.0
+pyverge export --manager user --version 2.0.0 > schema.json
+```
+
 ## Features
 
 - **Versioned model registry** — decorator-based registration with semver or ISO date versioning
@@ -113,7 +127,8 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 - [Execution Flow](docs/execution-flow.md)
 - [Target Policy](docs/target-policy.md)
 - [Model Reflection](docs/reflection.md)
-- [Common Usage Patterns](docs/diffing.md)
+- [Telemetry & Hooks](docs/telemetry.md)
+- [Common Usage Patterns](docs/usage.md)
 - [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)
 
