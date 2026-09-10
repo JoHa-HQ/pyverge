@@ -96,7 +96,6 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 ## Features
 
 - **Versioned model registry** — decorator-based registration with semver or ISO date versioning
-- **Meta versions** — register a version by `(kind, version)` alone, with no concrete model, for patch-delta chains against a single latest model
 - **Model reflection** — when a migration endpoint has no concrete model, the engine reconstructs it from the other endpoint's model and the migration diff (`on_missing_model="reconstruct"`), so every version in a chain is materializable
 - **Provider adapters** — pluggable `ModelAdapter`; Pydantic and JSON Schema ship today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
 - **Declarative migrations** — express a migration as an RFC 6902 JSON Patch op list (plus `set_default`/`coerce`/`map`/`split`), compiled into a `MigrationFunc` via `JsonPatchMigration`
@@ -113,7 +112,7 @@ Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
 - [Concepts](docs/concepts.md)
 - [Execution Flow](docs/execution-flow.md)
 - [Target Policy](docs/target-policy.md)
-- [Meta Versions](docs/meta-versions.md)
+- [Model Reflection](docs/reflection.md)
 - [Common Usage Patterns](docs/diffing.md)
 - [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)

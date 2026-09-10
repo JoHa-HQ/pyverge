@@ -129,7 +129,7 @@ The manager unwraps the compiled patch automatically. Core ops (`add`,
 
 - [Registration](registration.md) — decorator vs. lazy registration, class-level vs. instance-level.
 - [Common usage patterns](diffing.md) — lookup, validation, diffing, hooks.
-- [Meta versions](meta-versions.md) — version chains without concrete models.
+- [Model Reflection](reflection.md) — materialize missing versions from an anchor and migration diffs.
 - [Target policy](target-policy.md) — declarative convergence rules.
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
 - [Concepts](concepts.md) — the problem and the approach.
