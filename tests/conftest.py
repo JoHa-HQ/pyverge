@@ -1,27 +1,26 @@
 from __future__ import annotations
 
-from typing import Any, cast
-
-import pendulum
 import pytest
-import semver
-from pydantic import BaseModel
 
 from pyverge.core import (
     DiscoverySettings,
     MigrationSettings,
     VersioningSettings,
 )
-from pyverge.core.types import Walker
+from pyverge.core.types import ModelAdapter, ModelBase, VersionValue, Walker
 from pyverge.migration import (
+    CompoundKeyWalker,
+    DefaultMigrationEntry,
     Engine,
+    GraphBuilder,
     JsonSchemaModelAdapter,
     ModelManager,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
+    SequentialExecutor,
 )
-from tests.utils import make_engine, register_models
+from tests.utils import register_models
 
 # Example model modules are imported by tests, not collected as tests.  With
 # ``--doctest-modules`` their basenames (e.g. ``semver.py``) collide with
@@ -37,6 +36,26 @@ def versioning_settings(
     return VersioningSettings(
         version_property=version_property,
         kind_property=kind_property,
+    )
+
+
+@pytest.fixture
+def migration_settings(
+    version_property: str = "version",
+    kind_property: str = "kind",
+) -> MigrationSettings:
+    return MigrationSettings(
+        version_property=version_property,
+        kind_property=kind_property,
+    )
+
+@pytest.fixture
+def discovery_settings(
+    version_property: str = "version",
+    kind_property: str = "kind",
+) -> DiscoverySettings:
+    return DiscoverySettings(
+        version_property=version_property, kind_property=kind_property
     )
 
 
@@ -60,136 +79,90 @@ def json_model_adapter(
     )
 
 
-@pytest.fixture
+@pytest.fixture(params=[("provider")])
 def model_adapter(
     request: pytest.FixtureRequest,
 ) -> PydanticModelAdapter | JsonSchemaModelAdapter:
-    provider = getattr(request, "param", "pydantic")
-    if provider == "json":
+    provider = request.param
+    if provider == JsonSchemaModelAdapter:
         return request.getfixturevalue("json_model_adapter")
-    return request.getfixturevalue("pydantic_model_adapter")
+    if provider == PydanticModelAdapter:
+        return request.getfixturevalue("pydantic_model_adapter")
+    raise ValueError(f"Unknown provider: {provider}")
 
-
-@pytest.fixture
-def migration_settings(
-    version_property: str = "version",
-    kind_property: str = "kind",
-) -> MigrationSettings:
-    return MigrationSettings(
-        version_property=version_property,
-        kind_property=kind_property,
-    )
-
-
-@pytest.fixture
-def discovery_settings(
-    version_property: str = "version",
-    kind_property: str = "kind",
-) -> DiscoverySettings:
-    return DiscoverySettings(
-        version_property=version_property, kind_property=kind_property
-    )
-
-
-@pytest.fixture(scope="function")
-def semver_registry(name: str | None = None) -> Registry:
-    return Registry[semver.Version, BaseModel](name=name)
-
-
-@pytest.fixture(scope="function")
-def date_registry(name: str | None = None) -> Registry:
-    return Registry[pendulum.DateTime, BaseModel](name=name)
-
-
-@pytest.fixture
-def registry(request: pytest.FixtureRequest) -> Registry:
-    if request.param == semver.Version:
-        return request.getfixturevalue("semver_registry")
-    elif request.param == pendulum.DateTime:
-        return request.getfixturevalue("date_registry")
-    else:
-        raise ValueError(f"Unsupported registry type: {request.param}")
-
-
-@pytest.fixture
-def semver_manager(
+@pytest.fixture(scope="function", params=[("strategy", "name", "models")])
+def registry(
+    request: pytest.FixtureRequest,
     model_adapter: PydanticModelAdapter,
-) -> type[ModelManager[semver.Version]]:
-    return ModelManager[semver.Version].scoped(model_adapter)
-
+    migration_settings: MigrationSettings,
+) -> Registry[VersionValue, ModelBase]:
+    strategy, name, models = request.param
+    registry = Registry[strategy, ModelBase](name=name)
+    if models:
+        register_models(model_adapter, registry, migration_settings, *models)
+    return registry
 
 @pytest.fixture
 def walker(
     request: pytest.FixtureRequest,
-    semver_registry: Registry,
+    registry: Registry[VersionValue, ModelBase],
     migration_settings: MigrationSettings,
     model_adapter: PydanticModelAdapter,
 ) -> Walker:
     """Indirect fixture: a preconfigured walker built from ``request.param``.
 
     Parametrize with a walker class (e.g. ``PydanticWalker``) to obtain a
-    walker bound to the shared ``semver_registry``; pass it to
-    ``ModelManager[semver.Version].scoped(walker=...)`` to drive
+    walker bound to the shared ``registry``; pass it to
+    ``ModelManager[VersionValue].scoped(walker=...)`` to drive
     container-guided discovery.
     """
     if request.param == PydanticWalker:
         return PydanticWalker(
-            semver_registry,
+            registry,
             settings=migration_settings,
             adapter=model_adapter,
         )
 
     raise ValueError(f"Unsupported walker type: {request.param}")
 
+@pytest.fixture
+def graph_builder(
+    registry: Registry[VersionValue, ModelBase],
+    migration_settings: MigrationSettings,
+    model_adapter: ModelAdapter,
+) -> GraphBuilder[VersionValue]:
+    """Return a graph builder with the standard compound-key walker."""
+    return GraphBuilder(
+        registry,
+        migration_settings,
+        CompoundKeyWalker(registry, settings=migration_settings, adapter=model_adapter),
+    )
+
 
 @pytest.fixture
-def chrono_manager(
-    model_adapter: PydanticModelAdapter,
-) -> type[ModelManager[pendulum.Date]]:
-    return ModelManager[pendulum.Date].scoped(model_adapter)
-
+def engine(
+    registry: Registry,
+    migration_settings: MigrationSettings,
+    graph_builder: GraphBuilder[VersionValue],
+    model_adapter: ModelAdapter,
+) -> Engine[VersionValue]:
+    return Engine(
+        registry,
+        migration_settings,
+        SequentialExecutor(),
+        graph_builder,
+        model_adapter,
+        entry_migration=DefaultMigrationEntry(),
+    )
 
 @pytest.fixture
 def manager(
-    request: pytest.FixtureRequest,
-) -> type[ModelManager]:
-    if request.param == semver.Version:
-        return request.getfixturevalue("semver_manager")
-    elif request.param == pendulum.Date:
-        return request.getfixturevalue("chrono_manager")
-    else:
-        raise ValueError(f"Unsupported manager strategy: {request.param}")
-
-
-@pytest.fixture
-def populated_registry(
-    request: pytest.FixtureRequest,
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-) -> Registry[Any, BaseModel]:
-    """Indirect fixture: build a registry populated with the requested models.
-
-    Parametrize with ``(version_type, models)`` where *version_type* is
-    ``semver.Version`` or ``pendulum.Date`` and *models* is a tuple of model
-    classes to register.
-    """
-    version_type, models = request.param
-    registry = Registry[version_type, BaseModel]()
-    register_models(model_adapter, registry, discovery_settings, *models)
-    return registry
-
-
-@pytest.fixture
-def semver_engine(
-    semver_registry: Registry, migration_settings: MigrationSettings
-) -> Engine[semver.Version]:
-    return make_engine(semver_registry, migration_settings)
-
-
-@pytest.fixture
-def date_engine(
-    date_registry: Registry, migration_settings: MigrationSettings
-) -> Engine[pendulum.DateTime]:
-    return cast(
-        Engine[pendulum.DateTime], make_engine(date_registry, migration_settings)
+    migration_settings: MigrationSettings,
+    model_adapter: ModelAdapter,
+    engine: Engine[VersionValue],
+) -> type[ModelManager[VersionValue]]:
+    return ModelManager[VersionValue].configure(
+        migration_settings,
+        model_adapter,
+        engine=engine
     )
