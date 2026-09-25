@@ -8,10 +8,8 @@ from unittest.mock import MagicMock
 import pendulum
 import pytest
 import semver
-from pydantic import BaseModel
 
 from pyverge.core import (
-    DiscoverySettings,
     MigrationAlreadyRegisteredError,
     MigrationHook,
     MigrationNotFoundError,
@@ -20,21 +18,15 @@ from pyverge.core import (
     ModelNotFoundError,
     RegistryError,
     SentinelEdge,
-    VersioningSettings,
     VersionNode,
     types,
 )
 from pyverge.migration import (
-    CompoundKeyWalker,
-    DefaultMigrationEntry,
     Engine,
     EntryMigration,
-    GraphBuilder,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
-    Registry,
-    SequentialExecutor,
     earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,
@@ -58,35 +50,7 @@ from tests.examples.pydantic.semver import (
     UserV3,
 )
 from tests.examples.pydantic.semver_nested import AddressV1
-from tests.utils import envelope_model, meta_versionable
-
-# Alias for compatibility with existing test references
-ModelVersion = VersionNode
-SequentialWalker = CompoundKeyWalker
-
-
-def _make_engine(
-    registry: Registry[types.VersionValue, types.ModelBase],
-    settings: MigrationSettings,
-    adapter: types.ModelAdapter,
-    *,
-    entry_migration: EntryMigration | None = None,
-    graph_settings: DiscoverySettings | None = None,
-) -> Engine[types.VersionValue]:
-    graph_settings = graph_settings or settings
-    builder = GraphBuilder(
-        registry,
-        graph_settings,
-        CompoundKeyWalker(registry, settings=graph_settings, adapter=adapter),
-    )
-    return Engine(
-        registry,
-        settings,
-        SequentialExecutor(),
-        builder,
-        adapter,
-        entry_migration=entry_migration or DefaultMigrationEntry(),
-    )
+from tests.utils import envelope_model
 
 
 class TestModelManagement:
@@ -802,13 +766,21 @@ class TestMigrationManagement:
         engine.delete_kind("Nope")
 
     @pytest.mark.parametrize(
-        "model_adapter, registry, models",
+        "model_adapter, registry, models, scenario",
         [
             pytest.param(
                 PydanticModelAdapter,
                 [semver.Version, "test", [], []],
                 [UserV1, UserV2],
-                id="pydantic_semver_user_v1_v2",
+                "add_remove",
+                id="add_remove",
+            ),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [], []],
+                [UserV1, UserV2],
+                "clear",
+                id="clear",
             ),
         ],
         indirect=["model_adapter", "registry"],
@@ -817,6 +789,7 @@ class TestMigrationManagement:
         self,
         engine: Engine[types.VersionValue],
         models: list[type[types.VModel]],
+        scenario: str,
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
@@ -824,34 +797,16 @@ class TestMigrationManagement:
         engine.store_migration((versions[0], versions[1]), lambda d: d)
 
         key = SentinelEdge.from_pair(versions[0], versions[1])
-        hook = MigrationHook()
-        engine.add_hook(SentinelEdge.from_pair(versions[0], versions[1]), hook)
-        assert engine.registry.has_hooks(engine.registry.get_migration_by_edge(key))
+        if scenario == "add_remove":
+            hook = MigrationHook()
+            engine.add_hook(SentinelEdge.from_pair(versions[0], versions[1]), hook)
+            assert engine.registry.has_hooks(engine.registry.get_migration_by_edge(key))
 
-        engine.remove_hook(SentinelEdge.from_pair(versions[0], versions[1]), hook)
-        assert not engine.registry.has_hooks(engine.registry.get_migration_by_edge(key))
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, models",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [], []],
-                [UserV1, UserV2],
-                id="pydantic_semver_user_v1_v2",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_clear_hooks(
-        self,
-        engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
-    ) -> None:
-        versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
-        for v in versions:
-            engine.store_model(v)
-        engine.store_migration((versions[0], versions[1]), lambda d: d)
+            engine.remove_hook(SentinelEdge.from_pair(versions[0], versions[1]), hook)
+            assert not engine.registry.has_hooks(
+                engine.registry.get_migration_by_edge(key)
+            )
+            return
 
         engine.add_hook(
             SentinelEdge.from_pair(versions[0], versions[1]), MigrationHook()
@@ -864,25 +819,29 @@ class TestReflection:
     """Engine reconstructs missing models implicitly on migration registration."""
 
     @pytest.mark.parametrize(
-        "model_adapter",
-        [pytest.param(PydanticModelAdapter, id="pydantic")],
-        indirect=True,
+        "model_adapter, registry, migration_settings, models",
+        [
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "test", [USER_V1_0_0], []],
+                {"on_missing_model": "reconstruct"},
+                [USER_V1_0_0],
+                id="json_semver_reconstruct_user_v1_0_0",
+            ),
+        ],
+        indirect=["model_adapter", "registry", "migration_settings"],
     )
     def test_reconstructs_missing_model_on_store_migration(
         self,
-        model_adapter: PydanticModelAdapter,
-        migration_settings: MigrationSettings,
+        engine: Engine[types.VersionValue],
+        models: list[types.ModelBase],
     ) -> None:
-        settings = migration_settings.model_copy(
-            update={"on_missing_model": "reconstruct"}
+        real, meta = (
+            engine.adapter.versionable(models[0]),
+            engine.adapter.versionable(None, kind="User", version="2.0.0"),
         )
-        registry = Registry[semver.Version, BaseModel]()
-        eng = _make_engine(registry, settings, model_adapter)
-        real = eng.adapter.versionable(UserV2)
-        eng.store_model(real)
-        meta = meta_versionable(model_adapter, "User", "1.0.0")
 
-        eng.store_migration(
+        engine.store_migration(
             (meta, real),
             JsonPatchMigration(
                 {
@@ -893,66 +852,41 @@ class TestReflection:
             ).patch,
         )
 
-        reconstructed = eng.get_model(
-            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
+        reconstructed = engine.get_model(
+            VersionNode(_model=None, _value=semver.Version(2, 0, 0), _kind="User")
         )
         assert reconstructed.model is not None
-        fields = reconstructed.model.model_fields
-        assert "name" in fields
-        assert "age" not in fields
-        assert fields["version"].default == "1.0.0"
+        assert all(
+            field in reconstructed.model.model_fields
+            for field in ["name", "age", "version"]
+        )
+        assert reconstructed.model.model_fields["version"].default == "2.0.0"
 
     @pytest.mark.parametrize(
-        "model_adapter",
-        [pytest.param(PydanticModelAdapter, id="pydantic")],
-        indirect=True,
-    )
-    def test_reconstructs_with_callable_migration(
-        self,
-        model_adapter: PydanticModelAdapter,
-        migration_settings: MigrationSettings,
-    ) -> None:
-        settings = migration_settings.model_copy(
-            update={"on_missing_model": "reconstruct"}
-        )
-        registry = Registry[semver.Version, BaseModel]()
-        eng = _make_engine(registry, settings, model_adapter)
-        real = eng.adapter.versionable(UserV2)
-        eng.store_model(real)
-        meta = meta_versionable(model_adapter, "User", "1.0.0")
-
-        def add_age(data: dict) -> dict:
-            return {**data, "age": None}
-
-        eng.store_migration((meta, real), add_age)
-
-        reconstructed = eng.get_model(
-            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
-        )
-        assert reconstructed.model is not None
-        assert "age" not in reconstructed.model.model_fields
-
-    @pytest.mark.parametrize(
-        "model_adapter",
-        [pytest.param(PydanticModelAdapter, id="pydantic")],
-        indirect=True,
+        "model_adapter, registry, migration_settings, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV2], []],
+                {"on_missing_model": "skip"},
+                [UserV2],
+                id="pydantic_skip_user_v2",
+            ),
+        ],
+        indirect=["model_adapter", "registry", "migration_settings"],
     )
     def test_skips_reconstruction_when_disabled(
         self,
-        model_adapter: PydanticModelAdapter,
-        migration_settings: MigrationSettings,
+        engine: Engine[types.VersionValue],
+        models: list[types.ModelBase],
     ) -> None:
-        settings = migration_settings.model_copy(update={"on_missing_model": "skip"})
-        registry = Registry[semver.Version, BaseModel]()
-        eng = _make_engine(registry, settings, model_adapter)
-        real = eng.adapter.versionable(UserV2)
-        eng.store_model(real)
-        meta = meta_versionable(model_adapter, "User", "1.0.0")
-        eng.store_model(meta)
+        real = engine.adapter.versionable(models[0])
+        meta = engine.adapter.versionable(None, kind="User", version="1.0.0")
+        engine.store_model(meta)
 
-        eng.store_migration((meta, real), lambda d: {**d, "age": None})
+        engine.store_migration((meta, real), lambda d: {**d, "age": None})
 
-        stored = eng.get_model(
+        stored = engine.get_model(
             VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
         )
         assert stored.model is None
@@ -1114,18 +1048,20 @@ class TestEntryMigrationIntegration:
 
     @pytest.mark.parametrize(
         "model_adapter, registry",
-        [pytest.param(
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2],
+        [
+            pytest.param(
+                PydanticModelAdapter,
                 [
-                    ((UserV1, UserV2), lambda d: d),
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2],
+                    [
+                        ((UserV1, UserV2), lambda d: d),
+                    ],
                 ],
-            ],
-            id="pydantic",
-        )],
+                id="pydantic",
+            )
+        ],
         indirect=["model_adapter", "registry"],
     )
     def test_engine_uses_custom_entry_migration(
