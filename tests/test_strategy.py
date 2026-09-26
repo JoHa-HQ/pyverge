@@ -13,7 +13,7 @@ from pyverge.core import (
     types,
 )
 from pyverge.migration import (
-    DefaultEntryMigration,
+    DefaultMigrationEntry,
     GraphEntry,
     PydanticModelAdapter,
 )
@@ -59,7 +59,7 @@ class TestDefaultEntryMigration:
         execute_step: MagicMock,
     ) -> None:
         entry = GraphEntry(path=(), source=source, target=source, steps=())
-        strategy = DefaultEntryMigration()
+        strategy = DefaultMigrationEntry()
         current: types.ModelData = {"version": "1.0.0"}
 
         result = strategy.migrate(
@@ -82,7 +82,7 @@ class TestDefaultEntryMigration:
         entry: GraphEntry[Any, Any],
         execute_step: MagicMock,
     ) -> None:
-        strategy = DefaultEntryMigration()
+        strategy = DefaultMigrationEntry()
 
         with pytest.raises(MigrationError):
             strategy.migrate(
@@ -104,7 +104,7 @@ class TestDefaultEntryMigration:
         entry: GraphEntry[Any, Any],
         execute_step: MagicMock,
     ) -> None:
-        strategy = DefaultEntryMigration()
+        strategy = DefaultMigrationEntry()
         current: types.ModelData = {"version": "1.0.0"}
 
         result = strategy.migrate(
@@ -129,7 +129,7 @@ class TestDefaultEntryMigration:
         target: Any,
         execute_step: MagicMock,
     ) -> None:
-        strategy = DefaultEntryMigration()
+        strategy = DefaultMigrationEntry()
         current: types.ModelData = {"version": "1.0.0"}
 
         result = strategy.migrate(
@@ -163,7 +163,7 @@ class TestDefaultEntryMigration:
         model_adapter.finalize = MagicMock(  # ty: ignore
             return_value={"version": "2.0.0", "name": "Alice"}
         )
-        strategy = DefaultEntryMigration()
+        strategy = DefaultMigrationEntry()
 
         strategy.migrate(
             finalized_entry,
@@ -190,7 +190,7 @@ class TestDefaultEntryMigration:
             entry.target,
             "no path",
         )
-        strategy = DefaultEntryMigration()
+        strategy = DefaultMigrationEntry()
         current: types.ModelData = {"version": "1.0.0"}
 
         result = strategy.migrate(
@@ -218,7 +218,7 @@ class TestDefaultEntryMigration:
             entry.target,
             "no path",
         )
-        strategy = DefaultEntryMigration()
+        strategy = DefaultMigrationEntry()
 
         with pytest.raises(MigrationError):
             strategy.migrate(
