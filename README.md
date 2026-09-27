@@ -111,6 +111,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 
 - **Versioned model registry** — decorator-based registration with semver or ISO date versioning
 - **Model reflection** — when a migration endpoint has no concrete model, the engine reconstructs it from the other endpoint's model and the migration diff (`on_missing="reconstruct_model"`), so every version in a chain is materializable
+- **Migration proposal** — when you hold both models but no migration, `Engine.propose_migration` diffs their schemas into a declarative JSON Patch to review (`on_missing="reconstruct_migration"`). The two reconstruction strategies are mutually exclusive
 - **Provider adapters** — pluggable `ModelAdapter`; Pydantic and JSON Schema ship today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
 - **Declarative migrations** — express a migration as an RFC 6902 JSON Patch op list (plus `set_default`/`coerce`/`map`/`split`), compiled into a `MigrationFunc` via `JsonPatchMigration`
 - **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
@@ -126,7 +127,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 - [Concepts](docs/concepts.md)
 - [Execution Flow](docs/execution-flow.md)
 - [Target Policy](docs/target-policy.md)
-- [Model Reflection](docs/reflection.md)
+- [Migrations](docs/migration.md)
 - [Telemetry & Hooks](docs/telemetry.md)
 - [Common Usage Patterns](docs/usage.md)
 - [Scenarios](docs/scenarios.md)

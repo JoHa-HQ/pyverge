@@ -159,7 +159,7 @@ understands both formats.
 
 - [Registration](registration.md) — decorator vs. lazy registration, class-level vs. instance-level.
 - [Common usage patterns](usage.md) — lookup, validation, diffing, hooks.
-- [Model Reflection](reflection.md) — materialize missing versions from an anchor and migration diffs.
+- [Migrations](migration.md) — reconstruct missing models or migrations, and the mutually exclusive `on_missing` strategies.
 - [Target policy](target-policy.md) — declarative convergence rules.
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
 - [Telemetry & Hooks](telemetry.md) — observability via hooks and OpenTelemetry.
