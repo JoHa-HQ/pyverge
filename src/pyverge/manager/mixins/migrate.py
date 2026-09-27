@@ -5,13 +5,13 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast, overload
 
-from pyverge.migration.strategy import EntryMigration
 from pyverge.types import (
     Diffable,
     DirectionViolationStrategy,
     Executor,
     ManagerMigrationKey,
     MigrationDirectionStrategy,
+    MigrationEntry,
     ModelData,
     ModelKey,
     ModelKind,
@@ -44,7 +44,7 @@ class MigrateMixin(Generic[VersionValue]):
         on_direction_violation: DirectionViolationStrategy | None = None,
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
-        entry_migration: EntryMigration[VersionValue] | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> TContainer: ...
 
     @overload
@@ -60,7 +60,7 @@ class MigrateMixin(Generic[VersionValue]):
         on_direction_violation: DirectionViolationStrategy | None = None,
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
-        entry_migration: EntryMigration[VersionValue] | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> ModelData: ...
 
     def migrate(  # noqa: PLR0913
@@ -75,7 +75,7 @@ class MigrateMixin(Generic[VersionValue]):
         on_direction_violation: DirectionViolationStrategy | None = None,
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
-        entry_migration: EntryMigration[VersionValue] | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> ModelData | TContainer:
         """Migrate *data* to the configured target policy.
 

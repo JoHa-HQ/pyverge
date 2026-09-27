@@ -23,9 +23,9 @@ from pyverge.core import (
 )
 from pyverge.migration import (
     Engine,
-    EntryMigration,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
+    MigrationEntry,
     PydanticModelAdapter,
     earliest_target_resolver,
     fixed_target_resolver,
@@ -825,7 +825,7 @@ class TestReflection:
             pytest.param(
                 JsonSchemaModelAdapter,
                 [semver.Version, "test", [USER_V1_0_0], []],
-                {"on_missing_model": "reconstruct"},
+                {"on_missing": "reconstruct_model"},
                 [USER_V1_0_0],
                 id="json_semver_reconstruct_user_v1_0_0",
             ),
@@ -869,7 +869,7 @@ class TestReflection:
             pytest.param(
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV2], []],
-                {"on_missing_model": "skip"},
+                {"on_missing": "skip"},
                 [UserV2],
                 id="pydantic_skip_user_v2",
             ),
@@ -1044,8 +1044,8 @@ class TestLookupConvenience:
         assert engine[(versions[0], versions[1])].func is _migrate
 
 
-class TestEntryMigrationIntegration:
-    """Engine delegates per-entry migration to an injected EntryMigration strategy."""
+class TestMigrationEntryIntegration:
+    """Engine delegates per-entry migration to an injected MigrationEntry strategy."""
 
     @pytest.mark.parametrize(
         "model_adapter, registry",
@@ -1074,7 +1074,7 @@ class TestEntryMigrationIntegration:
             def run(self) -> dict[str, Any]:
                 return {"custom": True}
 
-        custom_strategy = MagicMock(spec=EntryMigration)
+        custom_strategy = MagicMock(spec=MigrationEntry)
         custom_strategy.migrate.return_value = _CustomTask()
         result = engine.migrate(
             {"kind": "User", "version": "1.0.0", "name": "Alice"},

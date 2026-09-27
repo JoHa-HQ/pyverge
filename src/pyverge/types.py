@@ -25,9 +25,8 @@ if TYPE_CHECKING:
     from pyverge.adapters import JsonPatchMigration
     from pyverge.core.settings import MigrationSettings
     from pyverge.migration.engine import Engine
-    from pyverge.migration.graph import MigrationGraph
+    from pyverge.migration.graph import GraphEntry, MigrationGraph
     from pyverge.migration.registry import Registry
-    from pyverge.migration.strategy import EntryMigration
 
 ModelBase: TypeAlias = BaseModel
 
@@ -446,7 +445,7 @@ class ManagerClassState(Protocol[VersionValue]):
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
 
     @classmethod
-    def configure(  # noqa: PLR0913
+    def configure(
         cls,
         settings: MigrationSettings,
         adapter: ModelAdapter,
@@ -454,7 +453,7 @@ class ManagerClassState(Protocol[VersionValue]):
         engine: Engine[VersionValue] | None = None,
         walker: Walker | None = None,
         executor: Executor | None = None,
-        entry_migration: EntryMigration[VersionValue] | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> type[Self]: ...
 
     @classmethod
@@ -525,16 +524,43 @@ class RunnableMigration(Protocol):
 class Executor(Protocol):
     """Protocol for executing a migration graph."""
 
-    def run(  # noqa: PLR0913
+    def run(
         self,
         data: ModelData,
         graph: MigrationGraph[VersionValue_co],
         *,
         registry: Registry[VersionValue_co, VModel_co],
-        entry_migration: EntryMigration[VersionValue_co],
+        entry_migration: MigrationEntry[VersionValue_co],
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
     ) -> ModelData: ...
+
+
+@runtime_checkable
+class MigrationEntry(Protocol[VersionValue]):
+    """Per-entry migration policy."""
+
+    def migrate(
+        self,
+        entry: GraphEntry[VersionValue, ModelBase],
+        current: ModelData,
+        *,
+        execute_step: Callable[
+            [
+                Any,
+                Any,
+                ModelData,
+                tuple[Any, ...],
+                str,
+            ],
+            ModelData,
+        ],
+        adapter: ModelAdapter,
+        version_property: str,
+        direction: MigrationDirectionStrategy,
+        on_direction_violation: DirectionViolationStrategy,
+        on_missing_path: VersionMissingStrategy,
+    ) -> RunnableMigration: ...

@@ -3,7 +3,7 @@
 The migration engine is deliberately agnostic about *what* target version each
 payload entry should converge to. This module provides lightweight
 :class:`~pyverge.migration.types.TargetResolver` factories that
-:class:`GraphBuilder` and the individual :class:`EntryMigration` strategies
+:class:`GraphBuilder` and the individual :class:`MigrationEntry` strategies
 consume.
 
 Declarative spec compilation lives in :mod:`~pyverge.manager`, the high-level

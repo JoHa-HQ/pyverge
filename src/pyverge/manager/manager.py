@@ -37,10 +37,11 @@ from pyverge.migration.engine import Engine
 from pyverge.migration.executor import SequentialExecutor
 from pyverge.migration.graph import GraphBuilder
 from pyverge.migration.registry import Registry
-from pyverge.migration.strategy import DefaultMigrationEntry, EntryMigration
+from pyverge.migration.strategy import DefaultMigrationEntry
 from pyverge.migration.walker import CompoundKeyWalker
 from pyverge.types import (
     Executor,
+    MigrationEntry,
     ModelAdapter,
     ModelBase,
     VersionValue,
@@ -119,7 +120,7 @@ class Manager(
         engine: Engine[VersionValue] | None = None,
         walker: Walker | None = None,
         executor: Executor | None = None,
-        entry_migration: EntryMigration[VersionValue] | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> type[Manager[VersionValue]]:
         """Build a configured ``Manager`` subclass.
 

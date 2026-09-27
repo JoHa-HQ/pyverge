@@ -40,6 +40,7 @@ from pyverge.reflection import (
     DiffDiscovery,
     JsonPatchDiffDiscovery,
 )
+from pyverge.types import MigrationEntry
 
 from .engine import Engine
 from .executor import LevelParallelExecutor, SequentialExecutor, StepExecutor
@@ -52,7 +53,7 @@ from .policy import (
     skip_target_resolver,
 )
 from .registry import Registry
-from .strategy import DefaultMigrationEntry, EntryMigration
+from .strategy import DefaultMigrationEntry
 from .walker import CompoundKeyWalker, PydanticWalker
 
 __all__ = [
@@ -67,7 +68,6 @@ __all__ = [
     "DiscoveryValidationError",
     "Engine",
     "EngineError",
-    "EntryMigration",
     "ExplicitStep",
     "GraphBuilder",
     "GraphEntry",
@@ -78,6 +78,7 @@ __all__ = [
     "LevelParallelExecutor",
     "MaxDepthExceededError",
     "MigrationAlreadyRegisteredError",
+    "MigrationEntry",
     "MigrationError",
     "MigrationGraph",
     "MigrationHook",
