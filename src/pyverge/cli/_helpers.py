@@ -44,16 +44,16 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
+from pyverge import Manager
 from pyverge.migration import (
     MigrationSettings,
-    ModelManager,
     PydanticModelAdapter,
 )
 
-# Create a scoped manager class
-UserManager = ModelManager[semver.Version].scoped(
+# Create a configured manager class
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(),
     PydanticModelAdapter(),
-    settings=MigrationSettings(),
 )
 
 

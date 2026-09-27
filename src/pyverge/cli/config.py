@@ -4,14 +4,14 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from pyverge.migration import ModelManager
+from pyverge import Manager
 
 
 class ConfigError(Exception):
     """Configuration loading error."""
 
 
-def resolve_manager(spec: str) -> ModelManager:
+def resolve_manager(spec: str) -> Manager:
     """Resolve a manager from a ``module_path:object_path`` spec."""
 
     if ":" not in spec:
@@ -23,10 +23,9 @@ def resolve_manager(spec: str) -> ModelManager:
     obj: Any = module
     for part in object_path.split("."):
         obj = getattr(obj, part)
-    if not isinstance(obj, ModelManager):
+    if not isinstance(obj, Manager):
         raise ConfigError(
-            f"Manager '{spec}' resolved to {type(obj).__name__}, "
-            "expected a ModelManager"
+            f"Manager '{spec}' resolved to {type(obj).__name__}, expected a Manager"
         )
     return obj
 
@@ -54,11 +53,11 @@ def _import_module(cwd: Path, module_path: str) -> ModuleType:
 
 
 def list_managers_from_module(module_path: str) -> list[str]:
-    """Return the names of ``ModelManager`` instances/subclasses in *module_path*."""
+    """Return the names of ``Manager`` instances/subclasses in *module_path*."""
     module = importlib.import_module(module_path)
     return [
         name
         for name, value in vars(module).items()
-        if isinstance(value, ModelManager)
-        or (isinstance(value, type) and issubclass(value, ModelManager))
+        if isinstance(value, Manager)
+        or (isinstance(value, type) and issubclass(value, Manager))
     ]
