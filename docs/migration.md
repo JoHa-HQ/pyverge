@@ -38,6 +38,38 @@ flowchart TD
     B -->|neither / not sure| I[on_missing = raise / skip]
 ```
 
+## When to choose which
+
+Rule of thumb: **pick the strategy for the half you cannot produce by hand.**
+
+Choose `reconstruct_model` when:
+
+- You version **schemas** and author migrations explicitly — the migration is
+  the source of truth and carries business intent.
+- You keep one canonical (usually latest) model and treat older versions as
+  patch deltas — e.g. git-versioned JSON specs.
+- Registering every historical model by hand is the pain point.
+- You can accept registry mutation: the engine writes a new model during
+  `store_migration`, and it is immediately usable for validation and lookup.
+
+Choose `reconstruct_migration` when:
+
+- You already have every model registered (e.g. generated from schema files or
+  ORM classes) but no migration code between versions.
+- You want a **starting patch to review**, not an automatically trusted one.
+- You want zero side effects: `propose_migration` never registers anything and
+  never mutates endpoint models.
+- The gap is mechanical (added/removed/retyped fields) rather than semantic.
+
+Avoid or postpone reconstruction when:
+
+- The missing side carries business intent you cannot infer (field renames,
+  value remaps, splits/merges) — reconstruct, then **edit** the result.
+- The chain has non-adjacent jumps — reconstruction works per edge; register
+  the intermediate edges first.
+- You want both sides reconstructed at once — they are mutually exclusive by
+  design; pick one and register the other by hand.
+
 ## Reconstructing a model (per migration edge)
 
 A version chain can be represented as declarative patches against a single
