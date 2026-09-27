@@ -91,3 +91,10 @@ manager.store_migration((UserV1, UserV2), add_age)
 Class-level and instance-level registration are alternatives — an instance shares
 its class's registry, so registering the same model through both would raise
 `ModelAlreadyRegisteredError`.
+
+## Which manager owns what
+
+A model belongs to the manager that owns its **whole version graph** — the kind
+and every kind it transitively contains. See
+[Manager organization](managers.md) for the invariant and the failure modes of
+splitting a graph across managers.

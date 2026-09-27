@@ -124,6 +124,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 
 - [Getting Started](docs/getting-started.md)
 - [Registration](docs/registration.md)
+- [Manager Organization](docs/managers.md)
 - [Concepts](docs/concepts.md)
 - [Execution Flow](docs/execution-flow.md)
 - [Target Policy](docs/target-policy.md)

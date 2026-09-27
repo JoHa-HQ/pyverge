@@ -16,6 +16,7 @@ nav:
   - Home: getting-started.md
   - Concepts: concepts.md
   - Registration: registration.md
+  - Manager Organization: managers.md
   - Migrations: migration.md
   - Execution Flow: execution-flow.md
   - Target Policy: target-policy.md

@@ -158,6 +158,7 @@ understands both formats.
 ## Next steps
 
 - [Registration](registration.md) — decorator vs. lazy registration, class-level vs. instance-level.
+- [Manager organization](managers.md) — one complete version graph per manager.
 - [Common usage patterns](usage.md) — lookup, validation, diffing, hooks.
 - [Migrations](migration.md) — reconstruct missing models or migrations, and the mutually exclusive `on_missing` strategies.
 - [Target policy](target-policy.md) — declarative convergence rules.
