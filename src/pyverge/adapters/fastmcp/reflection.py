@@ -32,9 +32,10 @@ class ComponentReflection(ABC):
     wrapping) lives here.
     """
 
-    def __init__(self, component, adapter) -> None:
+    def __init__(self, component, adapter, *, injected: set[str] | None = None) -> None:
         self._component = component
         self._adapter = adapter
+        self._injected = injected or set()
 
     @property
     def component(self) -> Any:
@@ -70,6 +71,25 @@ class ComponentReflection(ABC):
             props.setdefault(name, {"type": "string", "default": default})
         return document
 
+    def _drop_injected(self, document: dict[str, Any]) -> dict[str, Any]:
+        """Remove injected parameters from a schema document's properties.
+
+        An injected parameter is wiring, not contract: it is part of the
+        callable's signature but never of the payload. FastMCP still emits it in
+        the schema, so it is filtered here before the model is reflected — the
+        same exclusion the adapter must apply when it validates the signature.
+        """
+        if not self._injected:
+            return document
+        props = document.get("properties")
+        if props:
+            for name in self._injected:
+                props.pop(name, None)
+        required = document.get("required")
+        if required:
+            document["required"] = [r for r in required if r not in self._injected]
+        return document
+
     def versionable(self) -> Any:
         """Wrap the component's compliant schema into a versionable."""
         return self._adapter.versionable(
@@ -92,7 +112,8 @@ class ToolReflection(ComponentReflection):
         version = self.version
         if version is None:
             raise ValueError(f"tool {self._component.name!r} is not versioned")
-        return self._inject_identity(dict(self._component.parameters))
+        document = self._drop_injected(dict(self._component.parameters))
+        return self._inject_identity(document)
 
 
 class PromptReflection(ComponentReflection):

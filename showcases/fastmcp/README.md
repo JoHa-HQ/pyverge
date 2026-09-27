@@ -54,9 +54,10 @@ The layers are one-directional: `domain` knows nothing of FastMCP or
 OpenTelemetry; `adapters` are the only modules that import them; `application`
 orchestrates and `container` wires. The physical tool receives the
 `WeatherService` through dependency-injector wiring (`@inject` + `Provide`), so
-no component reaches for its own dependencies. The injected parameter is hidden
-from the exposed signature — the physical tool signature *is* the anchor model,
-so a stray parameter would break the adapter's contract reconciliation.
+no component reaches for its own dependencies. The adapter recognizes the
+`Provide` marker and excludes the injected parameter from the reflected schema
+and the reconciled contract — no signature rewrite needed, just annotate the
+injected parameter `Any`.
 
 ## Run
 

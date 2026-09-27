@@ -5,7 +5,7 @@ is no manager routing to do — only call-time convergence. The converger answer
 the per-call questions: which version was called, which physical handler serves
 it, and how the payload converges there. It reads the ``_physical`` tool index
 and the ``_paths`` precomputed by
-:class:`~pyverge.adapters.fastmcp.registration.Registrar` — no graph rebuild and
+:class:`~pyverge.adapters.fastmcp.registry.ToolRegistry` — no graph rebuild and
 no per-call policy resolution.
 
 A versioned call is fully served by the converging delegate; an unversioned call
