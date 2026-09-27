@@ -18,7 +18,7 @@ class ManagerContext:
     def __enter__(self):
         """Register the manager in a temporary module."""
         self.module = types.ModuleType(self.manager_name)
-        self.module.manager = self.manager
+        setattr(self.module, "manager", self.manager)
         sys.modules[self.manager_name] = self.module
         return self.manager
 

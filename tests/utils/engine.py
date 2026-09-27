@@ -32,7 +32,7 @@ def envelope_model(
     """
     return cast(
         VersionNode[VersionValue, ModelBase],
-        adapter.versionable(model_cls),
+        adapter.versionable(cast("type[VModel]", model_cls)),
     )
 
 

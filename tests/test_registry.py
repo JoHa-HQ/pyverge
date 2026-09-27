@@ -6,7 +6,6 @@ Most behaviors are exercised for both the semver (pydantic) and chrono/JSON
 
 import pendulum
 import pytest
-from pyverge._version import version
 import semver
 from pydantic import BaseModel
 

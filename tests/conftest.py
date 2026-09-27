@@ -82,9 +82,9 @@ def model_adapter(
     request: pytest.FixtureRequest,
 ) -> PydanticModelAdapter | JsonSchemaModelAdapter:
     provider = request.param
-    if provider == JsonSchemaModelAdapter:
+    if provider is JsonSchemaModelAdapter:
         return request.getfixturevalue("json_model_adapter")
-    if provider == PydanticModelAdapter:
+    if provider is PydanticModelAdapter:
         return request.getfixturevalue("pydantic_model_adapter")
     raise ValueError(f"Unknown provider: {provider}")
 
@@ -95,8 +95,8 @@ def registry(
     model_adapter: PydanticModelAdapter,
     migration_settings: MigrationSettings,
 ) -> Registry[VersionValue, ModelBase]:
-    strategy, name, models, migrations = request.param
-    registry = Registry[strategy or VersionValue, ModelBase](name=name)
+    _strategy, name, models, migrations = request.param
+    registry = Registry[VersionValue, ModelBase](name=name)
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
     if migrations:
@@ -155,19 +155,22 @@ def engine(
     migration_settings: MigrationSettings,
     model_adapter: ModelAdapter,
 ) -> Engine[VersionValue]:
-    return Engine(
-        registry,
-        migration_settings,
-        SequentialExecutor(),
-        GraphBuilder(
+    return cast(
+        "Engine[VersionValue]",
+        Engine(
             registry,
             migration_settings,
-            CompoundKeyWalker(
-                registry, settings=migration_settings, adapter=model_adapter
+            SequentialExecutor(),
+            GraphBuilder(
+                registry,
+                migration_settings,
+                CompoundKeyWalker(
+                    registry, settings=migration_settings, adapter=model_adapter
+                ),
             ),
+            model_adapter,
+            entry_migration=DefaultMigrationEntry(),
         ),
-        model_adapter,
-        entry_migration=DefaultMigrationEntry(),
     )
 
 

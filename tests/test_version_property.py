@@ -9,6 +9,7 @@ from pyverge.core import (
     VersioningSettings,
 )
 from pyverge.migration import (
+    JsonSchemaModelAdapter,
     PydanticModelAdapter,
 )
 from tests.examples.json import (
@@ -43,16 +44,16 @@ class TestOperations:
     @pytest.mark.parametrize(
         ("model_adapter", "left", "right", "op"),
         [
-            ("pydantic", UserV011Dev7, UserV123, "lt"),
-            ("json", USER_V0_1_1_DEV_7, USER_V1_2_3, "lt"),
-            ("pydantic", UserV200Beta1, UserV2, "lt"),
-            ("json", USER_V2_0_0_BETA_1, USER_V2_0_0, "lt"),
-            ("pydantic", UserV011Dev7, UserV011Dev7, "eq"),
-            ("json", USER_V0_1_1_DEV_7, USER_V0_1_1_DEV_7, "eq"),
-            ("pydantic", UserV20250101, UserV20251231, "lt"),
-            ("json", USER_V2025_01_01, USER_V2025_12_31, "lt"),
-            ("pydantic", UserV20250101, UserV20250101, "eq"),
-            ("json", USER_V2025_01_01, USER_V2025_01_01, "eq"),
+            (PydanticModelAdapter, UserV011Dev7, UserV123, "lt"),
+            (JsonSchemaModelAdapter, USER_V0_1_1_DEV_7, USER_V1_2_3, "lt"),
+            (PydanticModelAdapter, UserV200Beta1, UserV2, "lt"),
+            (JsonSchemaModelAdapter, USER_V2_0_0_BETA_1, USER_V2_0_0, "lt"),
+            (PydanticModelAdapter, UserV011Dev7, UserV011Dev7, "eq"),
+            (JsonSchemaModelAdapter, USER_V0_1_1_DEV_7, USER_V0_1_1_DEV_7, "eq"),
+            (PydanticModelAdapter, UserV20250101, UserV20251231, "lt"),
+            (JsonSchemaModelAdapter, USER_V2025_01_01, USER_V2025_12_31, "lt"),
+            (PydanticModelAdapter, UserV20250101, UserV20250101, "eq"),
+            (JsonSchemaModelAdapter, USER_V2025_01_01, USER_V2025_01_01, "eq"),
         ],
         ids=[
             "dev-lt-pydantic",
@@ -85,12 +86,12 @@ class TestOperations:
     @pytest.mark.parametrize(
         ("model_adapter", "left", "right", "op"),
         [
-            ("pydantic", UserV123, UserV20251231, "lt"),
-            ("json", USER_V1_2_3, USER_V2025_12_31, "lt"),
-            ("pydantic", UserV20250101, UserV123, "gt"),
-            ("json", USER_V2025_01_01, USER_V1_2_3, "gt"),
-            ("pydantic", UserV123, UserV20250101, "eq"),
-            ("json", USER_V1_2_3, USER_V2025_01_01, "eq"),
+            (PydanticModelAdapter, UserV123, UserV20251231, "lt"),
+            (JsonSchemaModelAdapter, USER_V1_2_3, USER_V2025_12_31, "lt"),
+            (PydanticModelAdapter, UserV20250101, UserV123, "gt"),
+            (JsonSchemaModelAdapter, USER_V2025_01_01, USER_V1_2_3, "gt"),
+            (PydanticModelAdapter, UserV123, UserV20250101, "eq"),
+            (JsonSchemaModelAdapter, USER_V1_2_3, USER_V2025_01_01, "eq"),
         ],
         ids=[
             "semver-lt-date-pydantic",
@@ -120,22 +121,22 @@ class TestOperations:
         ("model_adapter", "models", "expected"),
         [
             (
-                "pydantic",
+                PydanticModelAdapter,
                 [UserV200Beta1, UserV123, UserV011Dev7],
                 [UserV011Dev7, UserV123, UserV200Beta1],
             ),
             (
-                "json",
+                JsonSchemaModelAdapter,
                 [USER_V2_0_0_BETA_1, USER_V1_2_3, USER_V0_1_1_DEV_7],
                 [USER_V0_1_1_DEV_7, USER_V1_2_3, USER_V2_0_0_BETA_1],
             ),
             (
-                "pydantic",
+                PydanticModelAdapter,
                 [UserV20260228, UserV20250101, UserV20260301_120530300Z],
                 [UserV20250101, UserV20260228, UserV20260301_120530300Z],
             ),
             (
-                "json",
+                JsonSchemaModelAdapter,
                 [USER_V2026_02_28, USER_V2025_01_01, USER_V2026_03_01],
                 [USER_V2025_01_01, USER_V2026_02_28, USER_V2026_03_01],
             ),
@@ -161,18 +162,18 @@ class TestOperations:
     @pytest.mark.parametrize(
         ("model_adapter", "left", "right", "op"),
         [
-            ("pydantic", AddressV1, UserV123, "lt"),
-            ("json", ADDRESS_V1_0_0, USER_V1_2_3, "lt"),
-            ("pydantic", AddressV1, AddressV2, "lt"),
-            ("json", ADDRESS_V1_0_0, ADDRESS_V2_0_0, "lt"),
-            ("pydantic", UserV123, AddressV1, "gt"),
-            ("json", USER_V1_2_3, ADDRESS_V1_0_0, "gt"),
-            ("pydantic", UserV011Dev7, UserV123, "lt"),
-            ("json", USER_V0_1_1_DEV_7, USER_V1_2_3, "lt"),
-            ("pydantic", UserV123, UserV123, "eq"),
-            ("json", USER_V1_2_3, USER_V1_2_3, "eq"),
-            ("pydantic", UserV20250101, UserV20260301_120530300Z, "lt"),
-            ("json", USER_V2025_01_01, USER_V2026_03_01, "lt"),
+            (PydanticModelAdapter, AddressV1, UserV123, "lt"),
+            (JsonSchemaModelAdapter, ADDRESS_V1_0_0, USER_V1_2_3, "lt"),
+            (PydanticModelAdapter, AddressV1, AddressV2, "lt"),
+            (JsonSchemaModelAdapter, ADDRESS_V1_0_0, ADDRESS_V2_0_0, "lt"),
+            (PydanticModelAdapter, UserV123, AddressV1, "gt"),
+            (JsonSchemaModelAdapter, USER_V1_2_3, ADDRESS_V1_0_0, "gt"),
+            (PydanticModelAdapter, UserV011Dev7, UserV123, "lt"),
+            (JsonSchemaModelAdapter, USER_V0_1_1_DEV_7, USER_V1_2_3, "lt"),
+            (PydanticModelAdapter, UserV123, UserV123, "eq"),
+            (JsonSchemaModelAdapter, USER_V1_2_3, USER_V1_2_3, "eq"),
+            (PydanticModelAdapter, UserV20250101, UserV20260301_120530300Z, "lt"),
+            (JsonSchemaModelAdapter, USER_V2025_01_01, USER_V2026_03_01, "lt"),
         ],
         ids=[
             "different_kind_lt-pydantic",
@@ -206,8 +207,8 @@ class TestOperations:
     @pytest.mark.parametrize(
         ("model_adapter", "model"),
         [
-            ("pydantic", UserV123),
-            ("json", USER_V1_2_3),
+            (PydanticModelAdapter, UserV123),
+            (JsonSchemaModelAdapter, USER_V1_2_3),
         ],
         ids=["pydantic", "json"],
         indirect=["model_adapter"],
@@ -234,8 +235,8 @@ class TestOperations:
     @pytest.mark.parametrize(
         ("model_adapter", "model1", "model2"),
         [
-            ("pydantic", UserV123, UserV2),
-            ("json", USER_V1_2_3, USER_V2_0_0),
+            (PydanticModelAdapter, UserV123, UserV2),
+            (JsonSchemaModelAdapter, USER_V1_2_3, USER_V2_0_0),
         ],
         ids=["pydantic", "json"],
         indirect=["model_adapter"],
@@ -255,10 +256,18 @@ class TestOperations:
     @pytest.mark.parametrize(
         ("model_adapter", "models", "expected"),
         [
-            ("pydantic", [UserV123, UserV011Dev7], 2),
-            ("json", [USER_V1_2_3, USER_V0_1_1_DEV_7], 2),
-            ("pydantic", [UserV20260228, UserV20250101, UserV20260301_120530300Z], 3),
-            ("json", [USER_V2026_02_28, USER_V2025_01_01, USER_V2026_03_01], 3),
+            (PydanticModelAdapter, [UserV123, UserV011Dev7], 2),
+            (JsonSchemaModelAdapter, [USER_V1_2_3, USER_V0_1_1_DEV_7], 2),
+            (
+                PydanticModelAdapter,
+                [UserV20260228, UserV20250101, UserV20260301_120530300Z],
+                3,
+            ),
+            (
+                JsonSchemaModelAdapter,
+                [USER_V2026_02_28, USER_V2025_01_01, USER_V2026_03_01],
+                3,
+            ),
         ],
         ids=["semver-pydantic", "semver-json", "date-pydantic", "date-json"],
         indirect=["model_adapter"],

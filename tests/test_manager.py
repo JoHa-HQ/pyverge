@@ -81,13 +81,14 @@ NESTED_MODELS = [PersonV1, PersonV2, AddressV1, AddressV2, AddressV3]
 
 
 class TestScoping:
-
     def test_explicit_engine_used_as_is(
         self,
         engine: Engine[VersionValue],
     ) -> None:
         UserManager = Manager[semver.Version].configure(
-            engine.settings, engine.adapter, engine=engine
+            engine.settings,
+            engine.adapter,
+            engine=engine,  # ty: ignore[invalid-argument-type]
         )
 
         assert UserManager._default_engine is engine
@@ -111,33 +112,42 @@ class TestClassLevelRegistration:
         versions = [str(v) for v in manager().registry.versions]
         assert versions == ["User:1.0.0", "User:2.0.0"]
 
-    @pytest.mark.parametrize("model_adapter, registry, key", [
-        pytest.param(
-            PydanticModelAdapter, [semver.Version, "test", [UserV1, UserV2], []],
-            ("User", "1.0.0", "2.0.0"),
-            id="pydantic_semver_user_v1_v2_migration_string"
-        ),
-        pytest.param(
-            PydanticModelAdapter, [semver.Version, "test", [UserV1, UserV2], []],
-            (UserV1, UserV2),
-            id="pydantic_semver_user_v1_v2_migration_schema"
-        ),
-        pytest.param(
-            PydanticModelAdapter, [semver.Version, "test", [UserV1, UserV2], []],
-            (ModelPair(UserV1, UserV2)),
-            id="pydantic_semver_user_v1_v2_migration_model_pair"
-        ),
-        pytest.param(
-            JsonSchemaModelAdapter, [semver.Version, "test", [USER_V1_0_0, USER_V2_0_0], []],
-            ("User", "1.0.0", "2.0.0"),
-            id="json_schema_semver_user_v1_v2_migration_string"
-        ),
-        pytest.param(
-            JsonSchemaModelAdapter, [semver.Version, "test", [USER_V1_0_0, USER_V2_0_0], []],
-            (USER_V1_0_0, USER_V2_0_0),
-            id="json_schema_semver_user_v1_v2_migration_schema"
-        ),
-    ], indirect=["model_adapter", "registry"])
+    @pytest.mark.parametrize(
+        "model_adapter, registry, key",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                ("User", "1.0.0", "2.0.0"),
+                id="pydantic_semver_user_v1_v2_migration_string",
+            ),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                (UserV1, UserV2),
+                id="pydantic_semver_user_v1_v2_migration_schema",
+            ),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                (ModelPair(UserV1, UserV2)),
+                id="pydantic_semver_user_v1_v2_migration_model_pair",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "test", [USER_V1_0_0, USER_V2_0_0], []],
+                ("User", "1.0.0", "2.0.0"),
+                id="json_schema_semver_user_v1_v2_migration_string",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "test", [USER_V1_0_0, USER_V2_0_0], []],
+                (USER_V1_0_0, USER_V2_0_0),
+                id="json_schema_semver_user_v1_v2_migration_schema",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
     def test_migration_decorator(
         self,
         manager: type[Manager[VersionValue]],
@@ -164,7 +174,7 @@ class TestClassLevelRegistration:
                 ],
                 ("User", "1.0.0", "2.0.0"),
                 "1.0.0",
-                id="pydantic_semver_user_v1_v2_string"
+                id="pydantic_semver_user_v1_v2_string",
             ),
             pytest.param(
                 JsonSchemaModelAdapter,
@@ -172,14 +182,19 @@ class TestClassLevelRegistration:
                     pendulum.Date,
                     "test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), migrate_v20250101_to_v20250310)]
+                    [
+                        (
+                            (USER_V2025_01_01, USER_V2025_03_10),
+                            migrate_v20250101_to_v20250310,
+                        )
+                    ],
                 ],
                 ("User", "2025-01-01", "2025-03-10"),
                 "2025-01-01",
-                id="json_schema_semver_user_v1_v2_string"
+                id="json_schema_semver_user_v1_v2_string",
             ),
         ],
-        indirect=["model_adapter", "registry"]
+        indirect=["model_adapter", "registry"],
     )
     def test_hook_decorator(
         self,
@@ -196,7 +211,7 @@ class TestClassLevelRegistration:
 
         hook = CountingHook()
 
-        @manager.hook(*key, hook)
+        @manager.hook(*key, hook)  # ty: ignore[invalid-argument-type]
         class _HookMarker:
             pass
 
@@ -244,17 +259,12 @@ class TestInstanceFacade:
         [
             pytest.param(
                 PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    []
-                ],
+                [semver.Version, "test", [UserV1, UserV2], []],
                 ManagerMigrationKey("User", "1.0.0", "2.0.0"),
-                id="pydantic_semver_user_v1_v2"
+                id="pydantic_semver_user_v1_v2",
             ),
         ],
-        indirect=["model_adapter", "registry"]
+        indirect=["model_adapter", "registry"],
     )
     def test_migration_string_triple_form(
         self,
@@ -262,9 +272,7 @@ class TestInstanceFacade:
         key: ManagerMigrationKey,
     ) -> None:
         instance = manager()
-        instance.store_migration(
-            key, migrate_v1_to_v2
-        )
+        instance.store_migration(key, migrate_v1_to_v2)
 
         assert instance.migrate(_payload("1.0.0"))["document"]["version"] == "2.0.0"
 
@@ -277,15 +285,13 @@ class TestInstanceFacade:
                     semver.Version,
                     "test",
                     [UserV1, UserV2],
-                    [
-                        ((UserV1, UserV2), migrate_v1_to_v2)
-                    ]
+                    [((UserV1, UserV2), migrate_v1_to_v2)],
                 ],
                 ManagerMigrationKey("User", "1.0.0", "2.0.0"),
-                id="pydantic_semver_user_v1_v2"
+                id="pydantic_semver_user_v1_v2",
             ),
         ],
-        indirect=["model_adapter", "registry"]
+        indirect=["model_adapter", "registry"],
     )
     def test_hook_via_instance_proxy(
         self, manager: type[Manager[semver.Version]], key: ManagerMigrationKey
@@ -382,19 +388,27 @@ class TestInstanceFacade:
 
 class TestLookupHelpers:
     @pytest.mark.parametrize(
-        ("model_adapter", "registry", "models", "versions"),
+        ("model_adapter", "registry", "models", "versions", "payloads"),
         [
             (
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV1, UserV2], []],
                 [UserV1, UserV2],
                 ["1.0.0", "2.0.0"],
+                [
+                    {"name": "Alice", "email": "alice@example.com", "role": "user"},
+                    {"name": "Alice", "email": "alice@example.com", "role": "user"},
+                ],
             ),
             (
                 PydanticModelAdapter,
                 [pendulum.Date, "test", [UserV20250310, UserV20251231], []],
                 [UserV20250310, UserV20251231],
                 ["2025-03-10", "2025-12-31"],
+                [
+                    {"name": "Alice", "email": "alice@example.com", "role": "user"},
+                    {"name": "Alice", "email": "alice@example.com", "role": "user"},
+                ],
             ),
         ],
         indirect=["model_adapter", "registry"],
@@ -405,9 +419,16 @@ class TestLookupHelpers:
         manager: type[Manager],
         models: list[type[BaseModel]],
         versions: list[str],
+        payloads: list[dict],
     ) -> None:
-        for model, version in zip(models, versions, strict=True):
+        """``get(kind, version_string)`` resolves the registered versionable.
+
+        Regression: the string was parsed once by ``get`` and then parsed again
+        by ``adapter.versionable``, whose ``of`` accepted only strings.
+        """
+        for model, version, payload in zip(models, versions, payloads, strict=True):
             assert manager.get("User", version).model is model
+            manager().validate(payload, "User", version)
 
     @pytest.mark.parametrize(
         ("model_adapter", "registry", "missing_version"),

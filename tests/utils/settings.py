@@ -1,4 +1,7 @@
-def overrides(options: dict[str, object]) -> dict[str, object]:
+from typing import Any
+
+
+def overrides(options: dict[str, Any]) -> dict[str, Any]:
     """Merge the standard defaults with ``options``, letting extras pass through."""
     overrides = {
         key: value

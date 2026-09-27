@@ -72,7 +72,7 @@ class Manager(
     decorators at class level; then instantiate for the runtime facade.
     """
 
-    _strategy: ClassVar[type[VersionValue]]  # type: ignore[invalid-var-type]
+    _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_settings: ClassVar[MigrationSettings]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]

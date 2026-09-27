@@ -18,12 +18,17 @@ from pyverge.core import (
 from pyverge.migration import (
     CompoundKeyWalker,
     Engine,
+    JsonSchemaModelAdapter,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
     fixed_target_resolver,
     latest_target_resolver,
     skip_target_resolver,
+)
+from tests.examples.json import (
+    USER_V1_0_0,
+    USER_V2_0_0,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -41,34 +46,6 @@ from tests.examples.pydantic.semver import (
     migrate_v2_to_v3,
 )
 from tests.utils import envelope_model
-
-_SEMVER_ENGINE = (
-    semver.Version,
-    "test",
-    (UserV1, UserV2, UserV3),
-    (
-        ((UserV1, UserV2), migrate_v1_to_v2),
-        ((UserV2, UserV3), migrate_v2_to_v3),
-    ),
-)
-_CHRONO_ENGINE = (
-    pendulum.Date,
-    "test",
-    (UserV20250310, UserV20251231),
-    (((UserV20250310, UserV20251231), migrate_chrono_v1_to_v2),),
-)
-
-_SEMVER_ENGINE_ANY_DIRECTION = (
-    semver.Version,
-    "test",
-    (UserV1, UserV2, UserV3),
-    (
-        ((UserV1, UserV2), migrate_v1_to_v2),
-        ((UserV2, UserV3), migrate_v2_to_v3),
-        ((UserV2, UserV1), lambda data: data, True),
-        ((UserV3, UserV2), lambda data: data, True),
-    ),
-)
 
 
 @pytest.mark.parametrize(
@@ -331,17 +308,41 @@ def test_pydantic_walker_validation_mode_none_skips_model_validate(
 
 
 @pytest.mark.parametrize(
-    "model_adapter, registry",
+    "model_adapter, registry, expected_version, expected_age",
     [
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
+            "3.0.0",
+            0,
             id="engine_migrate_latest",
+        ),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (USER_V1_0_0, USER_V2_0_0),
+                (((USER_V1_0_0, USER_V2_0_0), lambda d: {**d, "version": "2.0.0"}),),
+            ),
+            "2.0.0",
+            None,
+            id="engine_migrate_latest_json_schema",
         ),
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_engine_migrates_to_latest(engine: Engine[types.VersionValue]) -> None:
+def test_engine_migrates_to_latest(
+    engine: Engine[types.VersionValue], expected_version: str, expected_age: int | None
+) -> None:
     payload = {
         "document": {
             "kind": "User",
@@ -352,8 +353,8 @@ def test_engine_migrates_to_latest(engine: Engine[types.VersionValue]) -> None:
         }
     }
     result = engine.migrate(payload, target=latest_target_resolver(engine.registry))
-    assert result["document"]["version"] == "3.0.0"
-    assert result["document"]["age"] == 0
+    assert result["document"]["version"] == expected_version
+    assert result["document"]["age"] == expected_age
 
 
 @pytest.mark.parametrize(
@@ -361,7 +362,15 @@ def test_engine_migrates_to_latest(engine: Engine[types.VersionValue]) -> None:
     [
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             id="engine_container_guided",
         ),
     ],
@@ -390,7 +399,15 @@ def test_engine_container_guided_migration(engine: Engine[types.VersionValue]) -
     [
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             id="engine_explicit_target_v2",
         ),
     ],
@@ -422,21 +439,45 @@ def test_engine_explicit_target_versionable(
     [
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             latest_target_resolver,
             "3.0.0",
             id="latest",
         ),
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             skip_target_resolver,
             "1.0.0",
             id="skip",
         ),
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             latest_target_resolver,
             "3.0.0",
             id="default-latest",
@@ -458,7 +499,7 @@ def test_engine_target_policy(
             "role": "user",
         }
     }
-    resolver = resolver_factory(engine.registry)
+    resolver = resolver_factory(engine.registry)  # ty: ignore[invalid-argument-type]
     result = engine.migrate(payload, target=resolver)
     assert result["document"]["version"] == expected_version
 
@@ -468,7 +509,15 @@ def test_engine_target_policy(
     [
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             id="engine_noop_same_version",
         ),
     ],
@@ -497,7 +546,15 @@ def test_engine_no_op_when_source_equals_target(
     [
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             id="engine_forward_skip",
         ),
     ],
@@ -537,7 +594,17 @@ def test_engine_forward_direction_policy_skip(
     [
         pytest.param(
             PydanticModelAdapter,
-            _SEMVER_ENGINE_ANY_DIRECTION,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                    ((UserV2, UserV1), lambda data: data, True),
+                    ((UserV3, UserV2), lambda data: data, True),
+                ),
+            ),
             id="engine_any_direction_backward",
         ),
     ],
@@ -575,7 +642,12 @@ def test_engine_any_direction_policy(
     [
         pytest.param(
             PydanticModelAdapter,
-            _CHRONO_ENGINE,
+            (
+                pendulum.Date,
+                "test",
+                (UserV20250310, UserV20251231),
+                (((UserV20250310, UserV20251231), migrate_chrono_v1_to_v2),),
+            ),
             id="pydantic_chrono_engine",
         ),
     ],

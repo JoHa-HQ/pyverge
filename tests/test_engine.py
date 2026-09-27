@@ -50,7 +50,7 @@ from tests.examples.pydantic.semver import (
     UserV3,
 )
 from tests.examples.pydantic.semver_nested import AddressV1
-from tests.utils import envelope_model
+from tests.utils import envelope_model, meta_versionable
 
 
 class TestModelManagement:
@@ -353,10 +353,11 @@ class TestMigrationManagement:
             envelope_model(engine.adapter, engine.settings, model) for model in models
         ]
         with pytest.raises(RegistryError, match="across kinds"):
-            engine.store_migration(versions, lambda d: d)
+            engine.store_migration(versions, lambda d: d)  # ty: ignore[invalid-argument-type]
 
     @pytest.mark.parametrize(
-        "model_adapter, registry, meta_models, expected_version, func_factory, migration_direction",
+        "model_adapter, registry, meta_models, "
+        "expected_version, func_factory, migration_direction",
         [
             pytest.param(
                 PydanticModelAdapter,
@@ -417,7 +418,7 @@ class TestMigrationManagement:
         meta_models: list[types.ModelVersionKey],
         expected_version: str,
         func_factory: Callable,
-        migration_direction: str,
+        migration_direction: types.MigrationDirectionStrategy,
     ) -> None:
         """A meta chain hooks stored (kind, version) pairs and converges forward.
 
@@ -484,7 +485,7 @@ class TestMigrationManagement:
         self,
         engine: Engine[types.VersionValue],
         meta_versions: list[tuple[str, str]],
-        direction: str,
+        direction: types.MigrationDirectionStrategy,
     ) -> None:
         """Backward migration raises when a reverse edge is missing."""
         versionables = [
@@ -834,11 +835,11 @@ class TestReflection:
     def test_reconstructs_missing_model_on_store_migration(
         self,
         engine: Engine[types.VersionValue],
-        models: list[types.ModelBase],
+        models: list[type[types.ModelBase]],
     ) -> None:
         real, meta = (
-            engine.adapter.versionable(models[0]),
-            engine.adapter.versionable(None, kind="User", version="2.0.0"),
+            envelope_model(engine.adapter, engine.settings, models[0]),
+            meta_versionable(engine.adapter, "User", "2.0.0"),
         )
 
         engine.store_migration(
@@ -878,9 +879,9 @@ class TestReflection:
     def test_skips_reconstruction_when_disabled(
         self,
         engine: Engine[types.VersionValue],
-        models: list[types.ModelBase],
+        models: list[type[types.ModelBase]],
     ) -> None:
-        real = engine.adapter.versionable(models[0])
+        real = envelope_model(engine.adapter, engine.settings, models[0])
         meta = engine.adapter.versionable(None, kind="User", version="1.0.0")
         engine.store_model(meta)
 

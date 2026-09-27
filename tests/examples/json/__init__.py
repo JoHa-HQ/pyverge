@@ -84,5 +84,6 @@ MIGRATE_CONTACT_100_200 = {
     ],
 }
 
+
 def migrate_v20250101_to_v20250310(state: ModelData) -> ModelData:
     return state
