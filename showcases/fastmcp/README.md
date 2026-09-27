@@ -124,8 +124,10 @@ function's AST to reconstruct the older model, and runs it to migrate the
 payload. A caller sending a v1-shaped payload has the missing fields filled by
 the forward migrations before the handler refreshes them from the live API.
 
-Tracing is attached per forward edge with `manager.add_hook(...)`. One span per
-migration step flows over OTLP to the collector, which forwards traces to
+Tracing is wired at the composition root: the `ToolRegistry` receives the OTEL
+hook and attaches it to **every** migration edge, while the `ConvergeMiddleware`
+opens a parent span per call. One span per migration step then **nests** under
+the call span, and the whole trace flows over OTLP to the collector and into
 Jaeger. The hook is an adapter (`pyverge.adapters.otel.OTELHook`), so the domain
 layer stays free of OpenTelemetry.
 

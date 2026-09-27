@@ -36,7 +36,7 @@ async def _run() -> None:
 
         kind = settings.graph.kind
         print("Self-driving demo — older calls converge to the anchor handler:")
-        for version, result in service.demo_calls():
+        for version, result in await service.demo_calls():
             print(f"  {kind}@{version:6s} -> {result}")
     finally:
         await shutdown_container(container)

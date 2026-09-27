@@ -166,12 +166,8 @@ def configured_server():
         async with registry(mcp):
             pass
 
-    def _configure(
-        managers: Manager | list[Manager],
-        mcp,
-        **registry_kwargs,
-    ):
-        registry = ToolRegistry(managers, **registry_kwargs)
+    def _configure(manager: Manager, mcp, **registry_kwargs):
+        registry = ToolRegistry(manager, **registry_kwargs)
         asyncio.run(_lifecycle(registry, mcp))
         return mcp, registry
 

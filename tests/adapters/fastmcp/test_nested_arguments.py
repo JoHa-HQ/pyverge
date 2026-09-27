@@ -201,7 +201,7 @@ class TestStrictNestedRegistration:
         def search_weather(location: dict) -> dict:
             return {"location": location}
 
-        with pytest.raises(ValueError, match="not registered in any manager"):
+        with pytest.raises(ValueError, match="not registered in the manager"):
             configured_server(
                 manager,
                 mcp,

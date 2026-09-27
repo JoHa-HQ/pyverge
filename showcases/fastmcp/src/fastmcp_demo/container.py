@@ -18,7 +18,13 @@ import inspect
 
 from dependency_injector import containers, providers, resources
 
-from .adapters import build_registry, build_server, make_tracer
+from .adapters import (
+    build_registry,
+    build_server,
+    make_migration_hooks,
+    make_span_factory,
+    make_tracer,
+)
 from .adapters import tools as tools_module
 from .application.service import DemoService
 from .domain import WeatherClient, WeatherService, build_manager
@@ -60,19 +66,29 @@ class DemoContainer(containers.DeclarativeContainer):
         graph=settings.provided.graph,
     )
 
+    tracer = providers.Singleton(
+        make_tracer,
+        settings=settings.provided.telemetry,
+    )
     registry = providers.Singleton(
         build_registry,
         manager=manager,
         graph=settings.provided.graph,
+        hooks=providers.Callable(
+            make_migration_hooks,
+            tracer=tracer,
+            service=settings.provided.telemetry.provided.service_name,
+        ),
     )
     server = providers.Singleton(
         build_server,
         registry=registry,
         graph=settings.provided.graph,
-    )
-    tracer = providers.Callable(
-        make_tracer,
-        settings=settings.provided.telemetry,
+        span_factory=providers.Callable(
+            make_span_factory,
+            tracer=tracer,
+            service=settings.provided.telemetry.provided.service_name,
+        ),
     )
 
     demo_service: providers.Singleton[DemoService] = providers.Singleton(
@@ -81,7 +97,6 @@ class DemoContainer(containers.DeclarativeContainer):
         manager=manager,
         registry=registry,
         server=server,
-        tracer=tracer,
     )
     prepared: providers.Resource[DemoService] = providers.Resource(
         _Prepared,

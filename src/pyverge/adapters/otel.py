@@ -5,6 +5,10 @@ exception recording.  It is an adapter over the platform-agnostic
 :class:`~pyverge.core.hooks.MigrationHook` contract: pyverge core never
 imports OpenTelemetry for its own behavior.
 
+The span is opened **as current**, so when a tool call has already opened a
+parent span (see ``ConvergeMiddleware``), each migration step's span nests
+underneath it — a trace shows the call with one child span per step.
+
 Example:
     ```python
     from opentelemetry import trace
@@ -23,6 +27,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping
+from contextlib import AbstractContextManager
 from typing import Any
 
 from opentelemetry.trace import Span, SpanKind, StatusCode, Tracer
@@ -40,6 +45,7 @@ class OTELHook(MigrationHook):
         self._tracer = tracer
         self._service = service
         self._span: Span | None = None
+        self._scope: AbstractContextManager[Span] | None = None
         self._start_time: float = 0.0
 
     def before_migrate(
@@ -50,7 +56,9 @@ class OTELHook(MigrationHook):
         data: Mapping[str, Any],
     ) -> None:
         self._start_time = time.perf_counter()
-        self._span = self._tracer.start_span(
+        # ``start_as_current_span`` makes the step span the active span for the
+        # duration of the migration, so it nests under any enclosing call span.
+        self._scope = self._tracer.start_as_current_span(
             f"{self._service}.migrate",
             kind=SpanKind.INTERNAL,
             attributes={
@@ -60,6 +68,7 @@ class OTELHook(MigrationHook):
                 "migration.to_version": str(to_version),
             },
         )
+        self._span = self._scope.__enter__()
 
     def after_migrate(
         self,
@@ -69,14 +78,14 @@ class OTELHook(MigrationHook):
         original_data: Mapping[str, Any],
         migrated_data: Mapping[str, Any],
     ) -> None:
-        if self._span is not None:
-            self._span.set_attribute(
-                "migration.duration_seconds",
-                time.perf_counter() - self._start_time,
-            )
-            self._span.set_status(StatusCode.OK)
-            self._span.end()
-            self._span = None
+        if self._span is None:
+            return
+        self._span.set_attribute(
+            "migration.duration_seconds",
+            time.perf_counter() - self._start_time,
+        )
+        self._span.set_status(StatusCode.OK)
+        self._close()
 
     def on_error(
         self,
@@ -86,11 +95,17 @@ class OTELHook(MigrationHook):
         data: Mapping[str, Any],
         error: Exception,
     ) -> None:
-        if self._span is not None:
-            self._span.record_exception(error)
-            self._span.set_status(StatusCode.ERROR, str(error))
-            self._span.end()
-            self._span = None
+        if self._span is None:
+            return
+        self._span.record_exception(error)
+        self._span.set_status(StatusCode.ERROR, str(error))
+        self._close()
+
+    def _close(self) -> None:
+        if self._scope is not None:
+            self._scope.__exit__(None, None, None)
+        self._scope = None
+        self._span = None
 
 
 __all__ = ["OTELHook"]

@@ -10,10 +10,10 @@ The registrar owns the *write* phases of the FastMCP lifecycle over the shared
 * ``enrich`` — precompute convergence paths and materialize virtual tools for
   the versions that have no physical declaration.
 
-It depends only on the :class:`ToolManagerRouter` (manager routing + policy)
-and the shared index dicts; it never talks to the server outside the phases.
-Call-time routing (delegates, payload convergence) lives in the sibling
-:class:`~pyverge.adapters.fastmcp.routing.Converger`.
+It depends only on the :class:`Converger` (the single manager, its policy and
+its precomputed artifacts); it never talks to the server outside the phases.
+Call-time routing lives in the sibling
+:class:`~pyverge.adapters.fastmcp.converger.Converger`.
 """
 
 from __future__ import annotations
@@ -22,10 +22,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from pyverge.manager import Manager
-
+from .converger import Converger
 from .reflection import ToolReflection
-from .router import ToolManagerRouter
 
 _SCHEMA_HIDDEN = {"kind", "version"}
 
@@ -35,38 +33,35 @@ class Registrar:
 
     def __init__(
         self,
-        router: ToolManagerRouter,
+        converger: Converger,
         *,
         physical: dict,
         paths: dict,
-        converger,
     ) -> None:
-        self._router = router
+        self._converger = converger
+        self._manager = converger.manager
         self._physical = physical
         self._paths = paths
-        self._converger = converger
 
     # -- phase: register ----------------------------------------------------
 
     async def register(self, server) -> None:
         """Materialize every physical versioned tool's signature as an anchor.
 
-        A physical tool *is* its own model: its signature is reflected into
-        the registered anchor via the model adapter, so there is no separate
-        raw registration for physical tools.  Nested model parameters must
-        already be registered — only the tool's own signature is materialized
-        here, never its nested sub-trees (that is checked in ``reconcile``).
+        A physical tool *is* its own model: its signature is reflected into the
+        registered anchor via the model adapter, so there is no separate raw
+        registration for physical tools. Nested model parameters must already be
+        registered — only the tool's own signature is materialized here, never
+        its nested sub-trees (that is checked in ``reconcile``).
 
-        Re-running is idempotent: an already-registered ``(kind, version)``
-        is left untouched.  A version whose signature cannot materialize into
-        a model (e.g. a typed adapter with no registered class) still raises.
+        Re-running is idempotent: an already-registered ``(kind, version)`` is
+        left untouched. A version whose signature cannot materialize into a
+        model (e.g. a typed adapter with no registered class) still raises.
         """
         for (kind, version), tool in self._physical.items():
-            manager = self._manager_for(kind)
-            if self._has_version(manager, kind, version):
+            if self._has_version(kind, version):
                 continue
-            assert manager is not None, f"no manager owns kind {kind!r}"
-            adapter = manager.engine.adapter
+            adapter = self._manager.engine.adapter
             anchor = self._reflected_versionable(ToolReflection(tool, adapter))
             if anchor is None:
                 raise ValueError(
@@ -74,109 +69,97 @@ class Registrar:
                     "that version is registered and its signature cannot "
                     "materialize one either"
                 )
-            manager.engine.store_model(anchor)
+            self._manager.engine.store_model(anchor)
 
-    def _manager_for(self, kind: str) -> Manager | None:
-        return self._router.manager_for(kind)
-
-    @staticmethod
-    def _has_version(manager: Manager | None, kind: str, version: str) -> bool:
-        if manager is None:
-            return False
-        for versionable in manager.list_versions(kind):
-            if str(versionable.version[1]) == version:
-                return True
-        return False
+    def _has_version(self, kind: str, version: str) -> bool:
+        return any(
+            str(versionable.version[1]) == version
+            for versionable in self._manager.list_versions(kind)
+        )
 
     # -- phase: reconcile ---------------------------------------------------
 
     async def reconcile(self, server) -> None:
         """Merge the reflected signature tree onto the registered tree.
 
-        Every versioned tool's signature reflects into a model tree (its
-        ``weather.json``).  That reflection must attach onto the tree already
-        registered in the managers:
+        Every versioned tool's signature reflects into a model tree. That
+        reflection must attach onto the tree already registered in the manager:
 
-        * the registered contract for ``(kind, version)`` must be complete —
-          every lowest sub-tree it uses must be registered (there is no
-          implicit registration, ever),
-        * the reflected signature tree must agree with the registered contract
-          (same field surface, minus the identity fields).
+        * the registered contract for ``(kind, version)`` must be complete — the
+          tool's signature must agree with it (same field surface, minus the
+          identity fields),
+        * no implicit registration, ever: a nested versioned kind the tool uses
+          but the manager does not own is a misconfiguration.
 
         Nothing is written here: the reflected model is transient and never
-        registered into any manager.
+        registered into the manager.
         """
         for (kind, version), tool in self._physical.items():
-            manager = self._manager_for(kind)
-            assert manager is not None, f"no manager owns kind {kind!r}"
-            adapter = manager.engine.adapter
-            self._check_registered_tree_owned(manager, kind, version)
+            adapter = self._manager.engine.adapter
+            self._check_registered_tree_owned(kind, version)
             reflected = ToolReflection(tool, adapter)
-            self._check_reflected_signature(adapter, kind, version, reflected)
-            self._check_schema_agreement(adapter, kind, version, reflected)
+            self._check_reflected_signature(kind, version, reflected)
+            self._check_schema_agreement(kind, version, reflected)
 
     def _reflected_versionable(self, reflected: ToolReflection):
         """Return the reflected signature's versionable, or ``None`` if unusable.
 
-        Reflection wraps the tool's compliant JSON Schema through the adapter.
-        A schema-based adapter (``versionable(dict)``) materializes a transient
-        leaf-free model tree for inspection.  A typed adapter refuses raw
-        schemas — there the tool's signature is the registered model itself, so
-        the reflected checks are already covered by the registered-tree walk.
+        Reflection wraps the tool's compliant JSON Schema through the adapter. A
+        schema-based adapter (``versionable(dict)``) materializes a transient
+        leaf-free model tree for inspection. A typed adapter refuses raw schemas
+        — there the tool's signature is the registered model itself, so the
+        reflected checks are already covered by the registered-tree walk.
         """
         try:
             return reflected.versionable()
         except (AttributeError, TypeError, ValueError):
             return None
 
-    def _check_registered_tree_owned(
-        self, manager: Manager, kind: str, version: str
-    ) -> None:
+    def _check_registered_tree_owned(self, kind: str, version: str) -> None:
         """Fail when a registered model *uses* a nested versioned model unregistered.
 
         The registered contract for ``(kind, version)`` may embed another
         versioned model in its field annotations (the nested-arguments case).
-        Every such nested model must be registered in some manager — there is no
-        implicit registration or movement.  Plain (unversioned) nested models
-        are untouched.
+        Every such nested model must be registered in the manager — there is no
+        implicit registration. Plain (unversioned) nested models are untouched.
         """
-        versionable = manager.get(kind, version)
+        versionable = self._manager.get(kind, version)
         if versionable.model is None:
             return
-        adapter = manager.engine.adapter
+        adapter = self._manager.engine.adapter
         for nested in self._nested_models(adapter, versionable.model):
             nested_kind = adapter.kind(nested)
             if not nested_kind:
                 continue
-            if self._router.manager_for(nested_kind) is None:
+            if not self._converger.owns(nested_kind):
                 raise ValueError(
                     f"tool {kind!r}@{version} uses nested model "
                     f"{nested.__name__!r} (kind {nested_kind!r}) but that kind "
-                    "is not registered in any manager; there is no implicit "
+                    "is not registered in the manager; there is no implicit "
                     "registration"
                 )
 
     def _check_reflected_signature(
-        self, adapter, kind: str, version: str, reflected: ToolReflection
+        self, kind: str, version: str, reflected: ToolReflection
     ) -> None:
         """Fail when the tool's signature uses a nested model that is unregistered.
 
         A tool whose parameter is typed by a versioned model (not a bare
-        ``dict``) reflects that model into its signature tree.  Just like the
-        registered contract, the lowest sub-trees of the reflected signature
-        must already be registered.  (bare ``dict`` parameters reflect no
-        nested model, so they add no constraint.)
+        ``dict``) reflects that model into its signature tree. Just like the
+        registered contract, the lowest sub-trees must already be registered.
+        (bare ``dict`` parameters reflect no nested model, so they add no
+        constraint.)
         """
         if reflected.version is None:
             return
         for nested_kind in self._signature_nested_kinds(reflected.schema()):
             if nested_kind in _SCHEMA_HIDDEN:
                 continue
-            if self._router.manager_for(nested_kind) is None:
+            if not self._converger.owns(nested_kind):
                 raise ValueError(
                     f"tool {kind!r}@{version} signature uses nested model "
                     f"(kind {nested_kind!r}) but that kind is not registered "
-                    "in any manager; lowest sub-trees must be registered already"
+                    "in the manager; lowest sub-trees must be registered already"
                 )
 
     @staticmethod
@@ -184,7 +167,7 @@ class Registrar:
         """Return the identity kinds embedded in *document*'s object properties.
 
         FastMCP flattens a model-typed parameter into a nested JSON-Schema
-        object.  A nested object that carries ``kind``/``version`` default
+        object. A nested object that carries ``kind``/``version`` default
         properties is a versioned model used by the signature — its kind is
         collected for the registered-tree merge check.
         """
@@ -201,18 +184,16 @@ class Registrar:
         return kinds
 
     def _check_schema_agreement(
-        self, adapter, kind: str, version: str, reflected: ToolReflection
+        self, kind: str, version: str, reflected: ToolReflection
     ) -> None:
         """Fail when the reflected signature drifts from the registered contract.
 
         The tool's signature must reflect the model the customer registered for
         ``(kind, version)``: same field names and types, minus the identity
-        fields (``kind``/``version``).  A drift means the signature no longer
+        fields (``kind``/``version``). A drift means the signature no longer
         matches the contract it serves — that is a misconfiguration.
         """
-        manager = self._manager_for(kind)
-        assert manager is not None, f"no manager owns kind {kind!r}"
-        versionable = manager.get(kind, version)
+        versionable = self._manager.get(kind, version)
         if versionable.model is None:
             return
         registered = self._schema_card(versionable.model)
@@ -253,14 +234,14 @@ class Registrar:
     async def enrich(self, server) -> None:
         """Precompute convergence paths and materialize virtual tools.
 
-        Every registered version of a policy-marked kind gets a precomputed
-        path to its policy target.  Versions with **no** physical declaration
-        get a virtual tool: calling its schema converges the arguments to the
-        target and dispatches to the target's physical handler.  A kind with
-        no recorded policy is skipped entirely (stays plain).
+        Every registered version of a policy-marked kind gets a precomputed path
+        to its policy target. Versions with **no** physical declaration get a
+        virtual tool: calling its schema converges the arguments to the target
+        and dispatches to the target's physical handler. A kind with no recorded
+        policy is skipped entirely (stays plain).
         """
         for kind, versions in self._versions_by_kind().items():
-            policy = self._router.policy_for(kind)
+            policy = self._converger.policy_for(kind)
             if policy is None:
                 continue
             target = self._resolve_target(kind, policy)
@@ -274,24 +255,15 @@ class Registrar:
         kinds: dict[str, list[str]] = {}
         for kind, version in self._physical:
             kinds.setdefault(kind, []).append(version)
-        for manager in self._router.managers():
-            for versionable in manager.list_versions():
-                kind = str(versionable.version[0])
-                version = str(versionable.version[1])
-                owner = self._router.manager_for(kind)
-                if owner is manager:
-                    kinds.setdefault(kind, [])
-                    if version not in kinds[kind]:
-                        kinds[kind].append(version)
+        for versionable in self._manager.list_versions():
+            kind = str(versionable.version[0])
+            version = str(versionable.version[1])
+            kinds.setdefault(kind, [])
+            if version not in kinds[kind]:
+                kinds[kind].append(version)
         return kinds
 
-    def _register_virtual(
-        self,
-        server,
-        kind: str,
-        version: str,
-        target: str,
-    ) -> None:
+    def _register_virtual(self, server, kind: str, version: str, target: str) -> None:
         """Register a virtual tool for *version* exposing the version's schema."""
         from fastmcp.tools.function_tool import FunctionTool  # noqa: PLC0415
 
@@ -312,21 +284,17 @@ class Registrar:
     def _schema_for_version(self, kind: str, version: str) -> dict:
         """Return the full JSON Schema for a version.
 
-        A concrete version returns its model's schema.  A meta version (no
+        A concrete version returns its model's schema. A meta version (no
         concrete model) is reconstructed implicitly by the engine on migration
         registration (``on_missing="reconstruct_model"``), so the model is
-        already materialized here.  The LLM sees the full schema it would have
+        already materialized here. The LLM sees the full schema it would have
         called against at that version.
         """
-        manager = self._manager_for(kind)
-        assert manager is not None, f"no manager owns kind {kind!r}"
-        versionable: Any = manager.get(kind, version)
+        versionable: Any = self._manager.get(kind, version)
         return versionable.model.model_json_schema()
 
     def _resolve_target(self, kind: str, policy: str) -> str:
-        manager = self._manager_for(kind)
-        assert manager is not None, f"no manager owns kind {kind!r}"
-        versions = sorted(manager.list_versions(kind), key=lambda v: v.version[1])
+        versions = sorted(self._manager.list_versions(kind), key=lambda v: v.version[1])
         if not versions:
             raise ValueError(f"no registered versions for kind {kind!r}")
         if policy == "latest":

@@ -23,7 +23,7 @@ async def test_live_forecast_returns_current_reading() -> None:
     )
     try:
         service = await resolve_prepared(container)
-        result = service.demo_calls()[0][1]
+        result = (await service.demo_calls())[0][1]
         assert result["city"] == "Berlin"
         assert isinstance(result["temperature"], float)
         assert isinstance(result["humidity"], int)

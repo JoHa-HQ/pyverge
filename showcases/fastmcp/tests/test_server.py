@@ -22,7 +22,7 @@ class TestServerWiring:
 
 class TestConvergence:
     async def test_calls_converge_to_anchor_shape(self, prepared) -> None:
-        results = dict(prepared.demo_calls())
+        results = dict(await prepared.demo_calls())
         expected = {
             "city": "Berlin",
             "units": "celsius",
