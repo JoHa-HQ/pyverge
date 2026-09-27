@@ -7,6 +7,7 @@ precomputed convergence path.
 
 from __future__ import annotations
 
+from conftest import FAKE_READING
 from fastmcp_demo.domain import V1, V2, V3
 
 
@@ -25,8 +26,9 @@ class TestConvergence:
         expected = {
             "city": "Berlin",
             "units": "celsius",
-            "humidity": False,
-            "wind": 0.0,
+            "temperature": FAKE_READING.temperature,
+            "humidity": FAKE_READING.humidity,
+            "wind": FAKE_READING.wind,
         }
         # Every registered version converges to the anchor handler's shape.
         for version in (V1, V2, V3):
@@ -50,6 +52,7 @@ class TestToolInjection:
             "version",
             "city",
             "units",
+            "temperature",
             "humidity",
             "wind",
         }
@@ -57,4 +60,4 @@ class TestToolInjection:
     async def test_injected_service_serves_the_call(self, prepared) -> None:
         delegate = prepared.registry.delegate(prepared.kind, V3)
         assert delegate is not None
-        assert delegate(city="Berlin")["city"] == "Berlin"
+        assert delegate(city="Berlin")["temperature"] == FAKE_READING.temperature

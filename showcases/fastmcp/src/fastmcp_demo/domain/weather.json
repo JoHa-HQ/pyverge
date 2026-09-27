@@ -7,7 +7,8 @@
         "version": {"type": "string", "default": "3.0.0"},
         "city": {"type": "string"},
         "units": {"type": "string", "default": "celsius"},
-        "humidity": {"type": "boolean", "default": false},
+        "temperature": {"type": "number", "default": 0},
+        "humidity": {"type": "integer", "default": 0},
         "wind": {"type": "number", "default": 0}
     },
     "required": ["city"]

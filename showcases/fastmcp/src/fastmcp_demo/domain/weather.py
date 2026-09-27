@@ -1,26 +1,100 @@
-"""The tool's business logic — a plain service with no framework imports.
+"""Weather domain: a real upstream client plus the tool's service.
 
-The FastMCP tool receives an instance of this via dependency-injector wiring,
-so the handler stays a thin adapter over testable domain logic.
+``WeatherClient`` talks to Open-Meteo (keyless): geocode a city, then read the
+current conditions. ``WeatherService`` returns the anchor (v3) response shape.
+
+The version graph models the API's schema evolution: v1 returned only
+``temperature``, v2 added ``humidity``, v3 added ``wind``. A caller sending an
+older-shaped payload has it converged forward before the service refreshes the
+values from the live API. No framework imports — dependency-injector wires the
+client into the service.
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+import httpx
+
+GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
+FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+
+_CURRENT_FIELDS = "temperature_2m,relative_humidity_2m,wind_speed_10m"
+
+#: Query ``units`` value -> (temperature_unit, wind_speed_unit).
+_UNIT_PARAMS: dict[str, tuple[str, str]] = {
+    "celsius": ("celsius", "kmh"),
+    "fahrenheit": ("fahrenheit", "mph"),
+}
+
+
+class CityNotFound(LookupError):
+    """Raised when geocoding yields no match for a city."""
+
+
+@dataclass(frozen=True)
+class CurrentWeather:
+    """A normalized current-conditions reading."""
+
+    temperature: float
+    humidity: int
+    wind: float
+
+
+class WeatherClient:
+    """Open-Meteo client (geocoding + current forecast). Keyless."""
+
+    def __init__(self, *, timeout: float = 10.0) -> None:
+        self._client = httpx.Client(timeout=timeout)
+
+    def close(self) -> None:
+        self._client.close()
+
+    def _geocode(self, city: str) -> tuple[float, float]:
+        response = self._client.get(GEOCODE_URL, params={"name": city, "count": 1})
+        response.raise_for_status()
+        results = response.json().get("results") or []
+        if not results:
+            raise CityNotFound(city)
+        match = results[0]
+        return float(match["latitude"]), float(match["longitude"])
+
+    def current(self, city: str, *, units: str = "celsius") -> CurrentWeather:
+        """Return the current conditions for *city* in *units*."""
+        latitude, longitude = self._geocode(city)
+        temperature_unit, wind_unit = _UNIT_PARAMS.get(units, _UNIT_PARAMS["celsius"])
+        response = self._client.get(
+            FORECAST_URL,
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+                "current": _CURRENT_FIELDS,
+                "temperature_unit": temperature_unit,
+                "wind_speed_unit": wind_unit,
+            },
+        )
+        response.raise_for_status()
+        current = response.json()["current"]
+        return CurrentWeather(
+            temperature=float(current["temperature_2m"]),
+            humidity=int(current["relative_humidity_2m"]),
+            wind=float(current["wind_speed_10m"]),
+        )
+
 
 class WeatherService:
-    """Forecast lookup. In a real app this would call an upstream provider."""
+    """Turn a city lookup into the anchor (v3) response shape."""
 
-    def forecast(
-        self,
-        city: str,
-        units: str = "celsius",
-        humidity: bool = False,
-        wind: float = 0.0,
-    ) -> dict:
-        """Return the weather for *city* at the anchor (v3) shape."""
+    def __init__(self, client: WeatherClient) -> None:
+        self._client = client
+
+    def forecast(self, city: str, units: str = "celsius") -> dict:
+        """Fetch *city* and return the current conditions in the v3 shape."""
+        current = self._client.current(city, units=units)
         return {
             "city": city,
             "units": units,
-            "humidity": humidity,
-            "wind": wind,
+            "temperature": current.temperature,
+            "humidity": current.humidity,
+            "wind": current.wind,
         }

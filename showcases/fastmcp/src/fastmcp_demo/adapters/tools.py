@@ -41,19 +41,23 @@ def hide_parameter(func: _F, name: str) -> _F:
 
 
 @inject
-def search_weather(
+def search_weather(  # noqa: PLR0913
     city: str,
     units: str = "celsius",
-    humidity: bool = False,
+    temperature: float = 0.0,
+    humidity: int = 0,
     wind: float = 0.0,
     weather: WeatherService = Provide["weather_service"],
 ) -> dict:
     """Search weather for a city (anchor: v3).
 
-    A call against an older schema (via a virtual tool) converges to this v3
-    shape before the handler runs. ``weather`` is provided by the container.
+    The parameters form the v3 weather record — an older caller's payload is
+    converged to this shape before the handler runs, so ``temperature``,
+    ``humidity`` and ``wind`` arrive populated. The handler refreshes them from
+    the live Open-Meteo API and returns the current reading. ``units`` selects
+    the measurement system.
     """
-    return weather.forecast(city=city, units=units, humidity=humidity, wind=wind)
+    return weather.forecast(city=city, units=units)
 
 
 hide_parameter(search_weather, "weather")

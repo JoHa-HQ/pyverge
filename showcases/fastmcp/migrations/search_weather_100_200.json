@@ -1,5 +1,5 @@
 {
     "from": "1.0.0",
     "to": "2.0.0",
-    "ops": [{"op": "add", "path": "/humidity", "value": false}]
+    "ops": [{"op": "add", "path": "/humidity", "value": 0}]
 }

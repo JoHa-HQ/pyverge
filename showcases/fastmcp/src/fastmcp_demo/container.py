@@ -21,7 +21,7 @@ from dependency_injector import containers, providers, resources
 from .adapters import build_registry, build_server, make_tracer
 from .adapters import tools as tools_module
 from .application.service import DemoService
-from .domain import WeatherService, build_manager
+from .domain import WeatherClient, WeatherService, build_manager
 from .settings import DemoSettings
 
 
@@ -48,15 +48,18 @@ class DemoContainer(containers.DeclarativeContainer):
     settings: providers.Singleton[DemoSettings] = providers.Singleton(DemoSettings)
 
     # -- domain --------------------------------------------------------------
+    weather_client: providers.Singleton[WeatherClient] = providers.Singleton(
+        WeatherClient
+    )
     weather_service: providers.Singleton[WeatherService] = providers.Singleton(
-        WeatherService
+        WeatherService,
+        client=weather_client,
     )
     manager = providers.Singleton(
         build_manager,
         graph=settings.provided.graph,
     )
 
-    # -- adapters ------------------------------------------------------------
     registry = providers.Singleton(
         build_registry,
         manager=manager,
@@ -72,7 +75,6 @@ class DemoContainer(containers.DeclarativeContainer):
         settings=settings.provided.telemetry,
     )
 
-    # -- application ---------------------------------------------------------
     demo_service: providers.Singleton[DemoService] = providers.Singleton(
         DemoService,
         settings=settings,

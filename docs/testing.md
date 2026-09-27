@@ -49,6 +49,28 @@ def test_topology(kind, manager):
     ...  # round trip as above
 ```
 
+### Parametrize per version
+
+A whole-chain assertion points at the chain, not the version that drifted. Make
+each version a named case: assert the **field surface** the converged payload
+exposes, driven by a table that doubles as documentation of the schema
+evolution.
+
+```python
+SURFACE = {
+    "1.0.0": {"kind", "version", "city", "temperature"},
+    "2.0.0": {"kind", "version", "city", "temperature", "humidity"},
+    "3.0.0": {"kind", "version", "city", "temperature", "humidity", "wind"},
+}
+
+@pytest.mark.parametrize(("version", "surface"), SURFACE.items(), ids=SURFACE)
+def test_version_field_surface(manager, version, surface):
+    hop = next(h for h in walk_topology(manager, kind, versions) if h.version == version)
+    assert set(hop.payload) == surface
+```
+
+Adding a version adds one row; the diff documents the change.
+
 The round trip needs **both directions**. Register reverse edges (or run with
 `direction="any"`) before asserting, or the down-walk fails with
 `MigrationNotFoundError` — which is itself a useful guard test:
