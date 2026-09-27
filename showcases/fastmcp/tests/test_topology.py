@@ -14,7 +14,8 @@ that silently drops a field.
 from __future__ import annotations
 
 import pytest
-from fastmcp_demo.domain import ALL_VERSIONS, V1, V2, V3, schema
+from fastmcp_demo.domain import ALL_VERSIONS, V1, V2, V3
+from pydantic import create_model
 from topology import walk_topology
 
 from pyverge.core.exceptions import MigrationNotFoundError
@@ -70,8 +71,13 @@ class TestTopologyGuards:
         leave the payload at the wrong version.
         """
         # v4 exists with a forward edge only — nothing migrates v4 back down.
-        manager.store_model(
-            schema(KIND, "4.0.0", {"gust": {"type": "number", "default": 0}})
+        v4 = create_model(
+            "SearchWeatherV4",
+            kind=(str, "search_weather"),
+            version=(str, "4.0.0"),
+            city=(str, ...),
+            gust=(float, 0.0),
         )
+        manager.store_model(v4)
         with pytest.raises(MigrationNotFoundError):
             walk_topology(manager, KIND, (V1, V3, "4.0.0"))

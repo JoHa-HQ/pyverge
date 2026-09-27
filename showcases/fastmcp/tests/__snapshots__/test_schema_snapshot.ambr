@@ -2,30 +2,30 @@
 # name: test_version_field_surface_matches_snapshot[1.0.0][search_weather@1.0.0]
   dict({
     'city': "<class 'str'>",
-    'kind': 'str | None',
-    'temperature': 'float | None',
-    'units': 'str | None',
-    'version': 'str | None',
+    'kind': "typing.Literal['search_weather']",
+    'temperature': "<class 'float'>",
+    'units': "<class 'str'>",
+    'version': "<class 'str'>",
   })
 # ---
 # name: test_version_field_surface_matches_snapshot[2.0.0][search_weather@2.0.0]
   dict({
     'city': "<class 'str'>",
-    'humidity': 'int | None',
-    'kind': 'str | None',
-    'temperature': 'float | None',
-    'units': 'str | None',
-    'version': 'str | None',
+    'humidity': "<class 'int'>",
+    'kind': "typing.Literal['search_weather']",
+    'temperature': "<class 'float'>",
+    'units': "<class 'str'>",
+    'version': "<class 'str'>",
   })
 # ---
 # name: test_version_field_surface_matches_snapshot[3.0.0][search_weather@3.0.0]
   dict({
     'city': "<class 'str'>",
-    'humidity': 'int | None',
-    'kind': 'str | None',
-    'temperature': 'float | None',
-    'units': 'str | None',
-    'version': 'str | None',
-    'wind': 'float | None',
+    'humidity': "<class 'int'>",
+    'kind': "typing.Literal['search_weather']",
+    'temperature': "<class 'float'>",
+    'units': "<class 'str'>",
+    'version': "typing.Literal['3.0.0']",
+    'wind': "<class 'float'>",
   })
 # ---

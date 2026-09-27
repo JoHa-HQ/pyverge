@@ -36,8 +36,8 @@ showcases/fastmcp/
 │   ├── domain/
 │   │   ├── graph.py            # the version graph (no FastMCP, no OTEL)
 │   │   ├── migrations.py       # Python callable migration edges (fwd + rev)
-│   │   ├── weather.py          # WeatherClient (Open-Meteo) + WeatherService
-│   │   └── weather.json        # the anchor schema (source of truth)
+│   │   ├── models.py           # SearchWeather — the anchor Pydantic model
+│   │   └── weather.py          # WeatherClient (Open-Meteo) + WeatherService
 │   ├── application/service.py  # DemoService — the runnable use case
 │   ├── adapters/
 │   │   ├── server.py           # FastMCP server + registry + middleware
@@ -109,13 +109,13 @@ docker compose down
 
 ## How it works
 
-The **physical tool is its own anchor**. `search_weather` is declared once at
-`version="3.0.0"`; the registry reflects its signature into a v3 model during
-the `register` phase. The v1 and v2 models are never registered by hand — the
-engine reconstructs them from the v3 anchor and the migration diffs
-(`on_missing="reconstruct_model"`). The `enrich` phase then precomputes the
-convergence paths and materializes virtual v1 and v2 tools. A call against any
-version converges to v3 before the handler runs.
+The **anchor is a Pydantic model** (`domain/models.py`), registered with the
+`PydanticModelAdapter`. The physical tool `search_weather` is declared once at
+`version="3.0.0"` with a signature matching that model. The v1 and v2 models are
+never registered by hand — the engine reconstructs them from the v3 anchor and
+the migration diffs (`on_missing="reconstruct_model"`). The `enrich` phase then
+precomputes the convergence paths and materializes virtual v1 and v2 tools. A
+call against any version converges to v3 before the handler runs.
 
 The version chain models the **Open-Meteo response schema growing over time**:
 v1 carried `temperature`, v2 added `humidity`, v3 added `wind`. The edges are
