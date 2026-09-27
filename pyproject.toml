@@ -42,6 +42,9 @@ cli = [
   "typer>=0.21",
   "rich>=13"
 ]
+fastmcp = [
+  "fastmcp>=4"
+]
 
 [project.scripts]
 pyverge = "pyverge.cli.main:app"
