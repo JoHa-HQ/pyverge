@@ -129,6 +129,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 - [Target Policy](docs/target-policy.md)
 - [Migrations](docs/migration.md)
 - [Telemetry & Hooks](docs/telemetry.md)
+- [Testing](docs/testing.md)
 - [Common Usage Patterns](docs/usage.md)
 - [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)

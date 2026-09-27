@@ -163,5 +163,6 @@ understands both formats.
 - [Target policy](target-policy.md) — declarative convergence rules.
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
 - [Telemetry & Hooks](telemetry.md) — observability via hooks and OpenTelemetry.
+- [Testing](testing.md) — the time-travel topology round trip and other patterns.
 - [Concepts](concepts.md) — the problem and the approach.
 - [Showcases](../showcases/README.md) — end-to-end examples.

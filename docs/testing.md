@@ -1,0 +1,151 @@
+# Testing
+
+A version graph has failure modes that per-migration unit tests miss: a missing
+reverse edge, a forward migration that is not idempotent, or a finalize step
+that silently drops a field. This page covers the testing patterns that catch
+them.
+
+## Time-travel topology test
+
+The highest-value test for a version graph is a **round trip**: start from a
+newest-shaped payload, migrate down to the oldest version, then back up to
+newest, asserting every hop yields the correctly-typed container.
+
+```python
+def test_migration_topology(manager, kind, versions):
+    newest, oldest = versions[-1], versions[0]
+    newest_cls = manager.get(kind, newest).model
+
+    data = newest_cls.model_validate(
+        {"kind": kind, "version": newest, "city": "Berlin"}
+    )
+
+    # Down-walk: newest -> oldest, validating each hop against its model.
+    for version in reversed(versions):
+        cls = manager.get(kind, version).model
+        result = manager.migrate(
+            data.model_dump(mode="json"), target=version, container=cls
+        )
+        assert isinstance(result, cls)
+
+    # Return trip: oldest -> newest.
+    back = manager.migrate(
+        result.model_dump(mode="json"), target=newest, container=newest_cls
+    )
+    assert isinstance(back, newest_cls)
+```
+
+Why it works: `container=` validates the migrated payload against the target
+version's model, so a schema mismatch **raises** instead of passing silently
+(silent field drops are the classic bug). It is fully data-driven — parametrize
+over every registered kind and run it against your whole registry.
+
+```python
+@pytest.mark.parametrize("kind", ["cv", "jd", "application"])
+def test_topology(kind, manager):
+    versions = [str(n.version[1]) for n in manager.list_versions(kind)]
+    if len(versions) < 2:
+        pytest.skip("single version")
+    ...  # round trip as above
+```
+
+The round trip needs **both directions**. Register reverse edges (or run with
+`direction="any"`) before asserting, or the down-walk fails with
+`MigrationNotFoundError` — which is itself a useful guard test:
+
+```python
+def test_forward_only_chain_cannot_travel_back(manager):
+    with pytest.raises(MigrationNotFoundError):
+        walk_down_to_oldest(manager)
+```
+
+## Registering the graph in tests
+
+Build the manager through the same factory the application uses, so the test
+mirrors production wiring:
+
+```python
+@pytest.fixture
+def manager():
+    return build_manager(settings)  # your domain factory
+```
+
+Prefer registering **only the anchor** and letting the engine reconstruct older
+versions (`on_missing="reconstruct_model"`). Then the graph test doubles as a
+check that reconstruction produced the intended schemas — assert field presence
+per version:
+
+```python
+def test_older_models_were_reconstructed(manager):
+    v1 = manager.get(kind, "1.0.0")
+    assert "wind" not in v1.model.model_fields
+```
+
+## Property-based payloads
+
+Generate valid payloads for the **latest** model with Hypothesis, then assert
+the container validates. This guards the model contract independently of
+migrations:
+
+```python
+@given(instance=model_strategy(kind))
+def test_latest_models(kind, instance):
+    Doc.model_validate({"container": instance.model_dump(mode="json")})
+```
+
+Compose strategies per nested model and combine them (see joha's
+`tests/strategies/` for a worked example). Keep generators aligned with the
+model fields — a drifted generator is a false failure, not a real one.
+
+## Snapshotting a version chain
+
+Snapshot every version's validated dump in one parametrized test, so a schema
+change is a visible diff rather than a silent break:
+
+```python
+def test_all_versions_match_snapshot(manager, snapshot, subtests):
+    for node in manager.list_versions(kind):
+        version = str(node.version[1])
+        with subtests.test(version=version):
+            payload = node.model.sample()
+            document = {"container": payload.model_dump(mode="json")}
+            assert Doc.model_validate(document).model_dump(mode="json") == snapshot(
+                name=version
+            )
+```
+
+`pytest-subtests` keeps each version a distinct pass/fail; `syrupy` stores the
+expected dumps next to the test.
+
+## Asserting on hooks and tracing
+
+Hooks are observable, so assert them directly. Swap the OTLP exporter for an
+in-memory one and check the spans a migration emits:
+
+```python
+def test_one_span_per_step(manager, span_exporter):
+    manager.migrate(payload)
+    spans = span_exporter.get_finished_spans()
+    assert all(s.name.endswith(".migrate") for s in spans)
+    assert span_exporter.get_finished_spans()[0].attributes["migration.kind"] == kind
+```
+
+## Layering for testability
+
+Keep the version graph (domain) free of framework imports. Then tests build the
+graph **without** a server, an adapter, or a collector:
+
+```python
+manager = build_manager(settings)   # no FastMCP, no OpenTelemetry
+walk_topology(manager, kind, versions)
+```
+
+Framework wiring (servers, tracing) lives behind adapters and is exercised by
+its own thin suite. See `showcases/fastmcp/` in the repository for a worked
+layered example with `dependency-injector`.
+
+## See also
+
+- [Execution Flow](execution-flow.md) — discovery, ordering, and finalize.
+- [Migrations](migration.md) — reconstruct missing models or migrations.
+- [Telemetry & Hooks](telemetry.md) — observability for assertions.
