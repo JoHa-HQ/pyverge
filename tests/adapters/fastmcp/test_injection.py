@@ -8,9 +8,15 @@ signature rewrite.
 
 from __future__ import annotations
 
+import asyncio
+
 from fastmcp import FastMCP
 
-from pyverge.adapters.fastmcp import default_injection_detector, injected_names
+from pyverge.adapters.fastmcp import (
+    default_injection_detector,
+    injected_names,
+    make_tool,
+)
 
 
 class _Service:
@@ -83,3 +89,33 @@ class TestReflectedSchemaExcludesInjected:
         names = injected_names(tool)
         assert "service" in names
         assert "city" not in names
+
+
+class TestMakeTool:
+    def test_injected_param_absent_from_schema(self) -> None:
+        def tool(city: str, service=_provide_default()):
+            return city
+
+        built = make_tool(tool, version="1.0.0")
+        assert set(built.parameters["properties"]) == {"city"}
+
+    def test_wired_callable_is_preserved(self) -> None:
+        def tool(city: str, service=_provide_default()):
+            return city
+
+        built = make_tool(tool, version="1.0.0")
+        assert built.fn is tool
+
+    def test_built_tool_runs_on_server(self) -> None:
+
+        mcp = FastMCP("S")
+        calls: list[str] = []
+
+        def tool(city: str, service=_provide_default()):
+            calls.append(city)
+            return {"city": city}
+
+        mcp.add_tool(make_tool(tool, version="1.0.0"))
+        result = asyncio.run(mcp.call_tool("tool", {"city": "Berlin"}))
+        assert result.structured_content == {"city": "Berlin"}
+        assert calls == ["Berlin"]

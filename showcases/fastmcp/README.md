@@ -41,10 +41,10 @@ showcases/fastmcp/
 │   ├── application/service.py  # DemoService — the runnable use case
 │   ├── adapters/
 │   │   ├── server.py           # FastMCP server + registry + middleware
-│   │   ├── tools.py            # the injected physical tool
+│   │   ├── tools.py            # the injected physical tool (built via make_tool)
 │   │   └── tracing.py          # OTLP tracer builder
 │   └── __main__.py             # CLI entry point
-├── tests/                      # container, server, topology, snapshot, tracing
+├── tests/                      # tool convergence + topology (end-to-end)
 ├── docker-compose.yml          # otel-collector + jaeger
 ├── otel-collector-config.yaml  # collector pipeline: OTLP in -> Jaeger out
 └── pyproject.toml              # the demo package
@@ -141,17 +141,15 @@ tests swap the client for a fake at the composition root.
 
 ## Testing
 
-The suite is the reference for testing a version graph:
+The suite is deliberately small and **end-to-end**: the application is built
+once through its composition root, and tests drive it through public interfaces
+only — the FastMCP server (`server.call_tool`) and the pyverge manager
+(`manager.migrate`). No internal wiring is reassembled by tests.
 
 | Suite | Concern |
 | --- | --- |
-| `test_container.py` | DI wiring; the graph registers every version; only the anchor is concrete |
-| `test_server.py` | reflection lifecycle; every version converges; injected tool param is hidden |
+| `test_tool.py` | a call at any registered version converges to the anchor shape |
 | `test_topology.py` | the **time-travel round trip**, parametrized per version |
-| `test_schema_snapshot.py` | the **field surface** of every version, pinned by snapshot |
-| `test_migrations.py` | every callable edge is AST-discoverable (the reconstruction contract) |
-| `test_tracing.py` | one OTLP span per migration step, with the right attributes |
-| `test_live.py` | a real Open-Meteo call (opt-in, `--live`) |
 
 The **time-travel topology test** walks a newest-shaped payload down to the
 oldest version and back up, asserting each hop yields the correctly-typed
@@ -161,12 +159,9 @@ per version**, so each schema change is a named case. The helper
 (`tests/topology.py`) is a test utility, not application code. See
 [Testing](../../docs/testing.md) for the general patterns.
 
-The **schema snapshot** pins each version's field surface. A schema change then
-becomes a visible diff; `pytest --snapshot-update` rewrites only the changed
-version.
-
-By default the suite is offline: `weather_client` is overridden with a fake in
-the container. Run the real API test with `uv run pytest --live -m live`.
+The suite is offline: `weather_client` is overridden with a fake at the
+composition root. Live checks run through the demo CLI
+(`uv run python -m fastmcp_demo`) against the real Open-Meteo API.
 
 ## Configuration
 

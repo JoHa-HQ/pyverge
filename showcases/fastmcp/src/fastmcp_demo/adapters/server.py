@@ -13,7 +13,11 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from pyverge.adapters.fastmcp import ConvergeMiddleware, ToolRegistry
+from pyverge.adapters.fastmcp import (
+    ConvergeMiddleware,
+    ToolRegistry,
+    make_tool,
+)
 from pyverge.types import Attachable
 
 from ..domain import ANCHOR_VERSION
@@ -59,5 +63,5 @@ def build_server(
         middleware=[ConvergeMiddleware(registry, span_factory=span_factory)],
         lifespan=registry,
     )
-    mcp.tool(tool, version=ANCHOR_VERSION)
+    mcp.add_tool(make_tool(tool, version=ANCHOR_VERSION))
     return mcp

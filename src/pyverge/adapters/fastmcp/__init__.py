@@ -41,6 +41,7 @@ from .reflection import (
     ToolReflection,
 )
 from .registry import ToolRegistry
+from .tools import hide_injected, make_tool
 
 __all__ = [
     "ComponentReflection",
@@ -53,7 +54,9 @@ __all__ = [
     "ToolReflection",
     "ToolRegistry",
     "default_injection_detector",
+    "hide_injected",
     "injected_names",
+    "make_tool",
     "marker_detector",
     "never_injected",
 ]
