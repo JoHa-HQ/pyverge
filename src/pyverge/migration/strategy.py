@@ -122,7 +122,7 @@ class _DefaultMigrationTask:
         return data
 
 
-class DefaultEntryMigration(Generic[VersionValue]):
+class DefaultMigrationEntry(Generic[VersionValue]):
     """Default per-entry migration: direction check, step execution, finalize."""
 
     def migrate(

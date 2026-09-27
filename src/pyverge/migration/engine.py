@@ -35,7 +35,7 @@ from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
 
 from .graph import GraphBuilder
 from .registry import Registry
-from .strategy import DefaultEntryMigration, EntryMigration
+from .strategy import DefaultMigrationEntry, EntryMigration
 
 
 class Engine(Generic[VersionValue]):
@@ -86,7 +86,7 @@ class Engine(Generic[VersionValue]):
         self.graph_builder = graph_builder
         self.default_executor = default_executor
         self.adapter = adapter
-        self.entry_migration = entry_migration or DefaultEntryMigration()
+        self.entry_migration = entry_migration or DefaultMigrationEntry()
         self.discovery: DiffDiscovery[VersionValue, JsonPatch | MigrationFunc] = (
             CompositeDiffDiscovery()
         )

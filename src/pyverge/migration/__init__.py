@@ -53,14 +53,14 @@ from .policy import (
     skip_target_resolver,
 )
 from .registry import Registry
-from .strategy import DefaultEntryMigration, EntryMigration
+from .strategy import DefaultMigrationEntry, EntryMigration
 from .walker import CompoundKeyWalker, PydanticWalker
 
 __all__ = [
     "CallableDiffDiscovery",
     "CompositeDiffDiscovery",
     "CompoundKeyWalker",
-    "DefaultEntryMigration",
+    "DefaultMigrationEntry",
     "Diff",
     "DiffDiscovery",
     "DiscoveryError",
