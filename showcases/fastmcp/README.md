@@ -14,16 +14,16 @@ span to Jaeger.
 cd showcases/fastmcp
 uv sync
 docker compose up -d            # otel-collector + jaeger
-uv run python -m fastmcp_demo   # self-driving demo
+uv run python -m fastmcp_demo   # serves MCP over HTTP
 ```
 
-Open the Jaeger UI at <http://localhost:16686> (service `pyverge-fastmcp-demo`)
-to see the `pyverge-fastmcp-demo.call` span with one `…migrate` child per step.
+The server listens on `http://127.0.0.1:8000/mcp`. Open the Jaeger UI at
+<http://localhost:16686> (service `pyverge-fastmcp-demo`) to see the
+`pyverge-fastmcp-demo.call` span with one `…migrate` child per step.
 
 ## Connect to a code agent
 
-The server speaks MCP over stdio. Add it to an agent (e.g. OpenCode) as a local
-MCP server:
+Add the HTTP MCP endpoint to an agent (e.g. OpenCode):
 
 ```jsonc
 // opencode.json
@@ -31,16 +31,16 @@ MCP server:
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
     "fastmcp-demo": {
-      "type": "local",
-      "command": ["uv", "run", "python", "-m", "fastmcp_demo", "--serve"],
-      "environment": { "FASTMCP_DEMO_TELEMETRY__ENABLED": "false" }
+      "type": "remote",
+      "url": "http://127.0.0.1:8000/mcp"
     }
   }
 }
 ```
 
-Then ask the agent to call `search_weather` — at any schema version. Telemetry
-is off here because stdio owns stdout; drop the env var to also export spans.
+Then ask the agent to call `search_weather` — at any schema version. The agent
+sees one tool whose arguments are the v3 record; a call declaring an older
+version converges upstream.
 
 ## Tests
 
@@ -49,6 +49,6 @@ uv run pytest
 ```
 
 Offline end-to-end suite: a call at any registered version converges to the
-anchor shape (Hypothesis draws the readings, Syrupy snapshots the shape), plus a
-time-travel round-trip across versions. The app is built through its composition
-root and driven via public interfaces only.
+anchor shape (Hypothesis draws the readings, Syrupy snapshots the shape). The
+app is built through its composition root and driven via the public server API
+in-process — no HTTP, no entry point.

@@ -84,12 +84,26 @@ class GraphSettings(BaseSettings):
     )
 
 
+class ServerSettings(BaseSettings):
+    """HTTP transport binding for the MCP server."""
+
+    host: str = Field(default="127.0.0.1")
+    port: int = Field(default=8000)
+    path: str = Field(default="/mcp", description="HTTP path serving MCP.")
+
+    model_config = SettingsConfigDict(
+        env_prefix="SERVER_",
+        extra="ignore",
+    )
+
+
 class DemoSettings(BaseSettings):
     """Root settings for the showcase application."""
 
     telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
     weather: WeatherSettings = Field(default_factory=WeatherSettings)
     graph: GraphSettings = Field(default_factory=GraphSettings)
+    server: ServerSettings = Field(default_factory=ServerSettings)
     log_level: str = Field(
         default="INFO",
         description="Root log level for the demo (e.g. DEBUG, INFO, WARNING).",

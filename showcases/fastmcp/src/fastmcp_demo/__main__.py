@@ -1,14 +1,19 @@
-"""Command-line entry point for the showcase.
+"""Single entry point — serve the MCP server over HTTP.
 
-uv run python -m fastmcp_demo          # self-driving demo
-uv run python -m fastmcp_demo --serve  # run as an MCP server (stdio)
+    uv run python -m fastmcp_demo
+
+One async entry point: build the container, run the reflection lifecycle, then
+serve MCP over HTTP. HTTP (not stdio) keeps the entry point a plain coroutine —
+no second event loop — and lets a code agent connect with a URL.
+
+Tests do not use this module: they build the same app through the composition
+root and drive it in-process (see ``tests/conftest.py``).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import sys
 
 from .container import build_container, resolve_prepared, shutdown_container
 from .settings import DemoSettings
@@ -17,10 +22,9 @@ logger = logging.getLogger("fastmcp_demo")
 
 
 def configure_logging(settings: DemoSettings) -> None:
-    """Send logs to stderr — stdout is reserved for the MCP stdio protocol."""
+    """Configure root logging and quiet noisy third-party loggers."""
     logging.basicConfig(
         level=settings.log_level.upper(),
-        stream=sys.stderr,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     # Third-party chatter (one line per HTTP call) — only useful when debugging.
@@ -28,43 +32,33 @@ def configure_logging(settings: DemoSettings) -> None:
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
-async def _prepare():
-    """Build the container, configure logging, and run the lifecycle once."""
+async def serve() -> None:
+    """Build the app and serve it over HTTP until interrupted."""
     container = build_container()
-    configure_logging(container.settings())
-    service = await resolve_prepared(container)
-    return container, service
-
-
-def _serve() -> None:
-    """Run the server over stdio. Runs outside asyncio so ``server.run`` can."""
-    container, service = asyncio.run(_prepare())
-    logger.info("Serving MCP over stdio")
-    service.server.run()  # blocks on its own event loop
-    asyncio.run(shutdown_container(container))
-
-
-async def _demo() -> None:
-    container, service = await _prepare()
     settings = container.settings()
+    configure_logging(settings)
+    service = await resolve_prepared(container)
+
+    bind = settings.server
+    logger.info(
+        "OTLP tracing ready; open http://localhost:16686 (service %s)",
+        settings.telemetry.service_name,
+    )
+    logger.info("Serving MCP over http://%s:%d%s", bind.host, bind.port, bind.path)
     try:
-        logger.info(
-            "OTLP tracing ready; open http://localhost:16686 (service %s)",
-            settings.telemetry.service_name,
+        await service.server.run_async(
+            transport="http",
+            host=bind.host,
+            port=bind.port,
+            path=bind.path,
+            show_banner=False,
         )
-        kind = settings.graph.kind
-        logger.info("Older calls converge to the anchor handler:")
-        for version, result in await service.demo_calls():
-            logger.info("  %s@%s -> %s", kind, version, result)
     finally:
         await shutdown_container(container)
 
 
 def main() -> None:
-    if "--serve" in sys.argv:
-        _serve()
-    else:
-        asyncio.run(_demo())
+    asyncio.run(serve())
 
 
 if __name__ == "__main__":

@@ -2,9 +2,9 @@
 
 ``DemoService`` receives its collaborators (manager, registry, server) from the
 DI container and owns only the runnable lifecycle: it runs the async reflection
-phases and drives convergent calls. Tracing is wired at the composition root —
-the registry carries the per-edge hooks and the server carries the call-level
-span factory — so this service knows nothing of OpenTelemetry.
+phases. Tracing is wired at the composition root — the registry carries the
+per-edge hooks and the server carries the call-level span factory — so this
+service knows nothing of OpenTelemetry.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..domain import ALL_VERSIONS
 from ..settings import DemoSettings
 
 logger = logging.getLogger(__name__)
@@ -56,20 +55,3 @@ class DemoService:
         await self.registry.reconcile(self.server)
         await self.registry.enrich(self.server)
         logger.info("reflection lifecycle complete")
-
-    async def demo_calls(self) -> list[tuple[str, dict]]:
-        """Drive one convergent call per registered version, through the server.
-
-        Calls go via ``server.call_tool`` so they pass the ConvergeMiddleware —
-        production's path — which opens the parent span each migration step then
-        nests under.
-        """
-        kind = self._settings.graph.kind
-        results: list[tuple[str, dict]] = []
-        for version in ALL_VERSIONS:
-            logger.debug("calling %s@%s", kind, version)
-            call = await self.server.call_tool(
-                kind, {"city": "Berlin", "version": version}
-            )
-            results.append((version, call.structured_content or {}))
-        return results
