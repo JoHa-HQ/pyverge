@@ -1,3 +1,9 @@
+## v0.8.0 (2026-09-27)
+
+### Feat
+
+- **#56**: introduce migration reconstruction. update docs (#60)
+
 ## v0.7.0 (2026-09-10)
 
 ### Feat
