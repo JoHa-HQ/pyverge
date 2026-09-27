@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
-from typing import TYPE_CHECKING, Generic
+from typing import Generic
 
 from pyverge.core.exceptions import MigrationError, MigrationNotFoundError
 from pyverge.core.path import get_at as _get_at_path
@@ -14,6 +14,7 @@ from pyverge.types import (
     DirectionViolationStrategy,
     Executor,
     MigrationDirectionStrategy,
+    MigrationEntry,
     ModelAdapter,
     ModelBase,
     ModelData,
@@ -27,9 +28,6 @@ from pyverge.types import (
 
 from .graph import GraphEntry, MigrationGraph
 from .registry import Registry
-
-if TYPE_CHECKING:
-    from .strategy import EntryMigration
 
 
 class StepExecutor(Generic[VersionValue]):
@@ -92,7 +90,7 @@ class SequentialExecutor(Executor):
         graph: MigrationGraph[VersionValue],
         *,
         registry: Registry[VersionValue, ModelBase],
-        entry_migration: EntryMigration[VersionValue],
+        entry_migration: MigrationEntry[VersionValue],
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
@@ -134,7 +132,7 @@ class LevelParallelExecutor(Executor):
         graph: MigrationGraph[VersionValue],
         *,
         registry: Registry[VersionValue, ModelBase],
-        entry_migration: EntryMigration[VersionValue],
+        entry_migration: MigrationEntry[VersionValue],
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
@@ -193,7 +191,7 @@ class LevelParallelExecutor(Executor):
 
 
 def _run_task(
-    entry_migration: EntryMigration[VersionValue],
+    entry_migration: MigrationEntry[VersionValue],
     step_executor: StepExecutor,
     adapter: ModelAdapter,
     version_property: str,

@@ -9,7 +9,7 @@ lets the executor control when each entry is materialized.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Generic
 
 from pyverge.core.exceptions import MigrationError
 from pyverge.types import (
@@ -28,35 +28,8 @@ if TYPE_CHECKING:
     from pyverge.types import ModelAdapter
 
 
-@runtime_checkable
-class EntryMigration(Protocol[VersionValue]):
-    """Per-entry migration policy."""
-
-    def migrate(
-        self,
-        entry: GraphEntry[VersionValue, ModelBase],
-        current: ModelData,
-        *,
-        execute_step: Callable[
-            [
-                Any,
-                Any,
-                ModelData,
-                tuple[Any, ...],
-                str,
-            ],
-            ModelData,
-        ],
-        adapter: ModelAdapter,
-        version_property: str,
-        direction: MigrationDirectionStrategy,
-        on_direction_violation: DirectionViolationStrategy,
-        on_missing_path: VersionMissingStrategy,
-    ) -> RunnableMigration: ...
-
-
 class _DefaultMigrationTask:
-    """Runnable migration produced by :class:`DefaultEntryMigration`."""
+    """Runnable migration produced by :class:`DefaultMigrationEntry`."""
 
     def __init__(
         self,

@@ -23,7 +23,7 @@ from pyverge.core import (
 )
 from pyverge.migration import (
     Engine,
-    EntryMigration,
+    MigrationEntry,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
@@ -1044,8 +1044,8 @@ class TestLookupConvenience:
         assert engine[(versions[0], versions[1])].func is _migrate
 
 
-class TestEntryMigrationIntegration:
-    """Engine delegates per-entry migration to an injected EntryMigration strategy."""
+class TestMigrationEntryIntegration:
+    """Engine delegates per-entry migration to an injected MigrationEntry strategy."""
 
     @pytest.mark.parametrize(
         "model_adapter, registry",
@@ -1074,7 +1074,7 @@ class TestEntryMigrationIntegration:
             def run(self) -> dict[str, Any]:
                 return {"custom": True}
 
-        custom_strategy = MagicMock(spec=EntryMigration)
+        custom_strategy = MagicMock(spec=MigrationEntry)
         custom_strategy.migrate.return_value = _CustomTask()
         result = engine.migrate(
             {"kind": "User", "version": "1.0.0", "name": "Alice"},

@@ -1,4 +1,4 @@
-"""Tests for EntryMigration strategies."""
+"""Tests for MigrationEntry strategies."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from tests.examples.pydantic.semver_nested import PersonV1, PersonV2
 from tests.utils import envelope_model
 
 
-class TestDefaultEntryMigration:
+class TestDefaultMigrationEntry:
     @pytest.fixture
     def source(
         self,

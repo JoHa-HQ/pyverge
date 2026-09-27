@@ -20,6 +20,7 @@ from pyverge.types import (
     Executor,
     Migratable,
     MigrationDirectionStrategy,
+    MigrationEntry,
     MigrationFunc,
     ModelAdapter,
     ModelBase,
@@ -35,7 +36,7 @@ from pyverge.types import (
 
 from .graph import GraphBuilder
 from .registry import Registry
-from .strategy import DefaultMigrationEntry, EntryMigration
+from .strategy import DefaultMigrationEntry
 
 
 class Engine(Generic[VersionValue]):
@@ -67,7 +68,7 @@ class Engine(Generic[VersionValue]):
         default_executor: Executor,
         graph_builder: GraphBuilder[VersionValue],
         adapter: ModelAdapter,
-        entry_migration: EntryMigration[VersionValue] | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> None:
         """Initialize the engine.
 
@@ -79,7 +80,7 @@ class Engine(Generic[VersionValue]):
             adapter: Provider-specific model adapter used to validate and serialize
                 target models.
             entry_migration: Optional per-entry migration strategy. Defaults to
-                :class:`DefaultEntryMigration`.
+                :class:`DefaultMigrationEntry`.
         """
         self.registry = registry
         self.settings = settings
@@ -532,7 +533,7 @@ class Engine(Generic[VersionValue]):
         on_direction_violation: DirectionViolationStrategy | None = None,
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
-        entry_migration: EntryMigration[VersionValue] | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> ModelData:
         """Converge every versioned entry in *data* to match the target.
 
