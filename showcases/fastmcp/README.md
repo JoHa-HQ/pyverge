@@ -31,13 +31,13 @@ showcases/fastmcp/
 │   │   ├── graph.py            # the version graph (no FastMCP, no OTEL)
 │   │   ├── weather.py          # WeatherService — the tool's business logic
 │   │   └── weather.json        # the anchor schema (source of truth)
-│   ├── application/service.py  # DemoService + walk_topology use case
+│   ├── application/service.py  # DemoService — the runnable use case
 │   ├── adapters/
 │   │   ├── server.py           # FastMCP server + registry + middleware
 │   │   ├── tools.py            # the injected physical tool
 │   │   └── tracing.py          # OTLP tracer builder
 │   └── __main__.py             # CLI entry point
-├── tests/                      # container, server, topology, tracing suites
+├── tests/                      # container, server, topology, snapshot, tracing
 ├── migrations/                 # declarative JSON Patch specs (fwd + rev)
 ├── docker-compose.yml          # otel-collector + jaeger
 ├── otel-collector-config.yaml  # collector pipeline: OTLP in -> Jaeger out
@@ -133,13 +133,19 @@ The suite is the reference for testing a version graph:
 | `test_container.py` | DI wiring; the graph registers every version; only the anchor is concrete |
 | `test_server.py` | reflection lifecycle; every version converges; injected tool param is hidden |
 | `test_topology.py` | the **time-travel round trip** (below) |
+| `test_schema_snapshot.py` | the **field surface** of every version, pinned by snapshot |
 | `test_tracing.py` | one OTLP span per migration step, with the right attributes |
 
 The **time-travel topology test** walks a newest-shaped payload down to the
 oldest version and back up, asserting each hop yields the correctly-typed
 container. It catches missing reverse edges, non-idempotent migrations, and
-finalize drift — failures that per-edge unit tests miss. See
-[Testing](../../docs/testing.md) for the general pattern.
+finalize drift — failures that per-edge unit tests miss. The helper
+(`tests/topology.py`) is a test utility, not application code. See
+[Testing](../../docs/testing.md) for the general patterns.
+
+The **schema snapshot** pins each version's field surface. A schema change then
+becomes a visible diff; `pytest --snapshot-update` rewrites only the changed
+version.
 
 ## Configuration
 

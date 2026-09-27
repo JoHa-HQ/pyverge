@@ -1,19 +1,17 @@
 """The time-travel topology test.
 
-Extracted from the joha project's ``test_migration_topology``: given a
-registered version chain, migrate a newest-shaped payload down to the oldest
-version and back up, asserting each hop yields the correctly-typed container.
-
-This catches the failure modes that unit tests on individual migrations miss:
-a missing reverse edge, a non-idempotent forward migration, or a finalize step
-that silently drops a field.
+Given a registered version chain, migrate a newest-shaped payload down to the
+oldest version and back up, asserting each hop yields the correctly-typed
+container. This catches the failure modes that unit tests on individual
+migrations miss: a missing reverse edge, a non-idempotent forward migration, or
+a finalize step that silently drops a field.
 """
 
 from __future__ import annotations
 
 import pytest
-from fastmcp_demo.application import walk_topology
 from fastmcp_demo.domain import ALL_VERSIONS, V1, V3, schema
+from topology import walk_topology
 
 from pyverge.core.exceptions import MigrationNotFoundError
 

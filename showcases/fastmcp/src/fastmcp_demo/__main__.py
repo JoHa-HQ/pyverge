@@ -10,9 +10,7 @@ from __future__ import annotations
 import asyncio
 import sys
 
-from .application.service import walk_topology
 from .container import build_container, resolve_prepared, shutdown_container
-from .domain import ALL_VERSIONS
 
 
 async def _run() -> None:
@@ -40,10 +38,6 @@ async def _run() -> None:
         print("Self-driving demo — older calls converge to the anchor handler:")
         for version, result in service.demo_calls():
             print(f"  {kind}@{version:6s} -> {result}")
-
-        print("Topology walk (time travel down and back):")
-        for hop in walk_topology(service.manager, kind, ALL_VERSIONS):
-            print(f"  {hop.version:6s} -> {hop.payload}")
     finally:
         await shutdown_container(container)
 

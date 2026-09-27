@@ -1,0 +1,28 @@
+# serializer version: 1
+# name: test_version_field_surface_matches_snapshot[1.0.0][search_weather@1.0.0]
+  dict({
+    'city': "<class 'str'>",
+    'kind': 'str | None',
+    'units': 'str | None',
+    'version': 'str | None',
+  })
+# ---
+# name: test_version_field_surface_matches_snapshot[2.0.0][search_weather@2.0.0]
+  dict({
+    'city': "<class 'str'>",
+    'humidity': 'bool | None',
+    'kind': 'str | None',
+    'units': 'str | None',
+    'version': 'str | None',
+  })
+# ---
+# name: test_version_field_surface_matches_snapshot[3.0.0][search_weather@3.0.0]
+  dict({
+    'city': "<class 'str'>",
+    'humidity': 'bool | None',
+    'kind': 'str | None',
+    'units': 'str | None',
+    'version': 'str | None',
+    'wind': 'float | None',
+  })
+# ---

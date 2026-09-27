@@ -117,6 +117,23 @@ def test_all_versions_match_snapshot(manager, snapshot, subtests):
 `pytest-subtests` keeps each version a distinct pass/fail; `syrupy` stores the
 expected dumps next to the test.
 
+A lighter variant snapshots the **field surface** per version — one snapshot
+per version, parametrized — which pins the structural evolution of the chain
+without depending on sample data:
+
+```python
+def _field_surface(model: type[BaseModel]) -> dict[str, str]:
+    return {n: str(f.annotation) for n, f in sorted(model.model_fields.items())}
+
+
+@pytest.mark.parametrize("version", ALL_VERSIONS)
+def test_version_field_surface_matches_snapshot(manager, version, snapshot):
+    model = manager.get(kind, version).model
+    assert _field_surface(model) == snapshot(name=f"{kind}@{version}")
+```
+
+`pytest --snapshot-update` then rewrites only the version whose schema changed.
+
 ## Asserting on hooks and tracing
 
 Hooks are observable, so assert them directly. Swap the OTLP exporter for an
@@ -137,12 +154,18 @@ graph **without** a server, an adapter, or a collector:
 
 ```python
 manager = build_manager(settings)   # no FastMCP, no OpenTelemetry
-walk_topology(manager, kind, versions)
+for hop in walk_topology(manager, kind, versions):
+    ...
 ```
 
+The round-trip helper (`walk_topology`) is a **test utility**, not application
+logic — it lives under `tests/` and is imported only by the suite.
+
 Framework wiring (servers, tracing) lives behind adapters and is exercised by
-its own thin suite. See `showcases/fastmcp/` in the repository for a worked
-layered example with `dependency-injector`.
+its own thin suite. Dependency injection keeps the graph construction testable:
+wire the version graph as a provider and override it in tests. See
+`showcases/fastmcp/` in the repository for a worked layered example with
+`dependency-injector`.
 
 ## See also
 

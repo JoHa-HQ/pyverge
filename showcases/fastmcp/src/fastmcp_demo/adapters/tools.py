@@ -6,6 +6,11 @@ hidden from the exposed signature: the physical tool signature *is* the anchor
 model, and a stray parameter would break the adapter's signature/contract
 reconciliation. Hiding it also keeps the reflected JSON schema clean for the
 LLM client.
+
+NOTE: ``hide_parameter`` is a local workaround. The FastMCP adapter will later
+learn to recognize injected parameters natively (a marker on the annotation, or
+explicit registration), at which point the signature rewrite — and this helper —
+can be dropped without touching the tool body.
 """
 
 from __future__ import annotations

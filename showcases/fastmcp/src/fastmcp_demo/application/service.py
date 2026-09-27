@@ -1,17 +1,12 @@
-"""Application layer: the demo use case and the topology walk.
+"""Application layer: the demo use case.
 
 ``DemoService`` receives its collaborators (manager, registry, server) from the
 DI container and owns only the runnable lifecycle: it runs the async reflection
-phases and drives convergent calls. ``walk_topology`` is the reusable
-**time-travel round trip**: migrate a newest-shaped payload down to the oldest
-version and back up, asserting every hop yields the correctly-typed container.
-Run it against any version graph to catch missing reverse edges, non-idempotent
-migrations, and finalize drift.
+phases and drives convergent calls.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 from pyverge.adapters.otel import OTELHook
@@ -22,50 +17,6 @@ from ..settings import DemoSettings
 
 #: Forward edges (anchor-reconstructing), newest first.
 _FORWARD_EDGES = ((V2, V3), (V1, V2))
-
-
-@dataclass(frozen=True)
-class TopologyHop:
-    """One leg of a topology walk: the version visited and the typed result."""
-
-    version: str
-    container: type
-    payload: dict
-
-
-def walk_topology(
-    manager: Any, kind: str, versions: tuple[str, ...]
-) -> list[TopologyHop]:
-    """Walk *versions* from newest to oldest and back, asserting typed hops.
-
-    Starts from a newest-shaped payload, migrates down to the oldest version,
-    then back up to newest. Every hop is validated against the version's model
-    via ``container=`` so a schema mismatch raises instead of passing silently.
-
-    Returns the down-walk hops; raises ``AssertionError`` when a hop returns the
-    wrong container type.
-    """
-    newest = versions[-1]
-    newest_cls = manager.get(kind, newest).model
-
-    start = newest_cls.model_validate(
-        {"kind": kind, "version": newest, "city": "Berlin"}
-    )
-
-    hops: list[TopologyHop] = []
-    for version in reversed(versions):
-        cls = manager.get(kind, version).model
-        result = manager.migrate(
-            start.model_dump(mode="json"), target=version, container=cls
-        )
-        assert isinstance(result, cls), f"{version} did not yield {cls.__name__}"
-        hops.append(TopologyHop(version, cls, result.model_dump(mode="json")))
-
-    back = manager.migrate(hops[-1].payload, target=newest, container=newest_cls)
-    assert isinstance(back, newest_cls), (
-        f"return trip did not yield {newest_cls.__name__}"
-    )
-    return hops
 
 
 class DemoService:

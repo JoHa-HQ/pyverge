@@ -1,5 +1,5 @@
-"""Application layer: the demo use case and the topology walk."""
+"""Application layer: the demo use case."""
 
-from .service import DemoService, TopologyHop, walk_topology
+from .service import DemoService
 
-__all__ = ["DemoService", "TopologyHop", "walk_topology"]
+__all__ = ["DemoService"]
