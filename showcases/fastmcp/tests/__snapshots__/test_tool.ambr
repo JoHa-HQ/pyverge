@@ -1,0 +1,28 @@
+# serializer version: 1
+# name: TestToolConvergence.test_call_at_any_version_returns_anchor_shape[1.0.0]
+  dict({
+    'city': 'Berlin',
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestToolConvergence.test_call_at_any_version_returns_anchor_shape[2.0.0]
+  dict({
+    'city': 'Berlin',
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestToolConvergence.test_call_at_any_version_returns_anchor_shape[3.0.0]
+  dict({
+    'city': 'Berlin',
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---

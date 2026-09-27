@@ -3,47 +3,62 @@
 Every case drives the ready FastMCP server (``server.call_tool``): a call at any
 registered version converges to the anchor handler and returns the live shape.
 No internal wiring is assembled by the tests.
+
+A Hypothesis strategy draws arbitrary valid readings, so convergence is checked
+across the input space. The pinned reading is snapshotted for a readable record
+of the anchor shape.
 """
 
 from __future__ import annotations
 
 import pytest
-from conftest import FAKE_READING
+from conftest import SNAPSHOT_READING, call_tool, running_app, weather_reading
 from fastmcp.exceptions import ToolError
 from fastmcp_demo.domain import ALL_VERSIONS
+from hypothesis import given
+from syrupy.assertion import SnapshotAssertion
 
 KIND = "search_weather"
-
-ANCHOR_SHAPE = {
-    "city": "Berlin",
-    "units": "celsius",
-    "temperature": FAKE_READING.temperature,
-    "humidity": FAKE_READING.humidity,
-    "wind": FAKE_READING.wind,
-}
 
 
 class TestToolConvergence:
     @pytest.mark.parametrize("version", ALL_VERSIONS, ids=ALL_VERSIONS)
-    async def test_call_at_any_version_returns_anchor_shape(
-        self, server, version: str
+    def test_call_at_any_version_returns_anchor_shape(
+        self, server, version: str, snapshot: SnapshotAssertion
     ) -> None:
-        result = await server.call_tool(KIND, {"city": "Berlin", "version": version})
-        assert result.structured_content == ANCHOR_SHAPE
+        result = call_tool(server, KIND, {"city": "Berlin", "version": version})
+        assert result.structured_content == snapshot
 
-    async def test_call_without_version_defaults_to_anchor(self, server) -> None:
-        result = await server.call_tool(KIND, {"city": "Berlin"})
-        # An unversioned call to the physical tool runs the anchor handler.
+    def test_call_without_version_defaults_to_anchor(self, server) -> None:
+        result = call_tool(server, KIND, {"city": "Berlin"})
         assert result.structured_content is not None
-        assert result.structured_content["temperature"] == FAKE_READING.temperature
+        assert result.structured_content["temperature"] == SNAPSHOT_READING.temperature
 
-    async def test_units_are_forwarded(self, server) -> None:
-        result = await server.call_tool(
-            KIND, {"city": "Berlin", "units": "fahrenheit", "version": "1.0.0"}
+    def test_units_are_forwarded(self, server) -> None:
+        result = call_tool(
+            server, KIND, {"city": "Berlin", "units": "fahrenheit", "version": "1.0.0"}
         )
         assert result.structured_content is not None
         assert result.structured_content["units"] == "fahrenheit"
 
-    async def test_unknown_city_surfaces_an_error(self, server) -> None:
+    def test_unknown_city_surfaces_an_error(self, server) -> None:
         with pytest.raises(ToolError):
-            await server.call_tool(KIND, {"city": "nowhere"})
+            call_tool(server, KIND, {"city": "nowhere"})
+
+
+class TestArbitraryReadings:
+    @given(reading=weather_reading)
+    def test_any_reading_converges_to_the_anchor_shape(self, reading) -> None:
+        with running_app(reading) as app:
+            expected = {
+                "city": "Berlin",
+                "units": "celsius",
+                "temperature": reading.temperature,
+                "humidity": reading.humidity,
+                "wind": reading.wind,
+            }
+            for version in ALL_VERSIONS:
+                result = call_tool(
+                    app.server, KIND, {"city": "Berlin", "version": version}
+                )
+                assert result.structured_content == expected

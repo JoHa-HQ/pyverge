@@ -213,8 +213,8 @@ for hop in walk_topology(manager, kind, versions):
     ...
 ```
 
-The round-trip helper (`walk_topology`) is a **test utility**, not application
-logic — it lives under `tests/` and is imported only by the suite.
+Define the round-trip helper **locally in the test module** — it is a few lines
+and has a single caller, so a separate module would be over-abstraction.
 
 Framework wiring (servers, tracing) lives behind adapters and is exercised by
 its own thin suite. Dependency injection keeps the graph construction testable:

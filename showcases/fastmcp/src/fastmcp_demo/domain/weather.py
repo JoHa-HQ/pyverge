@@ -16,16 +16,7 @@ from dataclasses import dataclass
 
 import httpx
 
-GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
-FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
-
-_CURRENT_FIELDS = "temperature_2m,relative_humidity_2m,wind_speed_10m"
-
-#: Query ``units`` value -> (temperature_unit, wind_speed_unit).
-_UNIT_PARAMS: dict[str, tuple[str, str]] = {
-    "celsius": ("celsius", "kmh"),
-    "fahrenheit": ("fahrenheit", "mph"),
-}
+from ..settings import WeatherSettings
 
 
 class CityNotFound(LookupError):
@@ -44,14 +35,17 @@ class CurrentWeather:
 class WeatherClient:
     """Open-Meteo client (geocoding + current forecast). Keyless."""
 
-    def __init__(self, *, timeout: float = 10.0) -> None:
-        self._client = httpx.Client(timeout=timeout)
+    def __init__(self, settings: WeatherSettings) -> None:
+        self._settings = settings
+        self._client = httpx.Client(timeout=settings.request_timeout)
 
     def close(self) -> None:
         self._client.close()
 
     def _geocode(self, city: str) -> tuple[float, float]:
-        response = self._client.get(GEOCODE_URL, params={"name": city, "count": 1})
+        response = self._client.get(
+            self._settings.geocode_url, params={"name": city, "count": 1}
+        )
         response.raise_for_status()
         results = response.json().get("results") or []
         if not results:
@@ -62,13 +56,13 @@ class WeatherClient:
     def current(self, city: str, *, units: str = "celsius") -> CurrentWeather:
         """Return the current conditions for *city* in *units*."""
         latitude, longitude = self._geocode(city)
-        temperature_unit, wind_unit = _UNIT_PARAMS.get(units, _UNIT_PARAMS["celsius"])
+        temperature_unit, wind_unit = self._settings.unit_params[units]
         response = self._client.get(
-            FORECAST_URL,
+            self._settings.forecast_url,
             params={
                 "latitude": latitude,
                 "longitude": longitude,
-                "current": _CURRENT_FIELDS,
+                "current": self._settings.current_fields,
                 "temperature_unit": temperature_unit,
                 "wind_speed_unit": wind_unit,
             },

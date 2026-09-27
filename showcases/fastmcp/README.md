@@ -151,12 +151,18 @@ only — the FastMCP server (`server.call_tool`) and the pyverge manager
 | `test_tool.py` | a call at any registered version converges to the anchor shape |
 | `test_topology.py` | the **time-travel round trip**, parametrized per version |
 
+`test_tool.py` combines two techniques:
+
+- **Hypothesis** draws arbitrary valid readings (`weather_reading` strategy in
+  `conftest.py`), so convergence is checked across the input space rather than
+  one pinned value.
+- **Syrupy** snapshots the anchor payload, so a shape change is a visible diff.
+
 The **time-travel topology test** walks a newest-shaped payload down to the
 oldest version and back up, asserting each hop yields the correctly-typed
 container. It catches missing reverse edges, non-idempotent migrations, and
 finalize drift — failures that per-edge unit tests miss. It is **parametrized
-per version**, so each schema change is a named case. The helper
-(`tests/topology.py`) is a test utility, not application code. See
+per version**, so each schema change is a named case. See
 [Testing](../../docs/testing.md) for the general patterns.
 
 The suite is offline: `weather_client` is overridden with a fake at the

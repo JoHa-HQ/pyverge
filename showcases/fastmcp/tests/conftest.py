@@ -5,11 +5,18 @@ The application is built once through its public composition root
 interfaces only: the FastMCP server (``server.call_tool``) and the pyverge
 manager (``manager.migrate``). Tests never reassemble internal wiring.
 
-Offline by default: the weather client is overridden with a deterministic fake
-at the container, so no call leaves the process.
+Offline by default: the weather client is overridden with an in-memory fake
+whose reading is drawn from a **Hypothesis strategy**, so tests can exercise the
+whole input space. Sync fixtures keep the async machinery out of the test bodies
+— which also lets Hypothesis-driven tests (sync-only) drive the public surface.
 """
 
 from __future__ import annotations
+
+import asyncio
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
 
 import pytest
 from fastmcp_demo.container import (
@@ -19,49 +26,72 @@ from fastmcp_demo.container import (
 )
 from fastmcp_demo.domain import CityNotFound, CurrentWeather
 from fastmcp_demo.settings import DemoSettings, TelemetrySettings
+from hypothesis import strategies as st
 
-#: Deterministic reading the fake client returns.
-FAKE_READING = CurrentWeather(temperature=21.5, humidity=58, wind=12.0)
+#: Arbitrary valid current-conditions reading.
+weather_reading = st.builds(
+    CurrentWeather,
+    temperature=st.floats(min_value=-60, max_value=60, allow_nan=False),
+    humidity=st.integers(min_value=0, max_value=100),
+    wind=st.floats(min_value=0, max_value=200, allow_nan=False),
+)
+
+#: A readable reading pinned for snapshot tests.
+SNAPSHOT_READING = CurrentWeather(temperature=21.5, humidity=58, wind=12.0)
+
+
+def make_settings() -> DemoSettings:
+    """Settings for the offline showcase app."""
+    return DemoSettings(telemetry=TelemetrySettings(enabled=False))
 
 
 class FakeWeatherClient:
-    """In-memory stand-in for :class:`WeatherClient`."""
+    """In-memory stand-in for :class:`WeatherClient` returning a fixed reading."""
 
-    def __init__(self, reading: CurrentWeather = FAKE_READING) -> None:
-        self._reading = reading
+    def __init__(self, reading: CurrentWeather) -> None:
+        self.reading = reading
 
     def current(self, city: str, *, units: str = "celsius") -> CurrentWeather:
         if city.lower() == "nowhere":
             raise CityNotFound(city)
-        return self._reading
+        return self.reading
 
     def close(self) -> None:  # pragma: no cover - lifecycle parity
         return None
 
 
-@pytest.fixture
-def settings() -> DemoSettings:
-    return DemoSettings(telemetry=TelemetrySettings(enabled=False))
+@contextmanager
+def running_app(reading: CurrentWeather) -> Iterator[Any]:
+    """Build + prepare the app with *reading*, yielding it; shuts down after.
+
+    Synchronous context manager so sync tests (including Hypothesis examples)
+    can use it without touching the event loop themselves.
+    """
+    container = build_container(make_settings())
+    container.weather_client.override(FakeWeatherClient(reading))
+    app = asyncio.run(resolve_prepared(container))
+    try:
+        yield app
+    finally:
+        asyncio.run(shutdown_container(container))
+
+
+def call_tool(server: Any, name: str, arguments: dict) -> Any:
+    """Invoke a server tool synchronously; the public call surface."""
+    return asyncio.run(server.call_tool(name, arguments))
 
 
 @pytest.fixture
-def fake_client() -> FakeWeatherClient:
-    return FakeWeatherClient()
+def reading() -> CurrentWeather:
+    """The reading the fake client returns for this test."""
+    return SNAPSHOT_READING
 
 
 @pytest.fixture
-def container(settings: DemoSettings, fake_client: FakeWeatherClient):
-    c = build_container(settings)
-    c.weather_client.override(fake_client)
-    return c
-
-
-@pytest.fixture
-async def app(container):
+def app(reading: CurrentWeather) -> Iterator[Any]:
     """The composition root prepared end to end; yields the ready service."""
-    service = await resolve_prepared(container)
-    yield service
-    await shutdown_container(container)
+    with running_app(reading) as application:
+        yield application
 
 
 @pytest.fixture

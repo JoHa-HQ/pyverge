@@ -13,10 +13,12 @@ that silently drops a field.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
+
 import pytest
 from fastmcp_demo.domain import ALL_VERSIONS, V1, V2, V3
 from pydantic import create_model
-from topology import walk_topology
 
 from pyverge.core.exceptions import MigrationNotFoundError
 
@@ -32,24 +34,58 @@ VERSION_SURFACE = {
 }
 
 
-def _hop(manager, version: str):
-    """Return the down-walk hop for *version*."""
+@dataclass(frozen=True)
+class Hop:
+    """One leg of the walk: the version visited and the typed result."""
+
+    version: str
+    container: type
+    payload: dict
+
+
+def walk_topology(manager: Any, kind: str, versions: tuple[str, ...]) -> list[Hop]:
+    """Walk *versions* newest -> oldest -> newest, validating every hop.
+
+    Returns the down-walk hops; each payload is validated through ``container=``
+    so a schema mismatch raises instead of passing silently. The return trip
+    proves the reverse edges exist and are idempotent.
+    """
+    newest = versions[-1]
+    newest_cls = manager.get(kind, newest).model
+    start = newest_cls.model_validate(
+        {"kind": kind, "version": newest, "city": "Berlin"}
+    )
+
+    hops: list[Hop] = []
+    for version in reversed(versions):
+        cls = manager.get(kind, version).model
+        result = manager.migrate(
+            start.model_dump(mode="json"), target=version, container=cls
+        )
+        assert isinstance(result, cls), f"{version} did not yield {cls.__name__}"
+        hops.append(Hop(version, cls, result.model_dump(mode="json")))
+
+    back = manager.migrate(hops[-1].payload, target=newest, container=newest_cls)
+    assert isinstance(back, newest_cls), (
+        f"return trip did not yield {newest_cls.__name__}"
+    )
+    return hops
+
+
+def _hop(manager, version: str) -> Hop:
     return next(
         h for h in walk_topology(manager, KIND, ALL_VERSIONS) if h.version == version
     )
 
 
 class TestTopologyWalk:
-    @pytest.mark.parametrize("version", ALL_VERSIONS)
+    @pytest.mark.parametrize("version", ALL_VERSIONS, ids=ALL_VERSIONS)
     def test_hop_is_typed(self, manager, version: str) -> None:
         """Every hop validates against its version's model via ``container=``."""
-        hop = _hop(manager, version)
-        assert hop.container is manager.get(KIND, version).model
+        assert _hop(manager, version).container is manager.get(KIND, version).model
 
     @pytest.mark.parametrize(
-        ("version", "surface"),
-        VERSION_SURFACE.items(),
-        ids=["v1", "v2", "v3"],
+        ("version", "surface"), VERSION_SURFACE.items(), ids=VERSION_SURFACE
     )
     def test_hop_exposes_version_field_surface(
         self, manager, version: str, surface: set[str]
@@ -59,21 +95,16 @@ class TestTopologyWalk:
 
     def test_round_trip_visits_every_version(self, manager) -> None:
         hops = walk_topology(manager, KIND, ALL_VERSIONS)
-        assert [hop.version for hop in hops] == [V3, "2.0.0", V1]
+        assert [hop.version for hop in hops] == [V3, V2, V1]
 
 
 class TestTopologyGuards:
     def test_missing_reverse_edge_raises(self, manager) -> None:
-        """A version with only a forward edge cannot be reached by the down-walk.
-
-        ``walk_topology`` migrates down to the oldest version; a chain whose
-        oldest hop has no reverse edge must fail loudly rather than silently
-        leave the payload at the wrong version.
-        """
+        """A version with only a forward edge cannot be reached by the down-walk."""
         # v4 exists with a forward edge only — nothing migrates v4 back down.
         v4 = create_model(
             "SearchWeatherV4",
-            kind=(str, "search_weather"),
+            kind=(str, KIND),
             version=(str, "4.0.0"),
             city=(str, ...),
             gust=(float, 0.0),

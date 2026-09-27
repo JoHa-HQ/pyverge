@@ -31,6 +31,42 @@ class TelemetrySettings(BaseSettings):
     )
 
 
+class WeatherSettings(BaseSettings):
+    """Upstream Open-Meteo endpoints and query parameters."""
+
+    geocode_url: str = Field(
+        default="https://geocoding-api.open-meteo.com/v1/search",
+        description="Geocoding endpoint resolving a city name to coordinates.",
+    )
+    forecast_url: str = Field(
+        default="https://api.open-meteo.com/v1/forecast",
+        description="Current-conditions forecast endpoint.",
+    )
+    current_fields: str = Field(
+        default="temperature_2m,relative_humidity_2m,wind_speed_10m",
+        description="Comma-separated Open-Meteo `current` fields to request.",
+    )
+
+    #: Query ``units`` value -> (temperature_unit, wind_speed_unit). A fixed,
+    #: structural mapping (not operator config), so it stays a plain constant.
+    unit_params: dict[str, tuple[str, str]] = Field(
+        default_factory=lambda: {
+            "celsius": ("celsius", "kmh"),
+            "fahrenheit": ("fahrenheit", "mph"),
+        },
+        exclude=True,
+    )
+    request_timeout: float = Field(
+        default=10.0,
+        description="HTTP request timeout in seconds.",
+    )
+
+    model_config = SettingsConfigDict(
+        env_prefix="WEATHER_",
+        extra="ignore",
+    )
+
+
 class GraphSettings(BaseSettings):
     """The version graph the demo exposes."""
 
@@ -52,6 +88,7 @@ class DemoSettings(BaseSettings):
     """Root settings for the showcase application."""
 
     telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
+    weather: WeatherSettings = Field(default_factory=WeatherSettings)
     graph: GraphSettings = Field(default_factory=GraphSettings)
 
     model_config = SettingsConfigDict(

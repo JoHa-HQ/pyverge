@@ -55,7 +55,8 @@ class DemoContainer(containers.DeclarativeContainer):
 
     # -- domain --------------------------------------------------------------
     weather_client: providers.Singleton[WeatherClient] = providers.Singleton(
-        WeatherClient
+        WeatherClient,
+        settings=settings.provided.weather,
     )
     weather_service: providers.Singleton[WeatherService] = providers.Singleton(
         WeatherService,
