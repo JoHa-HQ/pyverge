@@ -4,12 +4,14 @@ import bisect
 from typing import Any, Generic, Self, cast, overload
 
 from pyverge.adapters.json_patch import JsonPatch
+from pyverge.adapters.json_patch.migration import JsonPatchMigration
 from pyverge.core.exceptions import (
     MigrationError,
     MigrationNotFoundError,
     ModelNotFoundError,
     RegistryError,
 )
+from pyverge.core.render import JsonPatchRender
 from pyverge.core.settings import MigrationSettings
 from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
 from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
@@ -235,7 +237,7 @@ class Engine(Generic[VersionValue]):
         """Register a migration with adjacency and backward-compat validation.
 
         Endpoints without a concrete model are reconstructed from the other
-        endpoint's model when ``settings.on_missing_model == "reconstruct"``;
+        endpoint's model when ``settings.on_missing == "reconstruct_model"``;
         otherwise ``ModelNotFoundError`` is raised.  The migration edge is
         stored only after both endpoints have models.
         """
@@ -282,7 +284,7 @@ class Engine(Generic[VersionValue]):
 
         A registered endpoint (including a registered meta node) is returned
         as-is.  An unregistered endpoint is reconstructed from *other*'s model
-        when ``settings.on_missing_model == "reconstruct"``; otherwise
+        when ``settings.on_missing == "reconstruct_model"``; otherwise
         ``ModelNotFoundError`` is raised.
         """
         registry = self.registry
@@ -291,7 +293,7 @@ class Engine(Generic[VersionValue]):
         except ModelNotFoundError:
             pass
 
-        if self.settings.on_missing_model != "reconstruct":
+        if self.settings.on_missing != "reconstruct_model":
             raise ModelNotFoundError(
                 registry.name,
                 endpoint.version,
@@ -331,6 +333,53 @@ class Engine(Generic[VersionValue]):
             diff = diff.inverted()
         model = self.adapter.materialize(anchor.model, diff, target.version[1])
         self.registry.store_model(self.adapter.versionable(model))
+
+    def propose_migration(
+        self: Self,
+        source: Versionable[VersionValue, ModelBase],
+        target: Versionable[VersionValue, ModelBase],
+        *,
+        is_backward_compatible: bool = False,
+    ) -> JsonPatchMigration:
+        """Propose a version-edge migration from two schema versions.
+
+        This is the migration-reconstruction strategy
+        (``on_missing == "reconstruct_migration"``): diff the two models'
+        schemas via the provider adapter and render the result as a declarative
+        RFC 6902 spec, wrapped in a :class:`JsonPatchMigration`.  The proposal
+        is a **starting point** — it is a shape-based diff, so business intent
+        cannot be inferred; the operator must review it before registering via
+        :meth:`store_migration`.
+
+        Contrast with model reconstruction (:meth:`reconstruct`): this
+        proposes the *edge* (migration), never auto-registers, and never
+        touches endpoint models.
+        """
+        if source.kind != target.kind:
+            raise RegistryError(
+                self.registry.name,
+                f"Cannot propose migration across kinds: "
+                f"{source.kind} != {target.kind}",
+            )
+        if source.strategy != target.strategy:
+            raise RegistryError(
+                self.registry.name,
+                f"Cannot propose migration across strategies: "
+                f"{source.strategy.__name__} != {target.strategy.__name__}",
+            )
+        if source.model is None or target.model is None:
+            raise ModelNotFoundError(self.registry.name, source.version)
+        diff = self.adapter.diff(
+            source,
+            target,
+            is_backward_compatible=is_backward_compatible,
+        )
+        spec = {
+            "from": str(source.version[1]),
+            "to": str(target.version[1]),
+            "ops": JsonPatchRender(diff)(),
+        }
+        return JsonPatchMigration(spec)
 
     def get_migration(
         self: Self,

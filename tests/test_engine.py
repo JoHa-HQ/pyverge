@@ -23,9 +23,9 @@ from pyverge.core import (
 )
 from pyverge.migration import (
     Engine,
-    MigrationEntry,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
+    MigrationEntry,
     PydanticModelAdapter,
     earliest_target_resolver,
     fixed_target_resolver,
@@ -825,7 +825,7 @@ class TestReflection:
             pytest.param(
                 JsonSchemaModelAdapter,
                 [semver.Version, "test", [USER_V1_0_0], []],
-                {"on_missing_model": "reconstruct"},
+                {"on_missing": "reconstruct_model"},
                 [USER_V1_0_0],
                 id="json_semver_reconstruct_user_v1_0_0",
             ),
@@ -869,7 +869,7 @@ class TestReflection:
             pytest.param(
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV2], []],
-                {"on_missing_model": "skip"},
+                {"on_missing": "skip"},
                 [UserV2],
                 id="pydantic_skip_user_v2",
             ),
