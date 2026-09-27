@@ -9,10 +9,13 @@ span factory — so this service knows nothing of OpenTelemetry.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ..domain import ALL_VERSIONS
 from ..settings import DemoSettings
+
+logger = logging.getLogger(__name__)
 
 
 class DemoService:
@@ -47,10 +50,12 @@ class DemoService:
         tracing hooks. Runs exactly once — re-running would re-materialize the
         virtual tools.
         """
+        logger.info("reflection lifecycle: search -> register -> reconcile -> enrich")
         await self.registry.search(self.server)
         await self.registry.register(self.server)
         await self.registry.reconcile(self.server)
         await self.registry.enrich(self.server)
+        logger.info("reflection lifecycle complete")
 
     async def demo_calls(self) -> list[tuple[str, dict]]:
         """Drive one convergent call per registered version, through the server.
@@ -62,6 +67,7 @@ class DemoService:
         kind = self._settings.graph.kind
         results: list[tuple[str, dict]] = []
         for version in ALL_VERSIONS:
+            logger.debug("calling %s@%s", kind, version)
             call = await self.server.call_tool(
                 kind, {"city": "Berlin", "version": version}
             )

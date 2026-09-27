@@ -7,25 +7,39 @@ uv run python -m fastmcp_demo --serve  # run as an MCP server (stdio)
 from __future__ import annotations
 
 import asyncio
+import logging
 import sys
 
 from .container import build_container, resolve_prepared, shutdown_container
+from .settings import DemoSettings
+
+logger = logging.getLogger("fastmcp_demo")
+
+
+def configure_logging(settings: DemoSettings) -> None:
+    """Send logs to stderr — stdout is reserved for the MCP stdio protocol."""
+    logging.basicConfig(
+        level=settings.log_level.upper(),
+        stream=sys.stderr,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+    # Third-party chatter (one line per HTTP call) — only useful when debugging.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 async def _prepare():
-    """Build the container and run the reflection lifecycle once."""
+    """Build the container, configure logging, and run the lifecycle once."""
     container = build_container()
+    configure_logging(container.settings())
     service = await resolve_prepared(container)
     return container, service
 
 
 def _serve() -> None:
-    """Run the server over stdio. Runs outside asyncio so ``server.run`` can.
-
-    Diagnostics go to stderr — stdout carries the MCP protocol.
-    """
+    """Run the server over stdio. Runs outside asyncio so ``server.run`` can."""
     container, service = asyncio.run(_prepare())
-    print("Serving MCP over stdio", file=sys.stderr)
+    logger.info("Serving MCP over stdio")
     service.server.run()  # blocks on its own event loop
     asyncio.run(shutdown_container(container))
 
@@ -34,14 +48,14 @@ async def _demo() -> None:
     container, service = await _prepare()
     settings = container.settings()
     try:
-        print(
-            "OTLP tracing enabled; open http://localhost:16686 (service "
-            f"{settings.telemetry.service_name})"
+        logger.info(
+            "OTLP tracing ready; open http://localhost:16686 (service %s)",
+            settings.telemetry.service_name,
         )
         kind = settings.graph.kind
-        print("Self-driving demo — older calls converge to the anchor handler:")
+        logger.info("Older calls converge to the anchor handler:")
         for version, result in await service.demo_calls():
-            print(f"  {kind}@{version:6s} -> {result}")
+            logger.info("  %s@%s -> %s", kind, version, result)
     finally:
         await shutdown_container(container)
 

@@ -90,6 +90,10 @@ class DemoSettings(BaseSettings):
     telemetry: TelemetrySettings = Field(default_factory=TelemetrySettings)
     weather: WeatherSettings = Field(default_factory=WeatherSettings)
     graph: GraphSettings = Field(default_factory=GraphSettings)
+    log_level: str = Field(
+        default="INFO",
+        description="Root log level for the demo (e.g. DEBUG, INFO, WARNING).",
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="FASTMCP_DEMO_",

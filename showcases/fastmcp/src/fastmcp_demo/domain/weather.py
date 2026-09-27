@@ -12,11 +12,14 @@ client into the service.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import httpx
 
 from ..settings import WeatherSettings
+
+logger = logging.getLogger(__name__)
 
 
 class CityNotFound(LookupError):
@@ -49,6 +52,7 @@ class WeatherClient:
         response.raise_for_status()
         results = response.json().get("results") or []
         if not results:
+            logger.warning("geocode found no match for %r", city)
             raise CityNotFound(city)
         match = results[0]
         return float(match["latitude"]), float(match["longitude"])
@@ -56,6 +60,9 @@ class WeatherClient:
     def current(self, city: str, *, units: str = "celsius") -> CurrentWeather:
         """Return the current conditions for *city* in *units*."""
         latitude, longitude = self._geocode(city)
+        logger.debug(
+            "forecast %s @ (%.3f, %.3f) units=%s", city, latitude, longitude, units
+        )
         temperature_unit, wind_unit = self._settings.unit_params[units]
         response = self._client.get(
             self._settings.forecast_url,
