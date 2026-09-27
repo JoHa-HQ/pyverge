@@ -107,7 +107,7 @@ is at the adapter seam. You can swap adapters without changing the engine.
 
 **Model reflection.** A version chain can be represented as declarative patches
 against a single latest model — e.g. git-versioned JSON specs where only the
-latest schema is kept. With `on_missing_model="reconstruct"`, the engine
+latest schema is kept. With `on_missing="reconstruct_model"`, the engine
 materializes every missing version from the anchor model and the migration
 diffs, so no historical model needs to be registered by hand. See
 [model reflection](reflection.md).

@@ -4,7 +4,7 @@ A version chain can be represented as declarative patches against a single
 latest model — for example, git-versioned JSON specs where only the latest
 schema is kept and older versions exist only as patch deltas. With model
 reflection, you never register the older versions by hand: register the anchor
-model, enable `on_missing_model="reconstruct"`, and the engine materializes
+model, enable `on_missing="reconstruct_model"`, and the engine materializes
 every missing version when you register its migration.
 
 ## How it works
@@ -26,13 +26,13 @@ from pyverge import Manager
 from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
-    MigrationSettings(on_missing_model="reconstruct"),
+    MigrationSettings(on_missing="reconstruct_model"),
     PydanticModelAdapter(),
 )
 manager = UserManager()
 ```
 
-With the default `on_missing_model="raise"`, registering a migration with an
+With the default `on_missing="raise"`, registering a migration with an
 unregistered endpoint raises `ModelNotFoundError`.
 
 ## Registering the anchor and migrations
@@ -84,6 +84,36 @@ manager.store_migration(
     ),
 )
 ```
+
+## Proposing a migration
+
+`on_missing` is a single, **exclusive** strategy — pick one:
+
+| Value | Behavior |
+| --- | --- |
+| `"reconstruct_model"` | Rebuild the missing endpoint *model* from the anchor and the migration diff, then store the migration. |
+| `"reconstruct_migration"` | Reconstruct the missing version-edge *migration* by diffing two schemas into a proposal. Model reconstruction is disabled. |
+| `"raise"` (default) | Fail with `ModelNotFoundError`. |
+| `"skip"` | Leave the version model-less. |
+
+Model reconstruction works from an existing migration; migration reconstruction
+is the inverse — you have both models and want a starting patch:
+
+```python
+# Both models must be registered (and carry concrete models).
+user_v1 = manager.get("User", "1.0.0")
+user_v2 = manager.get("User", "2.0.0")
+
+# Diff the two schema versions into a declarative proposal.
+proposal = manager.engine.propose_migration(user_v1, user_v2)
+
+# The proposal is a JsonPatchMigration — review it before registering.
+manager.store_migration(("User", "1.0.0", "2.0.0"), proposal)
+```
+
+The proposal is a **shape-based** diff: it captures field additions, removals
+and type changes, but cannot infer business intent (renames, value remaps).
+Treat it as a template to edit, never as auto-registered truth.
 
 ## Backward migration
 
