@@ -77,7 +77,7 @@ _SEMVER_ENGINE_ANY_DIRECTION = (
         pytest.param(
             PydanticModelAdapter,
             (semver.Version, "test", (), ()),
-            id="pydantic_semver_empty",
+            id="pydantic_semver_empty_compound_key",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -156,7 +156,7 @@ def test_finds_registered_versioned_dict(
         pytest.param(
             PydanticModelAdapter,
             (semver.Version, "test", (UserV1,), ()),
-            id="pydantic_semver_user_v1",
+            id="pydantic_semver_user_v1_unknown",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -188,7 +188,7 @@ def test_compound_key_unknown_version_is_skipped(
         pytest.param(
             PydanticModelAdapter,
             (semver.Version, "test", (UserV1,), ()),
-            id="pydantic_semver_user_v1",
+            id="pydantic_semver_user_v1_max_depth",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -229,7 +229,7 @@ def test_compound_key_max_depth_exceeded_for_nested_entry(
         pytest.param(
             PydanticModelAdapter,
             (semver.Version, "test", (), ()),
-            id="pydantic_semver_empty",
+            id="pydantic_semver_empty_pydantic",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -336,7 +336,7 @@ def test_pydantic_walker_validation_mode_none_skips_model_validate(
         pytest.param(
             PydanticModelAdapter,
             _SEMVER_ENGINE,
-            id="pydantic_semver_engine",
+            id="engine_migrate_latest",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -362,7 +362,7 @@ def test_engine_migrates_to_latest(engine: Engine[types.VersionValue]) -> None:
         pytest.param(
             PydanticModelAdapter,
             _SEMVER_ENGINE,
-            id="pydantic_semver_engine",
+            id="engine_container_guided",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -391,7 +391,7 @@ def test_engine_container_guided_migration(engine: Engine[types.VersionValue]) -
         pytest.param(
             PydanticModelAdapter,
             _SEMVER_ENGINE,
-            id="pydantic_semver_engine",
+            id="engine_explicit_target_v2",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -469,7 +469,7 @@ def test_engine_target_policy(
         pytest.param(
             PydanticModelAdapter,
             _SEMVER_ENGINE,
-            id="pydantic_semver_engine",
+            id="engine_noop_same_version",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -498,7 +498,7 @@ def test_engine_no_op_when_source_equals_target(
         pytest.param(
             PydanticModelAdapter,
             _SEMVER_ENGINE,
-            id="pydantic_semver_engine",
+            id="engine_forward_skip",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -538,7 +538,7 @@ def test_engine_forward_direction_policy_skip(
         pytest.param(
             PydanticModelAdapter,
             _SEMVER_ENGINE_ANY_DIRECTION,
-            id="pydantic_semver_engine",
+            id="engine_any_direction_backward",
         ),
     ],
     indirect=["model_adapter", "registry"],

@@ -160,7 +160,7 @@ class TestModel:
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "json_chrono_test", [], []],
                 ("User", "2025-03-10"),
-                id="json_chrono_user_2025_03_10",
+                id="json_chrono_get_nonexistent_model",
             ),
         ],
         indirect=["model_adapter", "registry"],
@@ -298,7 +298,7 @@ class TestModel:
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
                 USER_V2025_03_10,
-                id="json_chrono_user_2025_03_10",
+                id="json_chrono_store_duplicate",
             ),
         ],
         indirect=["model_adapter", "registry"],
@@ -328,7 +328,7 @@ class TestModel:
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
                 USER_V2025_03_10,
-                id="json_chrono_user_2025_03_10",
+                id="json_chrono_remove_model",
             ),
         ],
         indirect=["model_adapter", "registry"],
@@ -389,7 +389,7 @@ class TestModel:
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
                 USER_V2025_03_10,
-                id="json_chrono_user_2025_03_10",
+                id="json_chrono_model_cleanup",
             ),
         ],
         indirect=["model_adapter", "registry"],
@@ -1689,7 +1689,10 @@ class TestEdgePairLookup:
         models: list[type[types.ModelBase]],
         registry: Registry[types.VersionValue, BaseModel],
     ) -> None:
-        pair = [envelope_model(model_adapter, versioning_settings, model) for model in models]
+        pair = [
+            envelope_model(model_adapter, versioning_settings, model)
+            for model in models
+        ]
         with pytest.raises(MigrationNotFoundError):
             registry.get_migration_by_edge(SentinelEdge.from_pair(*pair))
 

@@ -4,23 +4,30 @@ from typing import cast
 
 import pytest
 
+from pyverge import Manager
 from pyverge.core import (
     DiscoverySettings,
     MigrationSettings,
     VersioningSettings,
 )
-from pyverge.core.types import ModelAdapter, ModelBase, VersionValue, Walker
 from pyverge.migration import (
     CompoundKeyWalker,
     DefaultMigrationEntry,
     Engine,
     GraphBuilder,
     JsonSchemaModelAdapter,
-    ModelManager,
+    MigrationGraph,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
     SequentialExecutor,
+)
+from pyverge.types import (
+    ModelAdapter,
+    ModelBase,
+    ResolverFactory,
+    VersionValue,
+    Walker,
 )
 from tests.utils import register_models
 from tests.utils.engine import register_migrations
@@ -70,7 +77,7 @@ def json_model_adapter(
     )
 
 
-@pytest.fixture(params=[("provider")])
+@pytest.fixture(params=[PydanticModelAdapter])
 def model_adapter(
     request: pytest.FixtureRequest,
 ) -> PydanticModelAdapter | JsonSchemaModelAdapter:
@@ -82,14 +89,14 @@ def model_adapter(
     raise ValueError(f"Unknown provider: {provider}")
 
 
-@pytest.fixture(scope="function", params=[("strategy", "name", "models", "migrations")])
+@pytest.fixture(scope="function", params=[(VersionValue, "test", [], [])])
 def registry(
     request: pytest.FixtureRequest,
     model_adapter: PydanticModelAdapter,
     migration_settings: MigrationSettings,
 ) -> Registry[VersionValue, ModelBase]:
     strategy, name, models, migrations = request.param
-    registry = Registry[strategy, ModelBase](name=name)
+    registry = Registry[strategy or VersionValue, ModelBase](name=name)
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
     if migrations:
@@ -99,26 +106,20 @@ def registry(
 
 @pytest.fixture
 def walker(
-    request: pytest.FixtureRequest,
     registry: Registry[VersionValue, ModelBase],
     migration_settings: MigrationSettings,
     model_adapter: PydanticModelAdapter,
 ) -> Walker:
-    """Indirect fixture: a preconfigured walker built from ``request.param``.
+    """A preconfigured :class:`PydanticWalker` bound to the shared registry.
 
-    Parametrize with a walker class (e.g. ``PydanticWalker``) to obtain a
-    walker bound to the shared ``registry``; pass it to
-    ``ModelManager[VersionValue].scoped(walker=...)`` to drive
-    container-guided discovery.
+    Pass it to ``Manager[VersionValue].configure(settings, adapter, walker=...)``
+    to drive container-guided discovery.
     """
-    if request.param == PydanticWalker:
-        return PydanticWalker(
-            registry,
-            settings=migration_settings,
-            adapter=model_adapter,
-        )
-
-    raise ValueError(f"Unsupported walker type: {request.param}")
+    return PydanticWalker(
+        registry,
+        settings=migration_settings,
+        adapter=model_adapter,
+    )
 
 
 @pytest.fixture
@@ -136,17 +137,35 @@ def graph_builder(
 
 
 @pytest.fixture
+def migration_graph(
+    request: pytest.FixtureRequest,
+    graph_builder: GraphBuilder[VersionValue],
+    registry: Registry[VersionValue, ModelBase],
+) -> MigrationGraph[VersionValue]:
+    resolver_factory, payload = cast("tuple[ResolverFactory, dict]", request.param)
+    return graph_builder.build(
+        payload,
+        target_resolver=resolver_factory(registry),
+    )
+
+
+@pytest.fixture
 def engine(
     registry: Registry,
     migration_settings: MigrationSettings,
-    graph_builder: GraphBuilder[VersionValue],
     model_adapter: ModelAdapter,
 ) -> Engine[VersionValue]:
     return Engine(
         registry,
         migration_settings,
         SequentialExecutor(),
-        graph_builder,
+        GraphBuilder(
+            registry,
+            migration_settings,
+            CompoundKeyWalker(
+                registry, settings=migration_settings, adapter=model_adapter
+            ),
+        ),
         model_adapter,
         entry_migration=DefaultMigrationEntry(),
     )
@@ -154,10 +173,8 @@ def engine(
 
 @pytest.fixture
 def manager(
-    migration_settings: MigrationSettings,
-    model_adapter: ModelAdapter,
     engine: Engine[VersionValue],
-) -> type[ModelManager[VersionValue]]:
-    return ModelManager[VersionValue].configure(
-        migration_settings, model_adapter, engine=engine
+) -> type[Manager[VersionValue]]:
+    return Manager[VersionValue].configure(
+        engine.settings, engine.adapter, engine=engine
     )

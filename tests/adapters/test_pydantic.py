@@ -7,7 +7,9 @@ import pytest
 import semver
 from pydantic import BaseModel
 
+from pyverge import Manager
 from pyverge.core import (
+    MigrationSettings,
     VersioningSettings,
     types,
 )
@@ -181,3 +183,103 @@ class TestPydanticDiff:
         assert not diff.has_additions
         assert not diff.has_removals
         assert not diff.has_modifications
+
+
+class TestOfIdempotency:
+    """``ModelAdapter.of`` is idempotent across the parse boundary."""
+
+    def test_of_parses_semver_string(self, model_adapter: PydanticModelAdapter) -> None:
+        """A semver string parses to a ``semver.Version``."""
+        assert model_adapter.of("1.0.0") == semver.Version(1, 0, 0)
+
+    def test_of_returns_parsed_semver_unchanged(
+        self, model_adapter: PydanticModelAdapter
+    ) -> None:
+        """An already-parsed ``semver.Version`` is returned as-is."""
+        parsed = semver.Version(1, 0, 0)
+        assert model_adapter.of(parsed) is parsed
+
+    def test_of_returns_parsed_date_unchanged(
+        self, model_adapter: PydanticModelAdapter
+    ) -> None:
+        """An already-parsed ``pendulum.Date`` is returned as-is."""
+        parsed = pendulum.Date(2025, 3, 10)
+        assert model_adapter.of(parsed) is parsed
+
+
+class TestManagerVersionStringLookup:
+    """``Manager.get`` and ``Manager.validate`` accept version strings.
+
+    Regression: the string was parsed once by ``Manager.get`` and then parsed
+    again by ``adapter.versionable``, whose ``of`` accepted only strings and
+    raised ``TypeError`` on the intermediate ``VersionValue``.
+    """
+
+    @pytest.mark.parametrize(
+        ("strategy", "models", "version", "expected"),
+        [
+            (semver.Version, [UserV1, UserV2], "1.0.0", UserV1),
+            (
+                pendulum.Date,
+                [UserV20250310, UserV20251231],
+                "2025-03-10",
+                UserV20250310,
+            ),
+        ],
+        ids=["semver", "date"],
+    )
+    def test_get_returns_versionable_for_string(
+        self,
+        model_adapter: PydanticModelAdapter,
+        strategy: type,
+        models: list[type[BaseModel]],
+        version: str,
+        expected: type[BaseModel],
+    ) -> None:
+        """``get(kind, version_string)`` resolves the registered versionable."""
+        manager = Manager[strategy].configure(MigrationSettings(), model_adapter)()
+        for model in models:
+            manager.store_model(model)
+
+        assert manager.get("User", version).model is expected
+
+    @pytest.mark.parametrize(
+        ("strategy", "model", "payload"),
+        [
+            (
+                semver.Version,
+                UserV1,
+                {
+                    "kind": "User",
+                    "version": "1.0.0",
+                    "name": "Alice",
+                    "email": "alice@example.com",
+                    "role": "user",
+                },
+            ),
+            (
+                pendulum.Date,
+                UserV20250310,
+                {
+                    "kind": "User",
+                    "version": "2025-03-10",
+                    "name": "Alice",
+                    "email": "alice@example.com",
+                    "role": "user",
+                },
+            ),
+        ],
+        ids=["semver", "date"],
+    )
+    def test_validate_accepts_string_version(
+        self,
+        model_adapter: PydanticModelAdapter,
+        strategy: type,
+        model: type[BaseModel],
+        payload: dict,
+    ) -> None:
+        """``validate(data, kind, version_string)`` validates without raising."""
+        manager = Manager[strategy].configure(MigrationSettings(), model_adapter)()
+        manager.store_model(model)
+
+        manager.validate(payload, "User", payload["version"])

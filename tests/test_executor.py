@@ -246,7 +246,7 @@ class TestStepExecutor:
         pytest.param(
             PydanticModelAdapter,
             [semver.Version, "test", [PersonV1, PersonV2, AddressV1, AddressV2], []],
-            id="pydantic_nested",
+            id="pydantic_person_address",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -510,11 +510,14 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
                     "address": {"version": "1.0.0", "street": "Main", "city": "Paris"},
                 }
             },
-            functools.partial(fixed_target_resolver, target=VersionNode(
-                _model=PersonV2,
-                _value=semver.Version(2, 0, 0),
-                _kind="Person",
-            )),
+            functools.partial(
+                fixed_target_resolver,
+                target=VersionNode(
+                    _model=PersonV2,
+                    _value=semver.Version(2, 0, 0),
+                    _kind="Person",
+                ),
+            ),
             None,
             id="fixed",
         ),
@@ -575,11 +578,14 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
                     "city": "Paris",
                 }
             },
-            functools.partial(fixed_target_resolver, target=VersionNode(
-                _model=PersonV2,
-                _value=semver.Version(2, 0, 0),
-                _kind="Person",
-            )),
+            functools.partial(
+                fixed_target_resolver,
+                target=VersionNode(
+                    _model=PersonV2,
+                    _value=semver.Version(2, 0, 0),
+                    _kind="Person",
+                ),
+            ),
             RegistryError,
             id="fixed_wrong_kind_raises",
         ),
@@ -609,11 +615,12 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
                 }
             },
             functools.partial(
-                fixed_target_resolver, target=VersionNode(
+                fixed_target_resolver,
+                target=VersionNode(
                     _model=PersonV2,
                     _value=semver.Version(9, 9, 9),
                     _kind="Person",
-                )
+                ),
             ),
             RegistryError,
             id="fixed_unregistered_target_raises",
