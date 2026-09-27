@@ -1,9 +1,8 @@
 """End-to-end fixtures for the showcase.
 
 The application is built once through its public composition root
-(``build_container`` + ``resolve_prepared``) and driven through public
-interfaces only: the FastMCP server (``server.call_tool``) and the pyverge
-manager (``manager.migrate``). Tests never reassemble internal wiring.
+(``build_container`` + ``resolve_prepared``) and driven through the public
+FastMCP server (``server.call_tool``). Tests never reassemble internal wiring.
 
 Offline by default: the weather client is overridden with an in-memory fake
 whose reading is either pinned (parametrized) or drawn from a **Hypothesis
@@ -106,9 +105,3 @@ def app(reading: CurrentWeather, settings: DemoSettings) -> Iterator[Any]:
 def server(app):
     """The ready FastMCP server — the public call surface."""
     return app.server
-
-
-@pytest.fixture
-def manager(app):
-    """The registered version graph — the public pyverge surface."""
-    return app.manager
