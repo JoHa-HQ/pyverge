@@ -11,7 +11,9 @@ from pyverge.core.exceptions import (
     RegistryError,
 )
 from pyverge.core.settings import MigrationSettings
-from pyverge.core.types import (
+from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
+from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
+from pyverge.types import (
     Attachable,
     Comparable,
     DirectionViolationStrategy,
@@ -30,8 +32,6 @@ from pyverge.core.types import (
     VersionPair,
     VersionValue,
 )
-from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
-from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
 
 from .graph import GraphBuilder
 from .registry import Registry

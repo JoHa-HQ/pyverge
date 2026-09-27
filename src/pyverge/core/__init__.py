@@ -5,6 +5,7 @@ This package holds the provider-agnostic building blocks used by the
 dependencies on the rest of the library — everything else depends on it.
 """
 
+from .. import types
 from .exceptions import (
     DiscoveryError,
     DiscoveryValidationError,
@@ -54,4 +55,5 @@ __all__ = [
     "VersioningSettings",
     "get_at",
     "set_at",
+    "types",
 ]

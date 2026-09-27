@@ -6,7 +6,7 @@ from typing import cast
 import pendulum
 from semver import Version
 
-from pyverge.core.types import VersionValue
+from pyverge.types import VersionValue
 
 logger = logging.getLogger(__name__)
 

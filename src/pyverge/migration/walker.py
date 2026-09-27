@@ -9,7 +9,8 @@ from pydantic import BaseModel
 
 from pyverge.core.exceptions import DiscoveryValidationError, MaxDepthExceededError
 from pyverge.core.settings import DiscoverySettings
-from pyverge.core.types import (
+from pyverge.core.versioning import VersionNode
+from pyverge.types import (
     Entry,
     MigrationDirectionStrategy,
     ModelAdapter,
@@ -17,10 +18,9 @@ from pyverge.core.types import (
     TargetResolver,
     VersionValue,
 )
-from pyverge.core.types import (
+from pyverge.types import (
     Walker as WalkerProtocol,
 )
-from pyverge.core.versioning import VersionNode
 
 from .registry import Registry
 

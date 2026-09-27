@@ -12,7 +12,7 @@ from typing import Any
 
 import jsonpatch
 
-from pyverge.core.types import ModelData
+from pyverge.types import ModelData
 
 
 class SetDefaultOperation(jsonpatch.PatchOperation):

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any, Self
 
-from .types import (
+from ..types import (
     MIGRATION_PAIR_LEN,
     MigrationKey,
     ModelBase,

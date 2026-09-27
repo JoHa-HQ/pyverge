@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Literal
 
 from pyverge.core.exceptions import RegistryError
-from pyverge.core.types import (
+from pyverge.types import (
     ModelBase,
     ModelKind,
     TargetResolver,

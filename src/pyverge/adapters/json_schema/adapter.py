@@ -18,7 +18,9 @@ from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from pyverge.adapters.base import BaseModelAdapter
-from pyverge.core.types import (
+from pyverge.core.versioning import VersionNode
+from pyverge.reflection.diff import Diff
+from pyverge.types import (
     Diffable,
     ModelBase,
     Versionable,
@@ -27,8 +29,6 @@ from pyverge.core.types import (
     VSource_co,
     VTarget_co,
 )
-from pyverge.core.versioning import VersionNode
-from pyverge.reflection.diff import Diff
 
 
 class JsonSchemaModelAdapter(BaseModelAdapter):

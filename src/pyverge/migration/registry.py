@@ -10,7 +10,8 @@ from pyverge.core.exceptions import (
     ModelNotFoundError,
     RegistryError,
 )
-from pyverge.core.types import (
+from pyverge.core.versioning import SentinelEdge
+from pyverge.types import (
     Attachable,
     Comparable,
     LookupKey,
@@ -25,7 +26,6 @@ from pyverge.core.types import (
     VSource_co,
     VTarget_co,
 )
-from pyverge.core.versioning import SentinelEdge
 
 
 class Registry(Generic[VersionValue, ProviderBase]):
