@@ -6,8 +6,12 @@ from collections.abc import Callable, Iterator
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
+    Generic,
     Literal,
+    NamedTuple,
     Protocol,
+    Self,
     TypeAlias,
     TypeVar,
     runtime_checkable,
@@ -18,6 +22,9 @@ from pydantic import BaseModel
 from semver import Version as SemVer
 
 if TYPE_CHECKING:
+    from pyverge.adapters import JsonPatchMigration
+    from pyverge.core.settings import MigrationSettings
+    from pyverge.migration.engine import Engine
     from pyverge.migration.graph import MigrationGraph
     from pyverge.migration.registry import Registry
     from pyverge.migration.strategy import EntryMigration
@@ -303,10 +310,11 @@ class ModelAdapter(Protocol):
 
     def version(self, model_cls: type[Any]) -> str: ...
     def kind(self, model_cls: type[Any]) -> str: ...
-    def of(self, value: str) -> VersionValue:
-        """Parse a version string into a version value.
+    def of(self, value: str | VersionValue) -> VersionValue:
+        """Parse a version string, or pass through an already-parsed value.
 
-        Understands both semver and ISO date strings.
+        Understands both semver and ISO date strings.  Idempotent: an existing
+        ``VersionValue`` is returned unchanged.
         """
         ...
 
@@ -377,11 +385,39 @@ TargetResolver: TypeAlias = Callable[
     Versionable[VersionValue_co, VModel_co] | None,
 ]
 
+#: A callable that binds a registry to a :data:`TargetResolver`; the shape of
+#: the ``*_target_resolver`` factories in :mod:`pyverge.migration.policy`.
+ResolverFactory: TypeAlias = Callable[
+    ["Registry[VersionValue, ModelBase]"], TargetResolver
+]
 
-ManagerMigrationKeyInput: TypeAlias = (
-    tuple[type[VModel_co], type[VModel_co]] | tuple[str, str, str]
-)
 
+class ModelKey(NamedTuple, Generic[VersionValue]):
+    """Typed model key: a model ``kind`` and its ``version`` value."""
+
+    kind: ModelKind
+    version: VersionValue
+
+
+class ManagerMigrationKey(NamedTuple):
+    """Typed manager migration key: ``kind`` plus source/target versions."""
+
+    kind: ModelKind
+    source_version: str
+    target_version: str
+
+
+class ModelPair(NamedTuple):
+    """Typed model-pair key: the ``source`` and ``target`` model classes."""
+
+    source: type[ModelBase]
+    target: type[ModelBase]
+
+
+#: Accepted migration-key shapes for the manager's registration methods.
+MigrationKeyInput: TypeAlias = ModelPair | ManagerMigrationKey
+
+ManagerKey: TypeAlias = ModelKey | ManagerMigrationKey | ModelPair
 
 TargetSpec: TypeAlias = (
     Versionable[VersionValue_co, VModel_co]
@@ -395,6 +431,73 @@ TargetPolicy: TypeAlias = (
     | dict[ModelKind | Literal["*"], TargetSpec[VersionValue_co, VModel_co]]
     | TargetResolver[VersionValue_co, VModel_co]
 )
+
+
+class ManagerClassState(Protocol[VersionValue]):
+    """Class-level defaults shared by every manager instance.
+
+    Established by :meth:`configure` and read by the registration descriptors
+    and target-resolution helpers through the class object.
+    """
+
+    _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
+    _default_settings: ClassVar[MigrationSettings]
+    _default_adapter: ClassVar[ModelAdapter]
+    _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+
+    @classmethod
+    def configure(  # noqa: PLR0913
+        cls,
+        settings: MigrationSettings,
+        adapter: ModelAdapter,
+        *,
+        engine: Engine[VersionValue] | None = None,
+        walker: Walker | None = None,
+        executor: Executor | None = None,
+        entry_migration: EntryMigration[VersionValue] | None = None,
+    ) -> type[Self]: ...
+
+    @classmethod
+    def store_model(
+        cls,
+        key: type[VModel],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Versionable[VersionValue, VModel]: ...
+
+    @classmethod
+    def store_migration(
+        cls,
+        key: MigrationKeyInput,
+        func: MigrationFunc | JsonPatchMigration,
+        *,
+        engine: Engine[VersionValue] | None = None,
+        backward_compatible: bool = False,
+    ) -> MigrationFunc: ...
+
+    @classmethod
+    def add_hook(
+        cls,
+        key: MigrationKeyInput,
+        hook: Attachable,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None: ...
+
+
+class ManagerInstanceState(Protocol[VersionValue]):
+    """Runtime state exposed by an instantiated manager."""
+
+    engine: Engine[VersionValue]
+
+    @property
+    def registry(self) -> Registry[VersionValue, ModelBase]: ...
+
+    @property
+    def settings(self) -> MigrationSettings | None: ...
+
+    @property
+    def adapter(self) -> ModelAdapter: ...
 
 
 class Walker(Protocol):
@@ -422,7 +525,7 @@ class RunnableMigration(Protocol):
 class Executor(Protocol):
     """Protocol for executing a migration graph."""
 
-    def run(
+    def run(  # noqa: PLR0913
         self,
         data: ModelData,
         graph: MigrationGraph[VersionValue_co],
