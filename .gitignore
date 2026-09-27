@@ -45,6 +45,7 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+coverage.json
 *.cover
 *.py.cover
 .hypothesis/
@@ -206,6 +207,9 @@ cython_debug/
 .zed/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
+
+# Scratch files
+/test.py
 
 # Ruff stuff:
 .ruff_cache/
