@@ -23,8 +23,24 @@ class BaseModelAdapter:
         self._kind_property = kind_property
 
     @classmethod
-    def of(cls, value: str) -> VersionValue:
-        """Parse a version string (mostly coming from Literal), then determine the strategy"""  # noqa: E501
+    def of(cls, value: str | VersionValue) -> VersionValue:
+        """Parse a version string, or pass through an already-parsed value.
+
+        Understands both semver and ISO date strings.  Idempotent: a
+        ``semver.Version`` or ``pendulum.Date`` produced by a previous call is
+        returned unchanged, so a value may cross the parse boundary more than
+        once.
+        """
+        if isinstance(value, Version) or (
+            isinstance(value, pendulum.Date)
+            and not isinstance(value, pendulum.DateTime)
+        ):
+            return cast(VersionValue, value)
+
+        if not isinstance(value, str):
+            msg = f"Cannot parse version {value!r}: expected a string or VersionValue."
+            raise TypeError(msg)
+
         try:
             return cast(VersionValue, Version.parse(value))
         except ValueError:
