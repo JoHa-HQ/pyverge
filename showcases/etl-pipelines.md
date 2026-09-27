@@ -48,14 +48,15 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-CustomerManager = ModelManager[semver.Version].scoped(
-    PydanticModelAdapter(),
-    settings=MigrationSettings(
+CustomerManager = Manager[semver.Version].configure(
+    MigrationSettings(
         direction="forward",
         on_missing_path="raise",
     ),
+    PydanticModelAdapter(),
 )
 
 
@@ -111,7 +112,7 @@ for record in normalized:
 
 ### Abstractions used
 
-- **ModelManager** — configured once and reused per record.
+- **Manager** — configured once and reused per record.
 - **Default `target="latest"`** — defaults every entry to the newest registered
   version.
 - **`executor=` per call** — `LevelParallelExecutor` parallelizes independent

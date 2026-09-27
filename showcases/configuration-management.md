@@ -43,14 +43,15 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-FeatureFlagsManager = ModelManager[semver.Version].scoped(
-    PydanticModelAdapter(),
-    settings=MigrationSettings(
+FeatureFlagsManager = Manager[semver.Version].configure(
+    MigrationSettings(
         direction="any",
         on_direction_violation="raise",
     ),
+    PydanticModelAdapter(),
 )
 
 
@@ -104,7 +105,7 @@ assert "notifications" not in rollback
 
 ### Abstractions used
 
-- **ModelManager** with `direction="any"` — supports both forward migration and
+- **Manager** with `direction="any"` — supports both forward migration and
   backward rollback.
 - **`target` policy** — `manager.migrate(payload, target=...)` pins a specific
   schema at runtime (`"latest"`, `"earliest"`, or a per-kind dict).

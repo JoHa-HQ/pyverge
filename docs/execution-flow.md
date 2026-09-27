@@ -90,16 +90,16 @@ A container model drives schema-guided discovery. Register the container and
 its versioned models, then migrate a nested payload:
 
 ```python
+from pyverge import Manager
 from pyverge.migration import (
     MigrationSettings,
-    ModelManager,
     PydanticModelAdapter,
     PydanticWalker,
 )
 
-UserManager = ModelManager[semver.Version].scoped(
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(),
     PydanticModelAdapter(),
-    settings=MigrationSettings(),
     walker=PydanticWalker(
         registry,
         settings=MigrationSettings(),
@@ -133,11 +133,12 @@ payloads, enable level-parallel execution — independent entries within each
 topological level run concurrently:
 
 ```python
+from pyverge import Manager
 from pyverge.migration import MigrationSettings
 
-UserManager = ModelManager[semver.Version].scoped(
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(parallel_workers=4),
     PydanticModelAdapter(),
-    settings=MigrationSettings(parallel_workers=4),
 )
 ```
 

@@ -22,7 +22,7 @@ broken are rejected without requeue, routing them to a dead-letter queue.
 
 ## Quick start (projected)
 
-Uses the high-level `ModelManager` facade with a thin adapter around the
+Uses the high-level `Manager` facade with a thin adapter around the
 `aio-pika` driver. **Illustrative — the transport glue is not shipped.**
 
 ```python
@@ -32,11 +32,12 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-OrderManager = ModelManager[semver.Version].scoped(
+OrderManager = Manager[semver.Version].configure(
+    MigrationSettings(direction="forward", on_missing_path="raise"),
     PydanticModelAdapter(),
-    settings=MigrationSettings(direction="forward", on_missing_path="raise"),
 )
 
 
@@ -98,7 +99,7 @@ async def main():
 
 ## Abstractions used
 
-- **ModelManager** — high-level facade; `manager.migrate(message, target=...)`
+- **Manager** — high-level facade; `manager.migrate(message, target=...)`
   converges the payload.
 - **StreamWorker** — thin adapter owning the ack/reject lifecycle.
 - **`on_missing_path="raise"`** — a broken path raises, so the message is

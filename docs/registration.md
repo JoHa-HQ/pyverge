@@ -11,15 +11,15 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
+from pyverge import Manager
 from pyverge.migration import (
     MigrationSettings,
-    ModelManager,
     PydanticModelAdapter,
 )
 
-UserManager = ModelManager[semver.Version].scoped(
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(),
     PydanticModelAdapter(),
-    settings=MigrationSettings(),
 )
 
 
@@ -78,9 +78,9 @@ UserManager.model()(UserV2)
 UserManager.migration("User", "1.0.0", "2.0.0")(add_age)
 
 # Instance-level registration (alternative) — use a separate manager class.
-OtherManager = ModelManager[semver.Version].scoped(
+OtherManager = Manager[semver.Version].configure(
+    MigrationSettings(),
     PydanticModelAdapter(),
-    settings=MigrationSettings(),
 )
 manager = OtherManager()
 manager.store_model(UserV1)

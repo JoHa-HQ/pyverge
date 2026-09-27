@@ -22,7 +22,7 @@ device families on an intermediate schema while the rest converge fully.
 
 ## Quick start (projected)
 
-Uses the high-level `ModelManager` facade with a thin adapter around the
+Uses the high-level `Manager` facade with a thin adapter around the
 `paho-mqtt` driver. **Illustrative — the transport glue is not shipped.**
 
 ```python
@@ -32,11 +32,12 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-OrderManager = ModelManager[semver.Version].scoped(
+OrderManager = Manager[semver.Version].configure(
+    MigrationSettings(direction="forward", on_missing_path="raise"),
     PydanticModelAdapter(),
-    settings=MigrationSettings(direction="forward", on_missing_path="raise"),
 )
 
 
@@ -92,7 +93,7 @@ client.on_message = gateway.on_telemetry
 
 ## Abstractions used
 
-- **ModelManager** — stateless facade; `manager.migrate(payload, target=...)`
+- **Manager** — stateless facade; `manager.migrate(payload, target=...)`
   converges each device payload.
 - **TelemetryGateway** — thin adapter; converge-and-forward with no per-device
   state.
