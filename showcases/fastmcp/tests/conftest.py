@@ -6,9 +6,9 @@ interfaces only: the FastMCP server (``server.call_tool``) and the pyverge
 manager (``manager.migrate``). Tests never reassemble internal wiring.
 
 Offline by default: the weather client is overridden with an in-memory fake
-whose reading is drawn from a **Hypothesis strategy**, so tests can exercise the
-whole input space. Sync fixtures keep the async machinery out of the test bodies
-— which also lets Hypothesis-driven tests (sync-only) drive the public surface.
+whose reading is either pinned (parametrized) or drawn from a **Hypothesis
+strategy**. Sync fixtures keep the async machinery out of the test bodies —
+which also lets Hypothesis-driven tests (sync-only) drive the public surface.
 """
 
 from __future__ import annotations
@@ -36,12 +36,12 @@ weather_reading = st.builds(
     wind=st.floats(min_value=0, max_value=200, allow_nan=False),
 )
 
-#: A readable reading pinned for snapshot tests.
+#: A readable reading pinned for the snapshot tests (parametrized indirectly).
 SNAPSHOT_READING = CurrentWeather(temperature=21.5, humidity=58, wind=12.0)
 
 
-def make_settings() -> DemoSettings:
-    """Settings for the offline showcase app."""
+def offline_settings() -> DemoSettings:
+    """Settings for the offline showcase app (no OTLP exporter)."""
     return DemoSettings(telemetry=TelemetrySettings(enabled=False))
 
 
@@ -61,13 +61,15 @@ class FakeWeatherClient:
 
 
 @contextmanager
-def running_app(reading: CurrentWeather) -> Iterator[Any]:
-    """Build + prepare the app with *reading*, yielding it; shuts down after.
+def running_app(
+    reading: CurrentWeather, settings: DemoSettings | None = None
+) -> Iterator[Any]:
+    """Build + prepare the app with *reading*, yielding it; shut down after.
 
-    Synchronous context manager so sync tests (including Hypothesis examples)
-    can use it without touching the event loop themselves.
+    Synchronous so sync tests (including Hypothesis examples, which cannot use
+    fixtures) can drive the public surface without touching the event loop.
     """
-    container = build_container(make_settings())
+    container = build_container(settings or offline_settings())
     container.weather_client.override(FakeWeatherClient(reading))
     app = asyncio.run(resolve_prepared(container))
     try:
@@ -82,15 +84,21 @@ def call_tool(server: Any, name: str, arguments: dict) -> Any:
 
 
 @pytest.fixture
-def reading() -> CurrentWeather:
-    """The reading the fake client returns for this test."""
-    return SNAPSHOT_READING
+def settings() -> DemoSettings:
+    """Offline settings for the showcase app."""
+    return offline_settings()
 
 
 @pytest.fixture
-def app(reading: CurrentWeather) -> Iterator[Any]:
+def reading(request: pytest.FixtureRequest) -> CurrentWeather:
+    """The fake client's reading; parametrize indirectly to pin one."""
+    return getattr(request, "param", SNAPSHOT_READING)
+
+
+@pytest.fixture
+def app(reading: CurrentWeather, settings: DemoSettings) -> Iterator[Any]:
     """The composition root prepared end to end; yields the ready service."""
-    with running_app(reading) as application:
+    with running_app(reading, settings) as application:
         yield application
 
 

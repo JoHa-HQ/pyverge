@@ -5,8 +5,8 @@ registered version converges to the anchor handler and returns the live shape.
 No internal wiring is assembled by the tests.
 
 A Hypothesis strategy draws arbitrary valid readings, so convergence is checked
-across the input space. The pinned reading is snapshotted for a readable record
-of the anchor shape.
+across the input space. The pinned reading is parametrized in, so the anchor
+shape is snapshotted for a readable record.
 """
 
 from __future__ import annotations
@@ -22,6 +22,7 @@ KIND = "search_weather"
 
 
 class TestToolConvergence:
+    @pytest.mark.parametrize("reading", [SNAPSHOT_READING], indirect=True)
     @pytest.mark.parametrize("version", ALL_VERSIONS, ids=ALL_VERSIONS)
     def test_call_at_any_version_returns_anchor_shape(
         self, server, version: str, snapshot: SnapshotAssertion
@@ -29,6 +30,7 @@ class TestToolConvergence:
         result = call_tool(server, KIND, {"city": "Berlin", "version": version})
         assert result.structured_content == snapshot
 
+    @pytest.mark.parametrize("reading", [SNAPSHOT_READING], indirect=True)
     def test_call_without_version_defaults_to_anchor(self, server) -> None:
         result = call_tool(server, KIND, {"city": "Berlin"})
         assert result.structured_content is not None
