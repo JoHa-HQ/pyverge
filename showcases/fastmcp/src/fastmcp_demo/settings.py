@@ -8,12 +8,8 @@ variables (e.g. ``FASTMCP_DEMO__TELEMETRY__OTLP_ENDPOINT``).
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 class TelemetrySettings(BaseSettings):
@@ -41,7 +37,6 @@ class GraphSettings(BaseSettings):
     kind: str = Field(default="search_weather")
     version_property: str = Field(default="version")
     kind_property: str = Field(default="kind")
-    migrations_dir: Path = Field(default=PROJECT_ROOT / "migrations")
     policy: str = Field(
         default="latest",
         description="Target policy recorded for the kind on the registry.",

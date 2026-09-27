@@ -2,8 +2,9 @@
 
 Defines the versioned kind the demo exposes and builds a fully registered
 ``Manager`` from it: the anchor model plus every migration edge (forward and
-reverse). The anchor schema is the source of truth in ``weather.json``; older
-versions are reconstructed from it. No FastMCP, no OpenTelemetry.
+reverse), authored as Python callables. The anchor schema is the source of
+truth in ``weather.json``; older versions are reconstructed from it. No FastMCP,
+no OpenTelemetry.
 """
 
 from __future__ import annotations
@@ -14,14 +15,11 @@ from pathlib import Path
 import semver
 
 from pyverge import Manager
-from pyverge.migration import (
-    JsonPatchMigration,
-    JsonSchemaModelAdapter,
-    MigrationSettings,
-)
+from pyverge.migration import JsonSchemaModelAdapter, MigrationSettings
 from pyverge.types import ManagerMigrationKey
 
 from ..settings import GraphSettings
+from . import migrations
 
 V1, V2, V3 = "1.0.0", "2.0.0", "3.0.0"
 ALL_VERSIONS = (V1, V2, V3)
@@ -29,6 +27,16 @@ ANCHOR_VERSION = V3
 
 #: The anchor schema document — the newest model's source of truth.
 ANCHOR_SCHEMA_PATH = Path(__file__).resolve().parent / "weather.json"
+
+#: Migration edges, newest first: forward edges so the engine reconstructs each
+#: older endpoint from the already-materialized newer one, then the reverse
+#: edges. Each is a plain ``(dict) -> dict`` callable.
+EDGES: tuple[tuple[str, str, migrations.Migration], ...] = (
+    (V2, V3, migrations.add_wind),
+    (V1, V2, migrations.add_humidity),
+    (V3, V2, migrations.drop_wind),
+    (V2, V1, migrations.drop_humidity),
+)
 
 
 def schema(kind: str, version: str, extra: dict) -> dict:
@@ -58,23 +66,6 @@ def anchor_schema() -> dict:
     return json.loads(ANCHOR_SCHEMA_PATH.read_text())
 
 
-def _spec_name(kind: str, source: str, target: str) -> str:
-    stem = lambda v: v.replace(".", "")  # noqa: E731
-    return f"{kind.replace('.', '_')}_{stem(source)}_{stem(target)}.json"
-
-
-def migration_files(graph: GraphSettings) -> list[Path]:
-    """Return the migration spec files present for the graph, newest edge first.
-
-    Edges are registered newest-first so the engine reconstructs each older
-    endpoint from the already-materialized newer one. Reverse edges (if
-    present) are registered last.
-    """
-    edges = [(V2, V3), (V1, V2), (V3, V2), (V2, V1)]
-    paths = [graph.migrations_dir / _spec_name(graph.kind, a, b) for a, b in edges]
-    return [path for path in paths if path.exists()]
-
-
 def build_manager(graph: GraphSettings) -> Manager[semver.Version]:
     """Return a ``Manager`` with the whole version graph registered.
 
@@ -93,10 +84,9 @@ def build_manager(graph: GraphSettings) -> Manager[semver.Version]:
     manager = ToolManager()  # ty: ignore[invalid-argument-type]
     manager.store_model(anchor_schema())  # ty: ignore[invalid-argument-type]
 
-    for path in migration_files(graph):
-        spec = json.loads(path.read_text())
+    for source, target, func in EDGES:
         manager.store_migration(
-            ManagerMigrationKey(graph.kind, spec["from"], spec["to"]),
-            JsonPatchMigration(spec).patch,
+            ManagerMigrationKey(graph.kind, source, target),
+            func,
         )
     return manager

@@ -1,5 +1,6 @@
 """Domain layer: the demo's version graph and weather service."""
 
+from . import migrations
 from .graph import ALL_VERSIONS, V1, V2, V3, build_manager, schema
 from .weather import CityNotFound, CurrentWeather, WeatherClient, WeatherService
 
@@ -18,5 +19,6 @@ __all__ = [
     "WeatherClient",
     "WeatherService",
     "build_manager",
+    "migrations",
     "schema",
 ]

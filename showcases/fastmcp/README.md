@@ -35,6 +35,7 @@ showcases/fastmcp/
 │   ├── container.py            # dependency-injector composition root
 │   ├── domain/
 │   │   ├── graph.py            # the version graph (no FastMCP, no OTEL)
+│   │   ├── migrations.py       # Python callable migration edges (fwd + rev)
 │   │   ├── weather.py          # WeatherClient (Open-Meteo) + WeatherService
 │   │   └── weather.json        # the anchor schema (source of truth)
 │   ├── application/service.py  # DemoService — the runnable use case
@@ -44,7 +45,6 @@ showcases/fastmcp/
 │   │   └── tracing.py          # OTLP tracer builder
 │   └── __main__.py             # CLI entry point
 ├── tests/                      # container, server, topology, snapshot, tracing
-├── migrations/                 # declarative JSON Patch specs (fwd + rev)
 ├── docker-compose.yml          # otel-collector + jaeger
 ├── otel-collector-config.yaml  # collector pipeline: OTLP in -> Jaeger out
 └── pyproject.toml              # the demo package
@@ -118,9 +118,11 @@ convergence paths and materializes virtual v1 and v2 tools. A call against any
 version converges to v3 before the handler runs.
 
 The version chain models the **Open-Meteo response schema growing over time**:
-v1 carried `temperature`, v2 added `humidity`, v3 added `wind`. A caller sending
-a v1-shaped payload has the missing fields filled by the forward migrations
-before the handler refreshes them from the live API.
+v1 carried `temperature`, v2 added `humidity`, v3 added `wind`. The edges are
+**plain Python callables** (`domain/migrations.py`): the engine parses each
+function's AST to reconstruct the older model, and runs it to migrate the
+payload. A caller sending a v1-shaped payload has the missing fields filled by
+the forward migrations before the handler refreshes them from the live API.
 
 Tracing is attached per forward edge with `manager.add_hook(...)`. One span per
 migration step flows over OTLP to the collector, which forwards traces to
@@ -144,6 +146,7 @@ The suite is the reference for testing a version graph:
 | `test_server.py` | reflection lifecycle; every version converges; injected tool param is hidden |
 | `test_topology.py` | the **time-travel round trip**, parametrized per version |
 | `test_schema_snapshot.py` | the **field surface** of every version, pinned by snapshot |
+| `test_migrations.py` | every callable edge is AST-discoverable (the reconstruction contract) |
 | `test_tracing.py` | one OTLP span per migration step, with the right attributes |
 | `test_live.py` | a real Open-Meteo call (opt-in, `--live`) |
 

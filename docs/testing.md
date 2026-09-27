@@ -103,6 +103,39 @@ def test_older_models_were_reconstructed(manager):
     assert "wind" not in v1.model.model_fields
 ```
 
+## Testing callable migrations
+
+A Python-callable migration is executed as-is, but the engine also reconstructs
+missing models by **parsing its source AST**. That parser only recognizes a
+narrow set of shapes:
+
+- ``return {**data, "field": value}`` → the field is an addition
+- ``data["field"] = value`` → addition
+- ``del data["field"]`` → removal
+
+A callable written in an unrecognized shape reconstructs the wrong schema
+silently. Keep the two concerns apart: assert **discoverability** on the
+callable, and assert **behaviour** through the topology walk.
+
+```python
+EDGE_EFFECTS = {
+    migrations.add_wind: ("wind", None),
+    migrations.drop_wind: (None, "wind"),
+}
+
+@pytest.mark.parametrize(("func", "effect"), list(EDGE_EFFECTS.items()), ids=...)
+def test_callable_is_ast_discoverable(func, effect):
+    added, removed = effect
+    diff = CallableDiffDiscovery().discover(func, source=meta, target=meta)
+    if added:
+        assert added in diff.added_fields
+    if removed:
+        assert removed in diff.removed_fields
+```
+
+Write removals as ``del data["field"]`` (not ``del some_copy["field"]``) so the
+parser sees them; additions as ``{**data, "field": value}``.
+
 ## Property-based payloads
 
 Generate valid payloads for the **latest** model with Hypothesis, then assert
