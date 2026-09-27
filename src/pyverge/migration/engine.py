@@ -210,21 +210,19 @@ class Engine(Generic[VersionValue]):
         """Remove a model version from the registry."""
         self.registry.remove_model(key)
 
-    def model_latest(
+    def get_latest_model(
         self: Self,
         kind: ModelKind,
     ) -> Versionable[VersionValue, ModelBase]:
         """Most recent version for *kind*."""
         return self.registry.latest(kind)
 
-    def find_model(
+    def get_earliest_model(
         self: Self,
-        key: Comparable[VersionValue] | ModelKind,
+        kind: ModelKind,
     ) -> Versionable[VersionValue, ModelBase]:
-        """Return the model matching *key*."""
-        if isinstance(key, str):
-            return self.registry.latest(key)
-        return self.get_model(key)
+        """Earliest version for *kind*."""
+        return self.registry.earliest(kind)
 
     def store_migration(
         self: Self,
