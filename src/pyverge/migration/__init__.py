@@ -44,7 +44,6 @@ from pyverge.reflection import (
 from .engine import Engine
 from .executor import LevelParallelExecutor, SequentialExecutor, StepExecutor
 from .graph import GraphBuilder, GraphEntry, MigrationGraph
-from .manager import ModelManager
 from .policy import (
     earliest_target_resolver,
     fixed_target_resolver,
@@ -87,7 +86,6 @@ __all__ = [
     "MigrationPathIntegrityError",
     "MigrationSettings",
     "ModelAlreadyRegisteredError",
-    "ModelManager",
     "ModelNotFoundError",
     "OTELHook",
     "Path",
@@ -103,7 +101,6 @@ __all__ = [
     "VersionNode",
     "VersionedModelError",
     "VersioningSettings",
-    "compile_target_spec",
     "earliest_target_resolver",
     "fixed_target_resolver",
     "get_at",

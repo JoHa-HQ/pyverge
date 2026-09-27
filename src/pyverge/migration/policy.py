@@ -6,9 +6,9 @@ payload entry should converge to. This module provides lightweight
 :class:`GraphBuilder` and the individual :class:`EntryMigration` strategies
 consume.
 
-Declarative spec compilation lives in :mod:`~pyverge.migration.manager`, the
-high-level facade that turns strings, model classes, and per-kind mappings into
-resolved resolvers before invoking the engine.
+Declarative spec compilation lives in :mod:`~pyverge.manager`, the high-level
+facade that turns strings, model classes, and per-kind mappings into resolved
+resolvers before invoking the engine.
 """
 
 from __future__ import annotations
