@@ -1,8 +1,8 @@
-# Manager Organization
+# Managers
 
 A `Manager` is a **bounded context** — one version graph, one registry, one
-adapter. This page explains the invariant that makes that true, why the engine
-cannot work across a split graph, and how to organize several managers safely.
+adapter. This page covers how to register models and migrations, and how the
+bounded-context invariant shapes how you organize one or several managers.
 
 ## The invariant
 
@@ -12,6 +12,105 @@ cannot work across a split graph, and how to organize several managers safely.
 The unit of ownership is not "a kind" — it is **the whole graph rooted at a
 source**. If a payload can reach a kind, that kind must live in the manager that
 handles the payload.
+
+## Registration
+
+### Decorator registration
+
+Register models and migrations with decorators at class definition time. Version
+and kind are read from the class itself.
+
+```python
+from typing import Literal
+
+import semver
+from pydantic import BaseModel
+
+from pyverge import Manager
+from pyverge.migration import (
+    MigrationSettings,
+    PydanticModelAdapter,
+)
+
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(),
+    PydanticModelAdapter(),
+)
+
+
+@UserManager.model()
+class UserV1(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["1.0.0"] = "1.0.0"
+    name: str
+    email: str
+
+
+@UserManager.model()
+class UserV2(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["2.0.0"] = "2.0.0"
+    name: str
+    email: str
+    age: int | None = None
+
+
+@UserManager.migration("User", "1.0.0", "2.0.0")
+def add_age(data: dict) -> dict:
+    return {**data, "age": None}
+```
+
+### Lazy registration
+
+Define model classes first and register them later, either at the class level
+or on a manager instance. This keeps schema definition separate from runtime
+wiring and makes testing easier.
+
+```python
+class UserV1(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["1.0.0"] = "1.0.0"
+    name: str
+    email: str
+
+
+class UserV2(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["2.0.0"] = "2.0.0"
+    name: str
+    email: str
+    age: int | None = None
+
+
+def add_age(data: dict) -> dict:
+    data["age"] = None
+    return data
+
+
+# Class-level registration (preferred) — no instance needed.
+UserManager.model()(UserV1)
+UserManager.model()(UserV2)
+UserManager.migration("User", "1.0.0", "2.0.0")(add_age)
+
+# Instance-level registration (alternative) — use a separate manager class.
+OtherManager = Manager[semver.Version].configure(
+    MigrationSettings(),
+    PydanticModelAdapter(),
+)
+manager = OtherManager()
+manager.store_model(UserV1)
+manager.store_model(UserV2)
+manager.store_migration((UserV1, UserV2), add_age)
+```
+
+Class-level and instance-level registration are alternatives — an instance shares
+its class's registry, so registering the same model through both would raise
+`ModelAlreadyRegisteredError`.
+
+### Which manager owns what
+
+A model belongs to the manager that owns its **whole version graph** — the kind
+and every kind it transitively contains. The rest of this page explains why.
 
 ## Why: three engine mechanics
 
@@ -68,27 +167,9 @@ B.migrate(user_payload)   # user converges; nested location silently dropped
 | Parent migrated but children stale | missing containment edge -> wrong order |
 | Fields vanish after migration | nested entry not in the target model -> dropped at finalize |
 
-## Multiple managers
-
-Several managers in one application are safe **only when their graphs are
-disjoint and never nested**. This is the Django-style setup: each manager owns a
-distinct set of kinds, and a router sends each payload to exactly one owner.
-
-```python
-# WeatherManager owns the weather graph; BillingManager owns the billing graph.
-# No kind appears in both, and no payload embeds a kind from the other.
-router = ToolManagerRouter([WeatherManager(), BillingManager()])
-```
-
-The rule of thumb:
-
-- **Disjoint + non-nested** graphs -> multiple managers are fine; route by kind.
-- **Any overlap or containment** -> merge into a single manager.
-
-A router never stitches a graph together: it picks *one* owner per payload, and
-that owner must already contain the whole graph.
 
 ## See also
 
-- [Registration](registration.md) — how models and migrations are registered.
+- [Getting Started](getting-started.md) — a minimal end-to-end example.
+- [Migrations](migration.md) — reconstruct missing models or migrations.
 - [Execution Flow](execution-flow.md) — discovery, ordering, and finalize.

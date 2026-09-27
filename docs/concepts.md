@@ -108,7 +108,7 @@ is at the adapter seam. You can swap adapters without changing the engine.
 **Bounded context per manager.** A `Manager` owns one complete version graph —
 one registry, one adapter. A kind and every kind it contains must be registered
 in the same manager, or the engine cannot discover, order, or finalize it. See
-[manager organization](managers.md).
+[managers](managers.md).
 
 **Model reflection.** A version chain can be represented as declarative patches
 against a single latest model — e.g. git-versioned JSON specs where only the
@@ -122,7 +122,7 @@ exclusive. See [migrations](migration.md).
 ## Next steps
 
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
-- [Manager organization](managers.md) — one complete version graph per manager.
+- [Managers](managers.md) — registration and one complete version graph per manager.
 - [Target policy](target-policy.md) — declarative convergence rules.
 - [Migrations](migration.md) — reconstruct missing models or migrations.
 - [Real-world scenarios](scenarios.md) — where this applies.
