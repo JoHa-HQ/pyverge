@@ -1,0 +1,13 @@
+{
+    "kind": "search_weather",
+    "version": "2.0.0",
+    "type": "object",
+    "properties": {
+        "kind": {"type": "string", "default": "search_weather"},
+        "version": {"type": "string", "default": "2.0.0"},
+        "city": {"type": "string"},
+        "units": {"type": "string", "default": "celsius"},
+        "humidity": {"type": "boolean", "default": false}
+    },
+    "required": ["city"]
+}
