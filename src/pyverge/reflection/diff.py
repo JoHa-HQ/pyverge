@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, Generic
 
 from pyverge.core.render import JsonPatchRender
-from pyverge.core.types import (
+from pyverge.types import (
     MigrationKey,
     Renderable,
     Versionable,

@@ -51,14 +51,15 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-TempSensorManager = ModelManager[semver.Version].scoped(
-    PydanticModelAdapter(),
-    settings=MigrationSettings(
+TempSensorManager = Manager[semver.Version].configure(
+    MigrationSettings(
         direction="forward",
         on_direction_violation="skip",
     ),
+    PydanticModelAdapter(),
 )
 
 
@@ -98,7 +99,7 @@ assert migrated["temperature_c"] == 22.5
 
 ### Abstractions used
 
-- **ModelManager** — converges each telemetry payload independently.
+- **Manager** — converges each telemetry payload independently.
 - **`target` policy** — per-kind targets let fleets use different schemas.
 - **`on_direction_violation="skip"`** — newer messages arriving at an older
   gateway are left as-is instead of failing.

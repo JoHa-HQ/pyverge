@@ -1,0 +1,116 @@
+"""Composition mixins for the :class:`~pyverge.manager.Manager` facade.
+
+Each mixin owns one slice of the manager surface and :class:`Manager` composes
+them in a fixed order.  The typing-only ``_ManagerState`` protocol extends the
+:mod:`pyverge.types` contracts with the cross-mixin collaborators, so a
+mixin can type ``self`` without importing the concrete facade.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Literal, Protocol
+
+from .engine import EngineLifecycleMixin
+from .migrate import MigrateMixin
+from .migrations import MigrationStoreMixin
+from .models import ModelStoreMixin
+from .targets import TargetResolutionMixin
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel
+
+    from pyverge.migration.engine import Engine
+    from pyverge.types import (
+        Diffable,
+        ManagerClassState,
+        ManagerInstanceState,
+        ManagerMigrationKey,
+        MigrationKeyInput,  # noqa: F401
+        ModelKind,
+        ModelPair,
+        TargetPolicy,
+        TargetResolver,
+        TargetSpec,
+        Versionable,
+        VersionValue,
+        VModel,
+    )
+
+    class ManagerState(
+        ManagerInstanceState[VersionValue],
+        ManagerClassState[VersionValue],
+        Protocol[VersionValue],
+    ):
+        """Typing-only view of the composed manager shared by the mixins."""
+
+        def get_model(
+            self,
+            key: tuple[ModelKind, VersionValue] | type[VModel],
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> Versionable[VersionValue, VModel]: ...
+
+        def get(
+            self,
+            kind: ModelKind,
+            version: str,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> Versionable[VersionValue, VModel]: ...
+
+        @classmethod
+        def compile_target_spec(
+            cls,
+            spec: TargetSpec,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> TargetResolver: ...
+
+        @classmethod
+        def diff(
+            cls,
+            key: ModelPair | ManagerMigrationKey,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> Diffable[VersionValue]: ...
+
+        @classmethod
+        def _resolve_kind_mapping(
+            cls,
+            mapping: dict[ModelKind | Literal["*"], TargetSpec],
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> TargetResolver: ...
+
+        @classmethod
+        def _resolve_target_policy(
+            cls,
+            target: TargetPolicy,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> TargetResolver: ...
+
+        @classmethod
+        def _model_resolver(
+            cls,
+            model_cls: type[BaseModel],
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> TargetResolver: ...
+
+        @classmethod
+        def _string_resolver(
+            cls,
+            value: str,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> TargetResolver: ...
+
+
+__all__ = [
+    "EngineLifecycleMixin",
+    "MigrateMixin",
+    "MigrationStoreMixin",
+    "ModelStoreMixin",
+    "TargetResolutionMixin",
+]

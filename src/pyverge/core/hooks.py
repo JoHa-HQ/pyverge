@@ -6,7 +6,7 @@ from typing import Any
 
 from opentelemetry.trace import Span, SpanKind, StatusCode, Tracer
 
-from .types import Comparable
+from ..types import Comparable
 
 
 class MigrationHook:

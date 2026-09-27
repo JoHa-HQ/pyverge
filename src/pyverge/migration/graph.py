@@ -19,7 +19,8 @@ from pydantic import BaseModel
 
 from pyverge.core.exceptions import MaxDepthExceededError, RegistryError
 from pyverge.core.settings import DiscoverySettings
-from pyverge.core.types import (
+from pyverge.core.versioning import SentinelEdge
+from pyverge.types import (
     Attachable,
     ModelBase,
     ModelKind,
@@ -29,7 +30,6 @@ from pyverge.core.types import (
     VModel_co,
     Walker,
 )
-from pyverge.core.versioning import SentinelEdge
 
 from .registry import Registry
 

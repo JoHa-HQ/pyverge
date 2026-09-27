@@ -23,7 +23,7 @@ demand, with per-kind target policies.
 
 ## Quick start (projected)
 
-Uses the high-level `ModelManager` facade with a thin adapter around the
+Uses the high-level `Manager` facade with a thin adapter around the
 `motor` driver. **Illustrative — the transport glue is not shipped.**
 
 ```python
@@ -32,11 +32,12 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-OrderManager = ModelManager[semver.Version].scoped(
+OrderManager = Manager[semver.Version].configure(
+    MigrationSettings(direction="forward", on_missing_path="raise"),
     PydanticModelAdapter(),
-    settings=MigrationSettings(direction="forward", on_missing_path="raise"),
 )
 
 
@@ -93,7 +94,7 @@ async def main():
 
 ## Abstractions used
 
-- **ModelManager** — high-level facade; `manager.migrate(doc, target=...)`
+- **Manager** — high-level facade; `manager.migrate(doc, target=...)`
   converges the document.
 - **DocumentStore** — thin adapter hiding the migration step from callers.
 - **Per-kind target** — `{"Order": "latest"}` pins convergence to the app's

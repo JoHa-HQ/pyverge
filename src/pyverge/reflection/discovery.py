@@ -20,7 +20,8 @@ import textwrap
 from typing import Any, Generic, Protocol, runtime_checkable
 
 from pyverge.adapters.json_patch import JsonPatch
-from pyverge.core.types import (
+from pyverge.reflection.diff import Diff
+from pyverge.types import (
     MigrationFunc,
     MigrationFunc_co,
     Versionable,
@@ -28,7 +29,6 @@ from pyverge.core.types import (
     VSource_co,
     VTarget_co,
 )
-from pyverge.reflection.diff import Diff
 
 
 @runtime_checkable

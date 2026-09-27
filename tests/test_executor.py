@@ -1,22 +1,19 @@
-"""Tests for Executor implementations."""
-
 from __future__ import annotations
 
+import functools
 from collections.abc import Callable
 
 import pytest
 import semver
-from pydantic import BaseModel
 
 from pyverge.core import (
-    DiscoverySettings,
     MigrationError,
     MigrationNotFoundError,
-    MigrationSettings,
+    RegistryError,
+    VersionNode,
     types,
 )
 from pyverge.migration import (
-    DefaultEntryMigration,
     Engine,
     JsonPatchMigration,
     LevelParallelExecutor,
@@ -24,95 +21,61 @@ from pyverge.migration import (
     Registry,
     SequentialExecutor,
     StepExecutor,
+    earliest_target_resolver,
+    fixed_target_resolver,
+    latest_target_resolver,
+    multi_target_resolver,
+    skip_target_resolver,
 )
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
     AddressV2,
+    AddressV3,
     ContactV1,
     ContactV2,
     PersonV1,
     PersonV2,
+    demote_address,
     migrate_address_100_200,
     migrate_contact_100_200,
+    preserve_children_person,
+    promote_address,
 )
-from tests.utils import (
-    default_graph_builder,
-    edge_from_models,
-    envelope_model,
-    make_engine,
-    register_models,
+from tests.utils import edge_from_models, envelope_model
+
+
+@pytest.mark.parametrize(
+    "executor",
+    [
+        pytest.param(SequentialExecutor(), id="sequential"),
+        pytest.param(LevelParallelExecutor(), id="level_parallel"),
+    ],
 )
-
-
-def _latest_resolver(
-    registry: Registry[types.VersionValue, BaseModel],
-) -> types.TargetResolver:
-    def resolve(current: types.Versionable) -> types.Versionable:
-        return registry.latest(current.kind)
-
-    return resolve
-
-
-def _preserve_children_person(data: dict) -> dict:
-    """PersonV1 -> PersonV2 migration that keeps already-migrated child data."""
-    data.setdefault("email", None)
-    data.setdefault("contacts", [])
-    return data
-
-
-def _make_engine(
-    model_adapter: PydanticModelAdapter,
-    registry: Registry[semver.Version, BaseModel],
-    discovery: DiscoverySettings,
-    executor: types.Executor | None = None,
-) -> Engine[semver.Version]:
-    register_models(
-        model_adapter, registry, discovery, PersonV1, PersonV2, AddressV1, AddressV2
-    )
-    register_models(model_adapter, registry, discovery, ContactV1, ContactV2)
-
-    eng = Engine(
-        registry,
-        MigrationSettings(),
-        executor or SequentialExecutor(),
-        default_graph_builder(registry, discovery, model_adapter),
-        model_adapter,
-        DefaultEntryMigration(),
-    )
-    eng.store_migration(
-        (
-            envelope_model(model_adapter, discovery, PersonV1),
-            envelope_model(model_adapter, discovery, PersonV2),
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV2, ContactV1, ContactV2],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV2), migrate_address_100_200),
+                    ((ContactV1, ContactV2), migrate_contact_100_200),
+                ],
+            ],
+            id="pydantic_nested",
         ),
-        _preserve_children_person,
-    )
-    eng.store_migration(
-        (
-            envelope_model(model_adapter, discovery, AddressV1),
-            envelope_model(model_adapter, discovery, AddressV2),
-        ),
-        migrate_address_100_200,
-    )
-    eng.store_migration(
-        (
-            envelope_model(model_adapter, discovery, ContactV1),
-            envelope_model(model_adapter, discovery, ContactV2),
-        ),
-        migrate_contact_100_200,
-    )
-    return eng
-
-
-@pytest.mark.parametrize("executor", [SequentialExecutor(), LevelParallelExecutor()])
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
-@pytest.mark.parametrize("discovery", [DiscoverySettings()])
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_executor_returns_new_payload(
-    model_adapter: PydanticModelAdapter,
+    engine: Engine[types.VersionValue],
     executor: types.Executor,
-    registry: Registry[semver.Version, BaseModel],
-    discovery: DiscoverySettings,
+    snapshot,
 ) -> None:
-    eng = _make_engine(model_adapter, registry, discovery, executor=executor)
     payload = {
         "document": {
             "kind": "Person",
@@ -130,7 +93,11 @@ def test_executor_returns_new_payload(
         }
     }
 
-    result = eng.migrate(payload, target=_latest_resolver(eng.registry))
+    result = engine.migrate(
+        payload,
+        target=latest_target_resolver(engine.registry),
+        executor=executor,
+    )
 
     # Original payload is untouched
     assert payload["document"]["version"] == "1.0.0"
@@ -138,25 +105,41 @@ def test_executor_returns_new_payload(
 
     # Migrated copy has latest versions and added defaults.
     # The parent Person migration preserves already-migrated contacts.
-    assert result["document"]["version"] == "2.0.0"
-    assert result["document"]["email"] is None
-    assert result["document"]["contacts"][0]["version"] == "2.0.0"
-    assert result["document"]["contacts"][0]["email"] is None
-    assert result["document"]["contacts"][0]["preferred"] == "phone"
-    assert result["document"]["address"]["version"] == "2.0.0"
-    assert result["document"]["address"]["country"] is None
+    assert result == snapshot
 
 
-@pytest.mark.parametrize("executor", [SequentialExecutor(), LevelParallelExecutor()])
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
-@pytest.mark.parametrize("discovery", [DiscoverySettings()])
+@pytest.mark.parametrize(
+    "executor",
+    [
+        pytest.param(SequentialExecutor(), id="sequential"),
+        pytest.param(LevelParallelExecutor(), id="level_parallel"),
+    ],
+)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV2, ContactV1, ContactV2],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV2), migrate_address_100_200),
+                    ((ContactV1, ContactV2), migrate_contact_100_200),
+                ],
+            ],
+            id="pydantic_nested",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_executor_noop_when_source_is_target(
-    model_adapter: PydanticModelAdapter,
+    engine: Engine[types.VersionValue],
     executor: types.Executor,
-    registry: Registry[semver.Version, BaseModel],
-    discovery: DiscoverySettings,
+    snapshot,
 ) -> None:
-    eng = _make_engine(model_adapter, registry, discovery, executor=executor)
     payload = {
         "document": {
             "kind": "Person",
@@ -181,94 +164,117 @@ def test_executor_noop_when_source_is_target(
         }
     }
 
-    result = eng.migrate(payload, target=_latest_resolver(eng.registry))
+    result = engine.migrate(
+        payload,
+        target=latest_target_resolver(engine.registry),
+        executor=executor,
+    )
 
-    assert result["document"]["version"] == "2.0.0"
-    assert result["document"]["address"]["version"] == "2.0.0"
-    assert result["document"]["contacts"][0]["version"] == "2.0.0"
+    assert result == snapshot
 
 
 class TestStepExecutor:
     """StepExecutor resolves and runs a single migration edge."""
 
-    @pytest.mark.parametrize("registry", [semver.Version], indirect=True)
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [PersonV1, PersonV2], []],
+                [PersonV1, PersonV2],
+                id="pydantic_person_v1_v2",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
     def test_execute_step_runs_registered_migration_and_updates_version(
         self,
-        model_adapter: PydanticModelAdapter,
-        discovery_settings: DiscoverySettings,
-        registry: Registry[semver.Version, BaseModel],
+        engine: Engine[types.VersionValue],
+        models: list[type[types.ModelBase]],
     ) -> None:
-        register_models(model_adapter, registry, discovery_settings, PersonV1, PersonV2)
-
         edge = edge_from_models(
-            model_adapter,
-            discovery_settings,
-            PersonV1,
-            PersonV2,
+            engine.adapter,
+            engine.settings,
+            *models,
             func=lambda d: {"version": "2.0.0", "name": d.get("name")},
         )
-        registry.store_migration(edge)
-        source = envelope_model(model_adapter, discovery_settings, PersonV1)
-        target = envelope_model(model_adapter, discovery_settings, PersonV2)
+        engine.registry.store_migration(edge)
 
-        step_executor = StepExecutor(registry)
+        source, target = [
+            envelope_model(engine.adapter, engine.settings, model) for model in models
+        ]
+
+        step_executor = StepExecutor(engine.registry)
         result = step_executor.execute_step(
             source, target, {"version": "1.0.0", "name": "Alice"}, (), "version"
         )
 
         assert result == {"version": "2.0.0", "name": "Alice"}
 
-    @pytest.mark.parametrize("registry", [semver.Version], indirect=True)
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [PersonV1, PersonV2], []],
+                [PersonV1, PersonV2],
+                id="pydantic_person_v1_v2",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
     def test_execute_step_raises_when_migration_missing(
         self,
-        model_adapter: PydanticModelAdapter,
-        discovery_settings: DiscoverySettings,
-        registry: Registry[semver.Version, BaseModel],
+        engine: Engine[types.VersionValue],
+        models: list[type[types.ModelBase]],
     ) -> None:
-        register_models(model_adapter, registry, discovery_settings, PersonV1, PersonV2)
-        source = envelope_model(model_adapter, discovery_settings, PersonV1)
-        target = envelope_model(model_adapter, discovery_settings, PersonV2)
+        source, target = [
+            envelope_model(engine.adapter, engine.settings, model) for model in models
+        ]
 
-        step_executor = StepExecutor(registry)
+        step_executor = StepExecutor(engine.registry)
         with pytest.raises(MigrationNotFoundError):
             step_executor.execute_step(
                 source, target, {"version": "1.0.0"}, (), "version"
             )
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
-@pytest.mark.parametrize("discovery", [DiscoverySettings()])
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "test", [PersonV1, PersonV2, AddressV1, AddressV2], []],
+            id="pydantic_person_address",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_sequential_executor_runs_in_topological_order(
-    model_adapter: PydanticModelAdapter,
-    registry: Registry[semver.Version, BaseModel],
-    discovery: DiscoverySettings,
+    engine: Engine[types.VersionValue],
 ) -> None:
-    register_models(
-        model_adapter, registry, discovery, PersonV1, PersonV2, AddressV1, AddressV2
-    )
-
     order: list[str] = []
 
     def _track_person(data: dict) -> dict:
         order.append("person")
-        return _preserve_children_person(data)
+        return preserve_children_person(data)
 
     def _track_address(data: dict) -> dict:
         order.append("address")
         return migrate_address_100_200(data)
 
-    eng = make_engine(registry, MigrationSettings())
-    eng.store_migration(
+    engine.store_migration(
         (
-            envelope_model(model_adapter, discovery, PersonV1),
-            envelope_model(model_adapter, discovery, PersonV2),
+            envelope_model(engine.adapter, engine.settings, PersonV1),
+            envelope_model(engine.adapter, engine.settings, PersonV2),
         ),
         _track_person,
     )
-    eng.store_migration(
+    engine.store_migration(
         (
-            envelope_model(model_adapter, discovery, AddressV1),
-            envelope_model(model_adapter, discovery, AddressV2),
+            envelope_model(engine.adapter, engine.settings, AddressV1),
+            envelope_model(engine.adapter, engine.settings, AddressV2),
         ),
         _track_address,
     )
@@ -287,43 +293,52 @@ def test_sequential_executor_runs_in_topological_order(
         }
     }
 
-    eng.migrate(payload, target=_latest_resolver(eng.registry))
+    engine.migrate(payload, target=latest_target_resolver(engine.registry))
 
     # Address is nested inside Person, so it must run before Person.
     assert order == ["address", "person"]
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
-@pytest.mark.parametrize("discovery", [DiscoverySettings()])
 @pytest.mark.parametrize(
     "func_factory",
     [
-        lambda: lambda data: (_ for _ in ()).throw(RuntimeError("boom")),
-        lambda: (
-            JsonPatchMigration(
-                {
-                    "from": "1.0.0",
-                    "to": "2.0.0",
-                    "ops": [{"op": "test", "path": "/type", "value": "X"}],
-                }
-            ).patch
+        pytest.param(
+            lambda: lambda data: (_ for _ in ()).throw(RuntimeError("boom")),
+            id="python-callable",
+        ),
+        pytest.param(
+            lambda: (
+                JsonPatchMigration(
+                    {
+                        "from": "1.0.0",
+                        "to": "2.0.0",
+                        "ops": [{"op": "test", "path": "/type", "value": "X"}],
+                    }
+                ).patch
+            ),
+            id="jsonpatch-spec",
         ),
     ],
-    ids=["python-callable", "jsonpatch-spec"],
+)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "test", [PersonV1, PersonV2], []],
+            id="pydantic_person_v1_v2",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
 )
 def test_executor_propagates_migration_error(
-    model_adapter: PydanticModelAdapter,
-    registry: Registry[semver.Version, BaseModel],
-    discovery: DiscoverySettings,
+    engine: Engine[types.VersionValue],
     func_factory: Callable,
 ) -> None:
-    register_models(model_adapter, registry, discovery, PersonV1, PersonV2)
-
-    eng = make_engine(registry, MigrationSettings())
-    eng.store_migration(
+    engine.store_migration(
         (
-            envelope_model(model_adapter, discovery, PersonV1),
-            envelope_model(model_adapter, discovery, PersonV2),
+            envelope_model(engine.adapter, engine.settings, PersonV1),
+            envelope_model(engine.adapter, engine.settings, PersonV2),
         ),
         func_factory(),
     )
@@ -337,23 +352,34 @@ def test_executor_propagates_migration_error(
     }
 
     with pytest.raises(MigrationError, match="Migration failed"):
-        eng.migrate(payload, target=_latest_resolver(eng.registry))
+        engine.migrate(payload, target=latest_target_resolver(engine.registry))
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
-@pytest.mark.parametrize("discovery", [DiscoverySettings()])
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV2, ContactV1, ContactV2],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV2), migrate_address_100_200),
+                    ((ContactV1, ContactV2), migrate_contact_100_200),
+                ],
+            ],
+            id="pydantic_nested",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_level_parallel_executor_single_entry_uses_no_pool(
-    model_adapter: PydanticModelAdapter,
-    registry: Registry[semver.Version, BaseModel],
-    discovery: DiscoverySettings,
+    engine: Engine[types.VersionValue],
+    snapshot,
 ) -> None:
     """A graph with one entry per level should not require thread workers."""
-    eng = _make_engine(
-        model_adapter,
-        registry,
-        discovery,
-        executor=LevelParallelExecutor(max_workers=2),
-    )
     payload = {
         "document": {
             "kind": "Person",
@@ -368,6 +394,255 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
         }
     }
 
-    result = eng.migrate(payload, target=_latest_resolver(eng.registry))
-    assert result["document"]["version"] == "2.0.0"
-    assert result["document"]["address"]["version"] == "2.0.0"
+    result = engine.migrate(
+        payload,
+        target=latest_target_resolver(engine.registry),
+        executor=LevelParallelExecutor(max_workers=2),
+    )
+    assert result == snapshot
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry, payload, resolver_factory, expected_error",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV3],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV3), promote_address),
+                    ((AddressV3, AddressV1), demote_address),
+                ],
+            ],
+            {
+                "document": {
+                    "kind": "Person",
+                    "version": "1.0.0",
+                    "name": "Alice",
+                    "address": {
+                        "kind": "Address",
+                        "version": "1.0.0",
+                        "street": "Main",
+                        "city": "Paris",
+                    },
+                }
+            },
+            latest_target_resolver,
+            None,
+            id="latest",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV3],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV3), promote_address),
+                    ((AddressV3, AddressV1), demote_address),
+                ],
+            ],
+            {
+                "document": {
+                    "kind": "Address",
+                    "version": "3.0.0",
+                    "street": "Main",
+                    "city": "Paris",
+                    "country": None,
+                    "postal_code": None,
+                    "region": "IDF",
+                }
+            },
+            earliest_target_resolver,
+            None,
+            id="earliest",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV3],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV3), promote_address),
+                    ((AddressV3, AddressV1), demote_address),
+                ],
+            ],
+            {
+                "document": {
+                    "kind": "Person",
+                    "version": "1.0.0",
+                    "name": "Alice",
+                    "address": {
+                        "kind": "Address",
+                        "version": "1.0.0",
+                        "street": "Main",
+                        "city": "Paris",
+                    },
+                }
+            },
+            skip_target_resolver,
+            None,
+            id="skip",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV3],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV3), promote_address),
+                    ((AddressV3, AddressV1), demote_address),
+                ],
+            ],
+            {
+                "document": {
+                    "kind": "Person",
+                    "version": "1.0.0",
+                    "name": "Alice",
+                    "address": {"version": "1.0.0", "street": "Main", "city": "Paris"},
+                }
+            },
+            functools.partial(
+                fixed_target_resolver,
+                target=VersionNode(
+                    _model=PersonV2,
+                    _value=semver.Version(2, 0, 0),
+                    _kind="Person",
+                ),
+            ),
+            None,
+            id="fixed",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV3],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV3), promote_address),
+                    ((AddressV3, AddressV1), demote_address),
+                ],
+            ],
+            {
+                "document": {
+                    "kind": "Person",
+                    "version": "1.0.0",
+                    "name": "Alice",
+                    "address": {
+                        "kind": "Address",
+                        "version": "3.0.0",
+                        "street": "Main",
+                        "city": "Paris",
+                        "country": None,
+                        "postal_code": None,
+                        "region": "IDF",
+                    },
+                }
+            },
+            lambda registry: multi_target_resolver(
+                {
+                    "Person": latest_target_resolver(registry),
+                    "*": earliest_target_resolver(registry),
+                }
+            ),
+            None,
+            id="multi_wildcard_fallback",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV3],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV3), promote_address),
+                    ((AddressV3, AddressV1), demote_address),
+                ],
+            ],
+            {
+                "document": {
+                    "kind": "Address",
+                    "version": "1.0.0",
+                    "street": "Main",
+                    "city": "Paris",
+                }
+            },
+            functools.partial(
+                fixed_target_resolver,
+                target=VersionNode(
+                    _model=PersonV2,
+                    _value=semver.Version(2, 0, 0),
+                    _kind="Person",
+                ),
+            ),
+            RegistryError,
+            id="fixed_wrong_kind_raises",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [PersonV1, PersonV2, AddressV1, AddressV3],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV3), promote_address),
+                    ((AddressV3, AddressV1), demote_address),
+                ],
+            ],
+            {
+                "document": {
+                    "kind": "Person",
+                    "version": "1.0.0",
+                    "name": "Alice",
+                    "address": {
+                        "kind": "Address",
+                        "version": "1.0.0",
+                        "street": "Main",
+                        "city": "Paris",
+                    },
+                }
+            },
+            functools.partial(
+                fixed_target_resolver,
+                target=VersionNode(
+                    _model=PersonV2,
+                    _value=semver.Version(9, 9, 9),
+                    _kind="Person",
+                ),
+            ),
+            RegistryError,
+            id="fixed_unregistered_target_raises",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_target_resolver_converges_end_to_end(
+    engine: Engine[types.VersionValue],
+    payload: dict,
+    resolver_factory: Callable[
+        [Registry[types.VersionValue, types.ModelBase]], types.TargetResolver
+    ],
+    expected_error: type[Exception] | None,
+    snapshot,
+) -> None:
+    """Every resolver policy drives ``engine.migrate`` to its target version."""
+    if expected_error is not None:
+        with pytest.raises(expected_error):
+            engine.migrate(payload, target=resolver_factory(engine.registry))
+        return
+
+    result = engine.migrate(payload, target=resolver_factory(engine.registry))
+
+    assert result == snapshot

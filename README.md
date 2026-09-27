@@ -30,16 +30,16 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
+from pyverge import Manager
 from pyverge.migration import (
     MigrationSettings,
-    ModelManager,
     PydanticModelAdapter,
 )
 
 # A manager binds a version strategy to an adapter and settings.
-UserManager = ModelManager[semver.Version].scoped(
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(),
     PydanticModelAdapter(),
-    settings=MigrationSettings(),
 )
 
 
@@ -137,7 +137,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 Items intentionally out of scope for this documentation pass, tracked here for
 follow-up:
 
-- **CLI/manager facade alignment** — `ModelManager` now exposes `get`,
+- **CLI/manager facade alignment** — `Manager` now exposes `get`,
   `get_latest`, and `list_versions`. The CLI still expects `validate_data`,
   `diff`, `list_models`, `dump_schemas`, and
   `migrate(data, schema, from_version, to_version)` before those commands
@@ -146,7 +146,7 @@ follow-up:
   and MessagePack
 - **Real-source integrations** — `showcases/` projects wiring for document
   storage (converge on read), Kafka consumers, RabbitMQ/streams workers, and
-  MQTT/IoT gateways on the high-level `ModelManager` API, with thin adapters
+  MQTT/IoT gateways on the high-level `Manager` API, with thin adapters
   around real drivers (`motor`, `confluent-kafka`, `aio-pika`, `paho-mqtt`).
   The transport glue is not shipped yet.
 - **API reference** — an auto-generated API reference page will be restored

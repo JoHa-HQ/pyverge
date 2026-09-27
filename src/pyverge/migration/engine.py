@@ -11,7 +11,9 @@ from pyverge.core.exceptions import (
     RegistryError,
 )
 from pyverge.core.settings import MigrationSettings
-from pyverge.core.types import (
+from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
+from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
+from pyverge.types import (
     Attachable,
     Comparable,
     DirectionViolationStrategy,
@@ -30,12 +32,10 @@ from pyverge.core.types import (
     VersionPair,
     VersionValue,
 )
-from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
-from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
 
 from .graph import GraphBuilder
 from .registry import Registry
-from .strategy import DefaultEntryMigration, EntryMigration
+from .strategy import DefaultMigrationEntry, EntryMigration
 
 
 class Engine(Generic[VersionValue]):
@@ -86,7 +86,7 @@ class Engine(Generic[VersionValue]):
         self.graph_builder = graph_builder
         self.default_executor = default_executor
         self.adapter = adapter
-        self.entry_migration = entry_migration or DefaultEntryMigration()
+        self.entry_migration = entry_migration or DefaultMigrationEntry()
         self.discovery: DiffDiscovery[VersionValue, JsonPatch | MigrationFunc] = (
             CompositeDiffDiscovery()
         )
@@ -210,21 +210,19 @@ class Engine(Generic[VersionValue]):
         """Remove a model version from the registry."""
         self.registry.remove_model(key)
 
-    def model_latest(
+    def get_latest_model(
         self: Self,
         kind: ModelKind,
     ) -> Versionable[VersionValue, ModelBase]:
         """Most recent version for *kind*."""
         return self.registry.latest(kind)
 
-    def find_model(
+    def get_earliest_model(
         self: Self,
-        key: Comparable[VersionValue] | ModelKind,
+        kind: ModelKind,
     ) -> Versionable[VersionValue, ModelBase]:
-        """Return the model matching *key*."""
-        if isinstance(key, str):
-            return self.registry.latest(key)
-        return self.get_model(key)
+        """Earliest version for *kind*."""
+        return self.registry.earliest(kind)
 
     def store_migration(
         self: Self,

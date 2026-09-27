@@ -12,7 +12,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generic, Protocol, runtime_checkable
 
 from pyverge.core.exceptions import MigrationError
-from pyverge.core.types import (
+from pyverge.types import (
     DirectionViolationStrategy,
     MigrationDirectionStrategy,
     ModelBase,
@@ -25,7 +25,7 @@ from pyverge.core.types import (
 from .graph import GraphEntry
 
 if TYPE_CHECKING:
-    from pyverge.core.types import ModelAdapter
+    from pyverge.types import ModelAdapter
 
 
 @runtime_checkable
@@ -122,7 +122,7 @@ class _DefaultMigrationTask:
         return data
 
 
-class DefaultEntryMigration(Generic[VersionValue]):
+class DefaultMigrationEntry(Generic[VersionValue]):
     """Default per-entry migration: direction check, step execution, finalize."""
 
     def migrate(

@@ -1,7 +1,7 @@
 # Showcases
 
 Real-world patterns for wiring the migration engine into data pipelines. The
-examples use the high-level `ModelManager` facade and, where a transport is
+examples use the high-level `Manager` facade and, where a transport is
 involved, wrap a real driver in a thin adapter.
 
 ## Data pipelines
@@ -27,7 +27,7 @@ involved, wrap a real driver in a thin adapter.
 
 | Concern | Where it lives |
 |---------|----------------|
-| Registration and convergence | high-level `ModelManager` facade |
+| Registration and convergence | high-level `Manager` facade |
 | Target selection | `manager.migrate(..., target=...)` policies |
 | Transport (polling, acks, publish, reconnects) | caller glue / driver adapter |
 | Offset/DLQ/replay decisions | caller glue |

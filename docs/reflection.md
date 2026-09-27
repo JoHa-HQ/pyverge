@@ -22,11 +22,12 @@ against, introspected, or served with a version-accurate schema.
 ## Enabling reflection
 
 ```python
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-UserManager = ModelManager[semver.Version].scoped(
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(on_missing_model="reconstruct"),
     PydanticModelAdapter(),
-    settings=MigrationSettings(on_missing_model="reconstruct"),
 )
 manager = UserManager()
 ```

@@ -23,7 +23,7 @@ target policies let different groups hold different schemas.
 
 ## Quick start (projected)
 
-Uses the high-level `ModelManager` facade with a thin adapter around the
+Uses the high-level `Manager` facade with a thin adapter around the
 `confluent-kafka` driver. **Illustrative — the transport glue is not shipped.**
 
 ```python
@@ -33,11 +33,12 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-OrderManager = ModelManager[semver.Version].scoped(
+OrderManager = Manager[semver.Version].configure(
+    MigrationSettings(direction="forward", on_missing_path="raise"),
     PydanticModelAdapter(),
-    settings=MigrationSettings(direction="forward", on_missing_path="raise"),
 )
 
 
@@ -103,7 +104,7 @@ for record in iter(consumer.poll, None):
 
 ## Abstractions used
 
-- **ModelManager** — shared, stateless facade; one instance converges every
+- **Manager** — shared, stateless facade; one instance converges every
   record.
 - **ConvergingConsumer** — thin adapter that polls, converges, and routes
   failures.

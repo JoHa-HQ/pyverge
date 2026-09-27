@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import Any, Generic
 
-from .types import Diffable, VersionValue
+from ..types import Diffable, VersionValue
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,0 +1,97 @@
+# serializer version: 1
+# name: TestDiffCommand.test_diff_renders_json_patch[json-schema-manager]
+  '''
+  [
+    {
+      "op": "add",
+      "path": "/age",
+      "value": null
+    }
+  ]
+  
+  '''
+# ---
+# name: TestDiffCommand.test_diff_renders_json_patch[pydantic-manager]
+  '''
+  [
+    {
+      "op": "add",
+      "path": "/age",
+      "value": null
+    },
+    {
+      "op": "replace",
+      "path": "/version",
+      "changes": {
+        "type_changed": {
+          "from": "typing.Literal['1.0.0']",
+          "to": "typing.Literal['2.0.0']"
+        },
+        "default_changed": {
+          "from": "1.0.0",
+          "to": "2.0.0"
+        }
+      },
+      "value": null
+    }
+  ]
+  
+  '''
+# ---
+# name: TestInfoCommand.test_info_lists_registered_models[json-schema-manager]
+  '''
+  Manager: e2e_pkg.container.json_schema:manager
+  
+  Registered Models:
+  
+    Model
+      • v1.0.0
+      • v2.0.0
+  
+  Total: 1 models
+  
+  '''
+# ---
+# name: TestInfoCommand.test_info_lists_registered_models[pydantic-manager]
+  '''
+  Manager: e2e_pkg.container.pydantic:manager
+  
+  Registered Models:
+  
+    UserV1
+      • v1.0.0
+    UserV2
+      • v2.0.0
+    UserV3
+      • v3.0.0
+  
+  Total: 3 models
+  
+  '''
+# ---
+# name: TestManagersCommand.test_lists_managers_in_module[json-schema-manager]
+  '''
+  Managers in
+  e2e_pkg.jso
+   n_schema  
+  ┌─────────┐
+  │ Name    │
+  ├─────────┤
+  │ manager │
+  └─────────┘
+  
+  '''
+# ---
+# name: TestManagersCommand.test_lists_managers_in_module[pydantic-manager]
+  '''
+  Managers in
+  e2e_pkg.pyd
+     antic   
+  ┌─────────┐
+  │ Name    │
+  ├─────────┤
+  │ manager │
+  └─────────┘
+  
+  '''
+# ---

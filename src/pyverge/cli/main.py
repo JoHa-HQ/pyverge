@@ -8,6 +8,8 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
+from pyverge.types import ManagerMigrationKey
+
 from ._helpers import (
     load_json_file,
 )
@@ -81,7 +83,7 @@ def managers(
         str, typer.Argument(..., help="Module path to inspect for managers")
     ],
 ) -> None:
-    """List ModelManagers defined in a module."""
+    """List Managers defined in a module."""
     try:
         names = list_managers_from_module(module)
 
@@ -154,7 +156,7 @@ def diff(
     """Show differences between schema versions."""
     try:
         mgr = resolve_manager(manager)
-        diff_result = mgr.diff(schema, from_version, to_version)
+        diff_result = mgr.diff(ManagerMigrationKey(schema, from_version, to_version))
 
         if format == "json":
             typer.echo(json.dumps(diff_result.render(), indent=2, default=str))

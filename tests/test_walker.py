@@ -11,21 +11,24 @@ import semver
 from pydantic import BaseModel
 
 from pyverge.core import (
-    DiscoverySettings,
     DiscoveryValidationError,
     MaxDepthExceededError,
-    MigrationSettings,
     types,
 )
 from pyverge.migration import (
     CompoundKeyWalker,
     Engine,
+    JsonSchemaModelAdapter,
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
     fixed_target_resolver,
     latest_target_resolver,
     skip_target_resolver,
+)
+from tests.examples.json import (
+    USER_V1_0_0,
+    USER_V2_0_0,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -42,14 +45,24 @@ from tests.examples.pydantic.semver import (
     migrate_v1_to_v2,
     migrate_v2_to_v3,
 )
-from tests.utils import envelope_model, make_engine, register_models
+from tests.utils import envelope_model
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (), ()),
+            id="pydantic_semver_empty_compound_key",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_compound_key_empty_payload_returns_no_entries(
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version, BaseModel],
+    model_adapter,
+    discovery_settings,
+    registry,
 ) -> None:
     walker = CompoundKeyWalker[semver.Version](
         registry, settings=discovery_settings, adapter=model_adapter
@@ -62,22 +75,33 @@ def test_compound_key_empty_payload_returns_no_entries(
     assert entries == []
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
 @pytest.mark.parametrize(
-    "walker_cls, container",
+    "model_adapter, registry, walker_cls, container",
     [
-        (CompoundKeyWalker, None),
-        (PydanticWalker, UserContainer),
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (UserV1, UserV2), ()),
+            CompoundKeyWalker,
+            None,
+            id="compound_key_semver",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (UserV1, UserV2), ()),
+            PydanticWalker,
+            UserContainer,
+            id="pydantic_container_semver",
+        ),
     ],
+    indirect=["model_adapter", "registry"],
 )
 def test_finds_registered_versioned_dict(
+    model_adapter,
+    discovery_settings,
+    registry,
     walker_cls: type[CompoundKeyWalker | PydanticWalker],
     container: type | None,
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version, BaseModel],
 ) -> None:
-    register_models(model_adapter, registry, discovery_settings, UserV1, UserV2)
     payload = {
         "document": {
             "kind": "User",
@@ -103,13 +127,22 @@ def test_finds_registered_versioned_dict(
     assert entries[0][2].model is UserV1
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (UserV1,), ()),
+            id="pydantic_semver_user_v1_unknown",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_compound_key_unknown_version_is_skipped(
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version, BaseModel],
+    model_adapter,
+    discovery_settings,
+    registry,
 ) -> None:
-    register_models(model_adapter, registry, discovery_settings, UserV1)
     payload = {
         "document": {
             "kind": "User",
@@ -126,13 +159,22 @@ def test_compound_key_unknown_version_is_skipped(
     assert entries == []
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (UserV1,), ()),
+            id="pydantic_semver_user_v1_max_depth",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_compound_key_max_depth_exceeded_for_nested_entry(
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version, BaseModel],
+    model_adapter,
+    discovery_settings,
+    registry,
 ) -> None:
-    register_models(model_adapter, registry, discovery_settings, UserV1)
     walker = CompoundKeyWalker(
         registry, settings=discovery_settings, adapter=model_adapter
     )
@@ -158,11 +200,21 @@ def test_compound_key_max_depth_exceeded_for_nested_entry(
         )
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (), ()),
+            id="pydantic_semver_empty_pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_pydantic_walker_requires_container(
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version, BaseModel],
+    model_adapter,
+    discovery_settings,
+    registry,
 ) -> None:
     walker = PydanticWalker(
         registry, settings=discovery_settings, adapter=model_adapter
@@ -171,22 +223,32 @@ def test_pydantic_walker_requires_container(
         list(walker.discover({}, target_resolver=skip_target_resolver(registry)))
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
 @pytest.mark.parametrize(
-    "settings",
+    "model_adapter, registry, discovery_settings",
     [
-        DiscoverySettings(validation_mode="strict"),
-        DiscoverySettings(validation_mode="lax"),
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (UserV1,), ()),
+            {"validation_mode": "strict"},
+            id="validation_strict",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (UserV1,), ()),
+            {"validation_mode": "lax"},
+            id="validation_lax",
+        ),
     ],
+    indirect=["model_adapter", "registry", "discovery_settings"],
 )
 def test_pydantic_walker_invalid_payload_raises(
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version, BaseModel],
-    settings: DiscoverySettings,
+    model_adapter,
+    discovery_settings,
+    registry,
 ) -> None:
-    register_models(model_adapter, registry, discovery_settings, UserV1)
-    walker = PydanticWalker(registry, settings=settings, adapter=model_adapter)
+    walker = PydanticWalker(
+        registry, settings=discovery_settings, adapter=model_adapter
+    )
     payload = {
         "document": {
             "kind": "User",
@@ -206,19 +268,26 @@ def test_pydantic_walker_invalid_payload_raises(
         )
 
 
-@pytest.mark.parametrize("registry", [semver.Version], indirect=True)
 @pytest.mark.parametrize(
-    "settings",
-    [DiscoverySettings(validation_mode="none")],
+    "model_adapter, registry, discovery_settings",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (semver.Version, "test", (UserV1,), ()),
+            {"validation_mode": "none"},
+            id="validation_none",
+        ),
+    ],
+    indirect=["model_adapter", "registry", "discovery_settings"],
 )
 def test_pydantic_walker_validation_mode_none_skips_model_validate(
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    registry: Registry[semver.Version, BaseModel],
-    settings: DiscoverySettings,
+    model_adapter,
+    discovery_settings,
+    registry,
 ) -> None:
-    register_models(model_adapter, registry, discovery_settings, UserV1)
-    walker = PydanticWalker(registry, settings=settings, adapter=model_adapter)
+    walker = PydanticWalker(
+        registry, settings=discovery_settings, adapter=model_adapter
+    )
     payload = {
         "document": {
             "kind": "User",
@@ -238,69 +307,42 @@ def test_pydantic_walker_validation_mode_none_skips_model_validate(
     assert len(entries) == 1
 
 
-def _build_engine(
-    registry: Registry[types.VersionValue, BaseModel],
-    adapter: PydanticModelAdapter,
-    settings: DiscoverySettings,
-    models: tuple[type[BaseModel], ...],
-    migrations: tuple[
-        tuple[type[BaseModel], type[BaseModel], types.MigrationFunc, bool], ...
-    ],
-) -> Engine[types.VersionValue]:
-    """Populate a registry, build an engine, and register migrations."""
-    for model in models:
-        registry.store_model(envelope_model(adapter, settings, model))
-
-    eng = make_engine(registry, MigrationSettings(), adapter)
-    for source_cls, target_cls, func, backward_compatible in migrations:
-        eng.store_migration(
+@pytest.mark.parametrize(
+    "model_adapter, registry, expected_version, expected_age",
+    [
+        pytest.param(
+            PydanticModelAdapter,
             (
-                envelope_model(adapter, settings, source_cls),
-                envelope_model(adapter, settings, target_cls),
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
             ),
-            func,
-            backward_compatible=backward_compatible,
-        )
-    return eng
-
-
-@pytest.fixture
-def semver_engine(
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    semver_registry: Registry[semver.Version, BaseModel],
-) -> Engine:
-    return _build_engine(
-        semver_registry,
-        model_adapter,
-        discovery_settings,
-        (UserV1, UserV2, UserV3),
-        (
-            (UserV1, UserV2, migrate_v1_to_v2, False),
-            (UserV2, UserV3, migrate_v2_to_v3, False),
-            # Backward migrations so direction="any" can converge downward.
-            (UserV2, UserV1, lambda d: d, True),
-            (UserV3, UserV2, lambda d: d, True),
+            "3.0.0",
+            0,
+            id="engine_migrate_latest",
         ),
-    )
-
-
-@pytest.fixture
-def chrono_engine(
-    model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
-    date_registry: Registry[pendulum.Date, BaseModel],
-) -> Engine:
-    return _build_engine(
-        date_registry,
-        model_adapter,
-        discovery_settings,
-        (UserV20250310, UserV20251231),
-        ((UserV20250310, UserV20251231, migrate_chrono_v1_to_v2, False),),
-    )
-
-
-def test_engine_migrates_to_latest(semver_engine: Engine) -> None:
+        pytest.param(
+            JsonSchemaModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (USER_V1_0_0, USER_V2_0_0),
+                (((USER_V1_0_0, USER_V2_0_0), lambda d: {**d, "version": "2.0.0"}),),
+            ),
+            "2.0.0",
+            None,
+            id="engine_migrate_latest_json_schema",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_engine_migrates_to_latest(
+    engine: Engine[types.VersionValue], expected_version: str, expected_age: int | None
+) -> None:
     payload = {
         "document": {
             "kind": "User",
@@ -310,14 +352,31 @@ def test_engine_migrates_to_latest(semver_engine: Engine) -> None:
             "role": "user",
         }
     }
-    result = semver_engine.migrate(
-        payload, target=latest_target_resolver(semver_engine.registry)
-    )
-    assert result["document"]["version"] == "3.0.0"
-    assert result["document"]["age"] == 0
+    result = engine.migrate(payload, target=latest_target_resolver(engine.registry))
+    assert result["document"]["version"] == expected_version
+    assert result["document"]["age"] == expected_age
 
 
-def test_engine_container_guided_migration(semver_engine: Engine) -> None:
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
+            id="engine_container_guided",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_engine_container_guided_migration(engine: Engine[types.VersionValue]) -> None:
     payload = {
         "document": {
             "kind": "User",
@@ -327,21 +386,40 @@ def test_engine_container_guided_migration(semver_engine: Engine) -> None:
             "role": "user",
         }
     }
-    result = semver_engine.migrate(
+    result = engine.migrate(
         payload,
-        target=latest_target_resolver(semver_engine.registry),
+        target=latest_target_resolver(engine.registry),
         container=UserContainer,
     )
     assert result["document"]["version"] == "3.0.0"
 
 
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
+            id="engine_explicit_target_v2",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_engine_explicit_target_versionable(
-    semver_engine: Engine,
+    engine: Engine[types.VersionValue],
     model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
+    discovery_settings,
 ) -> None:
     target_model = envelope_model(model_adapter, discovery_settings, UserV2)
-    target = fixed_target_resolver(semver_engine.registry, target_model)
+    target = fixed_target_resolver(engine.registry, target_model)
     payload = {
         "document": {
             "kind": "User",
@@ -351,33 +429,64 @@ def test_engine_explicit_target_versionable(
             "role": "user",
         }
     }
-    result = semver_engine.migrate(payload, target=target)
+    result = engine.migrate(payload, target=target)
     assert result["document"]["version"] == "2.0.0"
     assert result["document"]["age"] is None
 
 
 @pytest.mark.parametrize(
-    ("resolver_factory", "expected_version"),
+    "model_adapter, registry, resolver_factory, expected_version",
     [
         pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             latest_target_resolver,
             "3.0.0",
             id="latest",
         ),
         pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             skip_target_resolver,
             "1.0.0",
             id="skip",
         ),
         pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
             latest_target_resolver,
             "3.0.0",
             id="default-latest",
         ),
     ],
+    indirect=["model_adapter", "registry"],
 )
 def test_engine_target_policy(
-    semver_engine: Engine,
+    engine: Engine[types.VersionValue],
     resolver_factory: Callable[[Registry[semver.Version, BaseModel]], Any],
     expected_version: str,
 ) -> None:
@@ -390,12 +499,33 @@ def test_engine_target_policy(
             "role": "user",
         }
     }
-    resolver = resolver_factory(semver_engine.registry)
-    result = semver_engine.migrate(payload, target=resolver)
+    resolver = resolver_factory(engine.registry)  # ty: ignore[invalid-argument-type]
+    result = engine.migrate(payload, target=resolver)
     assert result["document"]["version"] == expected_version
 
 
-def test_engine_no_op_when_source_equals_target(semver_engine: Engine) -> None:
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
+            id="engine_noop_same_version",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_engine_no_op_when_source_equals_target(
+    engine: Engine[types.VersionValue],
+) -> None:
     payload = {
         "document": {
             "kind": "User",
@@ -407,16 +537,33 @@ def test_engine_no_op_when_source_equals_target(semver_engine: Engine) -> None:
             "status": "active",
         }
     }
-    result = semver_engine.migrate(
-        payload, target=latest_target_resolver(semver_engine.registry)
-    )
+    result = engine.migrate(payload, target=latest_target_resolver(engine.registry))
     assert result["document"]["version"] == "3.0.0"
 
 
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
+            id="engine_forward_skip",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_engine_forward_direction_policy_skip(
-    semver_engine: Engine,
+    engine: Engine[types.VersionValue],
     model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
+    discovery_settings,
 ) -> None:
     payload = {
         "document": {
@@ -430,10 +577,10 @@ def test_engine_forward_direction_policy_skip(
         }
     }
     target = fixed_target_resolver(
-        semver_engine.registry,
+        engine.registry,
         envelope_model(model_adapter, discovery_settings, UserV1),
     )
-    result = semver_engine.migrate(
+    result = engine.migrate(
         payload,
         target=target,
         direction="forward",
@@ -442,10 +589,31 @@ def test_engine_forward_direction_policy_skip(
     assert result["document"]["version"] == "3.0.0"
 
 
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                    ((UserV2, UserV1), lambda data: data, True),
+                    ((UserV3, UserV2), lambda data: data, True),
+                ),
+            ),
+            id="engine_any_direction_backward",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_engine_any_direction_policy(
-    semver_engine: Engine,
+    engine: Engine[types.VersionValue],
     model_adapter: PydanticModelAdapter,
-    discovery_settings: DiscoverySettings,
+    discovery_settings,
 ) -> None:
     payload = {
         "document": {
@@ -459,18 +627,34 @@ def test_engine_any_direction_policy(
         }
     }
     target = fixed_target_resolver(
-        semver_engine.registry,
+        engine.registry,
         envelope_model(model_adapter, discovery_settings, UserV1),
     )
-    result = semver_engine.migrate(
+    result = engine.migrate(
         payload,
         target=target,
     )
     assert result["document"]["version"] == "1.0.0"
 
 
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                pendulum.Date,
+                "test",
+                (UserV20250310, UserV20251231),
+                (((UserV20250310, UserV20251231), migrate_chrono_v1_to_v2),),
+            ),
+            id="pydantic_chrono_engine",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_chrono_engine_migrates_to_latest(
-    chrono_engine: Engine,
+    engine: Engine[types.VersionValue],
 ) -> None:
     payload = {
         "document": {
@@ -481,7 +665,5 @@ def test_chrono_engine_migrates_to_latest(
             "role": "user",
         }
     }
-    result = chrono_engine.migrate(
-        payload, target=latest_target_resolver(chrono_engine.registry)
-    )
+    result = engine.migrate(payload, target=latest_target_resolver(engine.registry))
     assert result["document"]["version"] == "2025-12-31"

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, Protocol
 
-from .types import (
+from ..types import (
     Attachable,
     Migratable,
     ModelData,

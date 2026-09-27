@@ -22,16 +22,16 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
+from pyverge import Manager
 from pyverge.migration import (
     MigrationSettings,
-    ModelManager,
     PydanticModelAdapter,
 )
 
 # A manager binds a version strategy to an adapter and settings.
-UserManager = ModelManager[semver.Version].scoped(
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(),
     PydanticModelAdapter(),
-    settings=MigrationSettings(),
 )
 
 
@@ -77,15 +77,15 @@ each schema into a Pydantic model at registration time, so the engine sees the
 same `ModelAdapter` contract:
 
 ```python
+from pyverge import Manager
 from pyverge.migration import (
     JsonSchemaModelAdapter,
     MigrationSettings,
-    ModelManager,
 )
 
-UserManager = ModelManager[semver.Version].scoped(
+UserManager = Manager[semver.Version].configure(
+    MigrationSettings(),
     JsonSchemaModelAdapter(),
-    settings=MigrationSettings(),
 )
 
 user_schema = {
@@ -134,11 +134,12 @@ Versions can also be ISO calendar dates instead of semver. Use
 import pendulum
 from typing import Literal
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-UserManager = ModelManager[pendulum.Date].scoped(
+UserManager = Manager[pendulum.Date].configure(
+    MigrationSettings(),
     PydanticModelAdapter(),
-    settings=MigrationSettings(),
 )
 
 

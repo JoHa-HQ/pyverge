@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .types import (
+from ..types import (
     ExtraFieldStrategy,
     MigrationDirectionStrategy,
     MissingFieldStrategy,

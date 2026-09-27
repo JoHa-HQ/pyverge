@@ -10,8 +10,7 @@ from dataclasses import dataclass
 from functools import total_ordering
 from typing import Generic, Self, cast
 
-from .exceptions import MigrationError
-from .types import (
+from ..types import (
     Comparable,
     Diffable,
     Migratable,
@@ -25,6 +24,7 @@ from .types import (
     VSource_co,
     VTarget_co,
 )
+from .exceptions import MigrationError
 
 
 @total_ordering

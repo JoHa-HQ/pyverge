@@ -49,6 +49,21 @@ def migrate_address_300_200(data: dict) -> dict:
     return data
 
 
+def promote_address(data: dict) -> dict:
+    """AddressV1 -> AddressV3: add the fields the newer version introduced."""
+    data.setdefault("country", None)
+    data.setdefault("postal_code", None)
+    data.setdefault("region", None)
+    return data
+
+
+def demote_address(data: dict) -> dict:
+    """AddressV3 -> AddressV1: drop fields the older version does not know."""
+    for field in ("country", "postal_code", "region"):
+        data.pop(field, None)
+    return data
+
+
 class ContactV1(ContactBaseModel):
     phone: str
     version: Literal["1.0.0"] = "1.0.0"
@@ -100,4 +115,18 @@ class PersonContainer(BaseModel):
 def migrate_person_100_200(data: dict) -> dict:
     data["email"] = None
     data["contacts"] = []
+    return data
+
+
+def preserve_children_person(data: dict) -> dict:
+    """PersonV1 -> PersonV2 migration that keeps already-migrated child data."""
+    data.setdefault("email", None)
+    data.setdefault("contacts", [])
+    return data
+
+
+def demote_person(data: dict) -> dict:
+    """PersonV2 -> PersonV1: drop fields the older version does not know."""
+    for field in ("email", "contacts"):
+        data.pop(field, None)
     return data

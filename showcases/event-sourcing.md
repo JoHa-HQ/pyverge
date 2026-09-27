@@ -50,15 +50,16 @@ from typing import Any, Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge.migration import MigrationSettings, ModelManager, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-OrderManager = ModelManager[semver.Version].scoped(
-    PydanticModelAdapter(),
-    settings=MigrationSettings(
+OrderManager = Manager[semver.Version].configure(
+    MigrationSettings(
         direction="forward",
         on_missing_path="raise",
         on_direction_violation="raise",
     ),
+    PydanticModelAdapter(),
 )
 
 
@@ -119,7 +120,7 @@ assert migrated["items"] == []
 
 ### Abstractions used
 
-- **ModelManager** — high-level facade; registers models and migrations with
+- **Manager** — high-level facade; registers models and migrations with
   decorators, and converges events with `migrate(event, target=...)`.
 - **`@OrderManager.model()` / `@OrderManager.migration(...)`** — declarative
   registration at class level.

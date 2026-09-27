@@ -1,7 +1,7 @@
 """Tests for Registry: model and migration registration.
 
-Each behavior is covered once (semver strategy); date-strategy variants are
-dropped because they exercise the same code paths.
+Most behaviors are exercised for both the semver (pydantic) and chrono/JSON
+(``JsonSchemaModelAdapter`` + ``pendulum.Date``) strategies.
 """
 
 import pendulum
@@ -9,6 +9,7 @@ import pytest
 import semver
 from pydantic import BaseModel
 
+from pyverge.adapters import JsonSchemaModelAdapter
 from pyverge.core import (
     MigrationAlreadyRegisteredError,
     MigrationHook,
@@ -25,6 +26,14 @@ from pyverge.migration import (
     PydanticModelAdapter,
     Registry,
 )
+from tests.examples.json import (
+    USER_V0_1_1_DEV_7,
+    USER_V1_0_0,
+    USER_V1_2_3,
+    USER_V2025_01_01,
+    USER_V2025_03_10,
+    USER_V2025_12_31,
+)
 from tests.examples.pydantic.semver import (
     UserV011Dev7,
     UserV1,
@@ -37,35 +46,64 @@ from tests.utils import edge_from_models, envelope_model, meta_versionable
 
 class TestModel:
     @pytest.mark.parametrize(
-        "registry,model",
+        "model_adapter, registry, model",
         [
-            [
-                Registry[semver.Version, BaseModel](name="semver_test"),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV200Beta1], []],
                 UserV200Beta1,
-            ],
+                id="semver_user_latest",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "date_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                USER_V2025_01_01,
+                id="json_schema_unsorted_models",
+            ),
         ],
-        ids=["semver_user_latest"],
+        indirect=["model_adapter", "registry"],
     )
     def test_get_model(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel_co],
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, model)
-        registry.store_model(version)
-        assert registry.get_model(version).model is model
+        assert registry.get_model(version).model is version.model
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV3, UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV3, UserV1, UserV2], []],
+                [UserV3, UserV1, UserV2],
+                id="semver_unsorted_models",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [USER_V1_0_0, USER_V0_1_1_DEV_7, USER_V1_2_3],
+                    [],
+                ],
+                [USER_V1_0_0, USER_V0_1_1_DEV_7, USER_V1_2_3],
+                id="json_schema_unsorted_models",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_versions_sorted(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel_co]],
@@ -73,42 +111,58 @@ class TestModel:
         versions = [
             envelope_model(model_adapter, versioning_settings, cls) for cls in models
         ]
-        for version in versions:
-            registry.store_model(version)
-
         assert registry.versions == sorted(versions)
 
     @pytest.mark.parametrize(
-        "registry, models, latest",
+        "model_adapter, registry, latest",
         [
-            (
-                Registry[semver.Version, BaseModel](),
-                [UserV3, UserV1, UserV200Beta1],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV3, UserV1, UserV200Beta1], []],
                 UserV3,
+                id="semver_latest_v3",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [USER_V1_2_3, USER_V0_1_1_DEV_7, USER_V1_0_0],
+                    [],
+                ],
+                USER_V1_2_3,
+                id="semver_latest_v1",
             ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_latest(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel_co]],
         latest: type[types.VModel_co],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, cls) for cls in models
-        ]
-        for version in versions:
-            registry.store_model(version)
-
-        assert registry.latest(versions[0].version[0]).model == latest
+        version = envelope_model(model_adapter, versioning_settings, latest)
+        assert registry.latest(version.version[0]).model == version.model
 
     @pytest.mark.parametrize(
-        "registry, key",
+        "model_adapter, registry, key",
         [
-            (Registry[semver.Version, BaseModel](), ("User", "3.0.0")),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [], []],
+                ("User", "3.0.0"),
+                id="semver_user_3_0_0",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [], []],
+                ("User", "2025-03-10"),
+                id="json_chrono_get_nonexistent_model",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_get_nonexistent_model_raises(
         self,
@@ -119,151 +173,259 @@ class TestModel:
             registry.get_model(VersionNode(_model=None, _value=key[1], _kind=key[0]))
 
     @pytest.mark.parametrize(
-        "registry, registered, target",
+        "model_adapter, registry, target",
         [
-            (Registry[semver.Version, BaseModel](), UserV1, UserV3),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
+                UserV3,
+                id="semver_registered_v1_target_v3",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
+                USER_V2025_12_31,
+                id="json_chrono_registered_2025_03_10_target_2025_12_31",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_get_nonexistent_model_by_class_raises(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
-        registered: type[types.VModel],
         target: type[types.VModel],
     ) -> None:
-        registry.store_model(
-            envelope_model(model_adapter, versioning_settings, registered)
-        )
         with pytest.raises(ModelNotFoundError):
             registry.get_model(
                 envelope_model(model_adapter, versioning_settings, target)
             )
 
     @pytest.mark.parametrize(
-        "registry, model, predicate",
+        "model_adapter, registry, predicate",
         [
-            (
-                Registry[semver.Version, BaseModel](),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
                 UserV1,
-                UserV1,
+                id="semver_model_class",
             ),
-            (
-                Registry[semver.Version, BaseModel](),
-                UserV011Dev7,
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV011Dev7], []],
                 VersionNode(
                     _model=None,
                     _value=semver.Version.parse("0.1.1+dev.7"),
                     _kind="User",
                 ),
+                id="semver_version_node_dev",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
+                VersionNode(
+                    _model=None,
+                    _value=pendulum.Date(2025, 3, 10),
+                    _kind="User",
+                ),
+                id="json_chrono_version_node",
             ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_model_contains(
         self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
         predicate: types.LookupKey,
     ) -> None:
-        registry.store_model(envelope_model(model_adapter, versioning_settings, model))
         assert predicate in registry
 
     @pytest.mark.parametrize(
-        "registry, model, predicate",
+        "model_adapter, registry, model",
         [
-            (Registry[semver.Version, BaseModel](), UserV1, UserV3),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
+                UserV3,
+                id="semver_model_v1_predicate_v3",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_model_class_not_in_registry(
         self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
-        predicate: type[types.VModel],
     ) -> None:
-        registry.store_model(envelope_model(model_adapter, versioning_settings, model))
         with pytest.raises(ModelNotFoundError):
-            registry.get_model_by_class(predicate)
+            registry.get_model_by_class(model)
 
-    def test_latest_model_empty_raises(self) -> None:
-        registry = Registry[pendulum.Date, BaseModel]()
+    @pytest.mark.parametrize(
+        "model_adapter, registry",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [], []],
+                id="semver_empty_registry",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [], []],
+                id="json_chrono_empty_registry",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_latest_model_empty_raises(
+        self,
+        registry: Registry[types.VersionValue, BaseModel],
+    ) -> None:
         with pytest.raises(RegistryError):
             registry.latest("User")
 
     @pytest.mark.parametrize(
-        "registry, model",
+        "model_adapter, registry, model",
         [
-            (Registry[semver.Version, BaseModel](), UserV200Beta1),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV200Beta1], []],
+                UserV200Beta1,
+                id="semver_user_v200beta1",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
+                USER_V2025_03_10,
+                id="json_chrono_store_duplicate",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_store_duplicate_raises(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
-        registry.store_model(envelope_model(model_adapter, versioning_settings, model))
         with pytest.raises(ModelAlreadyRegisteredError, match="already registered"):
             registry.store_model(
                 envelope_model(model_adapter, versioning_settings, model)
             )
 
     @pytest.mark.parametrize(
-        "registry, model",
+        "model_adapter, registry, model",
         [
-            (Registry[semver.Version, BaseModel](), UserV1),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
+                UserV1,
+                id="semver_user_v1",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
+                USER_V2025_03_10,
+                id="json_chrono_remove_model",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_model(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, model)
-        registry.store_model(version)
         assert version in registry
         registry.remove_model(version)
         with pytest.raises(ModelNotFoundError):
             registry.get_model(version)
 
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [], []],
+                UserV1,
+                id="semver_user_v1_missing",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [], []],
+                USER_V2025_03_10,
+                id="json_chrono_user_2025_03_10_missing",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
     def test_remove_nonexistent_raises(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        model: type[types.VModel],
     ) -> None:
-        registry = Registry[semver.Version, BaseModel]()
         with pytest.raises(RegistryError, match="is not registered"):
             registry.remove_model(
-                envelope_model(model_adapter, versioning_settings, UserV1)
+                envelope_model(model_adapter, versioning_settings, model)
             )
 
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
+                UserV1,
+                id="semver_user_v1",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
+                USER_V2025_03_10,
+                id="json_chrono_model_cleanup",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
     def test_registry_model_cleanup(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        model: type[types.VModel],
     ) -> None:
-        version = envelope_model(model_adapter, versioning_settings, UserV1)
-        registry = Registry[semver.Version, BaseModel]()
-        registry.store_model(version)
+        version = envelope_model(model_adapter, versioning_settings, model)
         registry.clear_models()
         with pytest.raises(ModelNotFoundError):
             registry.get_model(version)
 
     @pytest.mark.parametrize(
-        "registry, version",
+        "model_adapter, registry, version",
         [
-            [Registry[semver.Version, BaseModel](), "0.1.0"],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [], []],
+                "0.1.0",
+                id="semver_meta_0_1_0",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [], []],
+                "2025-03-10",
+                id="json_chrono_meta_2025_03_10",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_meta_version_registers(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         registry: Registry[types.VersionValue, BaseModel],
         version: str,
     ) -> None:
@@ -275,76 +437,92 @@ class TestModel:
         assert registry.models("User") == frozenset()
 
     @pytest.mark.parametrize(
-        "registry, meta_versions, real_models, expected",
+        "model_adapter, registry, meta_versions, expected",
         [
-            (
-                Registry[semver.Version, BaseModel](),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
                 ["0.1.0", "0.2.0"],
-                [UserV1],
                 ["0.1.0", "0.2.0", "1.0.0"],
+                id="semver_meta_and_real",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
+                ["2025-01-01", "2025-12-31"],
+                ["2025-01-01", "2025-03-10", "2025-12-31"],
+                id="json_chrono_meta_and_real",
             ),
         ],
+        indirect=["model_adapter", "registry"],
     )
-    def test_meta_and_real_versions_order_together(  # noqa: PLR0913
+    def test_meta_and_real_versions_order_together(
         self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
+        model_adapter: types.ModelAdapter,
         registry: Registry[types.VersionValue, BaseModel],
         meta_versions: list[str],
-        real_models: list[type[types.VModel_co]],
         expected: list[str],
     ) -> None:
         """Meta and real versions order together by version value within a kind."""
         for v in meta_versions:
             registry.store_model(meta_versionable(model_adapter, "User", v))
-        for cls in real_models:
-            registry.store_model(
-                envelope_model(model_adapter, versioning_settings, cls)
-            )
 
         versions = [str(v.version[1]) for v in registry.kind_versions("User")]
         assert versions == expected
 
     @pytest.mark.parametrize(
-        "registry, model",
+        "model_adapter, registry, model",
         [
-            [Registry[semver.Version, BaseModel](), UserV1],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
+                UserV1,
+                id="semver_user_v1",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_copy_preserves_model_class_lookup(
         self,
-        model_adapter: PydanticModelAdapter,
-        versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
         """A copied registry keeps class-based lookups."""
-        registry.store_model(envelope_model(model_adapter, versioning_settings, model))
         clone = registry.copy()
         assert clone.get_model_by_class(model).model is model
 
 
 class TestMigration:
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="semver_user_v1_v2",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_user_2025_01_01_2025_03_10",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_store_and_get(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, model)
-            for model in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         def _migrate(data: dict) -> dict:
             return data
 
@@ -358,25 +536,30 @@ class TestMigration:
         )
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [
-                Registry[semver.Version, BaseModel](),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
                 [UserV1, UserV2],
-            ],
+                id="semver_user_v1_v2_missing_version",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [USER_V2025_01_01], []],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_user_2025_01_01_2025_03_10_missing_version",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_register_migration_with_missing_version(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
-    ):
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        registry.store_model(versions[0])
+    ) -> None:
         with pytest.raises(MigrationNotFoundError):
             edge = edge_from_models(
                 model_adapter,
@@ -388,79 +571,124 @@ class TestMigration:
             registry.store_migration(edge)
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_user_v1_v2_duplicate",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_user_2025_01_01_2025_03_10_duplicate",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_register_migration_dups(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
-    ):
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
+    ) -> None:
         def _migrate(data: dict) -> dict:
             return data
 
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=_migrate
         )
-        registry.store_migration(edge)
         with pytest.raises(MigrationAlreadyRegisteredError):
             registry.store_migration(edge)
 
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="semver_user_v1_v2_nonexistent",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_user_2025_01_01_2025_03_10_nonexistent",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
     def test_get_nonexistent_raises(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        models: list[type[types.VModel]],
     ) -> None:
-        registry = Registry[semver.Version, BaseModel]()
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m)
-            for m in [UserV1, UserV2, UserV3]
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         with pytest.raises(MigrationNotFoundError):
             fake_key = edge_from_models(
                 model_adapter,
                 versioning_settings,
-                UserV1,
-                UserV2,
+                models[0],
+                models[1],
                 func=lambda data: data,
             )
             registry.get_migration(SentinelEdge.from_version_edge(fake_key))
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [
-                Registry[semver.Version, BaseModel](),
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
                 [UserV1, UserV2],
-            ],
+                id="semver_user_v1_v2",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_user_2025_01_01_2025_03_10",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_migration(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         key = edge_from_models(
             model_adapter,
             versioning_settings,
@@ -468,7 +696,6 @@ class TestMigration:
             models[1],
             func=lambda data: data,
         )
-        registry.store_migration(key)
         registry.remove_migration(SentinelEdge.from_version_edge(key))
 
         with pytest.raises(MigrationNotFoundError):
@@ -477,84 +704,129 @@ class TestMigration:
 
 class TestHooks:
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_user_v1_v2",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_user_2025_01_01_2025_03_10",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_add_and_get_hook(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
         hook = MigrationHook()
-        registry.store_migration(edge)
         registry.add_hook(key, hook)
         assert registry.get_hooks(key) == [hook]
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_no_hooks",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_no_hooks",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_get_hooks_returns_empty_when_none_registered(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
-        registry.store_migration(edge)
         assert registry.get_hooks(edge) == []
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_remove_one_hook",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_remove_one_hook",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_single_hook(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         hook1 = MigrationHook()
         hook2 = MigrationHook()
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
-        registry.store_migration(edge)
         for h in [hook1, hook2]:
             registry.add_hook(edge, h)
         registry.remove_hook(key, hook1)
@@ -562,85 +834,132 @@ class TestHooks:
         assert registry.get_hooks(key) == [hook2]
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_remove_all_hooks",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_remove_all_hooks",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_all_hooks_for_key(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
-        registry.store_migration(edge)
         registry.add_hook(edge, MigrationHook())
         registry.add_hook(edge, MigrationHook())
         registry.remove_hook(edge)  # hook is None → remove all
         assert registry.get_hooks(edge) == []
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_missing_hook",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_missing_hook",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_nonexistent_hook_raises(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
-        registry.store_migration(edge)
         with pytest.raises(RegistryError):
             registry.remove_hook(key, MigrationHook())
 
     @pytest.mark.parametrize(
-        "registry, models, expected_amount",
+        "model_adapter, registry, models, expected_amount",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2], 2],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                2,
+                id="semver_two_hooks",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                2,
+                id="json_chrono_two_hooks",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_clear_all_hooks(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
         expected_amount: int,
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
-        registry.store_migration(edge)
         registry.add_hook(edge, MigrationHook())
         registry.add_hook(edge, MigrationHook())
         assert len(registry.get_hooks(key)) == expected_amount
@@ -648,29 +967,44 @@ class TestHooks:
         assert registry.get_hooks(key) == []
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_clear_key_hooks",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_clear_key_hooks",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_clear_hooks_for_key(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
-        registry.store_migration(edge)
         registry.add_hook(key, MigrationHook())
         registry.clear_hooks(key)
         assert registry.get_hooks(key) == []
@@ -680,14 +1014,31 @@ class TestVersionEdgeIndex:
     """Inverted index: version -> set of migration edges touching it."""
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="semver_empty_index",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_empty_index",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_migrations_of_empty(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -695,20 +1046,42 @@ class TestVersionEdgeIndex:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         assert registry.migrations_of(versions[0]) == frozenset()
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2, UserV3],
+                    [((UserV1, UserV2), lambda d: d), ((UserV2, UserV3), lambda d: d)],
+                ],
+                [UserV1, UserV2, UserV3],
+                id="semver_chain_v1_v2_v3",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
+                    [
+                        ((USER_V2025_01_01, USER_V2025_03_10), lambda d: d),
+                        ((USER_V2025_03_10, USER_V2025_12_31), lambda d: d),
+                    ],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
+                id="json_chrono_chain",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_migrations_of_source_and_target(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -716,34 +1089,48 @@ class TestVersionEdgeIndex:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         e1 = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         e2 = edge_from_models(
             model_adapter, versioning_settings, models[1], models[2], func=lambda d: d
         )
-        registry.store_migration(e1)
-        registry.store_migration(e2)
 
         assert registry.migrations_of(versions[0]) == {e1}
-        assert registry.migrations_of(versions[1]) == {
-            e1,
-            e2,
-        }
+        assert registry.migrations_of(versions[1]) == {e1, e2}
         assert registry.migrations_of(versions[2]) == {e2}
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_node_key",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_node_key",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_migrations_of_accepts_node_key(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -752,27 +1139,45 @@ class TestVersionEdgeIndex:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
-        edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
-        )
-        registry.store_migration(edge)
 
         assert registry.migrations_of(versions[0]) == registry.migrations_of(
             versions[0]
         )
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2, UserV3],
+                    [((UserV1, UserV2), lambda d: d), ((UserV2, UserV3), lambda d: d)],
+                ],
+                [UserV1, UserV2, UserV3],
+                id="semver_remove_updates_index",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
+                    [
+                        ((USER_V2025_01_01, USER_V2025_03_10), lambda d: d),
+                        ((USER_V2025_03_10, USER_V2025_12_31), lambda d: d),
+                    ],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
+                id="json_chrono_remove_updates_index",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_index_updated_on_remove_migration(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -780,17 +1185,12 @@ class TestVersionEdgeIndex:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         e1 = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         e2 = edge_from_models(
             model_adapter, versioning_settings, models[1], models[2], func=lambda d: d
         )
-        registry.store_migration(e1)
-        registry.store_migration(e2)
 
         registry.remove_migration(SentinelEdge.from_version_edge(e1))
 
@@ -798,14 +1198,36 @@ class TestVersionEdgeIndex:
         assert registry.migrations_of(versions[1]) == {e2}
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_clear_index",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_clear_index",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_index_cleared_on_clear_migrations(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -813,26 +1235,42 @@ class TestVersionEdgeIndex:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
 
-        edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
-        )
-        registry.store_migration(edge)
         registry.clear_migrations()
 
         assert registry.migrations_of(versions[0]) == (frozenset())
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_copy_index",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_copy_index",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_copy_preserves_index_independently(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -840,13 +1278,9 @@ class TestVersionEdgeIndex:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
-        registry.store_migration(edge)
 
         clone = registry.copy()
         key = versions[0]
@@ -857,14 +1291,36 @@ class TestVersionEdgeIndex:
         assert registry.migrations_of(key) == {edge}
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_referenced_model",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_referenced_model",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_model_raises_when_referenced(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -872,27 +1328,42 @@ class TestVersionEdgeIndex:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
-        edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
-        )
-        registry.store_migration(edge)
 
         with pytest.raises(RegistryError, match="referenced by migrations") as exc:
             registry.remove_model(versions[0])
         assert "→" in str(exc.value)
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_remove_after_migration",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_remove_after_migration",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_model_allowed_after_migration_removed(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -900,13 +1371,9 @@ class TestVersionEdgeIndex:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
-        registry.store_migration(edge)
         registry.remove_migration(SentinelEdge.from_version_edge(edge))
 
         registry.remove_model(versions[0])
@@ -918,14 +1385,31 @@ class TestEdgePairLookup:
     """Direct (from, to) pair index for point lookups on edges."""
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV3, UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV3, UserV1, UserV2], []],
+                [UserV3, UserV1, UserV2],
+                id="semver_kind_versions",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_12_31, USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_12_31, USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_kind_versions",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_kind_versions_sorted(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -933,24 +1417,61 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         assert registry.kind_versions(versions[0].kind) == sorted(versions)
 
-    def test_kind_versions_unknown_returns_empty(self) -> None:
-        registry = Registry[semver.Version, BaseModel]()
+    @pytest.mark.parametrize(
+        "model_adapter, registry",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [], []],
+                id="semver_unknown_kind",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "json_chrono_test", [], []],
+                id="json_chrono_unknown_kind",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_kind_versions_unknown_returns_empty(
+        self,
+        registry: Registry[types.VersionValue, BaseModel],
+    ) -> None:
         assert registry.kind_versions("Nope") == []
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2, UserV3]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2, UserV3],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2, UserV3],
+                id="semver_pair_lookup",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
+                id="json_chrono_pair_lookup",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_has_migration(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -958,13 +1479,6 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
-        edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
-        )
-        registry.store_migration(edge)
 
         key12 = SentinelEdge.from_pair(versions[0], versions[1])
         key13 = SentinelEdge.from_pair(versions[0], versions[2])
@@ -982,14 +1496,31 @@ class TestEdgePairLookup:
         )
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="semver_get_by_pair",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_get_by_pair",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_get_migration_by_pair(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -997,9 +1528,6 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
@@ -1010,14 +1538,31 @@ class TestEdgePairLookup:
         assert found.func is edge.func
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="semver_pair_missing",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_pair_missing",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_get_migration_by_pair_missing_raises(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -1025,22 +1570,42 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
 
         key = SentinelEdge.from_pair(versions[0], versions[1])
         with pytest.raises(MigrationNotFoundError):
             registry.get_migration_by_edge(key)
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_default_not_backward",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_default_not_backward",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_is_backward_compatible_edge_default_false(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -1048,26 +1613,36 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
-        edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
-        )
-        registry.store_migration(edge)
 
         key = SentinelEdge.from_pair(versions[0], versions[1])
         assert registry.get_migration_by_edge(key).diff.is_backward_compatible is False
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="semver_backward_compatible",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_backward_compatible",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_is_backward_compatible_edge_true(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -1075,9 +1650,6 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter,
             versioning_settings,
@@ -1091,26 +1663,69 @@ class TestEdgePairLookup:
         key = SentinelEdge.from_pair(versions[0], versions[1])
         assert registry.get_migration_by_edge(key).diff.is_backward_compatible is True
 
-    def test_get_migration_by_edge_missing_raises(self) -> None:
-        registry = Registry[semver.Version, BaseModel]()
-        v1 = VersionNode[semver.Version, UserV1](
-            _model=UserV1, _value=semver.Version(1, 0, 0), _kind="User"
-        )
-        v2 = VersionNode[semver.Version, UserV2](
-            _model=UserV2, _value=semver.Version(2, 0, 0), _kind="User"
-        )
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [], []],
+                [UserV1, UserV2],
+                id="pydantic_edge_missing",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "date_test", [], []],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_schema_edge_missing",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_get_migration_by_edge_missing_raises(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        models: list[type[types.ModelBase]],
+        registry: Registry[types.VersionValue, BaseModel],
+    ) -> None:
+        pair = [
+            envelope_model(model_adapter, versioning_settings, model)
+            for model in models
+        ]
         with pytest.raises(MigrationNotFoundError):
-            registry.get_migration_by_edge(SentinelEdge.from_pair(v1, v2))
+            registry.get_migration_by_edge(SentinelEdge.from_pair(*pair))
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_pair_remove",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_pair_remove",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_pair_index_updated_on_remove(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -1118,27 +1733,45 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
-        registry.store_migration(edge)
         registry.remove_migration(SentinelEdge.from_version_edge(edge))
 
         key = SentinelEdge.from_pair(versions[0], versions[1])
         assert registry.has_migration(key) is False
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_pair_clear",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_pair_clear",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_pair_index_cleared_on_clear_migrations(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -1146,27 +1779,43 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
 
-        edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
-        )
-        registry.store_migration(edge)
         registry.clear_migrations()
 
         key = SentinelEdge.from_pair(versions[0], versions[1])
         assert registry.has_migration(key) is False
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_pair_copy",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_pair_copy",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_pair_index_copy_independent(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
@@ -1174,13 +1823,9 @@ class TestEdgePairLookup:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
-        registry.store_migration(edge)
 
         clone = registry.copy()
         key = SentinelEdge.from_pair(versions[0], versions[1])
@@ -1195,24 +1840,35 @@ class TestMigrationHookGuard:
     """A migration with registered hooks cannot be removed directly."""
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="semver_hooks_present",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_hooks_present",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_migration_with_hooks_raises(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
@@ -1227,29 +1883,44 @@ class TestMigrationHookGuard:
         assert registry.get_migration(key).func is edge.func
 
     @pytest.mark.parametrize(
-        "registry, models",
+        "model_adapter, registry, models",
         [
-            [Registry[semver.Version, BaseModel](), [UserV1, UserV2]],
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                id="semver_hooks_cleared",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_hooks_cleared",
+            ),
         ],
+        indirect=["model_adapter", "registry"],
     )
     def test_remove_migration_allowed_after_hooks_cleared(
         self,
-        model_adapter: PydanticModelAdapter,
+        model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue, BaseModel],
         models: list[type[types.VModel]],
     ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        for v in versions:
-            registry.store_model(v)
-
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
         )
         key = SentinelEdge.from_version_edge(edge)
-        registry.store_migration(edge)
         registry.add_hook(key, MigrationHook())
         registry.clear_hooks(key)
 
