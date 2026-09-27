@@ -1,13 +1,18 @@
 """Tracing tests: assert the OTEL hook emits a span per migration step.
 
 Uses an in-memory exporter instead of the OTLP one, so nothing leaves the
-process — the same wiring the container builds, just a different exporter.
+process. The container's ``tracer`` provider is overridden with the in-memory
+tracer — the same wiring production uses, only the exporter differs.
 """
 
 from __future__ import annotations
 
 import pytest
-from fastmcp_demo.application import DemoService
+from fastmcp_demo.container import (
+    build_container,
+    resolve_prepared,
+    shutdown_container,
+)
 from fastmcp_demo.settings import DemoSettings, TelemetrySettings
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -27,11 +32,23 @@ def in_memory_tracer(span_exporter: InMemorySpanExporter):
 
 
 @pytest.fixture
-async def traced_service(in_memory_tracer, span_exporter) -> DemoService:
+async def traced_service(in_memory_tracer):
     settings = DemoSettings(telemetry=TelemetrySettings(enabled=False))
-    service = DemoService(settings, tracer=in_memory_tracer)
-    await service.prepare()
-    return service
+    container = build_container(settings)
+    container.tracer.override(in_memory_tracer)
+    service = await resolve_prepared(container)
+    yield service
+    await shutdown_container(container)
+
+
+@pytest.fixture
+async def untraced_service():
+    settings = DemoSettings(telemetry=TelemetrySettings(enabled=False))
+    container = build_container(settings)
+    container.tracer.override(None)
+    service = await resolve_prepared(container)
+    yield service
+    await shutdown_container(container)
 
 
 class TestTracing:
@@ -54,9 +71,8 @@ class TestTracing:
         assert "migration.to_version" in attrs
         assert "migration.duration_seconds" in attrs
 
-    async def test_tracing_disabled_emits_nothing(self, span_exporter) -> None:
-        settings = DemoSettings(telemetry=TelemetrySettings(enabled=False))
-        service = DemoService(settings, tracer=None)
-        await service.prepare()
-        service.demo_calls()
+    async def test_tracing_disabled_emits_nothing(
+        self, untraced_service, span_exporter
+    ) -> None:
+        untraced_service.demo_calls()
         assert span_exporter.get_finished_spans() == ()

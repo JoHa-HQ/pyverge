@@ -1,19 +1,23 @@
 """FastMCP server adapter.
 
-Builds the ``FastMCP`` server, the ``ToolRegistry`` lifespan hook and the
-``ConvergeMiddleware``, wiring them to the domain manager. This is the only
-module that imports FastMCP.
+Builds the ``FastMCP`` server and the ``ToolRegistry`` lifespan hook, wiring
+them to the domain manager. The physical tool lives in
+:mod:`fastmcp_demo.adapters.tools`; this module only assembles the server around
+it. This is the only module that imports FastMCP.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from fastmcp import FastMCP
 
 from pyverge.adapters.fastmcp import ConvergeMiddleware, ToolRegistry
 
+from ..domain import ANCHOR_VERSION
 from ..settings import GraphSettings
+from .tools import search_weather
 
 
 def build_registry(manager: Any, graph: GraphSettings) -> ToolRegistry:
@@ -25,36 +29,21 @@ def build_registry(manager: Any, graph: GraphSettings) -> ToolRegistry:
     )
 
 
-def build_server(registry: ToolRegistry, graph: GraphSettings) -> FastMCP:
+def build_server(
+    registry: ToolRegistry,
+    graph: GraphSettings,
+    tool: Callable[..., Any] = search_weather,
+) -> FastMCP:
     """Return a FastMCP server exposing the physical anchor (the newest version).
 
-    The physical tool *is* its own anchor: its signature is reflected into the
-    newest model. Older versions are served by virtual tools materialized
-    during the ``enrich`` phase.
+    The physical tool *is* its own anchor: its signature (with injected
+    parameters hidden) is reflected into the newest model. Older versions are
+    served by virtual tools materialized during the ``enrich`` phase.
     """
     mcp = FastMCP(
         "WeatherServer",
         middleware=[ConvergeMiddleware(registry)],
         lifespan=registry,
     )
-
-    @mcp.tool(version="3.0.0")
-    def search_weather(
-        city: str,
-        units: str = "celsius",
-        humidity: bool = False,
-        wind: float = 0.0,
-    ) -> dict:
-        """Search weather for a city (target: v3).
-
-        A call against an older schema (via a virtual tool) converges to this
-        v3 shape before the handler runs.
-        """
-        return {
-            "city": city,
-            "units": units,
-            "humidity": humidity,
-            "wind": wind,
-        }
-
+    mcp.tool(tool, version=ANCHOR_VERSION)
     return mcp

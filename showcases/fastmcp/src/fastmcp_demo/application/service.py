@@ -1,11 +1,12 @@
 """Application layer: the demo use case and the topology walk.
 
-``DemoService`` owns the runnable lifecycle — prepare the FastMCP server and
-drive convergent calls. ``walk_topology`` is the reusable **time-travel round
-trip**: migrate a latest-shaped payload down to the oldest version and back up,
-asserting every hop yields the correctly-typed container and the return trip
-validates. Run it against any version graph to catch missing reverse edges,
-non-idempotent migrations, and finalize drift.
+``DemoService`` receives its collaborators (manager, registry, server) from the
+DI container and owns only the runnable lifecycle: it runs the async reflection
+phases and drives convergent calls. ``walk_topology`` is the reusable
+**time-travel round trip**: migrate a newest-shaped payload down to the oldest
+version and back up, asserting every hop yields the correctly-typed container.
+Run it against any version graph to catch missing reverse edges, non-idempotent
+migrations, and finalize drift.
 """
 
 from __future__ import annotations
@@ -16,8 +17,7 @@ from typing import Any
 from pyverge.adapters.otel import OTELHook
 from pyverge.types import ManagerMigrationKey
 
-from ..adapters import build_registry, build_server
-from ..domain import ALL_VERSIONS, V1, V2, V3, build_manager
+from ..domain import ALL_VERSIONS, V1, V2, V3
 from ..settings import DemoSettings
 
 #: Forward edges (anchor-reconstructing), newest first.
@@ -69,14 +69,24 @@ def walk_topology(
 
 
 class DemoService:
-    """Orchestrates the demo lifecycle over the injected collaborators."""
+    """Runs the reflection lifecycle over the injected collaborators.
 
-    def __init__(self, settings: DemoSettings, tracer: Any | None = None) -> None:
+    The collaborators come from the DI container — this class builds nothing.
+    """
+
+    def __init__(
+        self,
+        settings: DemoSettings,
+        manager: Any,
+        registry: Any,
+        server: Any,
+        tracer: Any | None = None,
+    ) -> None:
         self._settings = settings
+        self.manager = manager
+        self.registry = registry
+        self.server = server
         self._tracer = tracer
-        self.manager = build_manager(settings.graph)
-        self.registry = None
-        self.server = None
 
     @property
     def kind(self) -> str:
@@ -91,20 +101,19 @@ class DemoService:
             self.manager.add_hook(
                 ManagerMigrationKey(self._settings.graph.kind, source, target),
                 OTELHook(
-                    tracer=self._tracer, service=self._settings.telemetry.service_name
+                    tracer=self._tracer,
+                    service=self._settings.telemetry.service_name,
                 ),
             )
 
     async def prepare(self) -> None:
         """Run the reflection lifecycle, then expose the tracing hook.
 
-        The physical server is built first so its tool signature becomes the
-        anchor; the registry then reflects, reconciles and enriches. The
-        migration edges are already registered by the domain layer, so the
-        virtual older tools have a convergence path.
+        The server (built by the container) carries the physical anchor tool;
+        the registry reflects it, reconciles the signature against the
+        registered contract, and enriches virtual older tools. Runs exactly
+        once — re-running would re-materialize the virtual tools.
         """
-        self.registry = build_registry(self.manager, self._settings.graph)
-        self.server = build_server(self.registry, self._settings.graph)
         await self.registry.search(self.server)
         await self.registry.register(self.server)
         await self.registry.reconcile(self.server)
@@ -113,7 +122,6 @@ class DemoService:
 
     def demo_calls(self) -> list[tuple[str, dict]]:
         """Drive one convergent call per registered version and return the results."""
-        assert self.registry is not None, "call prepare() first"
         kind = self._settings.graph.kind
         results: list[tuple[str, dict]] = []
         for version in ALL_VERSIONS:

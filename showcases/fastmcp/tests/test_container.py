@@ -21,12 +21,20 @@ class TestContainer:
     def test_service_is_singleton(self, container) -> None:
         assert container.demo_service() is container.demo_service()
 
+    def test_manager_is_singleton(self, container) -> None:
+        assert container.manager() is container.manager()
+
     def test_settings_override_is_honored(self) -> None:
         container = build_container(_settings(policy="earliest"))
         assert container.settings().graph.policy == "earliest"
 
     def test_tracer_disabled_in_tests(self, container) -> None:
         assert container.tracer() is None
+
+    def test_registry_and_server_share_the_manager(self, container) -> None:
+        service = container.demo_service()
+        assert service.registry is container.registry()
+        assert service.server is container.server()
 
 
 class TestGraphRegistration:

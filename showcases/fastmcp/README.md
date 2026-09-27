@@ -15,6 +15,11 @@ It shows four things end to end:
 4. **Observability** — each migration step emits an OTLP span, shipped to Jaeger
    through the OpenTelemetry Collector.
 
+## Prerequisites
+
+- Docker + Docker Compose (for the dashboard)
+- The demo package: `cd showcases/fastmcp && uv sync`
+
 ## Layout
 
 ```
@@ -22,14 +27,18 @@ showcases/fastmcp/
 ├── src/fastmcp_demo/
 │   ├── settings.py             # pydantic-settings configuration tree
 │   ├── container.py            # dependency-injector composition root
-│   ├── domain/graph.py         # the version graph (no FastMCP, no OTEL)
+│   ├── domain/
+│   │   ├── graph.py            # the version graph (no FastMCP, no OTEL)
+│   │   ├── weather.py          # WeatherService — the tool's business logic
+│   │   └── weather.json        # the anchor schema (source of truth)
 │   ├── application/service.py  # DemoService + walk_topology use case
-│   ├── adapters/server.py      # FastMCP server + registry + middleware
-│   ├── adapters/tracing.py     # OTLP tracer builder
+│   ├── adapters/
+│   │   ├── server.py           # FastMCP server + registry + middleware
+│   │   ├── tools.py            # the injected physical tool
+│   │   └── tracing.py          # OTLP tracer builder
 │   └── __main__.py             # CLI entry point
 ├── tests/                      # container, server, topology, tracing suites
 ├── migrations/                 # declarative JSON Patch specs (fwd + rev)
-├── registry/weather.json       # the v3 anchor schema (reference)
 ├── docker-compose.yml          # otel-collector + jaeger
 ├── otel-collector-config.yaml  # collector pipeline: OTLP in -> Jaeger out
 └── pyproject.toml              # the demo package
@@ -37,12 +46,11 @@ showcases/fastmcp/
 
 The layers are one-directional: `domain` knows nothing of FastMCP or
 OpenTelemetry; `adapters` are the only modules that import them; `application`
-orchestrates and `container` wires.
-
-## Prerequisites
-
-- Docker + Docker Compose (for the dashboard)
-- The demo package: `cd showcases/fastmcp && uv sync`
+orchestrates and `container` wires. The physical tool receives the
+`WeatherService` through dependency-injector wiring (`@inject` + `Provide`), so
+no component reaches for its own dependencies. The injected parameter is hidden
+from the exposed signature — the physical tool signature *is* the anchor model,
+so a stray parameter would break the adapter's contract reconciliation.
 
 ## Run
 
@@ -110,14 +118,20 @@ migration step flows over OTLP to the collector, which forwards traces to
 Jaeger. The hook is an adapter (`pyverge.adapters.otel.OTELHook`), so the domain
 layer stays free of OpenTelemetry.
 
+The reflection lifecycle (search → register → reconcile → enrich) runs exactly
+once, as a `dependency-injector` `AsyncResource` (`container.prepared`), so
+`await resolve_prepared(container)` yields a ready service. The physical tool
+gets its `WeatherService` from the container — the handler is a thin adapter
+over testable domain logic.
+
 ## Testing
 
 The suite is the reference for testing a version graph:
 
 | Suite | Concern |
 | --- | --- |
-| `test_container.py` | the graph registers every version; only the anchor is concrete |
-| `test_server.py` | reflection lifecycle; every version converges to the anchor |
+| `test_container.py` | DI wiring; the graph registers every version; only the anchor is concrete |
+| `test_server.py` | reflection lifecycle; every version converges; injected tool param is hidden |
 | `test_topology.py` | the **time-travel round trip** (below) |
 | `test_tracing.py` | one OTLP span per migration step, with the right attributes |
 
