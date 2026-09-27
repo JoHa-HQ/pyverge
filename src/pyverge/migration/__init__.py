@@ -1,9 +1,3 @@
-from pyverge.adapters import (
-    JsonPatchMigration,
-    JsonSchemaModelAdapter,
-    PydanticDiff,
-    PydanticModelAdapter,
-)
 from pyverge.core import (
     DiscoveryError,
     DiscoverySettings,
@@ -32,6 +26,12 @@ from pyverge.core import (
     get_at,
     set_at,
     types,
+)
+from pyverge.ports import (
+    JsonPatchMigration,
+    JsonSchemaModelAdapter,
+    PydanticDiff,
+    PydanticModelAdapter,
 )
 from pyverge.reflection import (
     CallableDiffDiscovery,

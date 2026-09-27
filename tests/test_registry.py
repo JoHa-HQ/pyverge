@@ -9,7 +9,6 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.adapters import JsonSchemaModelAdapter
 from pyverge.core import (
     MigrationAlreadyRegisteredError,
     MigrationHook,
@@ -26,6 +25,7 @@ from pyverge.migration import (
     PydanticModelAdapter,
     Registry,
 )
+from pyverge.ports import JsonSchemaModelAdapter
 from tests.examples.json import (
     USER_V0_1_1_DEV_7,
     USER_V1_0_0,

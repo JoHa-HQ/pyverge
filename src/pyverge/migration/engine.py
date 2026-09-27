@@ -3,8 +3,6 @@
 import bisect
 from typing import Any, Generic, Self, cast, overload
 
-from pyverge.adapters.json_patch import JsonPatch
-from pyverge.adapters.json_patch.migration import JsonPatchMigration
 from pyverge.core.exceptions import (
     MigrationError,
     MigrationNotFoundError,
@@ -14,6 +12,8 @@ from pyverge.core.exceptions import (
 from pyverge.core.render import JsonPatchRender
 from pyverge.core.settings import MigrationSettings
 from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
+from pyverge.ports.json_patch import JsonPatch
+from pyverge.ports.json_patch.migration import JsonPatchMigration
 from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
 from pyverge.types import (
     Attachable,

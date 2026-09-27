@@ -5,8 +5,8 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast
 
-from pyverge.adapters import JsonPatchMigration
 from pyverge.core.versioning import SentinelEdge
+from pyverge.ports import JsonPatchMigration
 from pyverge.types import (
     Attachable,
     ManagerMigrationKey,

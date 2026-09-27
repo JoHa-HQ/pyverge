@@ -8,7 +8,6 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.adapters import JsonSchemaModelAdapter
 from pyverge.core import (
     DiscoveryValidationError,
     MigrationHook,
@@ -22,6 +21,7 @@ from pyverge.migration import (
     PydanticModelAdapter,
     PydanticWalker,
 )
+from pyverge.ports import JsonSchemaModelAdapter
 from pyverge.types import (
     ManagerClassState,
     ManagerInstanceState,

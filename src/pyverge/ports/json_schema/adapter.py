@@ -17,8 +17,8 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from pyverge.adapters.base import BaseModelAdapter
 from pyverge.core.versioning import VersionNode
+from pyverge.ports.base import BaseModelAdapter
 from pyverge.reflection.diff import Diff
 from pyverge.types import (
     Diffable,

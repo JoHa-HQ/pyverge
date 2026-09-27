@@ -22,11 +22,11 @@ from pydantic import BaseModel
 from semver import Version as SemVer
 
 if TYPE_CHECKING:
-    from pyverge.adapters import JsonPatchMigration
     from pyverge.core.settings import MigrationSettings
     from pyverge.migration.engine import Engine
     from pyverge.migration.graph import GraphEntry, MigrationGraph
     from pyverge.migration.registry import Registry
+    from pyverge.ports import JsonPatchMigration
 
 ModelBase: TypeAlias = BaseModel
 

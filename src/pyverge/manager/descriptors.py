@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Protocol, overload
 
 from pydantic import BaseModel
 
-from pyverge.adapters import JsonPatchMigration
+from pyverge.ports import JsonPatchMigration
 from pyverge.types import (
     Attachable,
     ManagerClassState,
