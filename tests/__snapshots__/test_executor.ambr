@@ -1,0 +1,207 @@
+# serializer version: 1
+# name: test_executor_noop_when_source_is_target[pydantic_nested-level_parallel]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'country': 'FR',
+        'kind': 'Address',
+        'street': 'Main',
+        'version': '2.0.0',
+      }),
+      'contacts': list([
+        dict({
+          'kind': 'Contact',
+          'phone': '555-0100',
+          'preferred': 'phone',
+          'version': '2.0.0',
+        }),
+      ]),
+      'email': 'a@example.com',
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_executor_noop_when_source_is_target[pydantic_nested-sequential]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'country': 'FR',
+        'kind': 'Address',
+        'street': 'Main',
+        'version': '2.0.0',
+      }),
+      'contacts': list([
+        dict({
+          'kind': 'Contact',
+          'phone': '555-0100',
+          'preferred': 'phone',
+          'version': '2.0.0',
+        }),
+      ]),
+      'email': 'a@example.com',
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_executor_returns_new_payload[pydantic_nested-level_parallel]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'country': None,
+        'kind': 'Address',
+        'postal_code': None,
+        'street': 'Main',
+        'version': '2.0.0',
+      }),
+      'contacts': list([
+        dict({
+          'email': None,
+          'kind': 'Contact',
+          'phone': '555-0100',
+          'preferred': 'phone',
+          'version': '2.0.0',
+        }),
+      ]),
+      'email': None,
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_executor_returns_new_payload[pydantic_nested-sequential]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'country': None,
+        'kind': 'Address',
+        'postal_code': None,
+        'street': 'Main',
+        'version': '2.0.0',
+      }),
+      'contacts': list([
+        dict({
+          'email': None,
+          'kind': 'Contact',
+          'phone': '555-0100',
+          'preferred': 'phone',
+          'version': '2.0.0',
+        }),
+      ]),
+      'email': None,
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_level_parallel_executor_single_entry_uses_no_pool[pydantic_nested]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'country': None,
+        'kind': 'Address',
+        'postal_code': None,
+        'street': 'Main',
+        'version': '2.0.0',
+      }),
+      'contacts': list([
+      ]),
+      'email': None,
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_target_resolver_converges_end_to_end[earliest]
+  dict({
+    'document': dict({
+      'city': 'Paris',
+      'kind': 'Address',
+      'street': 'Main',
+      'version': '1.0.0',
+    }),
+  })
+# ---
+# name: test_target_resolver_converges_end_to_end[fixed]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'kind': 'Address',
+        'street': 'Main',
+        'version': '1.0.0',
+      }),
+      'contacts': list([
+      ]),
+      'email': None,
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_target_resolver_converges_end_to_end[latest]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'country': None,
+        'kind': 'Address',
+        'postal_code': None,
+        'region': None,
+        'street': 'Main',
+        'version': '3.0.0',
+      }),
+      'contacts': list([
+      ]),
+      'email': None,
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_target_resolver_converges_end_to_end[multi_wildcard_fallback]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'kind': 'Address',
+        'street': 'Main',
+        'version': '1.0.0',
+      }),
+      'contacts': list([
+      ]),
+      'email': None,
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_target_resolver_converges_end_to_end[skip]
+  dict({
+    'document': dict({
+      'address': dict({
+        'city': 'Paris',
+        'kind': 'Address',
+        'street': 'Main',
+        'version': '1.0.0',
+      }),
+      'kind': 'Person',
+      'name': 'Alice',
+      'version': '1.0.0',
+    }),
+  })
+# ---
