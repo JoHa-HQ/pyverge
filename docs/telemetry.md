@@ -31,15 +31,15 @@ manager.add_hook(("User", "1.0.0", "2.0.0"), AuditHook())
 
 ## OpenTelemetry
 
-`OTELHook` creates a span per migration with duration, status, and exception
-recording. Wire it to your tracer provider:
+`OTELHook` (in the adapters layer) creates a span per migration with duration,
+status, and exception recording. Wire it to your tracer provider:
 
 ```python
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, OTLPSpanExporter
 
-from pyverge.migration import OTELHook
+from pyverge.adapters.otel import OTELHook
 
 provider = TracerProvider()
 provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
