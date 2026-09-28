@@ -88,6 +88,7 @@ max-complexity = 10
 "src/pyverge/migration/types.py" = ["PLR0913"]
 "src/pyverge/core/types.py" = ["PLR0913"]
 "src/pyverge/types.py" = ["PLR0913"]
+"src/pyverge/serving/convergence.py" = ["PLR0913"]
 "src/pyverge/reflection/discovery.py" = ["C901", "PLR0912"]
 "src/pyverge/ports/json_schema/adapter.py" = ["PLR0911"]
 "tests/utils.py" = ["PLR0913"]

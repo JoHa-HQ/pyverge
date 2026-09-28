@@ -1,38 +1,28 @@
 """FastMCP integration adapter.
 
-The FastMCP adapter plugs pyverge into a FastMCP tool server. It is the first
-*adapter* behind pyverge's ports: the customer hands their manager to
-:class:`ToolRegistry` (a standard FastMCP ``lifespan`` hook), and the adapter
-reflects the server through ``list_tools`` under a deterministic flow:
+Plugs pyverge into a FastMCP tool server. The customer hands their manager to
+:class:`ToolRegistry` (a standard FastMCP ``lifespan`` hook); the adapter
+reflects the server through ``list_tools``, registers each versioned tool's
+signature as an anchor, reconciles it against the graph and materializes virtual
+tools for the remaining versions. A per-call :class:`ConvergeMiddleware`
+converges arguments to the policy target before the handler runs.
 
-1. the physical versioned tools are the anchors — the adapter reflects each
-   tool's signature into a model and materializes it into the manager,
-2. nested versioned models *used* by a tool's arguments must be registered;
-   versions with no physical declaration are reconstructed from the anchor
-   when the customer registers their migrations.
-
-One manager per source: the adapter binds exactly one bounded context, so there
-is no manager routing — a manager owns one complete version graph. The adapter
-precomputes convergence paths and materializes virtual tools for every
-registered version. Injected parameters (dependency-injector ``Provide``,
-FastMCP ``Depends``) are recognized and excluded from the contract by
-:mod:`pyverge.adapters.fastmcp.injection`. Per-component reflection — a single
-tool, prompt or resource plus a pyverge model adapter into a compliant model —
-lives in :mod:`pyverge.adapters.fastmcp.reflection`. A per-call
-:class:`ConvergeMiddleware` converges arguments — nested versioned models
-included — to the policy target before the handler runs. pyverge core and ports
-never import FastMCP.
+The framework-agnostic work lives in :mod:`pyverge.serving`; this package is the
+FastMCP context wiring only. pyverge core and ports never import FastMCP.
 """
 
-from .converger import Converger
-from .discovery import ToolDiscovery
-from .injection import (
+from pyverge.serving import (
+    Converger,
     InjectionDetector,
+    SchemaReflection,
+    ServingContract,
     default_injection_detector,
     injected_names,
     marker_detector,
     never_injected,
 )
+
+from .discovery import ToolDiscovery
 from .middleware import ConvergeMiddleware
 from .reflection import (
     ComponentReflection,
@@ -50,6 +40,8 @@ __all__ = [
     "InjectionDetector",
     "PromptReflection",
     "ResourceReflection",
+    "SchemaReflection",
+    "ServingContract",
     "ToolDiscovery",
     "ToolReflection",
     "ToolRegistry",

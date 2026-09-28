@@ -1,14 +1,12 @@
 """Injection detection — recognize parameters that are wired, not data.
 
-A tool's signature is its contract: every parameter is a field the caller may
-send. A dependency-injected parameter breaks that — it is wiring, not payload —
-so the adapter must exclude it from the reflected schema and the reconciled
-contract.
+A callable's signature is its contract: every parameter is a field the caller
+may send. A dependency-injected parameter breaks that — it is wiring, not
+payload — so the reflected schema must exclude it.
 
 No DI library is imported eagerly: :func:`default_injection_detector` probes for
 the markers of known libraries and falls back to a no-op. Detection is a plain
-predicate over an ``inspect.Parameter``, so a customer can supply their own
-(open/closed: extend by passing a detector, not by editing the adapter).
+predicate over an ``inspect.Parameter``, so a host can supply its own.
 """
 
 from __future__ import annotations
@@ -74,8 +72,8 @@ def injected_names(
 ) -> set[str]:
     """Return the names of the injected parameters of *func*.
 
-    ``func`` is any callable (typically a FastMCP tool's ``fn``). Returns an
-    empty set when the signature is unavailable or nothing is injected.
+    Returns an empty set when the signature is unavailable or nothing is
+    injected.
     """
     detect = detector or default_injection_detector()
     try:

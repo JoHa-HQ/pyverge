@@ -1,21 +1,9 @@
-"""Per-component reflectors — pure ``(component, adapter) -> compliant model``.
+"""Component reflectors — adapt a FastMCP component to :class:`SchemaReflection`.
 
-Contrast with :class:`~pyverge.adapters.fastmcp.registry.ToolRegistry`, which
-owns the server-wide lifecycle (search / register / enrich).  A reflector is
-registry-free: it takes a single FastMCP component (tool, prompt, resource or
-resource template) and a pyverge model adapter, and returns the *compliant*
-shape for that component — a JSON Schema document with ``kind``/``version``
-defaults injected, ready to wrap through ``adapter.versionable``.
-
-Three reflectors share the :class:`ComponentReflection` contract and differ
-only in how they synthesize the schema document:
-
-* :class:`ToolReflection` — a FastMCP ``Tool`` whose ``parameters`` is already
-  a JSON Schema document,
-* :class:`PromptReflection` — a FastMCP ``Prompt`` whose ``arguments`` are
-  typed ``PromptArgument`` lists (no JSON Schema), synthesized into one,
-* :class:`ResourceReflection` — a FastMCP ``Resource`` (no parameters → empty
-  object schema) or ``ResourceTemplate`` (``parameters`` JSON Schema).
+A FastMCP tool carries its input schema directly; a prompt's arguments and a
+resource's parameters must be synthesized into one. Each reflector only turns
+the component into a schema document; the schema→versionable work is
+framework-agnostic and lives in :mod:`pyverge.serving.reflection`.
 """
 
 from __future__ import annotations
@@ -23,19 +11,16 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
+from pyverge.serving import SchemaReflection, injected_names
+
 
 class ComponentReflection(ABC):
-    """Reflect a single FastMCP component into its compliant schema.
-
-    Subclasses only implement :meth:`kind` and :meth:`schema`; the shared
-    contract (component access, version, identity injection, ``versionable``
-    wrapping) lives here.
-    """
+    """Reflect a FastMCP component into a :class:`SchemaReflection`."""
 
     def __init__(self, component, adapter, *, injected: set[str] | None = None) -> None:
         self._component = component
         self._adapter = adapter
-        self._injected = injected or set()
+        self._injected = injected
 
     @property
     def component(self) -> Any:
@@ -54,85 +39,58 @@ class ComponentReflection(ABC):
 
     @abstractmethod
     def schema(self) -> dict[str, Any]:
-        """Return the component's compliant schema document."""
+        """Return the component's input schema document."""
 
-    def _inject_identity(self, document: dict[str, Any]) -> dict[str, Any]:
-        """Return *document* with ``kind``/``version`` default properties injected.
+    def _injected_names(self) -> frozenset[str]:
+        if self._injected is not None:
+            return frozenset(self._injected)
+        fn = getattr(self._component, "fn", None)
+        return frozenset(injected_names(fn)) if fn is not None else frozenset()
 
-        The model materialized from the document must round-trip its identity
-        through fields (mirroring the registered raw models), so the adapter can
-        read ``kind``/``version`` back when wrapping it.
-        """
-        assert self.version is not None
-        props = document.setdefault("properties", {})
-        for name, default in zip(
-            ("kind", "version"), (self.kind, self.version), strict=True
-        ):
-            props.setdefault(name, {"type": "string", "default": default})
-        return document
+    def _require_version(self, label: str) -> str:
+        version = self.version
+        if version is None:
+            raise ValueError(f"{label} {self._component.name!r} is not versioned")
+        return version
 
-    def _drop_injected(self, document: dict[str, Any]) -> dict[str, Any]:
-        """Remove injected parameters from a schema document's properties.
-
-        An injected parameter is wiring, not contract: it is part of the
-        callable's signature but never of the payload. FastMCP still emits it in
-        the schema, so it is filtered here before the model is reflected — the
-        same exclusion the adapter must apply when it validates the signature.
-        """
-        if not self._injected:
-            return document
-        props = document.get("properties")
-        if props:
-            for name in self._injected:
-                props.pop(name, None)
-        required = document.get("required")
-        if required:
-            document["required"] = [r for r in required if r not in self._injected]
-        return document
+    def reflection(self) -> SchemaReflection:
+        """Return the framework-agnostic reflection for this component."""
+        return SchemaReflection(
+            self._adapter,
+            kind=self.kind,
+            version=self._require_version(type(self).__name__),
+            schema=self.schema(),
+            injected=self._injected_names(),
+        )
 
     def versionable(self) -> Any:
-        """Wrap the component's compliant schema into a versionable."""
-        return self._adapter.versionable(
-            self.schema(), kind=self.kind, version=self.version
-        )
+        return self.reflection().versionable()
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(kind={self.kind!r}, version={self.version!r})"
 
 
 class ToolReflection(ComponentReflection):
-    """Reflect a single FastMCP :class:`Tool` into its compliant schema."""
+    """Reflect a FastMCP :class:`Tool` (its ``parameters`` schema)."""
 
     @property
     def kind(self) -> str:
         return self._component.name
 
     def schema(self) -> dict[str, Any]:
-        """Return the tool's parameters as a compliant schema document."""
-        version = self.version
-        if version is None:
-            raise ValueError(f"tool {self._component.name!r} is not versioned")
-        document = self._drop_injected(dict(self._component.parameters))
-        return self._inject_identity(document)
+        self._require_version("tool")
+        return dict(self._component.parameters)
 
 
 class PromptReflection(ComponentReflection):
-    """Reflect a single FastMCP :class:`Prompt` into its compliant schema.
-
-    A prompt's ``arguments`` are ``PromptArgument`` records (name/description/
-    required), not a JSON Schema — the reflector synthesizes an object schema
-    whose properties are strings.
-    """
+    """Reflect a FastMCP :class:`Prompt` into an object schema of string args."""
 
     @property
     def kind(self) -> str:
         return self._component.name
 
     def schema(self) -> dict[str, Any]:
-        """Synthesize a compliant schema document from the prompt arguments."""
-        version = self.version
-        if version is None:
-            raise ValueError(f"prompt {self._component.name!r} is not versioned")
+        self._require_version("prompt")
         props: dict[str, Any] = {}
         required: list[str] = []
         for arg in self._component.arguments or []:
@@ -145,16 +103,11 @@ class PromptReflection(ComponentReflection):
         document: dict[str, Any] = {"type": "object", "properties": props}
         if required:
             document["required"] = required
-        return self._inject_identity(document)
+        return document
 
 
 class ResourceReflection(ComponentReflection):
-    """Reflect a single FastMCP resource into its compliant schema.
-
-    A static :class:`Resource` has no parameters, so its compliant schema is
-    an empty object (identity fields only).  A :class:`ResourceTemplate`
-    carries a full ``parameters`` JSON Schema, used as-is.
-    """
+    """Reflect a FastMCP resource/template (its ``parameters`` schema)."""
 
     @property
     def kind(self) -> str:
@@ -162,21 +115,12 @@ class ResourceReflection(ComponentReflection):
         if name:
             return name
         uri = getattr(self._component, "uri_template", None)
-        if uri:
-            return str(uri)
-        return str(self._component.uri)
+        return str(uri) if uri else str(self._component.uri)
 
     def schema(self) -> dict[str, Any]:
-        """Return the resource's compliant schema document."""
-        version = self.version
-        if version is None:
-            raise ValueError(f"resource {self.kind!r} is not versioned")
+        self._require_version("resource")
         parameters = getattr(self._component, "parameters", None)
-        document: dict[str, Any] = (
-            dict(parameters) if parameters else {"type": "object"}
-        )
-        document.setdefault("properties", {})
-        return self._inject_identity(document)
+        return dict(parameters) if parameters else {"type": "object"}
 
 
 __all__ = [

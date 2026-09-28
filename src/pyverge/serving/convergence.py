@@ -1,26 +1,26 @@
-"""Converger — route and converge tool calls for a single manager.
+"""Convergence — resolve and run a converging tool call for one manager.
 
-One manager per source: the adapter binds exactly one bounded context, so there
-is no manager routing to do — only call-time convergence. The converger answers
-the per-call questions: which version was called, which physical handler serves
-it, and how the payload converges there. It reads the ``_physical`` tool index
-and the ``_paths`` precomputed by
-:class:`~pyverge.adapters.fastmcp.registry.ToolRegistry` — no graph rebuild and
-no per-call policy resolution.
+One manager per source: a host binds exactly one bounded context, so there is no
+manager routing — only call-time convergence. The converger answers the per-call
+questions: which version was called, which handler serves it, and how the
+payload converges there. It reads the physical-handler index and the precomputed
+paths — no graph rebuild, no per-call policy resolution.
 
-A versioned call is fully served by the converging delegate; an unversioned call
-converges only its embedded versioned entries and forwards to the tool's own
-handler.
+The host supplies a ``handler_for`` callable that turns a physical item into its
+callable, so this module stays framework-agnostic.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from pyverge.manager import Manager
 from pyverge.types import ModelData
 
 _KIND_PROPS = ("kind", "version")
+
+HandlerFor = Callable[[Any], Callable[..., Any]]
 
 
 class Converger:
@@ -30,24 +30,21 @@ class Converger:
         self,
         manager: Manager,
         *,
-        policies: dict[str, str] | None = None,
-        fallback_policy: str | None = None,
         physical: dict,
         paths: dict,
+        handler_for: HandlerFor,
+        policies: dict[str, str] | None = None,
+        fallback_policy: str | None = None,
     ) -> None:
         self.manager = manager
-        self._policies = policies or {}
-        self._fallback_policy = fallback_policy
         self._physical = physical
         self._paths = paths
+        self._handler_for = handler_for
+        self._policies = policies or {}
+        self._fallback_policy = fallback_policy
 
     def policy_for(self, kind: str) -> str | None:
-        """Return the recorded policy for *kind*, or ``None`` when disabled.
-
-        The fallback is disabled by default: a kind only becomes versioned when
-        it is explicitly listed in ``policies`` or a fallback policy was opted
-        into at construction.
-        """
+        """Return the recorded policy for *kind*, or ``None`` when disabled."""
         return self._policies.get(kind, self._fallback_policy)
 
     def owns(self, kind: str) -> bool:
@@ -58,59 +55,34 @@ class Converger:
         return self._paths.get((kind, version))
 
     def delegate(self, kind: str, version: str):
-        """Return a converging delegate for a call to *kind@version*.
-
-        The delegate converges the call's arguments to the version's policy
-        target and invokes the **target's** physical handler, so the consumer
-        always gets the tool's current behavior. Returns ``None`` when no
-        convergence path is precomputed for the version, or the kind is not
-        owned by the manager.
-        """
+        """Return a converging delegate for a call to *kind@version*, or ``None``."""
         target = self._paths.get((kind, version))
-        if target is None:
-            return None
-        if not self._physical_for(kind, target):
+        if target is None or not self._physical_for(kind, target):
             return None
         return self.make_indirection(kind, version, target)
 
     def converge_payload(self, arguments: dict) -> dict | None:
-        """Converge an unversioned tool's arguments to the latest models.
-
-        A plain tool (no version param, no versioned chain of its own) may still
-        embed versioned models in its arguments. When any embedded kind is owned
-        by the manager, the arguments converge to the latest version of every
-        registered chain. Returns ``None`` when the payload is not versioned.
-        """
+        """Converge an unversioned payload to the latest models, or ``None``."""
         if not self._owns_payload(arguments):
             return None
         return self.manager.migrate(arguments, target={"*": "latest"})
 
     def make_indirection(self, kind: str, version: str, target: str):
-        """Return a handler that converges args, then delegates to the target tool."""
+        """Return a handler that converges args, then calls the target handler."""
 
-        def handler(**kwargs: Any) -> dict:
+        def handler(**kwargs: Any) -> Any:
             payload: ModelData = {"kind": kind, "version": version, **kwargs}
             converged = self._converge(payload, kind, target)
             converged.pop("kind", None)
             converged.pop("version", None)
-            physical = self._physical_for(kind, target)
-            fn: Any = getattr(physical, "fn", None) or physical.run
-            return fn(**converged)
+            return self._handler_for(self._physical_for(kind, target))(**converged)
 
         return handler
 
     def _converge(self, payload: ModelData, kind: str, target: str) -> dict:
-        """Converge a payload — including nested versioned models — to target.
-
-        The tool's own kind converges to its policy *target*; every other
-        versioned entry found in the payload (nested models embedded in a tool's
-        arguments) converges to the latest version of its own chain via the
-        ``"*"`` fallback.
-        """
         return self.manager.migrate(payload, target={kind: target, "*": "latest"})
 
     def _owns_payload(self, value: Any) -> bool:
-        """Return whether the manager owns the first versioned kind in *value*."""
         found = self._first_kind(value)
         return found is not None and self.owns(found)
 
@@ -137,3 +109,6 @@ class Converger:
             return physical
         owners = sorted(v for (k, v) in self._physical if k == kind)
         return self._physical[(kind, owners[-1])]
+
+
+__all__ = ["Converger", "HandlerFor"]
