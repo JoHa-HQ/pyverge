@@ -6,6 +6,8 @@ from typing import Any, Generic, Self, cast, overload
 from pyverge.core.exceptions import (
     MigrationError,
     MigrationNotFoundError,
+    MissingReferenceError,
+    ModelConflictError,
     ModelNotFoundError,
     RegistryError,
 )
@@ -189,8 +191,51 @@ class Engine(Generic[VersionValue]):
         self: Self,
         version: Versionable[VersionValue, ModelBase],
     ) -> Versionable[VersionValue, ModelBase]:
-        """Register a model version in the registry."""
-        return self.registry.store_model(version)
+        """Register a model version, reconciling against an existing one.
+
+        An identical re-registration (same ``fields`` surface) is a no-op
+        returning the stored node; a re-registration declaring a different
+        surface raises :class:`ModelConflictError`.  The comparison uses the
+        node's adapter-computed ``fields``, so it stays provider-agnostic.
+        """
+        try:
+            existing = self.registry.get_model(version)
+        except ModelNotFoundError:
+            return self.registry.store_model(version)
+        if existing.fields != version.fields:
+            raise ModelConflictError(
+                self.registry.name,
+                version.version,
+                existing.fields,
+                version.fields,
+            )
+        return existing
+
+    def validate(
+        self: Self,
+        version: Versionable[VersionValue, ModelBase] | None = None,
+    ) -> None:
+        """Validate registered models' declared references are registered.
+
+        Every versioned kind a registered model references must itself be
+        registered — the payload walker silently skips unregistered kinds, so a
+        declared-but-absent child can never converge.  With *version*, only that
+        node is checked; otherwise the whole registry is walked.  Raises
+        :class:`MissingReferenceError` naming the absent references.
+        """
+        nodes = (
+            [self.registry.get_model(version)]
+            if version is not None
+            else list(self.registry.versions)
+        )
+        for node in nodes:
+            absent = self.registry.missing_references(node)
+            if absent:
+                raise MissingReferenceError(
+                    self.registry.name,
+                    node.version,
+                    absent,
+                )
 
     def get_model(
         self: Self,

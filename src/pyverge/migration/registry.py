@@ -306,7 +306,12 @@ class Registry(Generic[VersionValue, ProviderBase]):
         self: Self,
         version: Versionable[VersionValue, ProviderBase],
     ) -> Versionable[VersionValue, ProviderBase]:
-        """Register a model class at *version*."""
+        """Register a model class at *version*.
+
+        A duplicate ``(kind, version)`` raises
+        :class:`ModelAlreadyRegisteredError`; reconciliation against an
+        existing registration is the engine's concern (:meth:`Engine.store_model`).
+        """
         if version in self._by_versions:
             raise ModelAlreadyRegisteredError(
                 registry_name=self._name,

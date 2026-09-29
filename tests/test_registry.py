@@ -320,6 +320,11 @@ class TestModel:
         registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
+        """The registry is a store: a duplicate registration raises.
+
+        Reconciliation (identical-surface no-op) is the engine's concern.
+        The fixture already registered *model*.
+        """
         with pytest.raises(ModelAlreadyRegisteredError, match="already registered"):
             registry.store_model(
                 envelope_model(model_adapter, versioning_settings, model)

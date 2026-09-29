@@ -42,7 +42,12 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
     (every union member, transitively).  It is computed once when the node is
     built and lets the graph detect a payload that could carry a versioned
     child it cannot converge — the walker silently skips unregistered kinds.
-    The field does not participate in equality or ordering, which stay keyed on
+
+    ``fields`` is the model's field names minus the identity fields, also
+    computed once by the adapter.  It lets the engine reconcile two
+    registrations of the same ``(kind, version)`` without an adapter.
+
+    Neither field participates in equality or ordering, which stay keyed on
     ``(kind, version)``.
     """
 
@@ -50,6 +55,7 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
     _value: VersionValue_co
     _kind: ModelKind
     references: frozenset[ModelVersionKey] = frozenset()
+    fields: frozenset[str] = frozenset()
 
     @property
     def strategy(self) -> type[VersionValue_co]:

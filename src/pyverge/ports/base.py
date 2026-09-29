@@ -23,6 +23,16 @@ class BaseModelAdapter:
         self._version_property = version_property
         self._kind_property = kind_property
 
+    @property
+    def version_property(self) -> str:
+        """The field name carrying a model's version."""
+        return self._version_property
+
+    @property
+    def kind_property(self) -> str:
+        """The field name carrying a model's kind."""
+        return self._kind_property
+
     def version(self, model_cls: type[Any]) -> str:
         """Return the model's version string. Implemented by concrete adapters."""
         raise NotImplementedError
@@ -86,6 +96,20 @@ class BaseModelAdapter:
         found: set[ModelVersionKey] = set()
         self._collect_references(model_cls, found, set())
         return frozenset(found)
+
+    def fields(self, model_cls: type[Any]) -> frozenset[str]:
+        """Return the model's field names, minus the identity fields.
+
+        The identity fields (``version``/``kind``, per the adapter's configured
+        property names) are owned by the version graph, so they are excluded:
+        two registrations of the same ``(kind, version)`` must agree on the
+        *payload* surface, not on the identity encoding.
+        """
+        identity = {self._version_property, self._kind_property}
+        fields = getattr(model_cls, "model_fields", None)
+        if fields is None:
+            return frozenset()
+        return frozenset(name for name in fields if name not in identity)
 
     def _collect_references(
         self,

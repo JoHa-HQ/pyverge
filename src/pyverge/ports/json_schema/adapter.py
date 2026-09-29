@@ -172,6 +172,7 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             _value=self.of(self.version(model)),
             _kind=self.kind(model),
             references=self.references(model),
+            fields=self.fields(model),
         )
 
     def diff(

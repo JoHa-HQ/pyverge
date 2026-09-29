@@ -134,6 +134,15 @@ class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co, VModel_
         """Versioned ``(kind, version)`` pairs the model's fields declare."""
         ...
 
+    @property
+    def fields(self) -> frozenset[str]:
+        """The model's field names, minus the identity fields.
+
+        Computed by the adapter when the node is built (like ``references``),
+        so the engine can compare two nodes' shapes without an adapter.
+        """
+        ...
+
 
 @runtime_checkable
 class Transitional(Orderable, Protocol[VersionValue_co, VSource_co, VTarget_co]):
@@ -314,6 +323,16 @@ class ModelAdapter(Protocol):
 
     def version(self, model_cls: type[Any]) -> str: ...
     def kind(self, model_cls: type[Any]) -> str: ...
+    @property
+    def version_property(self) -> str:
+        """The field name carrying a model's version."""
+        ...
+
+    @property
+    def kind_property(self) -> str:
+        """The field name carrying a model's kind."""
+        ...
+
     def of(self, value: str | VersionValue) -> VersionValue:
         """Parse a version string, or pass through an already-parsed value.
 

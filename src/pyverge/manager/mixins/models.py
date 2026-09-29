@@ -5,11 +5,13 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast, overload
 
+from pyverge.core.versioning import VersionNode
 from pyverge.types import (
     Comparable,
     ModelBase,
     ModelKey,
     ModelKind,
+    ModelVersionKey,
     Versionable,
     VersionValue,
     VModel,
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
 class ModelStoreMixin(Generic[VersionValue]):
     """Store and look up registered model versions."""
 
+    @singledispatchmethod
     @classmethod
     def store_model(
         cls: type[ManagerState[VersionValue]],
@@ -34,6 +37,41 @@ class ModelStoreMixin(Generic[VersionValue]):
         """Register a model version through the engine."""
         engine = engine or cls._default_engine
         return engine.store_model(engine.adapter.versionable(key))
+
+    @store_model.register(VersionNode)
+    @classmethod
+    def _(
+        cls: type[ManagerState[VersionValue]],
+        version: VersionNode[VersionValue, ModelBase],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Versionable[VersionValue, ModelBase]:
+        """Register an already-built versionable, reconciling on collision.
+
+        Accepts a versionable an adapter built elsewhere (e.g. a reflected
+        schema) and routes it through the engine's reconcile-then-store.
+        """
+        engine = engine or cls._default_engine
+        return engine.store_model(version)
+
+    def missing_references(
+        self: ManagerState[VersionValue],
+        version: Versionable[VersionValue, VModel],
+    ) -> frozenset[ModelVersionKey]:
+        """Return the versioned ``(kind, version)`` pairs *version* declares
+        but that are not registered."""
+        return self.engine.registry.missing_references(version)
+
+    def validate_graph(
+        self: ManagerState[VersionValue],
+        version: Versionable[VersionValue, VModel] | None = None,
+    ) -> None:
+        """Validate registered models' declared references are registered.
+
+        Raises :class:`~pyverge.core.MissingReferenceError` on the first model
+        that references an unregistered versioned kind.
+        """
+        self.engine.validate(version)
 
     @classmethod
     def list_versions(

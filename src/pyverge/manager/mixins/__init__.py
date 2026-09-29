@@ -17,6 +17,8 @@ from .models import ModelStoreMixin
 from .targets import TargetResolutionMixin
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from pydantic import BaseModel
 
     from pyverge.migration.engine import Engine
@@ -57,6 +59,18 @@ if TYPE_CHECKING:
             *,
             engine: Engine[VersionValue] | None = None,
         ) -> Versionable[VersionValue, VModel]: ...
+
+        def missing_references(
+            self,
+            version: Versionable[VersionValue, VModel],
+        ) -> frozenset: ...
+
+        def validate_graph(
+            self,
+            version: Versionable[VersionValue, VModel] | None = None,
+        ) -> None: ...
+
+        def attach_hooks(self, hooks: Iterable) -> None: ...
 
         @classmethod
         def compile_target_spec(

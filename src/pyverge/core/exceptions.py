@@ -82,6 +82,85 @@ class ModelAlreadyRegisteredError(RegistryError):
         super().__init__(registry_name, msg)
 
 
+class ModelConflictError(ModelAlreadyRegisteredError):
+    """Raised when a re-registration declares a different field surface.
+
+    Two registrations of the same ``(kind, version)`` must agree on their
+    payload fields (identity fields ignored).  An identical re-registration is
+    a no-op; only a conflicting one raises.  It specializes
+    :class:`ModelAlreadyRegisteredError` so existing handlers keep working.
+
+    Carries the two surface halves as attributes — ``missing`` (registered but
+    absent from the incoming node) and ``extra`` (incoming but not registered)
+    — so a caller can render them without re-diffing.  An optional *subject*
+    names the conflicting registration (e.g. a host primitive); it defaults to
+    the version key.
+    """
+
+    def __init__(
+        self: Self,
+        registry_name: str,
+        version: ModelVersionKey,
+        registered: frozenset[str],
+        incoming: frozenset[str],
+        *,
+        subject: str | None = None,
+    ) -> None:
+        """Initializes ModelConflictError."""
+        super().__init__(registry_name, version)
+        self.registered = registered
+        self.incoming = incoming
+        self.missing = registered - incoming
+        self.extra = incoming - registered
+        self.registry_name = registry_name
+        self.subject = subject or f"{version[0]}@{version[1]}"
+        Exception.__init__(
+            self,
+            f"{self.subject} is already registered with fields "
+            f"{sorted(registered)}, but the new registration declares "
+            f"{sorted(incoming)} "
+            f"(missing: {sorted(self.missing)}, extra: {sorted(self.extra)}). "
+            "Resolve by aligning this declaration to the registered surface, "
+            "aligning the registered model to it, or giving the change its own "
+            "version.",
+        )
+
+
+class MissingReferenceError(RegistryError):
+    """Raised when a registered model references an unregistered version.
+
+    A model's fields may declare versioned child kinds.  The payload walker
+    silently skips unregistered kinds, so a declared-but-absent child can never
+    converge — a latent bug that must fail loud.  Carries ``absent`` (the
+    missing ``(kind, version)`` pairs) so a caller can render them.  An optional
+    *subject* names the referencing registration (e.g. a host primitive); it
+    defaults to the version key.
+    """
+
+    def __init__(
+        self: Self,
+        registry_name: str,
+        version: ModelVersionKey,
+        absent: frozenset[ModelVersionKey],
+        *,
+        subject: str | None = None,
+    ) -> None:
+        """Initializes MissingReferenceError."""
+        self.version = version
+        self.absent = absent
+        self.registry_name = registry_name
+        self.subject = subject or f"{version[0]}@{version[1]}"
+        rendered = ", ".join(f"{kind}@{ver}" for kind, ver in sorted(absent))
+        RegistryError.__init__(
+            self,
+            registry_name,
+            f"{self.subject} references versioned kinds that are not "
+            f"registered ({rendered}); there is no implicit registration. "
+            "Register a model for every referenced version, or give the "
+            "reference its own manager.",
+        )
+
+
 class MigrationPathNotFoundError(RegistryError):
     """Raised when a migration path cannot be found."""
 
