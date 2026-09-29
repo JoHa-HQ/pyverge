@@ -50,9 +50,18 @@ class FakeWeatherClient:
     def __init__(self, reading: CurrentWeather) -> None:
         self.reading = reading
 
-    def current(self, city: str, *, units: str = "celsius") -> CurrentWeather:
+    def resolve(self, city: str) -> tuple[float, float]:
         if city.lower() == "nowhere":
             raise CityNotFound(city)
+        return 52.52, 13.405
+
+    def current(self, city: str, *, units: str = "celsius") -> CurrentWeather:
+        self.resolve(city)
+        return self.reading
+
+    def current_at(
+        self, latitude: float, longitude: float, *, units: str = "celsius"
+    ) -> CurrentWeather:
         return self.reading
 
     def close(self) -> None:  # pragma: no cover - lifecycle parity

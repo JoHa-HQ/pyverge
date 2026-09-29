@@ -23,6 +23,10 @@ from syrupy.assertion import SnapshotAssertion
 
 KIND = "search_weather"
 
+#: Coordinates handed in explicitly — the handler must not geocode them away.
+EXPLICIT_LATITUDE = 40.0
+EXPLICIT_LONGITUDE = -3.0
+
 
 class TestToolConvergence:
     @pytest.mark.parametrize("reading", [SNAPSHOT_READING], indirect=True)
@@ -46,9 +50,70 @@ class TestToolConvergence:
         assert result.structured_content is not None
         assert result.structured_content["units"] == "fahrenheit"
 
+    async def test_explicit_coordinates_bypass_geocode(self, client) -> None:
+        result = await client.call_tool(
+            KIND,
+            {
+                "city": "anywhere",
+                "coordinates": {
+                    "kind": "coordinates",
+                    "version": "1.0.0",
+                    "latitude": EXPLICIT_LATITUDE,
+                    "longitude": EXPLICIT_LONGITUDE,
+                },
+            },
+        )
+        assert result.structured_content is not None
+        coordinates = result.structured_content["coordinates"]
+        assert coordinates["latitude"] == EXPLICIT_LATITUDE
+        assert coordinates["longitude"] == EXPLICIT_LONGITUDE
+
     async def test_unknown_city_surfaces_an_error(self, client) -> None:
         with pytest.raises(ToolError):
             await client.call_tool(KIND, {"city": "nowhere"})
+
+
+class TestSearchProxy:
+    """The ``call_tool`` proxy from the search transform routes versions."""
+
+    @pytest.mark.parametrize("reading", [SNAPSHOT_READING], indirect=True)
+    @pytest.mark.parametrize("version", ALL_VERSIONS, ids=ALL_VERSIONS)
+    async def test_proxy_forwards_version(
+        self, client, version: str, snapshot: SnapshotAssertion
+    ) -> None:
+        result = await client.call_tool(
+            "call_tool",
+            {"name": KIND, "arguments": {"city": "Berlin"}, "version": version},
+        )
+        assert result.structured_content == snapshot
+
+    @pytest.mark.parametrize("reading", [SNAPSHOT_READING], indirect=True)
+    async def test_proxy_without_version_defaults_to_anchor(self, client) -> None:
+        result = await client.call_tool(
+            "call_tool", {"name": KIND, "arguments": {"city": "Berlin"}}
+        )
+        assert result.structured_content is not None
+        assert result.structured_content["temperature"] == SNAPSHOT_READING.temperature
+
+
+class TestVersionAliases:
+    """Every version is callable by its own name, for name-only clients."""
+
+    @pytest.mark.parametrize("reading", [SNAPSHOT_READING], indirect=True)
+    @pytest.mark.parametrize("version", ALL_VERSIONS, ids=ALL_VERSIONS)
+    async def test_alias_call_converges_to_anchor(
+        self, client, version: str, snapshot: SnapshotAssertion
+    ) -> None:
+        result = await client.call_tool(f"{KIND}.v{version}", {"city": "Berlin"})
+        assert result.structured_content == snapshot
+
+    async def test_alias_is_searchable(self, client) -> None:
+        result = await client.call_tool("search_tools", {"query": "weather"})
+        names = {
+            hit["name"] for hit in (result.structured_content or {}).get("result", [])
+        }
+        for version in ALL_VERSIONS:
+            assert f"{KIND}.v{version}" in names
 
 
 class TestArbitraryReadings:
@@ -64,6 +129,12 @@ class TestArbitraryReadings:
             "temperature": reading.temperature,
             "humidity": reading.humidity,
             "wind": reading.wind,
+            "coordinates": {
+                "kind": "coordinates",
+                "version": "1.0.0",
+                "latitude": 52.52,
+                "longitude": 13.405,
+            },
         }
         for version in ALL_VERSIONS:
             result = await client.call_tool(KIND, {"city": "Berlin"}, version=version)
