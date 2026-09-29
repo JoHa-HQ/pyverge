@@ -214,6 +214,10 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# Agent tooling
+.opencode/
+opencode.jsonc
+
 # Hatch-vcs generated version file
 src/pydantic_migrator/_version.py
 
