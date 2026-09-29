@@ -119,6 +119,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 - **Executors** — sequential or level-parallel batch convergence
 - **Model diffing** — breaking-change detection with JSON Patch rendering
 - **Migration hooks** — observability via before/after/error callbacks, plus an OpenTelemetry hook
+- **FastMCP adapter** — version FastMCP tools, prompts, and resources: reflect each versioned primitive into the graph and converge every call to the policy target
 
 ## Documentation
 
@@ -129,6 +130,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 - [Target Policy](docs/target-policy.md)
 - [Migrations](docs/migration.md)
 - [Telemetry & Hooks](docs/telemetry.md)
+- [FastMCP Integration](docs/fastmcp.md)
 - [Testing](docs/testing.md)
 - [Common Usage Patterns](docs/usage.md)
 - [Scenarios](docs/scenarios.md)

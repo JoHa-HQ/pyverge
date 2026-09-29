@@ -167,7 +167,7 @@ B.migrate(user_payload)   # user converges; nested location silently dropped
 | Parent migrated but children stale | missing containment edge -> wrong order |
 | Fields vanish after migration | nested entry not in the target model -> dropped at finalize |
 
-The FastMCP adapter follows this invariant directly: `ToolRegistry` binds
+The FastMCP adapter follows this invariant directly: `ToolDiscovery` binds
 **one** manager, so there is no routing to do — the manager owns the whole graph
 and every tool kind resolves within it.
 

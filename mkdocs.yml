@@ -20,6 +20,7 @@ nav:
   - Execution Flow: execution-flow.md
   - Target Policy: target-policy.md
   - Telemetry & Hooks: telemetry.md
+  - FastMCP Integration: fastmcp.md
   - Testing: testing.md
   - Common Usage Patterns: usage.md
   - Scenarios: scenarios.md
