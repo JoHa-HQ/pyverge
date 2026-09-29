@@ -1,17 +1,3 @@
-"""Migration-format discovery: turn a migration into a :class:`Diff`.
-
-A migration can be authored in different formats — an RFC 6902 JSON Patch
-(:class:`~pyverge.ports.json_patch.JsonPatch`) or a plain Python callable.
-Discovery normalizes either format into the same provider-agnostic
-:class:`Diff`, so the engine and the model adapters never need to know how a
-migration was written.
-
-The discovery strategies are the "migration-format adapters": they are the
-only place that understands a migration's internal representation.  The model
-adapters consume the resulting :class:`Diff` via ``materialize`` and stay
-completely decoupled from the migration format.
-"""
-
 from __future__ import annotations
 
 import ast

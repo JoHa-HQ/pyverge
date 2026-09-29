@@ -1,9 +1,3 @@
-"""Entry-level migration strategies.
-
-A strategy decides how one discovered graph entry migrates. It returns a
-``RunnableMigration``; the executor decides when to run it.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

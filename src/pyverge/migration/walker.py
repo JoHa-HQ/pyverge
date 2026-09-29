@@ -1,5 +1,3 @@
-"""Schema-aware payload discovery walkers."""
-
 from __future__ import annotations
 
 from collections.abc import Iterator

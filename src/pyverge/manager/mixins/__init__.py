@@ -1,11 +1,3 @@
-"""Composition mixins for the :class:`~pyverge.manager.Manager` facade.
-
-Each mixin owns one slice of the manager surface and :class:`Manager` composes
-them in a fixed order.  The typing-only ``_ManagerState`` protocol extends the
-:mod:`pyverge.types` contracts with the cross-mixin collaborators, so a
-mixin can type ``self`` without importing the concrete facade.
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, Protocol

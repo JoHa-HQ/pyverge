@@ -1,5 +1,3 @@
-"""Migration hooks for observability and custom behavior."""
-
 from collections.abc import Mapping
 from typing import Any
 

@@ -1,10 +1,3 @@
-"""Target resolver factories for migration graphs.
-
-The engine is agnostic about *what* version each entry converges to; these
-factories produce the :class:`TargetResolver` it consumes. Declarative spec
-compilation lives in :mod:`~pyverge.manager`.
-"""
-
 from __future__ import annotations
 
 from typing import Literal

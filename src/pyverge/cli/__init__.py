@@ -1,1 +1,0 @@
-"""The pyverge CLI subpackage."""

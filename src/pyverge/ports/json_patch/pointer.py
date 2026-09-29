@@ -1,10 +1,3 @@
-"""JSON Pointer (RFC 6901) internal representation for the JSON Patch provider.
-
-A :class:`Pointer` locates a value inside a single JSON document.  It is
-distinct from the engine's containment :class:`~pyverge.migration.path.Path`,
-which locates a versioned entry inside a payload.
-"""
-
 from __future__ import annotations
 
 from typing import Any

@@ -1,5 +1,3 @@
-"""Injection detection — recognize parameters that are wired, not data."""
-
 from __future__ import annotations
 
 import inspect

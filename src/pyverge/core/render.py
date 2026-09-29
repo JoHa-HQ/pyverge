@@ -1,5 +1,3 @@
-"""Diff renderers: turn a :class:`Diffable` into an exportable representation."""
-
 from dataclasses import dataclass
 from typing import Any, Generic
 

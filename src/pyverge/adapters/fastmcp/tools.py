@@ -1,18 +1,3 @@
-"""Primitive decorators — build a FastMCP component with injections hidden.
-
-A dep-injected parameter is wiring, not payload, so it must not appear in the
-primitive's reflected contract. Apply the decorator **outside** ``@inject`` so
-it sees the raw signature::
-
-    @tool(name="search_weather", version="2.0.0")
-    @inject
-    def search_weather(city: str, weather: WeatherService = Provide[...]) -> dict: ...
-
-Each decorator is overloaded: given a function it returns the built component
-(the ``@tool`` bare form); given only options it returns a decorator
-(``@tool(name=...)`` / the factory ``tool(fn, name=...)``).
-"""
-
 from __future__ import annotations
 
 import inspect
