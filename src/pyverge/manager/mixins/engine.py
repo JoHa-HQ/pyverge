@@ -1,5 +1,3 @@
-"""Engine-lifecycle slice of the composed manager."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generic

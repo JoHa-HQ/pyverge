@@ -1,12 +1,3 @@
-"""JSON Schema model adapter.
-
-:class:`JsonSchemaModelAdapter` converts a JSON Schema document (a plain dict)
-into a Pydantic model via ``datamodel-code-generator`` and registers that model
-with the engine.  The adapter interface operates on ``type[ModelBase]`` only —
-the same contract as :class:`PydanticModelAdapter` — so the engine never sees
-JSON Schema semantics.
-"""
-
 from __future__ import annotations
 
 import json

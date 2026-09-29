@@ -1,5 +1,3 @@
-"""Migrations manager."""
-
 import bisect
 from typing import Any, Generic, Self, cast, overload
 

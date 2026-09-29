@@ -1827,6 +1827,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
   {name = "datamodel-code-generator", specifier = ">=0.76.2"},
+  {name = "dependency-injector", marker = "extra == 'fastmcp'", specifier = ">=4.49.1"},
   {name = "fastmcp", marker = "extra == 'fastmcp'", specifier = ">=4"},
   {name = "jsonpatch", specifier = ">=1.33"},
   {name = "jsonschema", specifier = ">=4.26.0"},
@@ -1859,6 +1860,7 @@ dev = [
 
 [package.optional-dependencies]
 fastmcp = [
+  {name = "dependency-injector"},
   {name = "fastmcp"}
 ]
 

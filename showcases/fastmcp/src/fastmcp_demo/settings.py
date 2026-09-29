@@ -95,8 +95,14 @@ class ServerSettings(BaseSettings):
     """HTTP transport binding for the MCP server."""
 
     host: str = Field(default="127.0.0.1")
-    port: int = Field(default=8000)
+    port: int = Field(default=8001)
     path: str = Field(default="/mcp", description="HTTP path serving MCP.")
+    search_enabled: bool = Field(
+        default=True,
+        description="Expose the BM25 search transform (search_tools + call_tool).",
+    )
+    search_tool_name: str = Field(default="search_tools")
+    search_max_results: int = Field(default=5)
 
     model_config = SettingsConfigDict(
         env_prefix="SERVER_",

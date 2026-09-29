@@ -1,13 +1,13 @@
 """Weather domain: a real upstream client plus the tool's service.
 
 ``WeatherClient`` talks to Open-Meteo (keyless): geocode a city, then read the
-current conditions. ``WeatherService`` returns the anchor (v3) response shape.
+current conditions. ``WeatherService`` returns the anchor (v4) response shape.
 
 The version graph models the API's schema evolution: v1 returned only
-``temperature``, v2 added ``humidity``, v3 added ``wind``. A caller sending an
-older-shaped payload has it converged forward before the service refreshes the
-values from the live API. No framework imports — dependency-injector wires the
-client into the service.
+``temperature``, v2 added ``humidity``, v3 added ``wind``, v4 added the resolved
+``coordinates``. A caller sending an older-shaped payload has it converged
+forward before the service refreshes the values from the live API. No framework
+imports — dependency-injector wires the client into the service.
 """
 
 from __future__ import annotations
@@ -59,10 +59,18 @@ class WeatherClient:
 
     def current(self, city: str, *, units: str = "celsius") -> CurrentWeather:
         """Return the current conditions for *city* in *units*."""
-        latitude, longitude = self._geocode(city)
-        logger.debug(
-            "forecast %s @ (%.3f, %.3f) units=%s", city, latitude, longitude, units
-        )
+        latitude, longitude = self.resolve(city)
+        return self.current_at(latitude, longitude, units=units)
+
+    def resolve(self, city: str) -> tuple[float, float]:
+        """Geocode *city* to ``(latitude, longitude)``."""
+        return self._geocode(city)
+
+    def current_at(
+        self, latitude: float, longitude: float, *, units: str = "celsius"
+    ) -> CurrentWeather:
+        """Return the current conditions at *(latitude, longitude)* in *units*."""
+        logger.debug("forecast @ (%.3f, %.3f) units=%s", latitude, longitude, units)
         temperature_unit, wind_unit = self._settings.unit_params[units]
         response = self._client.get(
             self._settings.forecast_url,
@@ -84,18 +92,38 @@ class WeatherClient:
 
 
 class WeatherService:
-    """Turn a city lookup into the anchor (v3) response shape."""
+    """Turn a city (or explicit coordinates) into the anchor (v4) shape."""
 
     def __init__(self, client: WeatherClient) -> None:
         self._client = client
 
-    def forecast(self, city: str, units: str = "celsius") -> dict:
-        """Fetch *city* and return the current conditions in the v3 shape."""
-        current = self._client.current(city, units=units)
+    def forecast(
+        self,
+        city: str,
+        units: str = "celsius",
+        latitude: float | None = None,
+        longitude: float | None = None,
+    ) -> dict:
+        """Return the current conditions in the v4 shape.
+
+        Explicit *latitude*/*longitude* bypass geocoding; otherwise the city is
+        resolved. The record always reports the coordinates actually queried.
+        """
+        if latitude is not None and longitude is not None:
+            coords = (latitude, longitude)
+        else:
+            coords = self._client.resolve(city)
+        current = self._client.current_at(*coords, units=units)
         return {
             "city": city,
             "units": units,
             "temperature": current.temperature,
             "humidity": current.humidity,
             "wind": current.wind,
+            "coordinates": {
+                "kind": "coordinates",
+                "version": "1.0.0",
+                "latitude": coords[0],
+                "longitude": coords[1],
+            },
         }

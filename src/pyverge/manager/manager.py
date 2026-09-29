@@ -1,33 +1,3 @@
-"""Public facade for building and running migrations.
-
-``Manager`` is a class factory.  ``Manager.configure(...)`` returns a
-configured subclass carrying an initialized ``Registry`` and ``Engine`` at
-class level, so models, migrations and hooks can be registered declaratively
-with the ``model`` / ``migration`` / ``hook`` decorators — no instance required.
-
-The configured class is instantiated for the runtime facade.  Instances share
-the class-level ``Engine`` and ``Registry``.
-
-Example:
-    .. code-block:: python
-
-        UserManager = Manager[semver.Version].configure(
-            settings=MigrationSettings(),
-            adapter=PydanticModelAdapter(),
-        )
-
-        @UserManager.model()
-        class UserV1(BaseModel):
-            kind: Literal["User"] = "User"
-            version: Literal["1.0.0"] = "1.0.0"
-
-        @UserManager.migration("User", "1.0.0", "2.0.0", backward_compatible=True)
-        def add_age(data): ...
-
-        manager = UserManager()
-        result = manager.migrate(payload)
-"""
-
 from __future__ import annotations
 
 from typing import ClassVar

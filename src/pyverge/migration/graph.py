@@ -1,11 +1,3 @@
-"""Dependency graph for convergent migration.
-
-:class:`GraphBuilder` scans a payload for versioned dicts and builds a
-structural containment graph: children converge before parents. A versioned
-entity needs the configured kind/version properties, and the pair must be
-registered.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

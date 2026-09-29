@@ -1,5 +1,3 @@
-"""Migration step strategies — used by :class:`Engine` for execution."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,9 +1,3 @@
-"""Path utilities shared across the migration engine.
-
-The internal path representation — :class:`Path` — is used by the executor
-and the walkers to locate versioned entries inside a payload.
-"""
-
 from __future__ import annotations
 
 from typing import Any

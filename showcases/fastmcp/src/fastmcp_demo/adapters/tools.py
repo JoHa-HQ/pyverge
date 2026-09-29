@@ -3,7 +3,7 @@
 Three physical entities, one per FastMCP primitive type, each the newest
 version of its kind:
 
-* ``search_weather`` — the tool whose parameters form the v3 record,
+* ``search_weather`` — the tool whose parameters form the v4 record,
 * ``weather_briefing`` — the prompt that words the reading (v2),
 * ``weather_reading`` — the resource template that serves the reading (v2).
 
@@ -35,17 +35,26 @@ def search_weather(  # noqa: PLR0913
     temperature: float = 0.0,
     humidity: int = 0,
     wind: float = 0.0,
+    coordinates: dict | None = None,
     weather: WeatherService = Provide["weather_service"],
 ) -> dict:
-    """Search weather for a city (anchor: v3).
+    """Search weather for a city (anchor: v4).
 
-    The parameters form the v3 weather record — an older caller's payload is
+    The parameters form the v4 weather record — an older caller's payload is
     converged to this shape before the handler runs, so ``temperature``,
-    ``humidity`` and ``wind`` arrive populated. The handler refreshes them from
-    the live Open-Meteo API and returns the current reading. ``units`` selects
-    the measurement system. ``weather`` is injected, not part of the payload.
+    ``humidity``, ``wind`` and ``coordinates`` arrive populated. An explicit
+    ``coordinates`` object bypasses geocoding; otherwise ``city`` is resolved.
+    The handler refreshes the reading from the live Open-Meteo API and returns
+    the current record. ``units`` selects the measurement system. ``weather`` is
+    injected, not part of the payload.
     """
-    return weather.forecast(city=city, units=units)
+    latitude = longitude = None
+    if coordinates:
+        latitude = coordinates.get("latitude")
+        longitude = coordinates.get("longitude")
+    return weather.forecast(
+        city=city, units=units, latitude=latitude, longitude=longitude
+    )
 
 
 @prompt(name="weather_briefing", version=PROMPT_VERSION)

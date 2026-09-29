@@ -1,5 +1,3 @@
-"""Type aliases needed in the package."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator

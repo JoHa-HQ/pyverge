@@ -1,11 +1,3 @@
-"""Extended JSON Patch operations, pluggable into :class:`jsonpatch.JsonPatch`.
-
-Subclasses :class:`jsonpatch.PatchOperation` so the extended ops
-(``set_default``, ``coerce``, ``map``, ``split``) can be registered in a
-:class:`jsonpatch.JsonPatch` subclass's ``operations`` mapping and applied in
-a single pass alongside the RFC 6902 core ops.
-"""
-
 from __future__ import annotations
 
 from typing import Any

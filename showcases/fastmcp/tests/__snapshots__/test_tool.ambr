@@ -1,7 +1,73 @@
 # serializer version: 1
+# name: TestSearchProxy.test_proxy_forwards_version[1.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestSearchProxy.test_proxy_forwards_version[2.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestSearchProxy.test_proxy_forwards_version[3.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestSearchProxy.test_proxy_forwards_version[4.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
 # name: TestToolConvergence.test_call_at_any_version_returns_anchor_shape[1.0.0-reading0]
   dict({
     'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
     'humidity': 58,
     'temperature': 21.5,
     'units': 'celsius',
@@ -11,6 +77,12 @@
 # name: TestToolConvergence.test_call_at_any_version_returns_anchor_shape[2.0.0-reading0]
   dict({
     'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
     'humidity': 58,
     'temperature': 21.5,
     'units': 'celsius',
@@ -20,6 +92,87 @@
 # name: TestToolConvergence.test_call_at_any_version_returns_anchor_shape[3.0.0-reading0]
   dict({
     'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestToolConvergence.test_call_at_any_version_returns_anchor_shape[4.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestVersionAliases.test_alias_call_converges_to_anchor[1.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestVersionAliases.test_alias_call_converges_to_anchor[2.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestVersionAliases.test_alias_call_converges_to_anchor[3.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
+    'humidity': 58,
+    'temperature': 21.5,
+    'units': 'celsius',
+    'wind': 12.0,
+  })
+# ---
+# name: TestVersionAliases.test_alias_call_converges_to_anchor[4.0.0-reading0]
+  dict({
+    'city': 'Berlin',
+    'coordinates': dict({
+      'kind': 'coordinates',
+      'latitude': 52.52,
+      'longitude': 13.405,
+      'version': '1.0.0',
+    }),
     'humidity': 58,
     'temperature': 21.5,
     'units': 'celsius',

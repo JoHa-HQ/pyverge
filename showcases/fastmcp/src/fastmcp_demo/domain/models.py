@@ -19,20 +19,36 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class Coordinates(BaseModel):
+    """A resolved location at the anchor version (v1).
+
+    A versioned nested kind: ``SearchWeather`` embeds it, so the engine
+    converges the coordinates to their own target while the outer payload
+    converges to the tool's target.
+    """
+
+    kind: Literal["coordinates"] = "coordinates"
+    version: Literal["1.0.0"] = "1.0.0"
+    latitude: float
+    longitude: float
+
+
 class SearchWeather(BaseModel):
-    """Weather search result at the anchor version (v3).
+    """Weather search result at the anchor version (v4).
 
     The fields mirror Open-Meteo's response schema as it grew: ``temperature``
-    was always present, ``humidity`` arrived in v2, ``wind`` in v3.
+    was always present, ``humidity`` arrived in v2, ``wind`` in v3, and the
+    resolved ``coordinates`` in v4.
     """
 
     kind: Literal["search_weather"] = "search_weather"
-    version: Literal["3.0.0"] = "3.0.0"
+    version: Literal["4.0.0"] = "4.0.0"
     city: str
     units: str = "celsius"
     temperature: float = Field(default=0.0)
     humidity: int = Field(default=0)
     wind: float = Field(default=0.0)
+    coordinates: Coordinates | None = None
 
 
 class WeatherBriefing(BaseModel):

@@ -1,28 +1,3 @@
-"""OpenTelemetry hook — a migration adapter for tracing.
-
-:class:`OTELHook` creates a span per migration with duration, status, and
-exception recording.  It is an adapter over the platform-agnostic
-:class:`~pyverge.core.hooks.MigrationHook` contract: pyverge core never
-imports OpenTelemetry for its own behavior.
-
-The span is opened **as current**, so when a caller has already opened a parent
-span (e.g. a host's call-span middleware), each migration step's span nests
-underneath it — a trace shows the call with one child span per step.
-
-Example:
-    ```python
-    from opentelemetry import trace
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor, OTLPSpanExporter
-
-    provider = TracerProvider()
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
-    trace.set_tracer_provider(provider)
-
-    hook = OTELHook(tracer=trace.get_tracer("converge"), service="converge")
-    ```
-"""
-
 from __future__ import annotations
 
 import time

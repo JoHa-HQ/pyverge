@@ -1,10 +1,3 @@
-"""Shared foundational components for pyverge.
-
-This package holds the provider-agnostic building blocks used by the
-``registry``, ``executor``, ``engine`` and ``migration`` packages.  It has no
-dependencies on the rest of the library — everything else depends on it.
-"""
-
 from .. import types
 from .exceptions import (
     DiscoveryError,

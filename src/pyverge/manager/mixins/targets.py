@@ -1,10 +1,3 @@
-"""Bound target-resolution helpers for the composed manager.
-
-The resolver factories live on :class:`TargetResolutionMixin` as classmethods
-and resolve targets through the shared manager state, so both class- and
-instance-level engines are supported.
-"""
-
 from __future__ import annotations
 
 from functools import singledispatchmethod

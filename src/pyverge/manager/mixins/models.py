@@ -1,5 +1,3 @@
-"""Model registration and lookup slice of the composed manager."""
-
 from __future__ import annotations
 
 from functools import singledispatchmethod

@@ -7,9 +7,11 @@ model in :mod:`fastmcp_demo.domain.models`; older versions are reconstructed
 from it. No FastMCP, no OpenTelemetry.
 
 Three kinds — one per FastMCP primitive type — so every reflection provider
-(tool, prompt, resource) has a physical anchor::
+(tool, prompt, resource) has a physical anchor, plus the nested ``coordinates``
+kind the tool embeds::
 
-    search_weather    tool     v1 -> v2 (+humidity) -> v3 (+wind)
+    search_weather    tool     v1 -> v2 (+humidity) -> v3 (+wind) -> v4 (+coordinates)
+    coordinates       nested   v1 (latitude, longitude)
     weather_briefing  prompt   v1 -> v2 (+style)
     weather_reading   resource v1 -> v2 (+units)
 """
@@ -24,26 +26,28 @@ from pyverge.types import ManagerMigrationKey
 
 from ..settings import GraphSettings
 from . import migrations
-from .models import SearchWeather, WeatherBriefing, WeatherReading
+from .models import Coordinates, SearchWeather, WeatherBriefing, WeatherReading
 
-V1, V2, V3 = "1.0.0", "2.0.0", "3.0.0"
+V1, V2, V3, V4 = "1.0.0", "2.0.0", "3.0.0", "4.0.0"
 
 #: Versions of the versioned tool.
-ALL_VERSIONS = (V1, V2, V3)
-ANCHOR_VERSION = V3
+ALL_VERSIONS = (V1, V2, V3, V4)
+ANCHOR_VERSION = V4
 
 #: The tool's anchor model — the newest version's source of truth.
 ANCHOR_MODEL = SearchWeather
 
 #: Anchor models per kind (registered concretely; older endpoints reconstructed).
-ANCHOR_MODELS = (SearchWeather, WeatherBriefing, WeatherReading)
+ANCHOR_MODELS = (SearchWeather, Coordinates, WeatherBriefing, WeatherReading)
 
 #: Migration edges, newest first: forward edges so the engine reconstructs each
 #: older endpoint from the already-materialized newer one, then the reverse
 #: edges. Each is a plain ``(dict) -> dict`` callable.
 EDGES: tuple[tuple[str, str, str, migrations.Migration], ...] = (
+    ("search_weather", V3, V4, migrations.add_coordinates),
     ("search_weather", V2, V3, migrations.add_wind),
     ("search_weather", V1, V2, migrations.add_humidity),
+    ("search_weather", V4, V3, migrations.drop_coordinates),
     ("search_weather", V3, V2, migrations.drop_wind),
     ("search_weather", V2, V1, migrations.drop_humidity),
     ("weather_briefing", V1, V2, migrations.add_style),

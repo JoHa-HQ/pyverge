@@ -1,11 +1,3 @@
-"""Declarative JSON Patch migration spec adapter.
-
-Compile a declarative spec document into an executable RFC 6902
-:class:`JsonPatch`.  :class:`JsonPatchMigration` is a migration-format
-adapter: it builds a :class:`JsonPatch` — the actual migration function — and
-is itself not callable.
-"""
-
 from __future__ import annotations
 
 from typing import Any

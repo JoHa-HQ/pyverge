@@ -1,9 +1,3 @@
-"""Model version: supports semver and calendar date versioning.
-
-Semver: ``1.0.0``, ``2.1.0-beta``, ``0.1.1.dev7``
-Date:   ``2024-06-01``, ``2025-03-15``
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

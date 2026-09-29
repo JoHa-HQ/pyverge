@@ -1,5 +1,3 @@
-"""Model version diff: pure data with queryable predicates and pluggable rendering."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
