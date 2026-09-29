@@ -1,19 +1,19 @@
 """FastMCP integration adapter.
 
-Plugs pyverge into a FastMCP tool server. The customer hands their manager to
-:class:`ToolRegistry` (a standard FastMCP ``lifespan`` hook); the adapter
-reflects the server through ``list_tools``, registers each versioned tool's
-signature as an anchor, reconciles it against the graph and materializes virtual
-tools for the remaining versions. A per-call :class:`ConvergeMiddleware`
-converges arguments to the policy target before the handler runs.
+Plugs pyverge into a FastMCP server. The customer hands their manager and a set
+of reflection providers to :class:`ToolDiscovery`, which indexes the versioned
+primitives, registers each as an anchor (validating it against the graph), and
+then materializes the virtual surface. The customer drives the lifecycle
+(search → register → enrich); a per-call :class:`ConvergeMiddleware` converges
+arguments to the policy target before the handler runs.
 
 The adapter is a composition over one :class:`~pyverge.manager.Manager` and the
-FastMCP server: endpoint/convergence/reflection helpers here are adapter-local
+FastMCP server: discovery/convergence/reflection helpers here are adapter-local
 representations (they reference both the manager and its model adapter), not a
 neutral port. pyverge core and ports never import FastMCP.
 """
 
-from .converger import Converger
+from .converge import Converger
 from .discovery import ToolDiscovery
 from .injection import (
     InjectionDetector,
@@ -26,12 +26,11 @@ from .middleware import ConvergeMiddleware
 from .reflection import (
     ComponentReflection,
     PromptReflection,
+    ReflectedNode,
     ResourceReflection,
     ToolReflection,
 )
-from .registry import ToolRegistry
-from .schema import SchemaReflection
-from .tools import hide_injected, make_tool
+from .tools import hide_injected, prompt, resource, tool
 
 __all__ = [
     "ComponentReflection",
@@ -39,15 +38,16 @@ __all__ = [
     "Converger",
     "InjectionDetector",
     "PromptReflection",
+    "ReflectedNode",
     "ResourceReflection",
-    "SchemaReflection",
     "ToolDiscovery",
     "ToolReflection",
-    "ToolRegistry",
     "default_injection_detector",
     "hide_injected",
     "injected_names",
-    "make_tool",
     "marker_detector",
     "never_injected",
+    "prompt",
+    "resource",
+    "tool",
 ]

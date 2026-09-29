@@ -1,38 +1,83 @@
-"""End-to-end helpers for the FastMCP adapter suites.
+"""End-to-end fixtures for the FastMCP adapter suites.
 
-Registration and model shapes come from the shared fixtures in ``tests/conftest.py``
-(``model_adapter`` / ``registry`` / ``manager``, parametrized indirectly as in
-``test_manager.py``).  These helpers only wire a manager into a real FastMCP
-server and drive calls through the public ``server.call_tool`` surface — no
-internal wiring is assembled by the tests.
+Registration and model shapes come from the shared fixtures in
+``tests/conftest.py`` (``model_adapter`` / ``registry`` / ``manager``). The
+``app`` fixture builds a test FastMCP server whose lifespan runs the discovery
+lifecycle; the async ``client`` fixture wraps it in a live session, so each test
+case drives the public client surface. No internal wiring is assembled by the
+tests.
 """
 
 from __future__ import annotations
 
-import asyncio
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
 from typing import Any
 
-from fastmcp import FastMCP
+import pytest
+from fastmcp import Client, FastMCP
 
-from pyverge.adapters.fastmcp import ConvergeMiddleware, ToolRegistry
+from pyverge.adapters.fastmcp import (
+    ConvergeMiddleware,
+    ToolDiscovery,
+    ToolReflection,
+)
 
 
-def serve(manager_cls: type, mcp: FastMCP, **registry_kwargs: Any) -> ToolRegistry:
-    """Wire *manager_cls* into *mcp* and run the reflection lifecycle once.
+@dataclass(frozen=True)
+class Case:
+    """A physical tool plus the call that must converge through it.
 
-    The registry is the lifespan hook; the middleware converges each call.
+    Parametrize the ``case`` fixture (indirectly) with a :class:`Case`; the
+    ``app`` fixture materializes its tool and the test drives ``client``.
+    ``call_version`` is negotiated natively (FastMCP's ``version=``).
     """
-    registry = ToolRegistry(manager_cls(), **registry_kwargs)
-    mcp.middleware = [*mcp.middleware, ConvergeMiddleware(registry)]
 
-    async def _lifecycle() -> None:
-        async with registry(mcp):
-            pass
+    id: str
+    kind: str
+    handler: Callable[..., Any]
+    version: str | None = None
+    policies: dict[str, str] = field(default_factory=dict)
+    args: dict[str, Any] = field(default_factory=dict)
+    expected: dict[str, Any] = field(default_factory=dict)
+    call_version: str | None = None
 
-    asyncio.run(_lifecycle())
-    return registry
+
+@pytest.fixture
+def case(request: pytest.FixtureRequest) -> Case:
+    """The parametrized app/call case (set via indirect parametrize)."""
+    return request.param
 
 
-def call_tool(mcp: FastMCP, name: str, arguments: dict) -> Any:
-    """Call a tool synchronously; the public call surface."""
-    return asyncio.run(mcp.call_tool(name, arguments))
+@pytest.fixture
+def app(request: pytest.FixtureRequest, manager: type, case: Case) -> FastMCP:
+    """A test FastMCP server whose lifespan runs the discovery lifecycle.
+
+    The physical tool and its policy come from *case*; the discovery owns the
+    lifecycle and the middleware converges each call. FastMCP enters the lifespan
+    when the ``client`` fixture opens its session.
+    """
+    instance = manager()
+    discovery = ToolDiscovery(
+        instance, [ToolReflection(instance.adapter)], policies=case.policies
+    )
+
+    @asynccontextmanager
+    async def app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
+        await discovery.search(server)
+        discovery.register()
+        await discovery.enrich(server)
+        yield {"discovery": discovery}
+
+    server = FastMCP("TestServer", lifespan=app_lifespan)
+    server.tool(case.handler, name=case.kind, version=case.version)
+    server.middleware = [*server.middleware, ConvergeMiddleware(discovery)]
+    return server
+
+
+@pytest.fixture
+async def client(app: FastMCP) -> AsyncIterator[Client]:
+    """A live client session over *app*, so the lifespan runs per test."""
+    async with Client(app) as active:
+        yield active

@@ -2,21 +2,21 @@
 
 Each adapter carries its own tool case, because the materialized model surface
 differs: the pydantic models declare ``name, email, role, age``; the JSON-schema
-examples materialize to ``name, age``.  The version graph comes from the shared
-``registry`` fixture; calls go through the public ``server.call_tool`` surface.
+examples materialize to ``name, age``. The version graph comes from the shared
+``registry`` fixture; calls go through the live ``client`` fixture, whose session
+runs the discovery lifecycle (the server's lifespan).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
 from typing import Any
 
 import pytest
 import semver
-from conftest import call_tool, serve
+from conftest import Case
 from fastmcp import FastMCP
 
+from pyverge.adapters.fastmcp import ToolDiscovery, ToolReflection
 from pyverge.migration import PydanticModelAdapter
 from pyverge.ports import JsonSchemaModelAdapter
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
@@ -39,57 +39,54 @@ def _lean_handler(name: str, age: int | None = None) -> dict[str, Any]:
     return {"name": name, "age": age}
 
 
-@dataclass(frozen=True)
-class ToolCase:
-    """A tool declaration plus the convergence a call must perform."""
-
-    id: str
-    kind: str
-    version: str
-    handler: Callable[..., Any]
-    args: dict[str, Any]
-    expected: dict[str, Any]
-
-
 RICH_CALLS = (
-    ToolCase(
+    Case(
         id="v1-call-converges",
         kind="User",
         version="2.0.0",
         handler=_rich_handler,
-        args={"name": "A", "email": "a@b.c", "role": "user", "version": "1.0.0"},
+        policies={"User": "latest"},
+        args={"name": "A", "email": "a@b.c", "role": "user"},
         expected={"name": "A", "email": "a@b.c", "role": "user", "age": None},
+        call_version="1.0.0",
     ),
-    ToolCase(
+    Case(
         id="v2-call-serves",
         kind="User",
         version="2.0.0",
         handler=_rich_handler,
-        args={"name": "A", "email": "a@b.c", "role": "user", "version": "2.0.0"},
+        policies={"User": "latest"},
+        args={"name": "A", "email": "a@b.c", "role": "user"},
         expected={"name": "A", "email": "a@b.c", "role": "user", "age": None},
+        call_version="2.0.0",
     ),
 )
 
 LEAN_CALLS = (
-    ToolCase(
+    Case(
         id="v1-call-converges",
         kind="User",
         version="2.0.0",
         handler=_lean_handler,
-        args={"name": "A", "version": "1.0.0"},
+        policies={"User": "latest"},
+        args={"name": "A"},
         expected={"name": "A", "age": None},
+        call_version="1.0.0",
     ),
-    ToolCase(
+    Case(
         id="v2-call-serves",
         kind="User",
         version="2.0.0",
         handler=_lean_handler,
-        args={"name": "A", "version": "2.0.0"},
+        policies={"User": "latest"},
+        args={"name": "A"},
         expected={"name": "A", "age": None},
+        call_version="2.0.0",
     ),
 )
 
 
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     "model_adapter, registry, case",
     [
@@ -120,28 +117,59 @@ LEAN_CALLS = (
         )
         for lean_call in LEAN_CALLS
     ],
-    indirect=["model_adapter", "registry"],
+    indirect=["model_adapter", "registry", "case"],
 )
-def test_call_at_any_version_reaches_the_handler(
-    manager: type, registry, case: ToolCase
-) -> None:
-    mcp = FastMCP("S")
-    mcp.tool(case.handler, name=case.kind, version=case.version)
-
-    serve(manager, mcp, policies={case.kind: "latest"})
-    result = call_tool(mcp, case.kind, case.args)
-
+async def test_call_at_any_version_reaches_the_handler(client, case: Case) -> None:
+    result = await client.call_tool(case.kind, case.args, version=case.call_version)
     assert result.structured_content == case.expected
 
 
-def test_unrelated_tool_is_left_untouched(manager: type, registry) -> None:
-    mcp = FastMCP("S")
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry, case",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "user_test", [], []],
+            Case(
+                id="unrelated",
+                kind="unrelated",
+                handler=lambda a: {"a": a},
+                policies={},
+                args={"a": "x"},
+                expected={"a": "x"},
+            ),
+            id="pydantic-unrelated",
+        ),
+    ],
+    indirect=["model_adapter", "registry", "case"],
+)
+async def test_unrelated_tool_is_left_untouched(client, case: Case) -> None:
+    result = await client.call_tool(case.kind, case.args)
+    assert result.structured_content == case.expected
 
-    @mcp.tool
-    def unrelated(a: str) -> dict[str, Any]:
-        return {"a": a}
 
-    serve(manager, mcp, policies={"User": "latest"})
-    result = call_tool(mcp, "unrelated", {"a": "x"})
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "user_test", [UserV1, UserV2], []],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+async def test_owned_kind_without_policy_fails_fast(manager: type) -> None:
+    """A versioned primitive of an owned kind but with no policy fails the lifecycle.
 
-    assert result.structured_content == {"a": "x"}
+    There is no silent default: every exposed kind needs an explicit policy.
+    """
+    instance = manager()
+    discovery = ToolDiscovery(instance, [ToolReflection(instance.adapter)])
+    server = FastMCP("TestServer")
+    server.tool(_rich_handler, name="User", version="2.0.0")
+
+    with pytest.raises(ValueError, match="has no policy"):
+        await discovery.search(server)

@@ -1,13 +1,4 @@
-"""Injection detection — recognize parameters that are wired, not data.
-
-A callable's signature is its contract: every parameter is a field the caller
-may send. A dependency-injected parameter breaks that — it is wiring, not
-payload — so the reflected schema must exclude it.
-
-No DI library is imported eagerly: :func:`default_injection_detector` probes for
-the markers of known libraries and falls back to a no-op. Detection is a plain
-predicate over an ``inspect.Parameter``, so a host can supply its own.
-"""
+"""Injection detection — recognize parameters that are wired, not data."""
 
 from __future__ import annotations
 
@@ -17,12 +8,18 @@ from typing import TypeAlias
 
 
 def never_injected(parameter: inspect.Parameter) -> bool:
-    """Default detector: no parameter is injected."""
+    """Detect no injection — the fallback when no DI library is present."""
     return False
 
 
 def marker_detector(*marker_types: type) -> Callable[[inspect.Parameter], bool]:
-    """Detect a parameter whose default is an instance of a marker type."""
+    """Detect a parameter whose default is an instance of a marker type.
+
+    A callable's signature is its contract: every parameter is a field the
+    caller may send. A dependency-injected parameter breaks that — it is wiring,
+    not payload — so the reflected schema must exclude it. A marker type (e.g.
+    a DI provider reference used as a default) identifies such a parameter.
+    """
 
     def detect(parameter: inspect.Parameter) -> bool:
         default = parameter.default
