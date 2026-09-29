@@ -7,7 +7,7 @@ from typing import Any
 
 from fastmcp.tools.function_tool import FunctionTool
 
-from pyverge.serving.injection import InjectionDetector, injected_names
+from .injection import InjectionDetector, injected_names
 
 
 def hide_injected(fn: Any, detector: InjectionDetector | None = None) -> set[str]:

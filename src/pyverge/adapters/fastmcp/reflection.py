@@ -3,7 +3,7 @@
 A FastMCP tool carries its input schema directly; a prompt's arguments and a
 resource's parameters must be synthesized into one. Each reflector only turns
 the component into a schema document; the schema→versionable work is
-framework-agnostic and lives in :mod:`pyverge.serving.reflection`.
+adapter-local and lives in :mod:`.schema`.
 """
 
 from __future__ import annotations
@@ -11,7 +11,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any
 
-from pyverge.serving import SchemaReflection, injected_names
+from .injection import injected_names
+from .schema import SchemaReflection
 
 
 class ComponentReflection(ABC):

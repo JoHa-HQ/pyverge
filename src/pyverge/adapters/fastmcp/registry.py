@@ -1,10 +1,10 @@
 """ToolRegistry — the FastMCP reflection lifecycle in one pipeline.
 
-The `lifespan` hook the customer hands to FastMCP. It owns the FastMCP-specific
-wiring only: discovery (``list_tools``), the four ordered phases, virtual-tool
-materialization and hook attachment. The framework-agnostic work — injection
-detection, schema reflection, contract checks, call convergence — lives in
-:mod:`pyverge.serving`.
+The `lifespan` hook the customer hands to FastMCP. It owns the four ordered
+phases over the physical-tool index: ``search`` (find versioned tools),
+``register`` (materialize each signature as an anchor), ``reconcile`` (validate
+the reflected schema against the graph), ``enrich`` (precompute paths,
+materialize virtual tools, attach hooks).
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
 from pyverge.manager import Manager
-from pyverge.serving import SchemaReflection, ServingContract, injected_names
-from pyverge.serving.convergence import Converger
-from pyverge.serving.reflection import IDENTITY
 from pyverge.types import Attachable
 
+from .converger import Converger
 from .discovery import ToolDiscovery
+from .injection import injected_names
+from .schema import IDENTITY, SchemaReflection
 
 if TYPE_CHECKING:
     from fastmcp import FastMCP
@@ -60,7 +60,6 @@ class ToolRegistry:
             policies=policies,
             fallback_policy=fallback_policy,
         )
-        self._contract = ServingContract(manager, self._converger.owns)
 
     @asynccontextmanager
     async def __call__(self, server: FastMCP):
@@ -121,12 +120,54 @@ class ToolRegistry:
     # -- phase: reconcile ---------------------------------------------------
 
     async def reconcile(self, server: FastMCP) -> None:
-        """Validate each reflected signature against the registered contract."""
+        """Validate each reflected signature against the registered graph.
+
+        Two invariants:
+
+        * every versioned kind a tool's model references must be registered —
+          the walker silently skips unregistered kinds, so a declared-but-absent
+          child could never converge;
+        * the tool's signature must agree with the registered contract (same
+          field surface, minus the identity fields).
+        """
         for (kind, version), tool in self._physical.items():
-            schema_reflection = self._reflection(kind, version, tool)
-            self._contract.check_registered(kind, version)
-            self._contract.check_signature(kind, version, schema_reflection.schema)
-            self._contract.check_agreement(kind, version, schema_reflection)
+            node = self._manager.get(kind, version)
+            missing = self._manager.engine.registry.missing_references(node)
+            if missing:
+                absent = ", ".join(f"{k}@{v}" for k, v in sorted(missing))
+                raise ValueError(
+                    f"tool {kind!r}@{version} references unregistered versioned "
+                    f"kinds ({absent}); there is no implicit registration"
+                )
+            self._check_agreement(kind, version, self._reflection(kind, version, tool))
+
+    def _check_agreement(
+        self, kind: str, version: str, reflection: SchemaReflection
+    ) -> None:
+        """Fail when the reflected signature drifts from the registered model.
+
+        A schema-based adapter materializes the reflected document; a typed
+        adapter that refuses raw schemas yields no model, so the check is
+        skipped (the reference walk already covers the registered side).
+        """
+        registered = self._manager.get(kind, version).model
+        if registered is None:
+            return
+        try:
+            reflected = reflection.versionable().model
+        except (AttributeError, TypeError, ValueError):
+            return
+        if reflected is None:
+            return
+        registered_fields = {n for n in registered.model_fields if n not in IDENTITY}
+        reflected_fields = {n for n in reflected.model_fields if n not in IDENTITY}
+        if registered_fields != reflected_fields:
+            raise ValueError(
+                f"tool {kind!r}@{version} signature reflects fields "
+                f"{sorted(reflected_fields)} but its registered model declares "
+                f"{sorted(registered_fields)}; register a matching model or align "
+                "the signature"
+            )
 
     # -- phase: enrich ------------------------------------------------------
 

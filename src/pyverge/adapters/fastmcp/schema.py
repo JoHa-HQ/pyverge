@@ -1,12 +1,11 @@
 """Schema reflection — wrap a reflected schema document as a versionable.
 
-A host framework reflects one of its primitives (a tool's input schema, a
-prompt's arguments) into a JSON Schema document. This module turns that document
-into a pyverge model: it drops injected parameters (wiring, not payload) and
-injects the ``kind``/``version`` identity fields, then wraps the result through
-the model adapter.
+FastMCP reflects a tool's input schema (or a prompt's arguments) into a JSON
+Schema document. This helper turns that document into a pyverge model: it drops
+injected parameters (wiring, not payload) and injects the ``kind``/``version``
+identity fields, then wraps the result through the manager's model adapter.
 
-The host supplies the document; nothing here knows the framework.
+Adapter-local: it needs both the reflected document and the model adapter.
 """
 
 from __future__ import annotations

@@ -7,22 +7,21 @@ signature as an anchor, reconciles it against the graph and materializes virtual
 tools for the remaining versions. A per-call :class:`ConvergeMiddleware`
 converges arguments to the policy target before the handler runs.
 
-The framework-agnostic work lives in :mod:`pyverge.serving`; this package is the
-FastMCP context wiring only. pyverge core and ports never import FastMCP.
+The adapter is a composition over one :class:`~pyverge.manager.Manager` and the
+FastMCP server: endpoint/convergence/reflection helpers here are adapter-local
+representations (they reference both the manager and its model adapter), not a
+neutral port. pyverge core and ports never import FastMCP.
 """
 
-from pyverge.serving import (
-    Converger,
+from .converger import Converger
+from .discovery import ToolDiscovery
+from .injection import (
     InjectionDetector,
-    SchemaReflection,
-    ServingContract,
     default_injection_detector,
     injected_names,
     marker_detector,
     never_injected,
 )
-
-from .discovery import ToolDiscovery
 from .middleware import ConvergeMiddleware
 from .reflection import (
     ComponentReflection,
@@ -31,6 +30,7 @@ from .reflection import (
     ToolReflection,
 )
 from .registry import ToolRegistry
+from .schema import SchemaReflection
 from .tools import hide_injected, make_tool
 
 __all__ = [
@@ -41,7 +41,6 @@ __all__ = [
     "PromptReflection",
     "ResourceReflection",
     "SchemaReflection",
-    "ServingContract",
     "ToolDiscovery",
     "ToolReflection",
     "ToolRegistry",

@@ -1,16 +1,9 @@
-"""Shared fixtures for the FastMCP adapter suites.
+"""End-to-end fixtures for the FastMCP adapter suites.
 
-Common plumbing is factored into fixtures so each usage case stays a thin,
-self-contained suite:
-
-* :func:`manager` — a fresh manager instance (no registrations),
-  parametrized over the JSON-Schema and pydantic model adapters,
-* :func:`store_schema` / :func:`store_patch` — registration helpers that
-  build the right model shape for the manager's bound adapter,
-* :func:`weather_chain` — a manager owning ``search_weather`` v1→v2,
-* :func:`configured_server` — a fully configured FastMCP server: registers
-  the models against the managers, reflects/registers/enriches a server and
-  returns ``(mcp, registry)``.
+Tests drive the adapter through public interfaces only: a real ``FastMCP`` server
+configured with a :class:`ToolRegistry` as its lifespan and a
+:class:`ConvergeMiddleware` in its middleware chain, then calls go through
+``server.call_tool``.  No internal wiring is assembled by the tests.
 """
 
 from __future__ import annotations
@@ -20,10 +13,11 @@ from typing import Any
 
 import pytest
 import semver
+from fastmcp import FastMCP
 from pydantic import create_model
 
 from pyverge import Manager
-from pyverge.adapters.fastmcp import ToolRegistry
+from pyverge.adapters.fastmcp import ConvergeMiddleware, ToolRegistry
 from pyverge.migration import (
     JsonPatchMigration,
     JsonSchemaModelAdapter,
@@ -31,25 +25,18 @@ from pyverge.migration import (
 )
 from pyverge.types import ManagerMigrationKey
 
+SETTINGS = MigrationSettings(
+    direction="forward",
+    on_missing_path="raise",
+    on_missing="reconstruct_model",
+)
+
 
 @pytest.fixture(params=["json", "pydantic"])
 def manager(request, pydantic_model_adapter, json_model_adapter) -> Manager:
-    """A fresh manager instance, parametrized over the model adapter.
-
-    The FastMCP suites run against both the JSON-Schema adapter (raw schemas
-    registered as dicts) and the pydantic adapter (models built with
-    ``create_model``), so the routing fixture inherits the selected adapter.
-    """
+    """A fresh manager, parametrized over the JSON-Schema and pydantic adapters."""
     adapter = json_model_adapter if request.param == "json" else pydantic_model_adapter
-    UserManager = Manager[semver.Version].configure(
-        MigrationSettings(
-            direction="forward",
-            on_missing_path="raise",
-            on_missing="reconstruct_model",
-        ),
-        adapter,
-    )
-    return UserManager()
+    return Manager[semver.Version].configure(SETTINGS, adapter)()
 
 
 def _model_from_schema(kind: str, version: str, props: dict, required: list[str]):
@@ -69,18 +56,10 @@ def _model_from_schema(kind: str, version: str, props: dict, required: list[str]
     return create_model(f"{kind}_{version}".replace(".", "_"), **fields)
 
 
-def _store_model(
-    manager: Manager,
-    kind: str,
-    version: str,
-    props: dict,
-    required: list[str],
+def store_model(
+    manager: Manager, kind: str, version: str, props: dict, required: list[str]
 ) -> None:
-    """Register one versioned model for *kind* into *manager*.
-
-    The input shape depends on the adapter the manager is bound to: a raw
-    JSON-Schema dict for the JSON adapter, a pydantic model otherwise.
-    """
+    """Register one versioned model, shaped for the manager's adapter."""
     props = dict(props)
     props.setdefault("kind", {"type": "string", "default": kind})
     props.setdefault("version", {"type": "string", "default": version})
@@ -97,49 +76,25 @@ def _store_model(
         manager.store_model(_model_from_schema(kind, version, props, required))
 
 
-@pytest.fixture
-def store_schema():
-    """Register one versioned model for *kind* into *manager*."""
-
-    def _store(
-        manager: Manager,
-        kind: str,
-        version: str,
-        props: dict,
-        required: list[str],
-    ) -> None:
-        _store_model(manager, kind, version, props, required)
-
-    return _store
-
-
-@pytest.fixture
-def store_patch():
+def store_patch(manager: Manager, kind: str, spec: dict) -> None:
     """Register one RFC 6902 JSON Patch migration for *kind*."""
-
-    def _store(manager: Manager, kind: str, spec: dict) -> None:
-        manager.store_migration(
-            ManagerMigrationKey(kind, spec["from"], spec["to"]),
-            JsonPatchMigration(spec).patch,
-        )
-
-    return _store
+    manager.store_migration(
+        ManagerMigrationKey(kind, spec["from"], spec["to"]),
+        JsonPatchMigration(spec).patch,
+    )
 
 
 @pytest.fixture
-def weather_chain(manager: Manager, store_schema, store_patch) -> Manager:
-    """A manager owning a ``search_weather`` chain: v1 → v2 (adds humidity)."""
-    store_schema(
+def weather_manager(manager: Manager) -> Manager:
+    """A manager owning ``search_weather`` v1 -> v2 (adds humidity)."""
+    store_model(
         manager, "search_weather", "1.0.0", {"city": {"type": "string"}}, ["city"]
     )
-    store_schema(
+    store_model(
         manager,
         "search_weather",
         "2.0.0",
-        {
-            "city": {"type": "string"},
-            "humidity": {"type": "boolean", "default": False},
-        },
+        {"city": {"type": "string"}, "humidity": {"type": "boolean", "default": False}},
         ["city"],
     )
     store_patch(
@@ -154,21 +109,22 @@ def weather_chain(manager: Manager, store_schema, store_patch) -> Manager:
     return manager
 
 
-@pytest.fixture
-def configured_server():
-    """Return a fully configured FastMCP server: ``(mcp, registry)``.
+def running_server(manager: Manager, mcp: FastMCP, **registry_kwargs) -> FastMCP:
+    """Wire *manager* into *mcp* and run the reflection lifecycle once.
 
-    Runs the registry's real lifespan (search → register → enrich) against the
-    given server instance, then hands the pair back for assertions and calling.
+    The registry is the lifespan hook; the middleware converges each call.
     """
+    registry = ToolRegistry(manager, **registry_kwargs)
+    mcp.middleware = [*mcp.middleware, ConvergeMiddleware(registry)]
 
-    async def _lifecycle(registry: ToolRegistry, mcp) -> None:
+    async def _lifecycle() -> None:
         async with registry(mcp):
             pass
 
-    def _configure(manager: Manager, mcp, **registry_kwargs):
-        registry = ToolRegistry(manager, **registry_kwargs)
-        asyncio.run(_lifecycle(registry, mcp))
-        return mcp, registry
+    asyncio.run(_lifecycle())
+    return mcp
 
-    return _configure
+
+def call_tool(mcp: FastMCP, name: str, arguments: dict):
+    """Call a tool synchronously; the public call surface."""
+    return asyncio.run(mcp.call_tool(name, arguments))
