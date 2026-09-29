@@ -19,8 +19,10 @@ import inspect
 from dependency_injector import containers, providers, resources
 
 from .adapters import (
+    CallLoggingMiddleware,
     build_discovery,
     build_lifespan,
+    build_search_transform,
     build_server,
     make_call_span_middleware,
     make_migration_hooks,
@@ -53,8 +55,15 @@ class _Prepared(resources.AsyncResource[DemoService]):
 
 
 def _call_middleware(span_middleware):
-    """Return the host middleware stack, dropping the disabled tracer's None."""
-    return [] if span_middleware is None else [span_middleware]
+    """Return the host middleware stack, dropping the disabled tracer's None.
+
+    Call logging is always present; the tracing span middleware is added only
+    when the tracer is enabled.
+    """
+    stack = [CallLoggingMiddleware()]
+    if span_middleware is not None:
+        stack.append(span_middleware)
+    return stack
 
 
 class DemoContainer(containers.DeclarativeContainer):
@@ -94,7 +103,14 @@ class DemoContainer(containers.DeclarativeContainer):
     )
     server = providers.Singleton(
         build_server,
-        lifespan=providers.Callable(build_lifespan, discovery=discovery),
+        lifespan=providers.Callable(
+            build_lifespan,
+            discovery=discovery,
+            transforms=providers.Callable(
+                build_search_transform,
+                settings=settings.provided.server,
+            ),
+        ),
         middleware=providers.Callable(
             _call_middleware,
             providers.Callable(
