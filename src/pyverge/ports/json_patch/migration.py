@@ -32,6 +32,7 @@ class JsonPatchMigration:
         ops = spec.get("ops")
         if not isinstance(ops, list) or not ops:
             raise ValueError("Migration spec requires a non-empty 'ops' list")
+        self.spec = dict(spec)
         self._patch = JsonPatch(self._translate(ops))
 
     @staticmethod

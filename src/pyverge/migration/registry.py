@@ -10,7 +10,7 @@ from pyverge.core.exceptions import (
     ModelNotFoundError,
     RegistryError,
 )
-from pyverge.core.versioning import SentinelEdge
+from pyverge.core.versioning import SentinelEdge, VersionNode
 from pyverge.types import (
     Attachable,
     Comparable,
@@ -19,6 +19,7 @@ from pyverge.types import (
     MigrationFunc,
     ModelBase,
     ModelKind,
+    ModelVersionKey,
     ProviderBase,
     Transitional,
     Versionable,
@@ -61,43 +62,6 @@ class Registry(Generic[VersionValue, ProviderBase]):
     """
 
     def __init__(self: Self, *, name: str | None = None) -> None:
-        """Create a named registry.
-
-        Internal indexes
-        ----------------
-        ``_by_versions``
-            All registered versions in sorted order.  Used for
-            bisect-based lookups and range queries.
-
-        ``_by_kinds``
-            Versions grouped by model family (kind).  Each value
-            is independently sorted.  Used to walk a single kind's
-            version chain for path resolution.
-
-        ``_by_models``
-            Inverted mapping from Pydantic model class to its
-            registered version.  Used for class-keyed lookups.
-
-        ``_backward_compatible``
-            Subset of versions explicitly marked as
-            backward-compatible; kept sorted for membership tests.
-
-        ``_migration_path``
-            Per-kind sorted lists of registered migration edges,
-            maintained via ``bisect.insort``.  Each entry is a
-            ``(from_version, to_version)`` pair.  Critical edges
-            are those whose endpoints are adjacent in the kind's
-            version list.
-
-        ``_edges_by_version``
-            Inverted index from a version to the set of migration
-            edges that reference it as source or target.  Maintained
-            on every migration store/remove; used for O(1) integrity
-            checks when removing a model version.
-
-        ``_hooks``
-            Per-edge lists of observer hooks fired during migration.
-        """
         self._name = name or "registry"
         self._by_versions: list[Versionable[VersionValue, ProviderBase]] = []
         self._by_kinds: dict[
@@ -208,6 +172,23 @@ class Registry(Generic[VersionValue, ProviderBase]):
         idx = bisect.bisect_left(self._by_versions, key)
         return idx < len(self._by_versions) and self._by_versions[idx] == key
 
+    def missing_references(
+        self: Self, node: Versionable[VersionValue, ProviderBase]
+    ) -> frozenset[ModelVersionKey]:
+        """The ``(kind, version)`` pairs *node* declares but that are absent.
+
+        *node* must itself be registered.
+        """
+        registered = self.get_model(node)
+        missing = []
+        for kind, version in registered.references:
+            sentinel = VersionNode[VersionValue, ProviderBase](
+                _model=None, _value=version, _kind=kind
+            )
+            if not self.has_model(sentinel):
+                missing.append((kind, version))
+        return frozenset(missing)
+
     def _find_edge(
         self: Self,
         kind: ModelKind,
@@ -286,7 +267,11 @@ class Registry(Generic[VersionValue, ProviderBase]):
         self: Self,
         version: Versionable[VersionValue, ProviderBase],
     ) -> Versionable[VersionValue, ProviderBase]:
-        """Register a model class at *version*."""
+        """Register a model at *version*.
+
+        A duplicate ``(kind, version)`` raises
+        :class:`ModelAlreadyRegisteredError`; reconciliation is the engine's.
+        """
         if version in self._by_versions:
             raise ModelAlreadyRegisteredError(
                 registry_name=self._name,
@@ -315,10 +300,7 @@ class Registry(Generic[VersionValue, ProviderBase]):
         raise ModelNotFoundError(self._name, cls)
 
     def remove_model(self: Self, key: Comparable) -> None:
-        """
-        Refuses to remove a version still referenced by registered
-        migration edges — remove those migrations first.
-        """
+        """Refuse to remove a version still referenced by a migration edge."""
 
         version_idx = bisect.bisect_left(self._by_versions, key)
         kind_idx = bisect.bisect_left(self._by_kinds[key.kind], key)
@@ -394,10 +376,7 @@ class Registry(Generic[VersionValue, ProviderBase]):
         self: Self,
         key: Transitional[VersionValue, VSource_co, VTarget_co],
     ) -> None:
-        """
-        A migration with registered hooks cannot be removed —
-        clear the hooks first.
-        """
+        """Remove a migration; refuses one with registered hooks."""
         if key in self._hooks:
             raise RegistryError(
                 self._name,

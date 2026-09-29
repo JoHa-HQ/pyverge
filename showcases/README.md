@@ -23,6 +23,12 @@ involved, wrap a real driver in a thin adapter.
 - [HTTP APIs (httpx transport)](http-apis.md) — converging request/response payloads around a versioned API (projected)
 - [LLM Tool Schemas (MCP SDK & FastMCP)](llm-tools.md) — converging tool-call arguments across MCP SDK and FastMCP (projected)
 
+## Runnable examples
+
+- [FastMCP + OpenTelemetry](fastmcp/README.md) — a versioned FastMCP server with
+  a self-driving demo and a Jaeger dashboard via `docker compose`. Shipped and
+  runnable.
+
 ## What's glue vs. engine
 
 | Concern | Where it lives |

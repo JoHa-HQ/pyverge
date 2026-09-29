@@ -22,11 +22,11 @@ from pydantic import BaseModel
 from semver import Version as SemVer
 
 if TYPE_CHECKING:
-    from pyverge.adapters import JsonPatchMigration
     from pyverge.core.settings import MigrationSettings
     from pyverge.migration.engine import Engine
     from pyverge.migration.graph import GraphEntry, MigrationGraph
     from pyverge.migration.registry import Registry
+    from pyverge.ports import JsonPatchMigration
 
 ModelBase: TypeAlias = BaseModel
 
@@ -128,6 +128,20 @@ class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co, VModel_
 
     @property
     def model(self) -> type[VModel_co]: ...
+
+    @property
+    def references(self) -> frozenset[ModelVersionKey]:
+        """Versioned ``(kind, version)`` pairs the model's fields declare."""
+        ...
+
+    @property
+    def fields(self) -> frozenset[str]:
+        """The model's field names, minus the identity fields.
+
+        Computed by the adapter when the node is built (like ``references``),
+        so the engine can compare two nodes' shapes without an adapter.
+        """
+        ...
 
 
 @runtime_checkable
@@ -309,6 +323,16 @@ class ModelAdapter(Protocol):
 
     def version(self, model_cls: type[Any]) -> str: ...
     def kind(self, model_cls: type[Any]) -> str: ...
+    @property
+    def version_property(self) -> str:
+        """The field name carrying a model's version."""
+        ...
+
+    @property
+    def kind_property(self) -> str:
+        """The field name carrying a model's kind."""
+        ...
+
     def of(self, value: str | VersionValue) -> VersionValue:
         """Parse a version string, or pass through an already-parsed value.
 
@@ -331,6 +355,15 @@ class ModelAdapter(Protocol):
     def field_model(
         self, parent_model: type[Any], field_name: str
     ) -> type[ModelBase] | None: ...
+    def references(self, model_cls: type[Any]) -> frozenset[ModelVersionKey]:
+        """Return every versioned ``(kind, version)`` the model's fields declare.
+
+        Walks annotations recursively and collects **all** model classes they
+        mention — every ``Union`` member, ``list`` items — not just the first,
+        so a model declaring several versions of a nested kind reports all.
+        """
+        ...
+
     def versionable(
         self,
         model_cls: type[VModel_co] | None,

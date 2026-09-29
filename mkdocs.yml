@@ -15,11 +15,13 @@ theme:
 nav:
   - Home: getting-started.md
   - Concepts: concepts.md
-  - Registration: registration.md
+  - Managers: managers.md
   - Migrations: migration.md
   - Execution Flow: execution-flow.md
   - Target Policy: target-policy.md
   - Telemetry & Hooks: telemetry.md
+  - FastMCP Integration: fastmcp.md
+  - Testing: testing.md
   - Common Usage Patterns: usage.md
   - Scenarios: scenarios.md
 

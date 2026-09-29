@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from itertools import pairwise
 from typing import Any
 from unittest.mock import MagicMock
@@ -14,7 +15,8 @@ from pyverge.core import (
     MigrationHook,
     MigrationNotFoundError,
     MigrationSettings,
-    ModelAlreadyRegisteredError,
+    MissingReferenceError,
+    ModelConflictError,
     ModelNotFoundError,
     RegistryError,
     SentinelEdge,
@@ -33,6 +35,9 @@ from pyverge.migration import (
 )
 from tests.examples.json import (
     ADDRESS_V1_0_0,
+    ADDRESS_V2_0_0,
+    ADDRESS_V3_0_0,
+    PERSON_V1_0_0,
     USER_V0_1_1_DEV_7,
     USER_V1_0_0,
     USER_V1_2_3,
@@ -49,7 +54,12 @@ from tests.examples.pydantic.semver import (
     UserV2,
     UserV3,
 )
-from tests.examples.pydantic.semver_nested import AddressV1
+from tests.examples.pydantic.semver_nested import (
+    AddressV1,
+    AddressV2,
+    AddressV3,
+    PersonV1,
+)
 from tests.utils import envelope_model, meta_versionable
 
 
@@ -107,28 +117,39 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV1], []],
                 lambda engine: engine.store_model(
-                    envelope_model(engine.adapter, engine.settings, UserV1)
+                    replace(
+                        envelope_model(engine.adapter, engine.settings, UserV1),
+                        fields=frozenset({"conflict"}),
+                    )
                 ),
-                ModelAlreadyRegisteredError,
-                id="store_duplicate_pydantic_semver",
+                ModelConflictError,
+                id="store_conflict_pydantic_semver",
             ),
             pytest.param(
                 PydanticModelAdapter,
                 [pendulum.Date, "test", [UserV20250310], []],
                 lambda engine: engine.store_model(
-                    envelope_model(engine.adapter, engine.settings, UserV20250310)
+                    replace(
+                        envelope_model(engine.adapter, engine.settings, UserV20250310),
+                        fields=frozenset({"conflict"}),
+                    )
                 ),
-                ModelAlreadyRegisteredError,
-                id="store_duplicate_pydantic_pendulum",
+                ModelConflictError,
+                id="store_conflict_pydantic_pendulum",
             ),
             pytest.param(
                 JsonSchemaModelAdapter,
                 [semver.Version, "test", [USER_V0_1_1_DEV_7], []],
                 lambda engine: engine.store_model(
-                    envelope_model(engine.adapter, engine.settings, USER_V0_1_1_DEV_7)
+                    replace(
+                        envelope_model(
+                            engine.adapter, engine.settings, USER_V0_1_1_DEV_7
+                        ),
+                        fields=frozenset({"conflict"}),
+                    )
                 ),
-                ModelAlreadyRegisteredError,
-                id="store_duplicate_json_semver",
+                ModelConflictError,
+                id="store_conflict_json_semver",
             ),
         ],
         indirect=["model_adapter", "registry"],
@@ -141,6 +162,134 @@ class TestModelManagement:
     ) -> None:
         with pytest.raises(expected):
             operation(engine)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1], []],
+                UserV1,
+                id="pydantic_semver",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "test", [USER_V1_0_0], []],
+                USER_V1_0_0,
+                id="json_semver",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_conflict_reports_structured_surface(
+        self,
+        model_adapter: types.ModelAdapter,
+        migration_settings: MigrationSettings,
+        engine: Engine[types.VersionValue],
+        model: type[types.VModel],
+    ) -> None:
+        """A conflict exposes the diff and a resolution hint."""
+        registered = envelope_model(model_adapter, migration_settings, model)
+        incoming = replace(registered, fields=registered.fields | {"extra_field"})
+        with pytest.raises(ModelConflictError) as raised:
+            engine.store_model(incoming)
+        error = raised.value
+        assert error.extra == {"extra_field"}
+        assert error.missing == frozenset()
+        assert error.registered == registered.fields
+        assert "Resolve by aligning" in str(error)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1], []],
+                UserV1,
+                id="pydantic_semver",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "test", [USER_V1_0_0], []],
+                USER_V1_0_0,
+                id="json_semver",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_store_identical_duplicate_is_noop(
+        self,
+        model_adapter: types.ModelAdapter,
+        migration_settings: MigrationSettings,
+        engine: Engine[types.VersionValue],
+        model: type[types.VModel],
+    ) -> None:
+        """The engine reconciles: an identical re-registration is a no-op."""
+        again = engine.store_model(
+            envelope_model(model_adapter, migration_settings, model)
+        )
+        assert engine.get_model(again) is again
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, children",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV1], []],
+                (AddressV1,),
+                id="pydantic_partial",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [PERSON_V1_0_0], []],
+                (ADDRESS_V1_0_0,),
+                id="json_partial",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_validate_reports_missing_references(
+        self,
+        model_adapter: types.ModelAdapter,
+        engine: Engine[types.VersionValue],
+        children: tuple,
+    ) -> None:
+        """One child registered, the rest absent: validate names the gaps."""
+        for child in children:
+            engine.store_model(model_adapter.versionable(child))
+        with pytest.raises(MissingReferenceError) as raised:
+            engine.validate()
+        assert raised.value.absent
+        assert all(kind == "Address" for kind, _ in raised.value.absent)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, children",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV1], []],
+                (AddressV1, AddressV2, AddressV3),
+                id="pydantic",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [PERSON_V1_0_0], []],
+                (ADDRESS_V1_0_0, ADDRESS_V2_0_0, ADDRESS_V3_0_0),
+                id="json",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_validate_passes_when_references_registered(
+        self,
+        model_adapter: types.ModelAdapter,
+        engine: Engine[types.VersionValue],
+        children: tuple,
+    ) -> None:
+        """A complete graph validates cleanly."""
+        for child in children:
+            engine.store_model(model_adapter.versionable(child))
+        engine.validate()
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model, expected_error",

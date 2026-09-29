@@ -1,14 +1,8 @@
 """Target resolver factories for migration graphs.
 
-The migration engine is deliberately agnostic about *what* target version each
-payload entry should converge to. This module provides lightweight
-:class:`~pyverge.migration.types.TargetResolver` factories that
-:class:`GraphBuilder` and the individual :class:`MigrationEntry` strategies
-consume.
-
-Declarative spec compilation lives in :mod:`~pyverge.manager`, the high-level
-facade that turns strings, model classes, and per-kind mappings into resolved
-resolvers before invoking the engine.
+The engine is agnostic about *what* version each entry converges to; these
+factories produce the :class:`TargetResolver` it consumes. Declarative spec
+compilation lives in :mod:`~pyverge.manager`.
 """
 
 from __future__ import annotations
@@ -32,12 +26,7 @@ from .registry import Registry
 def skip_target_resolver(
     registry: Registry[VersionValue, ModelBase],
 ) -> TargetResolver:
-    """Return a resolver that always skips (returns ``None``).
-
-    *registry* is accepted to keep the factory signature uniform with
-    ``latest_target_resolver`` and ``earliest_target_resolver``; it is not
-    used by the returned resolver.
-    """
+    """A resolver that always skips (returns ``None``)."""
 
     def resolve(
         current: Versionable[VersionValue_co, VModel_co],
@@ -50,7 +39,7 @@ def skip_target_resolver(
 def latest_target_resolver(
     registry: Registry[VersionValue, ModelBase],
 ) -> TargetResolver:
-    """Return a resolver that converges to the latest registered version per kind."""
+    """A resolver that converges to the latest registered version per kind."""
 
     def resolve(
         current: Versionable[VersionValue_co, VModel_co],
@@ -63,7 +52,7 @@ def latest_target_resolver(
 def earliest_target_resolver(
     registry: Registry[VersionValue, ModelBase],
 ) -> TargetResolver:
-    """Return a resolver that converges to the earliest registered version per kind."""
+    """A resolver that converges to the earliest registered version per kind."""
 
     def resolve(
         current: Versionable[VersionValue_co, VModel_co],
@@ -77,10 +66,9 @@ def fixed_target_resolver(
     registry: Registry[VersionValue, ModelBase],
     target: Versionable[VersionValue, ModelBase],
 ) -> TargetResolver:
-    """Return a resolver that always returns *target* for its kind.
+    """A resolver that always returns *target* for its kind.
 
-    The *target* is validated against *registry* immediately; a missing
-    target raises :class:`RegistryError` with source ``"target"``.
+    *target* is validated against *registry* immediately.
     """
     if not registry.has_model(target):
         raise RegistryError(
@@ -105,10 +93,9 @@ def fixed_target_resolver(
 def multi_target_resolver(
     resolvers: dict[ModelKind | Literal["*"], TargetResolver],
 ) -> TargetResolver:
-    """Compose per-kind resolvers into a single dispatcher.
+    """Compose per-kind resolvers into one dispatcher.
 
-    The special key ``"*"`` is used as the fallback for kinds not explicitly
-    listed. The input mapping is read but not modified.
+    The special key ``"*"`` is the fallback for kinds not explicitly listed.
     """
     fallback = resolvers.get("*")
     by_kind: dict[ModelKind, TargetResolver] = {

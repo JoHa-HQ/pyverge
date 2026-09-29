@@ -16,12 +16,14 @@ from .exceptions import (
     MigrationMissingFieldError,
     MigrationNotFoundError,
     MigrationPathIntegrityError,
+    MissingReferenceError,
     ModelAlreadyRegisteredError,
+    ModelConflictError,
     ModelNotFoundError,
     RegistryError,
     VersionedModelError,
 )
-from .hooks import MigrationHook, OTELHook
+from .hooks import MigrationHook
 from .path import Path, get_at, set_at
 from .render import JsonPatchRender
 from .settings import DiscoverySettings, MigrationSettings, VersioningSettings
@@ -43,9 +45,10 @@ __all__ = [
     "MigrationNotFoundError",
     "MigrationPathIntegrityError",
     "MigrationSettings",
+    "MissingReferenceError",
     "ModelAlreadyRegisteredError",
+    "ModelConflictError",
     "ModelNotFoundError",
-    "OTELHook",
     "Path",
     "RegistryError",
     "SentinelEdge",

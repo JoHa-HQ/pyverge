@@ -18,6 +18,7 @@ from ..types import (
     MigrationKey,
     ModelData,
     ModelKind,
+    ModelVersionKey,
     Versionable,
     VersionValue_co,
     VModel_co,
@@ -36,11 +37,25 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
     ``(version, kind)`` as a single comparable unit.  A ``None`` model
     denotes a meta version: a ``(kind, version)`` pair with no concrete
     model content.
+
+    ``references`` is the set of versioned kinds the model's fields *declare*
+    (every union member, transitively).  It is computed once when the node is
+    built and lets the graph detect a payload that could carry a versioned
+    child it cannot converge — the walker silently skips unregistered kinds.
+
+    ``fields`` is the model's field names minus the identity fields, also
+    computed once by the adapter.  It lets the engine reconcile two
+    registrations of the same ``(kind, version)`` without an adapter.
+
+    Neither field participates in equality or ordering, which stay keyed on
+    ``(kind, version)``.
     """
 
     _model: type[VModel_co] | None
     _value: VersionValue_co
     _kind: ModelKind
+    references: frozenset[ModelVersionKey] = frozenset()
+    fields: frozenset[str] = frozenset()
 
     @property
     def strategy(self) -> type[VersionValue_co]:

@@ -1,5 +1,7 @@
 # Getting Started
 
+Pyverge is a runtime schema-evolution engine that lets independently deployed producers and consumers exchange versioned payloads without requiring synchronized releases.
+
 ## Installation
 
 ```bash
@@ -157,11 +159,12 @@ understands both formats.
 
 ## Next steps
 
-- [Registration](registration.md) — decorator vs. lazy registration, class-level vs. instance-level.
+- [Managers](managers.md) — registration (decorator vs. lazy) and one complete version graph per manager.
 - [Common usage patterns](usage.md) — lookup, validation, diffing, hooks.
 - [Migrations](migration.md) — reconstruct missing models or migrations, and the mutually exclusive `on_missing` strategies.
 - [Target policy](target-policy.md) — declarative convergence rules.
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
 - [Telemetry & Hooks](telemetry.md) — observability via hooks and OpenTelemetry.
+- [Testing](testing.md) — the time-travel topology round trip and other patterns.
 - [Concepts](concepts.md) — the problem and the approach.
 - [Showcases](../showcases/README.md) — end-to-end examples.

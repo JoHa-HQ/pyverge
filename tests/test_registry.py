@@ -9,7 +9,6 @@ import pytest
 import semver
 from pydantic import BaseModel
 
-from pyverge.adapters import JsonSchemaModelAdapter
 from pyverge.core import (
     MigrationAlreadyRegisteredError,
     MigrationHook,
@@ -26,7 +25,12 @@ from pyverge.migration import (
     PydanticModelAdapter,
     Registry,
 )
+from pyverge.ports import JsonSchemaModelAdapter
 from tests.examples.json import (
+    ADDRESS_V1_0_0,
+    ADDRESS_V2_0_0,
+    ADDRESS_V3_0_0,
+    PERSON_V1_0_0,
     USER_V0_1_1_DEV_7,
     USER_V1_0_0,
     USER_V1_2_3,
@@ -40,6 +44,13 @@ from tests.examples.pydantic.semver import (
     UserV2,
     UserV3,
     UserV200Beta1,
+)
+from tests.examples.pydantic.semver_nested import (
+    AddressV1,
+    AddressV2,
+    AddressV3,
+    PersonV1,
+    PersonV2,
 )
 from tests.utils import edge_from_models, envelope_model, meta_versionable
 
@@ -309,6 +320,11 @@ class TestModel:
         registry: Registry[types.VersionValue, BaseModel],
         model: type[types.VModel],
     ) -> None:
+        """The registry is a store: a duplicate registration raises.
+
+        Reconciliation (identical-surface no-op) is the engine's concern.
+        The fixture already registered *model*.
+        """
         with pytest.raises(ModelAlreadyRegisteredError, match="already registered"):
             registry.store_model(
                 envelope_model(model_adapter, versioning_settings, model)
@@ -1927,3 +1943,266 @@ class TestMigrationHookGuard:
         registry.remove_migration(key)
         with pytest.raises(MigrationNotFoundError):
             registry.get_migration(SentinelEdge.from_version_edge(edge))
+
+
+class TestReferences:
+    """A registered model's declared references to other versioned kinds.
+
+    References are read from the model's *declared* field types — every union
+    member, transitively — when the model is stored, and cached on the
+    ``VersionNode``. Querying them needs no adapter, and a discriminated union
+    contributes **all** its members (unlike ``field_model``, which collapses a
+    union to its first member).
+
+    The FastMCP adapter uses this to fail fast when a payload could carry a
+    versioned child the graph cannot converge: the walker silently skips
+    unregistered kinds, so a declared-but-unregistered reference is a latent
+    runtime bug the graph can catch up front.
+
+    Both model providers are exercised. Pydantic declares a discriminated union
+    (``AddressV1 | AddressV2 | AddressV3``); JSON declares the same via ``oneOf``
+    over ``$ref`` definitions. Both must surface all three versions.
+    """
+
+    #: The three Address versions a Person references, parsed.
+    ADDRESS_VERSIONS = frozenset(
+        {
+            ("Address", semver.Version(1, 0, 0)),
+            ("Address", semver.Version(2, 0, 0)),
+            ("Address", semver.Version(3, 0, 0)),
+        }
+    )
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model, expected",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV1], []],
+                PersonV1,
+                ADDRESS_VERSIONS,
+                id="pydantic_union_contributes_all_members",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [PERSON_V1_0_0], []],
+                PERSON_V1_0_0,
+                ADDRESS_VERSIONS,
+                id="json_one_of_contributes_all_members",
+            ),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV2], []],
+                PersonV2,
+                ADDRESS_VERSIONS
+                | {
+                    ("Contact", semver.Version(1, 0, 0)),
+                    ("Contact", semver.Version(2, 0, 0)),
+                },
+                id="pydantic_list_of_union",
+            ),
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [AddressV1], []],
+                AddressV1,
+                frozenset(),
+                id="pydantic_leaf_references_nothing",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [ADDRESS_V1_0_0], []],
+                ADDRESS_V1_0_0,
+                frozenset(),
+                id="json_leaf_references_nothing",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_node_references_lists_declared_versions(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        model: type[types.VModel],
+        expected: frozenset[types.ModelVersionKey],
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, model)
+        assert node.references == expected
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV1], []],
+                PersonV1,
+                id="pydantic",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [PERSON_V1_0_0], []],
+                PERSON_V1_0_0,
+                id="json",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_references_are_transitive(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        model: type[types.VModel],
+    ) -> None:
+        """Every declared union member is reached, not just the first."""
+        node = envelope_model(model_adapter, versioning_settings, model)
+        assert {kind for kind, _ in node.references} == {"Address"}
+        assert len(node.references) == 3  # noqa: PLR2004
+
+    def test_meta_node_references_nothing(
+        self,
+        model_adapter: types.ModelAdapter,
+        registry: Registry[types.VersionValue, BaseModel],
+    ) -> None:
+        """A meta version carries no concrete model, so it references nothing."""
+        meta = meta_versionable(model_adapter, "User", "1.0.0")
+        assert meta.references == frozenset()
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV1], []],
+                PersonV1,
+                id="pydantic",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [PERSON_V1_0_0], []],
+                PERSON_V1_0_0,
+                id="json",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_references_survive_copy(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        model: type[types.VModel],
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, model)
+        copied = registry.copy(name="copy")
+        assert copied.get_model(node).references == node.references
+
+    # -- missing_references: the convenience the consumer actually wants -----
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model, children",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV1], []],
+                PersonV1,
+                (AddressV1, AddressV2, AddressV3),
+                id="pydantic",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [PERSON_V1_0_0], []],
+                PERSON_V1_0_0,
+                (ADDRESS_V1_0_0, ADDRESS_V2_0_0, ADDRESS_V3_0_0),
+                id="json",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_missing_references_empty_when_children_registered(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        model: type[types.VModel],
+        children: tuple,
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, model)
+        for child in children:
+            registry.store_model(model_adapter.versionable(child))
+        assert registry.missing_references(node) == frozenset()
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV1], []],
+                PersonV1,
+                id="pydantic",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [PERSON_V1_0_0], []],
+                PERSON_V1_0_0,
+                id="json",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_missing_references_reports_all_when_child_absent(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        model: type[types.VModel],
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, model)
+        assert registry.missing_references(node) == self.ADDRESS_VERSIONS
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model, one_child",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "nested_test", [PersonV1], []],
+                PersonV1,
+                AddressV1,
+                id="pydantic",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [semver.Version, "nested_test", [PERSON_V1_0_0], []],
+                PERSON_V1_0_0,
+                ADDRESS_V1_0_0,
+                id="json",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_missing_references_reports_only_absent_versions(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue, BaseModel],
+        model: type[types.VModel],
+        one_child: object,
+    ) -> None:
+        """Registering one ``Address`` version leaves the other two missing."""
+        node = envelope_model(model_adapter, versioning_settings, model)
+        registry.store_model(model_adapter.versionable(one_child))  # ty: ignore[invalid-argument-type]
+        assert registry.missing_references(node) == frozenset(
+            {
+                ("Address", semver.Version(2, 0, 0)),
+                ("Address", semver.Version(3, 0, 0)),
+            }
+        )
+
+    def test_missing_references_unknown_node_raises(
+        self,
+        model_adapter: types.ModelAdapter,
+        registry: Registry[types.VersionValue, BaseModel],
+    ) -> None:
+        unregistered = meta_versionable(model_adapter, "User", "9.9.9")
+        with pytest.raises(ModelNotFoundError):
+            registry.missing_references(unregistered)

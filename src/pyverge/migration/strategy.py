@@ -1,9 +1,7 @@
 """Entry-level migration strategies.
 
-A strategy decides how a single discovered graph entry is migrated.  It returns a
-:runnable:`.RunnableMigration` object for each entry; the executor is responsible
-for invoking ``run()``.  This keeps the engine out of the execution path and
-lets the executor control when each entry is materialized.
+A strategy decides how one discovered graph entry migrates. It returns a
+``RunnableMigration``; the executor decides when to run it.
 """
 
 from __future__ import annotations

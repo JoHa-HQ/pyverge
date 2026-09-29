@@ -42,6 +42,10 @@ cli = [
   "typer>=0.21",
   "rich>=13"
 ]
+fastmcp = [
+  "fastmcp>=4",
+  "dependency-injector>=4.49.1"
+]
 
 [project.scripts]
 pyverge = "pyverge.cli.main:app"
@@ -85,8 +89,9 @@ max-complexity = 10
 "src/pyverge/migration/types.py" = ["PLR0913"]
 "src/pyverge/core/types.py" = ["PLR0913"]
 "src/pyverge/types.py" = ["PLR0913"]
+"src/pyverge/adapters/fastmcp/converger.py" = ["PLR0913"]
 "src/pyverge/reflection/discovery.py" = ["C901", "PLR0912"]
-"src/pyverge/adapters/json_schema/adapter.py" = ["PLR0911"]
+"src/pyverge/ports/json_schema/adapter.py" = ["PLR0911"]
 "tests/utils.py" = ["PLR0913"]
 "tests/test_engine.py" = ["PLR0913"]
 "tests/test_graph.py" = ["PLR0913"]

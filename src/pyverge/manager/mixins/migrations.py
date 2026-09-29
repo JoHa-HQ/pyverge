@@ -5,8 +5,8 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast
 
-from pyverge.adapters import JsonPatchMigration
 from pyverge.core.versioning import SentinelEdge
+from pyverge.ports import JsonPatchMigration
 from pyverge.types import (
     Attachable,
     ManagerMigrationKey,
@@ -19,6 +19,8 @@ from pyverge.types import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from pyverge.migration.engine import Engine
 
     from . import ManagerState
@@ -215,3 +217,18 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.versionable(None, kind=key.kind, version=key.target_version),
         )
         engine.add_hook(SentinelEdge.from_pair(*pair), hook)
+
+    def attach_hooks(
+        self: ManagerState[VersionValue],
+        hooks: Iterable[Attachable],
+    ) -> None:
+        """Attach *hooks* to every registered migration edge.
+
+        The instance-level bulk form of :meth:`add_hook`, for observers that
+        watch the whole graph (e.g. tracing every step).
+        """
+        registry = self.engine.registry
+        for kind in registry.kinds:
+            for edge in registry.migrations(kind):
+                for hook in hooks:
+                    registry.add_hook(edge, hook)

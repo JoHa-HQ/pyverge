@@ -1,9 +1,3 @@
-from pyverge.adapters import (
-    JsonPatchMigration,
-    JsonSchemaModelAdapter,
-    PydanticDiff,
-    PydanticModelAdapter,
-)
 from pyverge.core import (
     DiscoveryError,
     DiscoverySettings,
@@ -19,9 +13,10 @@ from pyverge.core import (
     MigrationNotFoundError,
     MigrationPathIntegrityError,
     MigrationSettings,
+    MissingReferenceError,
     ModelAlreadyRegisteredError,
+    ModelConflictError,
     ModelNotFoundError,
-    OTELHook,
     Path,
     RegistryError,
     SentinelEdge,
@@ -32,6 +27,12 @@ from pyverge.core import (
     get_at,
     set_at,
     types,
+)
+from pyverge.ports import (
+    JsonPatchMigration,
+    JsonSchemaModelAdapter,
+    PydanticDiff,
+    PydanticModelAdapter,
 )
 from pyverge.reflection import (
     CallableDiffDiscovery,
@@ -86,9 +87,10 @@ __all__ = [
     "MigrationNotFoundError",
     "MigrationPathIntegrityError",
     "MigrationSettings",
+    "MissingReferenceError",
     "ModelAlreadyRegisteredError",
+    "ModelConflictError",
     "ModelNotFoundError",
-    "OTELHook",
     "Path",
     "PydanticDiff",
     "PydanticModelAdapter",

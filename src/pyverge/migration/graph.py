@@ -1,13 +1,9 @@
 """Dependency graph for convergent migration.
 
 :class:`GraphBuilder` scans a payload for versioned dicts and builds a
-structural containment :class:`MigrationGraph`.  The graph captures which
-entries exist and how they nest — children converge before parents.
-
-A versioned entity is identified by a strict ``(kind, version)`` predicate:
-the dict must contain the configured ``kind_property`` and ``version_property``,
-and the pair must be registered.  Everything else is traversed but not treated
-as a migratable entry.
+structural containment graph: children converge before parents. A versioned
+entity needs the configured kind/version properties, and the pair must be
+registered.
 """
 
 from __future__ import annotations
@@ -38,15 +34,8 @@ from .registry import Registry
 class GraphEntry(Generic[VersionValue, VModel_co]):
     """A single versioned entry discovered in a payload.
 
-    Attributes:
-        path: Position in the payload (``("document", "address")``).
-        source: Current registered version found in the payload.
-        target: Version to converge this entry to (resolved by the caller).
-        steps: Resolved migration path as a sequence of ``(source, target)``
-            pairs for each step.
-        hooks: Sequence of hooks for each migration step in this entry's path.
-        target_model: Optional Pydantic model class to validate the migrated
-            entry against.
+    ``steps`` is the resolved migration path, ``hooks`` the per-step hooks, and
+    ``target_model`` the model to validate the migrated entry against.
     """
 
     path: tuple[str | int, ...]
@@ -76,8 +65,8 @@ class GraphEntry(Generic[VersionValue, VModel_co]):
 class MigrationGraph(Generic[VersionValue]):
     """Structural containment DAG of versioned entries.
 
-    Built by :class:`GraphBuilder` from a payload.  The graph is consumed by
-    the engine to determine migration order and parallelization groups.
+    Consumed by the engine to determine migration order and parallelization
+    groups.
     """
 
     def __init__(self, entries: list[GraphEntry[VersionValue, BaseModel]]) -> None:
@@ -92,12 +81,10 @@ class MigrationGraph(Generic[VersionValue]):
         return list(self._entries)
 
     def topological_order(self) -> list[GraphEntry[VersionValue, BaseModel]]:
-        """Return entries in valid migration order: children before parents.
+        """Entries in migration order: children before parents.
 
-        Structural containment means a child's path is always a strict
-        extension of its parent's.  Sorting by path length descending
-        guarantees children precede their parents.  Equal-length paths
-        are ordered lexicographically for determinism.
+        A child's path strictly extends its parent's, so sorting by path length
+        descending puts children first (ties broken lexicographically).
         """
         return sorted(
             self._entries,
@@ -105,13 +92,9 @@ class MigrationGraph(Generic[VersionValue]):
         )
 
     def execution_levels(self) -> list[list[GraphEntry[VersionValue, BaseModel]]]:
-        """Return entries grouped by execution wave: leaves first, roots last.
+        """Entries grouped by execution wave: leaves first, roots last.
 
-        All leaf entries (entries with no registered children) run in the
-        first wave.  After a wave finishes, any entry whose children all
-        appeared in previous waves becomes a leaf and joins the next wave.
-        Entries within the same wave are independent and can be migrated in
-        parallel.
+        Entries within a wave are independent and can migrate in parallel.
         """
         if not self._entries:
             return []
@@ -159,11 +142,7 @@ class MigrationGraph(Generic[VersionValue]):
         return parent
 
     def independent_roots(self) -> list[GraphEntry[VersionValue, BaseModel]]:
-        """Return root entries of each disjoint connected component.
-
-        An entry is a root if no other entry's path is a proper prefix.
-        Roots can be migrated in parallel once their children are done.
-        """
+        """Root entry of each disjoint component — no other path is its prefix."""
         all_paths = {e.path for e in self._entries}
         roots: list[GraphEntry[VersionValue, BaseModel]] = []
         for entry in self._entries:
@@ -197,10 +176,7 @@ class MigrationGraph(Generic[VersionValue]):
 class GraphBuilder(Generic[VersionValue]):
     """Builds a :class:`MigrationGraph` by scanning a payload for versioned dicts.
 
-    The builder delegates the actual traversal to a :class:`Walker`.  When no
-    container is supplied it uses the containerless :class:`CompoundKeyWalker`;
-    when a container model is supplied it uses the schema-driven
-    :class:`PydanticWalker`.
+    Delegates traversal to the configured :class:`Walker`.
     """
 
     def __init__(
@@ -228,12 +204,8 @@ class GraphBuilder(Generic[VersionValue]):
     ) -> MigrationGraph[VersionValue]:
         """Scan *data* and return a migration graph of versioned entries.
 
-        Args:
-            container: Optional Pydantic schema model that drives discovery.
-                The configured walker must support the container (e.g.
-                :class:`PydanticWalker`).
-            max_depth: Override the configured ``max_migration_depth`` for
-                this call. ``0`` = top-level only, ``-1`` = unlimited.
+        *max_depth* overrides ``max_migration_depth`` for this call
+        (``0`` = top-level only, ``-1`` = unlimited).
         """
         active_walker = self._walker
         default_depth = self._settings.max_migration_depth
@@ -286,11 +258,10 @@ class GraphBuilder(Generic[VersionValue]):
             Versionable[VersionValue, BaseModel], Versionable[VersionValue, BaseModel]
         ]
     ]:
-        """Return the migration path between *source* and *target* for hook lookup.
+        """Adjacent migration steps between *source* and *target*, for hooks.
 
-        Uses the registry's sorted version list to find adjacent steps.  Edges
-        without an explicit migration are assumed backward-compatible and still
-        count as a step.
+        Uses the registry's sorted version list; an edge without an explicit
+        migration still counts as a step.
         """
         if source == target:
             return []

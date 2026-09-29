@@ -8,8 +8,8 @@ from pydantic import BaseModel, create_model
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from pyverge.adapters.base import BaseModelAdapter
 from pyverge.core.versioning import VersionNode
+from pyverge.ports.base import BaseModelAdapter
 from pyverge.reflection.diff import Diff
 from pyverge.types import (
     Diffable,
@@ -128,6 +128,8 @@ class PydanticModelAdapter(BaseModelAdapter):
                 _model=model_cls,
                 _value=self.of(self.version(model_cls)),
                 _kind=self.kind(model_cls),
+                references=self.references(model_cls),
+                fields=self.fields(model_cls),
             )
         if kind is None or version is None:
             raise ValueError("kind and version are required for a meta versionable")
