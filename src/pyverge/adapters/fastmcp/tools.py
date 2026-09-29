@@ -1,19 +1,14 @@
 """Primitive decorators — build a FastMCP component with injections hidden.
 
-A callable's signature is its contract, but a dependency-injected parameter is
-wiring, not payload. These decorators wrap a function into the matching FastMCP
-component — tool, prompt or resource — with its injected parameters removed from
-the reflected contract, so the primitive only exposes caller-sendable fields.
-
-Apply the decorator **outside** the DI decorator (``@inject``) so it sees the
-raw signature::
+A dep-injected parameter is wiring, not payload, so it must not appear in the
+primitive's reflected contract. Apply the decorator **outside** ``@inject`` so
+it sees the raw signature::
 
     @tool(name="search_weather", version="2.0.0")
     @inject
     def search_weather(city: str, weather: WeatherService = Provide[...]) -> dict: ...
 
-Each decorator also works as a plain factory (``tool(fn, name=...)``) for the
-case where the function is defined elsewhere.
+Each decorator also works as a plain factory: ``tool(fn, name=...)``.
 """
 
 from __future__ import annotations
@@ -28,16 +23,9 @@ from fastmcp.tools.function_tool import FunctionTool
 
 from .injection import InjectionDetector, injected_names
 
-Component = FunctionTool | FunctionPrompt | FunctionResourceTemplate
-
 
 def hide_injected(fn: Any, detector: InjectionDetector | None = None) -> set[str]:
-    """Strip injected (wired) parameters from *fn*'s reflected signature.
-
-    FastMCP reflects a function's signature into the primitive's contract, so a
-    dependency-injected parameter must be removed from it. Returns the names
-    that were hidden.
-    """
+    """Strip injected (wired) parameters from *fn*'s reflected signature."""
     names = injected_names(fn, detector)
     if not names:
         return names
@@ -54,7 +42,6 @@ def hide_injected(fn: Any, detector: InjectionDetector | None = None) -> set[str
 
 
 def _build(fn: Any, detector: InjectionDetector | None, factory, **kwargs: Any):
-    """Hide *fn*'s injected params, then build its component via *factory*."""
     hide_injected(fn, detector)
     return factory(fn, **kwargs)
 

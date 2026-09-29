@@ -8,18 +8,12 @@ from typing import TypeAlias
 
 
 def never_injected(parameter: inspect.Parameter) -> bool:
-    """Detect no injection — the fallback when no DI library is present."""
+    """No parameter is injected — the fallback when no DI library is present."""
     return False
 
 
 def marker_detector(*marker_types: type) -> Callable[[inspect.Parameter], bool]:
-    """Detect a parameter whose default is an instance of a marker type.
-
-    A callable's signature is its contract: every parameter is a field the
-    caller may send. A dependency-injected parameter breaks that — it is wiring,
-    not payload — so the reflected schema must exclude it. A marker type (e.g.
-    a DI provider reference used as a default) identifies such a parameter.
-    """
+    """Detect a parameter whose default is an instance of a marker type."""
 
     def detect(parameter: inspect.Parameter) -> bool:
         default = parameter.default
@@ -34,12 +28,7 @@ def default_injection_detector() -> Callable[[inspect.Parameter], bool]:
     """Detect markers of the DI libraries pyverge sees in practice.
 
     Probes lazily so neither library is a hard dependency:
-
-    * ``dependency_injector.wiring.Provide`` — a provider reference used as a
-      parameter default by ``@inject``,
-    * ``uncalled_for.Depends`` — FastMCP's own dependency marker.
-
-    Returns :func:`never_injected` when neither is importable.
+    ``dependency_injector.wiring.Provide`` and FastMCP's ``Depends``.
     """
     markers: list[type] = []
     try:  # pragma: no cover - import guard
@@ -67,11 +56,7 @@ InjectionDetector: TypeAlias = Callable[[inspect.Parameter], bool]
 def injected_names(
     func: Callable[..., object], detector: InjectionDetector | None = None
 ) -> set[str]:
-    """Return the names of the injected parameters of *func*.
-
-    Returns an empty set when the signature is unavailable or nothing is
-    injected.
-    """
+    """Return the names of *func*'s injected parameters (empty when unknown)."""
     detect = detector or default_injection_detector()
     try:
         parameters = inspect.signature(func).parameters

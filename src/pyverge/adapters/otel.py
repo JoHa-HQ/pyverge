@@ -5,8 +5,8 @@ exception recording.  It is an adapter over the platform-agnostic
 :class:`~pyverge.core.hooks.MigrationHook` contract: pyverge core never
 imports OpenTelemetry for its own behavior.
 
-The span is opened **as current**, so when a tool call has already opened a
-parent span (see ``ConvergeMiddleware``), each migration step's span nests
+The span is opened **as current**, so when a caller has already opened a parent
+span (e.g. a host's call-span middleware), each migration step's span nests
 underneath it — a trace shows the call with one child span per step.
 
 Example:
