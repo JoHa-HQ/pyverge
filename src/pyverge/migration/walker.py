@@ -28,8 +28,7 @@ from .registry import Registry
 class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
     """Containerless walker: every dict is checked for ``(kind, version)``.
 
-    Only registered compound keys produce entries.  No structural validation
-    is performed beyond the presence of the version marker.
+    Only registered compound keys produce entries.
     """
 
     def __init__(
@@ -137,11 +136,10 @@ class CompoundKeyWalker(WalkerProtocol, Generic[VersionValue]):
 
 
 class PydanticWalker(WalkerProtocol, Generic[VersionValue]):
-    """Container-driven walker that uses a Pydantic model to guide discovery.
+    """Container-driven walker: a Pydantic model guides discovery.
 
-    Validates the payload against *container* first, then recursively visits
-    fields whose annotations carry ``BaseModel`` subclasses.  Versioned entries
-    are extracted from validated sub-dicts.
+    Validates the payload against *container*, then visits fields whose
+    annotations carry versioned models.
     """
 
     def __init__(

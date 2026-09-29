@@ -46,23 +46,11 @@ from .strategy import DefaultMigrationEntry
 class Engine(Generic[VersionValue]):
     """Convergent migration driven by an inferred dependency graph.
 
-    Unlike sequential script migration (Alembic), this engine treats the
-    compound ``(kind, version)`` as the first-class axis.  It scans a
-    payload for versioned sub-entries using a :attr:`version_property`
-    predicate, builds a dependency graph from the migration functions
-    that touch each entry, then converges every entry independently
-    — forward or backward — to a policy-defined target version.
-
-    Nested entries at different versions (e.g., ``AddressV3`` inside
-    ``PersonV1``) are handled naturally: each converges on its own
-    terms.  The dependency graph ensures a migration function never
-    sees stale children, while avoiding wasted work on subtrees that
-    a parent migration will restructure entirely.
-
-    A container model is **not required** — discovery uses the
-    ``version_property`` predicate alone.  A typed container provides
-    an optional speedup via precomputed shape metrics to prune
-    branches.
+    Treats ``(kind, version)`` as the first-class axis: it scans a payload for
+    versioned entries, builds a graph from the migrations touching each, and
+    converges every entry to a target version. Nested entries converge on their
+    own terms; the graph orders children before parents. A container model is
+    optional (a typed one prunes branches via precomputed shape metrics).
     """
 
     def __init__(
@@ -74,18 +62,6 @@ class Engine(Generic[VersionValue]):
         adapter: ModelAdapter,
         entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> None:
-        """Initialize the engine.
-
-        Args:
-            registry: Registry instance.
-            settings: Migration configuration.
-            executor: Executor used to run the migration graph.
-            graph_builder: Pre-configured graph builder (carries its own walker).
-            adapter: Provider-specific model adapter used to validate and serialize
-                target models.
-            entry_migration: Optional per-entry migration strategy. Defaults to
-                :class:`DefaultMigrationEntry`.
-        """
         self.registry = registry
         self.settings = settings
         self.graph_builder = graph_builder
@@ -193,10 +169,8 @@ class Engine(Generic[VersionValue]):
     ) -> Versionable[VersionValue, ModelBase]:
         """Register a model version, reconciling against an existing one.
 
-        An identical re-registration (same ``fields`` surface) is a no-op
-        returning the stored node; a re-registration declaring a different
-        surface raises :class:`ModelConflictError`.  The comparison uses the
-        node's adapter-computed ``fields``, so it stays provider-agnostic.
+        An identical re-registration (same ``fields`` surface) is a no-op; a
+        different surface raises :class:`ModelConflictError`.
         """
         try:
             existing = self.registry.get_model(version)
@@ -215,13 +189,10 @@ class Engine(Generic[VersionValue]):
         self: Self,
         version: Versionable[VersionValue, ModelBase] | None = None,
     ) -> None:
-        """Validate registered models' declared references are registered.
+        """Validate that registered models' declared references are registered.
 
-        Every versioned kind a registered model references must itself be
-        registered — the payload walker silently skips unregistered kinds, so a
-        declared-but-absent child can never converge.  With *version*, only that
-        node is checked; otherwise the whole registry is walked.  Raises
-        :class:`MissingReferenceError` naming the absent references.
+        With *version*, only that node is checked; otherwise the whole registry.
+        Raises :class:`MissingReferenceError` naming the absent references.
         """
         nodes = (
             [self.registry.get_model(version)]
@@ -279,12 +250,11 @@ class Engine(Generic[VersionValue]):
         *,
         backward_compatible: bool = False,
     ) -> MigrationFunc:
-        """Register a migration with adjacency and backward-compat validation.
+        """Register a migration, validating adjacency and cross-kind endpoints.
 
-        Endpoints without a concrete model are reconstructed from the other
-        endpoint's model when ``settings.on_missing == "reconstruct_model"``;
-        otherwise ``ModelNotFoundError`` is raised.  The migration edge is
-        stored only after both endpoints have models.
+        An endpoint without a concrete model is reconstructed when
+        ``settings.on_missing == "reconstruct_model"``, else
+        ``ModelNotFoundError``.
         """
         registry = self.registry
         v_from, v_to = key
@@ -327,10 +297,9 @@ class Engine(Generic[VersionValue]):
     ) -> Versionable[VersionValue, ModelBase]:
         """Return *endpoint*, reconstructing it when it is not registered.
 
-        A registered endpoint (including a registered meta node) is returned
-        as-is.  An unregistered endpoint is reconstructed from *other*'s model
-        when ``settings.on_missing == "reconstruct_model"``; otherwise
-        ``ModelNotFoundError`` is raised.
+        A registered endpoint is returned as-is; an unregistered one is
+        reconstructed from *other*'s model when ``on_missing ==
+        "reconstruct_model"``, else ``ModelNotFoundError``.
         """
         registry = self.registry
         try:
@@ -368,10 +337,8 @@ class Engine(Generic[VersionValue]):
     ) -> None:
         """Reconstruct and store a missing model for *target*.
 
-        Applies the migration's diff to the *anchor* model via the provider
-        adapter and stores the resulting model at *target*'s version.  The
-        diff is applied forward when the anchor predates the target and
-        inverted when it is the newer endpoint.
+        Applies the migration diff to the *anchor* model and stores the result at
+        *target*'s version (inverted when the anchor is the newer endpoint).
         """
         diff = self.discovery.discover(migration, anchor, target)
         if anchor.version > target.version:
@@ -388,17 +355,10 @@ class Engine(Generic[VersionValue]):
     ) -> JsonPatchMigration:
         """Propose a version-edge migration from two schema versions.
 
-        This is the migration-reconstruction strategy
-        (``on_missing == "reconstruct_migration"``): diff the two models'
-        schemas via the provider adapter and render the result as a declarative
-        RFC 6902 spec, wrapped in a :class:`JsonPatchMigration`.  The proposal
-        is a **starting point** — it is a shape-based diff, so business intent
-        cannot be inferred; the operator must review it before registering via
-        :meth:`store_migration`.
-
-        Contrast with model reconstruction (:meth:`reconstruct`): this
-        proposes the *edge* (migration), never auto-registers, and never
-        touches endpoint models.
+        Diffs the two models' schemas and renders a declarative RFC 6902 spec
+        wrapped in a :class:`JsonPatchMigration`. It is a shape-based starting
+        point — review it before registering via :meth:`store_migration`. Never
+        auto-registers and never touches endpoint models.
         """
         if source.kind != target.kind:
             raise RegistryError(
