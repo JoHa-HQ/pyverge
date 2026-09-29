@@ -43,7 +43,8 @@ cli = [
   "rich>=13"
 ]
 fastmcp = [
-  "fastmcp>=4"
+  "fastmcp>=4",
+  "dependency-injector>=4.49.1"
 ]
 
 [project.scripts]
