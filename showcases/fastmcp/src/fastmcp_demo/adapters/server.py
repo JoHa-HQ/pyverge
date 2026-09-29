@@ -1,67 +1,111 @@
 """FastMCP server adapter.
 
-Builds the ``FastMCP`` server and the ``ToolRegistry`` lifespan hook, wiring
-them to the domain manager. The physical tool lives in
+Builds the ``FastMCP`` server and the converge middleware, wiring them to the
+domain manager. The physical primitives (tool, prompt, resource) live in
 :mod:`fastmcp_demo.adapters.tools`; this module only assembles the server around
-it. This is the only module that imports FastMCP.
+them. This is the only module that imports FastMCP.
+
+The discovery lifecycle is wired as the server's **lifespan** — the user's
+concern, per FastMCP's model. :func:`lifespan` runs the tool discovery's phases
+once at startup; FastMCP enters it whenever the server is run through a
+transport or client.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+import logging
+from collections.abc import AsyncIterator, Sequence
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastmcp import FastMCP
 
 from pyverge.adapters.fastmcp import (
     ConvergeMiddleware,
-    ToolRegistry,
-    make_tool,
+    PromptReflection,
+    ResourceReflection,
+    ToolDiscovery,
+    ToolReflection,
 )
 from pyverge.types import Attachable
 
-from ..domain import ANCHOR_VERSION
 from ..settings import GraphSettings
-from .tools import search_weather
+from .tools import search_weather, weather_briefing, weather_reading
+
+logger = logging.getLogger(__name__)
 
 
-def build_registry(
+def build_discovery(
     manager: Any,
     graph: GraphSettings,
     *,
     hooks: Sequence[Attachable] = (),
-) -> ToolRegistry:
-    """Return the lifespan hook owning *manager*'s kind.
+) -> ToolDiscovery:
+    """Return the discovery owning *manager*'s kinds.
 
-    One manager per source: the registry binds exactly one bounded context.
-    ``hooks`` are attached to every migration edge, so each step is observable.
+    One manager per source: the discovery binds exactly one bounded context and
+    one reflection provider per primitive type. ``hooks`` are attached to every
+    migration edge, so each step is observable.
     """
-    return ToolRegistry(
+    adapter = manager.adapter
+    return ToolDiscovery(
         manager,
-        policies={graph.kind: graph.policy},
-        fallback_policy=None,
+        providers=[
+            ToolReflection(adapter),
+            PromptReflection(adapter),
+            ResourceReflection(adapter, uri_scheme="weather://"),
+        ],
+        policies=graph.policies,
         hooks=hooks,
     )
 
 
-def build_server(
-    registry: ToolRegistry,
-    graph: GraphSettings,
-    tool: Callable[..., Any] = search_weather,
-    *,
-    span_factory=None,
-) -> FastMCP:
-    """Return a FastMCP server exposing the physical anchor (the newest version).
+def build_lifespan(discovery: ToolDiscovery):
+    """Return the server lifespan that drives the discovery lifecycle.
 
-    The physical tool *is* its own anchor: its signature (with injected
-    parameters hidden) is reflected into the newest model. Older versions are
-    served by virtual tools materialized during the ``enrich`` phase.
-    ``span_factory`` opens a parent span per call for the tracing middleware.
+    The user owns the lifecycle ordering: ``search`` (traverse the providers and
+    index every versioned node), ``register`` (reflect each node's schema,
+    materialize its anchor, then validate the graph's references), ``enrich``
+    (precompute paths, materialize virtual primitives, attach hooks). Runs once
+    at startup — re-running would re-materialize the virtual primitives.
     """
-    mcp = FastMCP(
+
+    @asynccontextmanager
+    async def app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
+        logger.info("discovery lifecycle: search -> register -> enrich")
+        await discovery.search(server)
+        discovery.register()
+        await discovery.enrich(server)
+        logger.info("discovery lifecycle complete")
+        yield {"discovery": discovery}
+
+    return app_lifespan
+
+
+def build_server(
+    discovery: ToolDiscovery,
+    graph: GraphSettings,
+    tool: Any = search_weather,
+    *,
+    lifespan: Any = None,
+    middleware: Sequence[Any] = (),
+) -> FastMCP:
+    """Return a FastMCP server exposing one physical anchor per kind.
+
+    Each decorated primitive (see :mod:`fastmcp_demo.adapters.tools`) *is* its
+    own kind's anchor: its signature (with injected parameters hidden) is
+    reflected into the newest model. Older versions are served by virtual
+    primitives materialized during the ``enrich`` phase. ``lifespan`` drives the
+    discovery lifecycle (see :func:`build_lifespan`); ``middleware`` are
+    host-supplied observers (e.g. tracing) stacked around the adapter's
+    :class:`ConvergeMiddleware`.
+    """
+    server = FastMCP(
         "WeatherServer",
-        middleware=[ConvergeMiddleware(registry, span_factory=span_factory)],
-        lifespan=registry,
+        lifespan=lifespan,
+        middleware=[*middleware, ConvergeMiddleware(discovery)],
+        tools=[tool],
     )
-    mcp.add_tool(make_tool(tool, version=ANCHOR_VERSION))
-    return mcp
+    server.add_prompt(weather_briefing)
+    server.add_template(weather_reading)
+    return server

@@ -2,7 +2,7 @@
 
 ``DemoContainer`` is a ``dependency-injector`` ``DeclarativeContainer`` wiring
 the whole application: settings, the domain service, the version-graph manager,
-the FastMCP registry and server, and the OpenTelemetry tracer. The FastMCP tool
+the FastMCP discovery and server, and the OpenTelemetry tracer. The FastMCP tool
 in :mod:`fastmcp_demo.adapters.tools` receives the domain service through
 wiring (``@inject`` + ``Provide``), so no component reaches for its own
 dependencies.
@@ -19,10 +19,11 @@ import inspect
 from dependency_injector import containers, providers, resources
 
 from .adapters import (
-    build_registry,
+    build_discovery,
+    build_lifespan,
     build_server,
+    make_call_span_middleware,
     make_migration_hooks,
-    make_span_factory,
     make_tracer,
 )
 from .adapters import tools as tools_module
@@ -32,18 +33,28 @@ from .settings import DemoSettings
 
 
 class _Prepared(resources.AsyncResource[DemoService]):
-    """Async resource that runs the demo lifecycle exactly once."""
+    """Async resource yielding the ready service.
+
+    The discovery lifecycle is the server's lifespan, entered by FastMCP when the
+    server is served or driven through a client — not here. Initializing the
+    container only assembles the app; the first client session (or the HTTP
+    transport) runs ``search -> register -> enrich``.
+    """
 
     def __init__(self, service: DemoService) -> None:
         super().__init__()
         self._service = service
 
     async def init(self) -> DemoService:
-        await self._service.prepare()
         return self._service
 
     async def shutdown(self, resource: DemoService | None) -> None:
         return None
+
+
+def _call_middleware(span_middleware):
+    """Return the host middleware stack, dropping the disabled tracer's None."""
+    return [] if span_middleware is None else [span_middleware]
 
 
 class DemoContainer(containers.DeclarativeContainer):
@@ -71,8 +82,8 @@ class DemoContainer(containers.DeclarativeContainer):
         make_tracer,
         settings=settings.provided.telemetry,
     )
-    registry = providers.Singleton(
-        build_registry,
+    discovery = providers.Singleton(
+        build_discovery,
         manager=manager,
         graph=settings.provided.graph,
         hooks=providers.Callable(
@@ -83,12 +94,16 @@ class DemoContainer(containers.DeclarativeContainer):
     )
     server = providers.Singleton(
         build_server,
-        registry=registry,
+        discovery=discovery,
         graph=settings.provided.graph,
-        span_factory=providers.Callable(
-            make_span_factory,
-            tracer=tracer,
-            service=settings.provided.telemetry.provided.service_name,
+        lifespan=providers.Callable(build_lifespan, discovery=discovery),
+        middleware=providers.Callable(
+            _call_middleware,
+            providers.Callable(
+                make_call_span_middleware,
+                tracer=tracer,
+                service=settings.provided.telemetry.provided.service_name,
+            ),
         ),
     )
 
@@ -96,7 +111,7 @@ class DemoContainer(containers.DeclarativeContainer):
         DemoService,
         settings=settings,
         manager=manager,
-        registry=registry,
+        discovery=discovery,
         server=server,
     )
     prepared: providers.Resource[DemoService] = providers.Resource(

@@ -70,12 +70,19 @@ class WeatherSettings(BaseSettings):
 class GraphSettings(BaseSettings):
     """The version graph the demo exposes."""
 
-    kind: str = Field(default="search_weather")
+    kind: str = Field(
+        default="search_weather",
+        description="The anchor kind (the versioned tool).",
+    )
     version_property: str = Field(default="version")
     kind_property: str = Field(default="kind")
-    policy: str = Field(
-        default="latest",
-        description="Target policy recorded for the kind on the registry.",
+    policies: dict[str, str] = Field(
+        default_factory=lambda: {
+            "search_weather": "latest",
+            "weather_briefing": "latest",
+            "weather_reading": "latest",
+        },
+        description="Target policy recorded per versioned kind.",
     )
 
     model_config = SettingsConfigDict(

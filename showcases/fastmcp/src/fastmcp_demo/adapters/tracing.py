@@ -1,22 +1,25 @@
 """OpenTelemetry tracing adapter.
 
 Builds a ``TracerProvider`` that exports spans over OTLP to the collector in
-``docker-compose.yml``, and adapts the tracer to the two hooks the FastMCP
-adapter consumes:
+``docker-compose.yml``, and adapts the tracer to the two seams the app composes:
 
-* :func:`make_migration_hooks` — the per-edge hooks attached by ``ToolRegistry``
+* :func:`make_migration_hooks` — the per-edge hooks attached by the discovery
   (one OTEL span per migration step),
-* :func:`make_span_factory` — the call-level parent span the ``ConvergeMiddleware``
-  opens, so every step span nests under the tool call.
+* :class:`CallSpanMiddleware` — a host-owned FastMCP middleware that opens the
+  call-level parent span, so every step span nests under the tool call.
 
-This is the only module that imports the OpenTelemetry SDK — the rest of the app
-depends on the returned objects alone.
+Tracing is the host's concern, not the adapter's: ``CallSpanMiddleware`` wraps
+the server's tool calls independently of ``ConvergeMiddleware``. This is the
+only module that imports the OpenTelemetry SDK — the rest of the app depends on
+the returned objects alone.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
+from fastmcp.server.middleware import Middleware
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
@@ -27,6 +30,10 @@ from pyverge.adapters.otel import OTELHook
 from pyverge.types import Attachable
 
 from ..settings import TelemetrySettings
+
+if TYPE_CHECKING:
+    from fastmcp.server.middleware import MiddlewareContext
+    from mcp.types import CallToolRequestParams
 
 
 def build_tracer(settings: TelemetrySettings):
@@ -64,14 +71,32 @@ def make_migration_hooks(tracer, service: str) -> Sequence[Attachable]:
     return (OTELHook(tracer=tracer, service=service),)
 
 
-def make_span_factory(tracer, service: str):
-    """Return a call-level parent-span factory, or ``None`` when tracing is off."""
+class CallSpanMiddleware(Middleware):
+    """Open a parent span per tool call; nested step spans attach beneath it.
+
+    A host-side observer, independent of the pyverge adapter: it wraps each
+    ``tools/call`` in a span named ``<service>.call``, so the per-migration
+    hooks (attached to the graph) nest their step spans underneath.
+    """
+
+    def __init__(self, tracer, service: str) -> None:
+        self._tracer = tracer
+        self._service = service
+
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[CallToolRequestParams],
+        call_next,
+    ) -> Any:
+        kind = context.message.name
+        with self._tracer.start_as_current_span(
+            f"{self._service}.call", attributes={"tool": kind}
+        ):
+            return await call_next(context)
+
+
+def make_call_span_middleware(tracer, service: str):
+    """Return a :class:`CallSpanMiddleware`, or ``None`` when tracing is off."""
     if tracer is None:
         return None
-
-    def span_factory(name: str):
-        return tracer.start_as_current_span(
-            f"{service}.call", attributes={"tool": name}
-        )
-
-    return span_factory
+    return CallSpanMiddleware(tracer, service)

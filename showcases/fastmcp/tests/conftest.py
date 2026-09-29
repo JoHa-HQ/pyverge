@@ -1,23 +1,25 @@
 """End-to-end fixtures for the showcase.
 
-The application is built once through its public composition root
-(``build_container`` + ``resolve_prepared``) and driven through the public
-FastMCP server (``server.call_tool``). Tests never reassemble internal wiring.
+The application is built through its public composition root
+(``build_container`` → ``resolve_prepared``) and driven through a FastMCP
+``Client``. The discovery lifecycle runs as the server's **lifespan**, which
+FastMCP enters only when the server is driven through a client — so the
+``application`` fixture opens one session and keeps it active, and the ``client``
+fixture hands that session to the test.
 
 Offline by default: the weather client is overridden with an in-memory fake
 whose reading is either pinned (parametrized) or drawn from a **Hypothesis
-strategy**. Sync fixtures keep the async machinery out of the test bodies —
-which also lets Hypothesis-driven tests (sync-only) drive the public surface.
+strategy**; it stays mutable, so a Hypothesis example can set a fresh reading.
 """
 
 from __future__ import annotations
 
-import asyncio
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from fastmcp import Client
 from fastmcp_demo.container import (
     build_container,
     resolve_prepared,
@@ -39,13 +41,11 @@ weather_reading = st.builds(
 SNAPSHOT_READING = CurrentWeather(temperature=21.5, humidity=58, wind=12.0)
 
 
-def offline_settings() -> DemoSettings:
-    """Settings for the offline showcase app (no OTLP exporter)."""
-    return DemoSettings(telemetry=TelemetrySettings(enabled=False))
-
-
 class FakeWeatherClient:
-    """In-memory stand-in for :class:`WeatherClient` returning a fixed reading."""
+    """In-memory stand-in for :class:`WeatherClient` returning a fixed reading.
+
+    The reading is mutable, so a Hypothesis example can swap it before calling.
+    """
 
     def __init__(self, reading: CurrentWeather) -> None:
         self.reading = reading
@@ -59,33 +59,19 @@ class FakeWeatherClient:
         return None
 
 
-@contextmanager
-def running_app(
-    reading: CurrentWeather, settings: DemoSettings | None = None
-) -> Iterator[Any]:
-    """Build + prepare the app with *reading*, yielding it; shut down after.
+@dataclass
+class Application:
+    """A ready app: the service, its live client session, and the weather fake."""
 
-    Synchronous so sync tests (including Hypothesis examples, which cannot use
-    fixtures) can drive the public surface without touching the event loop.
-    """
-    container = build_container(settings or offline_settings())
-    container.weather_client.override(FakeWeatherClient(reading))
-    app = asyncio.run(resolve_prepared(container))
-    try:
-        yield app
-    finally:
-        asyncio.run(shutdown_container(container))
-
-
-def call_tool(server: Any, name: str, arguments: dict) -> Any:
-    """Invoke a server tool synchronously; the public call surface."""
-    return asyncio.run(server.call_tool(name, arguments))
+    service: Any
+    client: Client
+    weather: FakeWeatherClient
 
 
 @pytest.fixture
 def settings() -> DemoSettings:
-    """Offline settings for the showcase app."""
-    return offline_settings()
+    """Offline settings for the showcase app (no OTLP exporter)."""
+    return DemoSettings(telemetry=TelemetrySettings(enabled=False))
 
 
 @pytest.fixture
@@ -95,13 +81,27 @@ def reading(request: pytest.FixtureRequest) -> CurrentWeather:
 
 
 @pytest.fixture
-def app(reading: CurrentWeather, settings: DemoSettings) -> Iterator[Any]:
-    """The composition root prepared end to end; yields the ready service."""
-    with running_app(reading, settings) as application:
-        yield application
+async def application(
+    reading: CurrentWeather, settings: DemoSettings
+) -> AsyncIterator[Application]:
+    """The composition root, prepared with a live client session.
+
+    Entering the client runs the server lifespan (the discovery lifecycle), so
+    the materialized tool, prompt, and resource primitives are servable for the
+    duration of the test.
+    """
+    container = build_container(settings)
+    weather = FakeWeatherClient(reading)
+    container.weather_client.override(weather)
+    service = await resolve_prepared(container)
+    try:
+        async with Client(service.server) as client:
+            yield Application(service=service, client=client, weather=weather)
+    finally:
+        await shutdown_container(container)
 
 
 @pytest.fixture
-def server(app):
-    """The ready FastMCP server — the public call surface."""
-    return app.server
+async def client(application: Application) -> Client:
+    """The app's live client session — the public call surface."""
+    return application.client
