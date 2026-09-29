@@ -1,9 +1,9 @@
 """End-to-end: a tool whose arguments embed versioned models.
 
-The tool itself is plain (stable schema); an argument carries an embedded model
-that is versioned. The middleware converges every embedded entry to its chain's
-latest version before the handler runs — without touching the tool's own
-handler. A declared-but-unregistered nested kind fails at startup.
+A plain tool (stable signature) carries an argument that is a versioned model.
+The middleware converges every embedded entry to its chain's latest version
+before the handler runs. A declared-but-unregistered nested kind fails the
+reflection lifecycle.
 """
 
 from __future__ import annotations
@@ -12,67 +12,70 @@ import asyncio
 
 import pytest
 import semver
-from conftest import call_tool, store_model
+from conftest import call_tool, serve
 from fastmcp import FastMCP
 from pydantic import create_model
 
 from pyverge import Manager
 from pyverge.adapters.fastmcp import ConvergeMiddleware, ToolRegistry
-from pyverge.migration import JsonPatchMigration, MigrationSettings
-from pyverge.types import ManagerMigrationKey
-
-
-def _chain(manager: Manager, kind: str, field: str, default: str) -> None:
-    store_model(manager, kind, "1.0.0", {"city": {"type": "string"}}, ["city"])
-    store_model(
-        manager,
-        kind,
-        "2.0.0",
-        {"city": {"type": "string"}, field: {"type": "string", "default": default}},
-        ["city"],
-    )
-    manager.store_migration(
-        ManagerMigrationKey(kind, "1.0.0", "2.0.0"),
-        JsonPatchMigration(
-            {
-                "from": "1.0.0",
-                "to": "2.0.0",
-                "ops": [{"op": "add", "path": f"/{field}", "value": default}],
-            }
-        ).patch,
-    )
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from tests.examples.pydantic.semver_nested import (
+    AddressV1,
+    AddressV2,
+    migrate_address_100_200,
+)
 
 
 class TestEmbeddedModelConvergence:
-    def test_embedded_model_converges_before_the_handler(self, manager) -> None:
-        _chain(manager, "location", "country", "DE")
-
+    @pytest.mark.parametrize(
+        "model_adapter, registry",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "nested_test",
+                    [AddressV1, AddressV2],
+                    [((AddressV1, AddressV2), migrate_address_100_200)],
+                ],
+                id="pydantic",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_embedded_model_converges_before_the_handler(
+        self, manager: type, registry
+    ) -> None:
         mcp = FastMCP("S")
-        seen: list[dict] = []
 
         @mcp.tool
-        def search_weather(location: dict) -> dict:
-            seen.append(location)
+        def search(location: dict) -> dict:
             return {"location": location}
 
-        registry = ToolRegistry(manager)
-        mcp.middleware = [*mcp.middleware, ConvergeMiddleware(registry)]
-
+        serve(manager, mcp)
         result = call_tool(
             mcp,
-            "search_weather",
-            {"location": {"kind": "location", "version": "1.0.0", "city": "Berlin"}},
+            "search",
+            {
+                "location": {
+                    "kind": "Address",
+                    "version": "1.0.0",
+                    "street": "S",
+                    "city": "C",
+                }
+            },
         )
 
         assert result.structured_content == {
             "location": {
-                "kind": "location",
+                "kind": "Address",
                 "version": "2.0.0",
-                "city": "Berlin",
-                "country": "DE",
+                "street": "S",
+                "city": "C",
+                "country": None,
+                "postal_code": None,
             }
         }
-        assert seen[0]["version"] == "2.0.0"
 
 
 class TestUnregisteredReference:
@@ -101,11 +104,13 @@ class TestUnregisteredReference:
 
         mcp = FastMCP("S")
 
-        @mcp.tool(version="2.0.0")
+        @mcp.tool(name="search_weather", version="2.0.0")
         def search_weather(location: dict) -> dict:
             return {"location": location}
 
         registry = ToolRegistry(manager, policies={"search_weather": "latest"})
+        mcp.middleware = [*mcp.middleware, ConvergeMiddleware(registry)]
+
         with pytest.raises(ValueError, match="references unregistered"):
             asyncio.run(_lifecycle(registry, mcp))
 
