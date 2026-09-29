@@ -94,8 +94,6 @@ class DemoContainer(containers.DeclarativeContainer):
     )
     server = providers.Singleton(
         build_server,
-        discovery=discovery,
-        graph=settings.provided.graph,
         lifespan=providers.Callable(build_lifespan, discovery=discovery),
         middleware=providers.Callable(
             _call_middleware,

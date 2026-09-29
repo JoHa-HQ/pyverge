@@ -1,32 +1,26 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 from pyverge.core import MissingReferenceError, ModelConflictError
 from pyverge.manager import Manager
 from pyverge.types import Attachable
 
 from .converge import Converger
-from .reflection import ComponentReflection, ReflectedNode
+from .reflection import ComponentReflection, Policy, ReflectedNode
+
+if TYPE_CHECKING:
+    from pyverge.types import TargetPolicy
 
 
 class ToolDiscovery:
-    """Index a server's versioned primitives against a manager's graph.
+    """Index a server's versioned primitives against one manager's graph.
 
-    Owns the lifecycle phases over the reflected-node index:
-
-    * :meth:`search` — traverse the reflection providers and index the nodes
-      the manager owns and a policy covers,
-    * :meth:`register` — wrap each node's schema, materialize it as its anchor
-      model, then validate the registered graph's references,
-    * :meth:`enrich` — precompute convergence paths, materialize virtual
-      components, attach hooks.
-
-    The ordered lifecycle (which phase, when) is the caller's concern; this
-    class only owns the phases. Discovery consumes only
-    :class:`~.reflection.ReflectedNode` objects — never a FastMCP primitive — so
-    a provider fully owns how its host primitive type is read.
+    The lifecycle phases: :meth:`search` traverses the providers and indexes
+    the nodes the manager owns; :meth:`register` materializes each as its anchor
+    model and validates the graph; :meth:`enrich` materializes the virtual
+    surface and attaches hooks. The caller owns the ordering.
     """
 
     def __init__(
@@ -34,7 +28,7 @@ class ToolDiscovery:
         manager: Manager,
         providers: Sequence[ComponentReflection],
         *,
-        policies: dict[str, str] | None = None,
+        policies: Mapping[str, Policy] | None = None,
         hooks: Sequence[Attachable] = (),
     ) -> None:
         self._manager = manager
@@ -42,48 +36,52 @@ class ToolDiscovery:
         self._hooks = tuple(hooks)
         self._policies = dict(policies or {})
         self._nodes: dict[tuple[str, str], ReflectedNode] = {}
+        self._declared: dict[str, Policy] = {}
         self._converger = Converger(manager)
 
-    def _policy_for(self, kind: str) -> str | None:
-        """Return the recorded policy for *kind*, or ``None`` when none exists."""
-        return self._policies.get(kind)
+    def _policy_for(self, kind: str) -> Policy | None:
+        return self._declared.get(kind) or self._policies.get(kind)
 
     async def search(self, server: Any) -> None:
         """Index every versioned node the manager owns and a policy covers.
 
-        A versioned primitive is indexed only when its kind is owned by the
-        manager. A primitive of an unowned kind is unrelated and skipped; a
-        primitive whose kind is owned but carries no policy is a
-        misconfiguration and fails fast — every exposed kind needs an explicit
-        policy. Re-running is idempotent: the index is rebuilt.
+        A node's policy comes from its primitive's ``meta["policy"]``, else the
+        discovery's ``policies`` map. An unowned kind is skipped; an owned kind
+        with no policy fails fast — every exposed kind needs one. Versions of a
+        kind must agree on their declared policy.
         """
         self._nodes.clear()
+        self._declared.clear()
         for provider in self._providers:
             async for node in provider.reflect(server):
                 if not self._manager.list_versions(node.kind):
                     continue
-                if self._policy_for(node.kind) is None:
+                declared = node.policy or self._policies.get(node.kind)
+                if declared is None:
                     raise ValueError(
                         f"versioned primitive {node.kind!r} is owned by the "
-                        "manager but has no policy; record one in the discovery "
-                        "policies to expose it"
+                        "manager but has no policy; declare meta={'policy': ...} "
+                        "or record one in the discovery policies"
                     )
-                self._nodes[(node.kind, node.version)] = node
+                self._accept(node, declared)
+
+    def _accept(self, node: ReflectedNode, policy: Policy) -> None:
+        """Index *node*, enforcing one policy per kind."""
+        existing = self._declared.get(node.kind)
+        if existing is not None and existing != policy:
+            raise ValueError(
+                f"kind {node.kind!r} declares conflicting policies "
+                f"{existing!r} and {policy!r}; a kind converges to one target"
+            )
+        self._declared[node.kind] = policy
+        self._nodes[(node.kind, node.version)] = node
 
     def register(self) -> None:
-        """Materialize each indexed node's schema as its anchor model, then
-        validate the registered graph.
+        """Materialize each indexed node as its anchor model, then validate.
 
-        Registration is unconditional: the engine reconciles a reflected node
-        against an already-registered model (identical surface is a no-op, a
-        different one raises ``ModelConflictError``), so the reflected schema is
-        always validated against the graph contract. A conflict names the host
-        primitive that drifted as the error's subject.
-
-        Reference completeness is checked only after every node is stored — it
-        is a property of the whole graph, so validating mid-loop would give
-        false negatives. ``_reconcile`` remains callable on its own for
-        debugging.
+        The engine reconciles a node against an already-registered model (a
+        conflict names the primitive). References are validated only after every
+        node is stored, since completeness is a property of the whole graph.
         """
         for (kind, version), node in self._nodes.items():
             try:
@@ -99,14 +97,6 @@ class ToolDiscovery:
         self._reconcile()
 
     def _reconcile(self) -> None:
-        """Validate the registered graph's references are complete.
-
-        Every versioned kind a registered model references must be registered
-        — the walker silently skips unregistered kinds, so a declared-but-absent
-        child could never converge. Field agreement is enforced by the engine
-        at registration time; reference completeness by ``Manager.validate_graph``.
-        A failure names the host primitive that declared the missing reference.
-        """
         for kind, version in self._nodes:
             node = self._manager.get(kind, version)
             try:
@@ -120,19 +110,43 @@ class ToolDiscovery:
                 ) from error
 
     async def enrich(self, server: Any) -> None:
-        """Materialize virtual components and attach hooks.
+        """Materialize a virtual component for every version that has no
+        physical primitive, then attach the hooks.
 
-        Every registered version without a physical primitive gets a virtual
-        component that converges calls to the kind's policy target.
+        A virtual's schema comes from the registered model; its callable is the
+        converging delegate bound to the kind's physical anchor handler.
         """
         for kind, versions in self._versions_by_kind().items():
             policy = self._policy_for(kind)
             if policy is None:
                 continue
-            target = self._resolve_target(kind, policy)
+            mapping = self._policy_mapping(kind, policy)
+            anchor = self._resolve_target(kind, mapping[kind])
+            adapter = self._manager.adapter
+            identity = {adapter.kind_property, adapter.version_property}
+            provider = self._provider_for(kind)
             for version in versions:
-                if (kind, version) not in self._nodes:
-                    self._register_virtual(server, kind, version, target)
+                if (kind, version) in self._nodes:
+                    continue
+                model = self._manager.get(kind, version).model
+                schema = model.model_json_schema()
+                schema["properties"] = {
+                    k: v
+                    for k, v in schema.get("properties", {}).items()
+                    if k not in identity
+                }
+                provider.virtual(
+                    server,
+                    kind,
+                    version,
+                    schema,
+                    self._converger.delegate(
+                        kind=kind,
+                        version=version,
+                        target=cast("TargetPolicy", mapping),
+                        handler=self._anchor_handler(kind, anchor),
+                    ),
+                )
         self._attach_hooks()
 
     def _versions_by_kind(self) -> dict[str, list[str]]:
@@ -146,36 +160,11 @@ class ToolDiscovery:
                 bucket.append(version)
         return kinds
 
-    def _register_virtual(
-        self, server: Any, kind: str, version: str, target: str
-    ) -> None:
-        adapter = self._manager.adapter
-        identity = {adapter.kind_property, adapter.version_property}
-        model = self._manager.get(kind, version).model
-        schema = model.model_json_schema()
-        schema["properties"] = {
-            k: v for k, v in schema.get("properties", {}).items() if k not in identity
-        }
-        provider = self._provider_for(kind)
-        provider.virtual(
-            server,
-            kind,
-            version,
-            schema,
-            self._converger.delegate(
-                kind=kind,
-                version=version,
-                target=target,
-                handler=self._anchor_handler(kind, target),
-            ),
-        )
-
     def _anchor_handler(self, kind: str, target: str) -> Callable[..., Any]:
-        """Return the physical handler a virtual converges calls to.
+        """The physical handler a virtual converges calls to.
 
         Prefers the physical node at *target*; falls back to the kind's newest
-        physical version (the target may itself be a virtual version). Raises
-        when the kind has no physical node at all.
+        physical version (the target may itself be a virtual version).
         """
         node = self._nodes.get((kind, target))
         if node is None:
@@ -186,11 +175,7 @@ class ToolDiscovery:
         return node.handler
 
     def _provider_for(self, kind: str) -> ComponentReflection:
-        """Return the provider that owns *kind*.
-
-        A virtual component must converge through the same provider type that
-        owns the kind's physical anchor, so call-time routing stays uniform.
-        """
+        """The provider that owns *kind* — a virtual must match its anchor's type."""
         providers = {
             p for (k, _), n in self._nodes.items() if k == kind for p in [n.provider]
         }
@@ -203,24 +188,34 @@ class ToolDiscovery:
             )
         raise ValueError(f"no provider owns kind {kind!r}")
 
+    def _policy_mapping(self, kind: str, policy: Policy) -> dict[str, str]:
+        """Normalize a policy to a per-kind mapping.
+
+        A pinned/named string applies to *kind* alone; a dict applies its own
+        entries, with ``"*"`` as the fallback for the kind itself.
+        """
+        if isinstance(policy, str):
+            return {kind: policy}
+        mapping = dict(policy)
+        mapping.setdefault(kind, mapping.get("*", "latest"))
+        return mapping
+
     def _resolve_target(self, kind: str, policy: str) -> str:
-        versions = sorted(self._manager.list_versions(kind), key=lambda v: v.version[1])
+        """Translate a named policy (``latest``/``earliest``) to a version.
+
+        Any other value is passed through untouched — resolving and validating
+        a concrete target is the manager's job at migrate time.
+        """
+        if policy not in ("latest", "earliest"):
+            return policy
+        versions = [str(v.version[1]) for v in self._manager.list_versions(kind)]
         if not versions:
             raise ValueError(f"no registered versions for kind {kind!r}")
-        if policy == "latest":
-            return str(versions[-1].version[1])
-        if policy == "earliest":
-            return str(versions[0].version[1])
-        return policy
+        return versions[-1] if policy == "latest" else versions[0]
 
     def _attach_hooks(self) -> None:
-        """Attach the observer hooks to every registered migration edge."""
-        if not self._hooks:
-            return
-        self._manager.attach_hooks(self._hooks)
-
-    def converge_payload(self, arguments: dict) -> dict:
-        return self._converger.converge_payload(arguments)
+        if self._hooks:
+            self._manager.attach_hooks(self._hooks)
 
 
 __all__ = ["ToolDiscovery"]

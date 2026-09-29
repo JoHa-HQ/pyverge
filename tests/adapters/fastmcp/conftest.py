@@ -18,11 +18,7 @@ from typing import Any
 import pytest
 from fastmcp import Client, FastMCP
 
-from pyverge.adapters.fastmcp import (
-    ConvergeMiddleware,
-    ToolDiscovery,
-    ToolReflection,
-)
+from pyverge.adapters.fastmcp import ToolDiscovery, ToolReflection
 
 
 @dataclass(frozen=True)
@@ -39,6 +35,7 @@ class Case:
     handler: Callable[..., Any]
     version: str | None = None
     policies: dict[str, str] = field(default_factory=dict)
+    policy: str | None = None
     args: dict[str, Any] = field(default_factory=dict)
     expected: dict[str, Any] = field(default_factory=dict)
     call_version: str | None = None
@@ -54,9 +51,8 @@ def case(request: pytest.FixtureRequest) -> Case:
 def app(request: pytest.FixtureRequest, manager: type, case: Case) -> FastMCP:
     """A test FastMCP server whose lifespan runs the discovery lifecycle.
 
-    The physical tool and its policy come from *case*; the discovery owns the
-    lifecycle and the middleware converges each call. FastMCP enters the lifespan
-    when the ``client`` fixture opens its session.
+    The physical tool and its policy come from *case*; FastMCP enters the
+    lifespan when the ``client`` fixture opens its session.
     """
     instance = manager()
     discovery = ToolDiscovery(
@@ -71,8 +67,8 @@ def app(request: pytest.FixtureRequest, manager: type, case: Case) -> FastMCP:
         yield {"discovery": discovery}
 
     server = FastMCP("TestServer", lifespan=app_lifespan)
-    server.tool(case.handler, name=case.kind, version=case.version)
-    server.middleware = [*server.middleware, ConvergeMiddleware(discovery)]
+    meta = {"policy": case.policy} if case.policy else None
+    server.tool(case.handler, name=case.kind, version=case.version, meta=meta)
     return server
 
 

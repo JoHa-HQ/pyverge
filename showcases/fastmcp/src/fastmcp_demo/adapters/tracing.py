@@ -9,9 +9,8 @@ Builds a ``TracerProvider`` that exports spans over OTLP to the collector in
   call-level parent span, so every step span nests under the tool call.
 
 Tracing is the host's concern, not the adapter's: ``CallSpanMiddleware`` wraps
-the server's tool calls independently of ``ConvergeMiddleware``. This is the
-only module that imports the OpenTelemetry SDK — the rest of the app depends on
-the returned objects alone.
+the server's tool calls on its own. This is the only module that imports the
+OpenTelemetry SDK — the rest of the app depends on the returned objects alone.
 """
 
 from __future__ import annotations

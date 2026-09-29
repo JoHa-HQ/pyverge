@@ -15,8 +15,7 @@ every reflection provider has a physical anchor:
 A call at any version converges to the anchor before the handler runs, and each
 migration step emits a span to Jaeger. Tool, prompt, and resource calls all
 negotiate the version natively (FastMCP's `version=`), routed to the materialized
-virtual primitive; `ConvergeMiddleware` handles the one case native routing
-cannot see — a plain tool with embedded versioned models in its arguments.
+virtual primitive.
 
 ## Run
 

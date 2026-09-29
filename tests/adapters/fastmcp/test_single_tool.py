@@ -16,7 +16,12 @@ import semver
 from conftest import Case
 from fastmcp import FastMCP
 
-from pyverge.adapters.fastmcp import ToolDiscovery, ToolReflection
+from pyverge.adapters.fastmcp import (
+    PromptReflection,
+    ResourceReflection,
+    ToolDiscovery,
+    ToolReflection,
+)
 from pyverge.migration import PydanticModelAdapter
 from pyverge.ports import JsonSchemaModelAdapter
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
@@ -173,3 +178,90 @@ async def test_owned_kind_without_policy_fails_fast(manager: type) -> None:
 
     with pytest.raises(ValueError, match="has no policy"):
         await discovery.search(server)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "user_test", [UserV1, UserV2], []],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+async def test_policy_declared_in_meta(manager: type) -> None:
+    """A primitive declares its policy via ``meta['policy']`` — no map needed."""
+    instance = manager()
+    discovery = ToolDiscovery(instance, [ToolReflection(instance.adapter)])
+    server = FastMCP("TestServer")
+    server.tool(_rich_handler, name="User", version="2.0.0", meta={"policy": "latest"})
+
+    await discovery.search(server)
+    discovery.register()
+    await discovery.enrich(server)
+
+    names = {t.name for t in await server.list_tools()}
+    assert names == {"User"}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "user_test", [UserV1, UserV2], []],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+async def test_conflicting_meta_policies_fail(manager: type) -> None:
+    """Versions of one kind must agree on their declared policy."""
+    instance = manager()
+    discovery = ToolDiscovery(instance, [ToolReflection(instance.adapter)])
+    server = FastMCP("TestServer")
+    server.tool(_rich_handler, name="User", version="1.0.0", meta={"policy": "latest"})
+    server.tool(
+        _rich_handler, name="User", version="2.0.0", meta={"policy": "earliest"}
+    )
+
+    with pytest.raises(ValueError, match="conflicting policies"):
+        await discovery.search(server)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "user_test", [UserV1, UserV2], []],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+async def test_meta_policy_on_prompt_and_resource(manager: type) -> None:
+    """Prompt and resource primitives declare their policy via meta too."""
+    instance = manager()
+    server = FastMCP("TestServer")
+
+    @server.prompt(name="User", version="2.0.0", meta={"policy": "latest"})
+    def user_prompt(name: str, email: str, role: str, age: int | None = None) -> str:
+        return name
+
+    @server.resource(
+        "userres://{name}", name="User", version="2.0.0", meta={"policy": "latest"}
+    )
+    def user_resource(name: str) -> str:
+        return name
+
+    # Each provider alone passes search because its meta declares a policy.
+    prompts = ToolDiscovery(instance, [PromptReflection(instance.adapter)])
+    resources = ToolDiscovery(instance, [ResourceReflection(instance.adapter)])
+    await prompts.search(server)
+    await resources.search(server)

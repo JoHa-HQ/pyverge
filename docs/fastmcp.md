@@ -27,9 +27,7 @@ models and migrations.
   and then calls the physical anchor. Older callers see the version they declared;
   the handler always receives the target shape.
 - **Convergence** — a versioned call is negotiated natively (FastMCP's
-  `version=`) and routed to the virtual primitive, which converges the outer
-  payload. `ConvergeMiddleware` covers the one case native routing cannot see: a
-  plain tool whose arguments **embed** versioned models.
+  `version=`) and routed to the virtual primitive, which converges the payload.
 
 Versioning is FastMCP's, end to end — pyverge adds no calling convention of its
 own.
@@ -47,7 +45,6 @@ from pydantic import BaseModel
 
 from pyverge import Manager
 from pyverge.adapters.fastmcp import (
-    ConvergeMiddleware,
     ToolDiscovery,
     ToolReflection,
     tool,
@@ -70,8 +67,8 @@ def add_wind(data: dict) -> dict:
     return {**data, "wind": 0.0}
 
 
-# 3. The physical tool — its signature is the v2 contract.
-@tool(name="search_weather", version="2.0.0")
+# 3. The physical tool — its signature is the v2 contract; meta declares policy.
+@tool(name="search_weather", version="2.0.0", meta={"policy": "latest"})
 def search_weather(city: str, temperature: float = 0.0, wind: float = 0.0) -> dict:
     return {"city": city, "temperature": temperature, "wind": wind}
 
@@ -83,11 +80,8 @@ manager = Manager[semver.Version].configure(
 manager.store_model(WeatherV2)
 manager.store_migration(ManagerMigrationKey("search_weather", "1.0.0", "2.0.0"), add_wind)
 
-discovery = ToolDiscovery(
-    manager,
-    [ToolReflection(manager.adapter)],
-    policies={"search_weather": "latest"},
-)
+# Policy comes from each primitive's meta; the map is only a fallback.
+discovery = ToolDiscovery(manager, [ToolReflection(manager.adapter)])
 
 
 # 4. The lifecycle is the server's lifespan — the user wires it.
@@ -104,7 +98,6 @@ server = FastMCP(
     lifespan=lifespan,
     tools=[search_weather],
 )
-server.middleware = [ConvergeMiddleware(discovery)]
 
 
 async def main() -> None:
@@ -175,9 +168,16 @@ providers = [
 ```
 
 - A primitive is indexed only if it declares a `version` and its kind is
-  registered in the manager. Unversioned primitives pass through untouched. A
-  versioned primitive of an owned kind with no recorded policy fails fast — every
-  exposed kind needs an explicit policy; there is no silent default.
+  registered in the manager. Unversioned primitives pass through untouched.
+- A kind's **policy** (its convergence target) comes from the primitive's own
+  declaration — `meta={"policy": ...}` — or the discovery's
+  `policies={kind: policy}` map. Every exposed kind needs one; there is no silent
+  default, and all versions of a kind must agree. `"latest"`/`"earliest"` pick
+  the chain ends; any other value is a pinned version, resolved by the manager at
+  migrate time.
+- A policy may be **per-kind** — `{"*": "latest", "Address": "earliest"}` — which
+  also steers the **nested** kinds embedded in the payload: each converts to its
+  own target while the outer kind converges to the `"*"` target.
 - `ResourceReflection` takes the URI `scheme`/prefix so virtual templates match the
   physical ones (e.g. `weather://{city}{?units}`).
 - A provider also hides **injected** parameters (wiring, not payload) from the
@@ -185,23 +185,11 @@ providers = [
   rule to a physical function's signature — see
   [Injected parameters](#injected-parameters).
 
-## Convergence middleware
+## Telemetry
 
-`ConvergeMiddleware` handles the one thing FastMCP's native version routing
-cannot see: a **plain** tool whose arguments embed versioned models — a nested
-entry carrying its own `kind`/`version`. It migrates each embedded entry in
-place, then forwards to the tool's handler.
-
-```python
-server.middleware = [ConvergeMiddleware(discovery)]
-```
-
-A natively versioned call is left untouched: FastMCP routes it to the matching
-virtual primitive, which converges the outer payload. There is no
-pyverge-specific version convention — versioning is FastMCP's, end to end.
-
-Telemetry is deliberately **not** the middleware's concern. To trace calls, stack
-your own middleware around it — the adapter is free of any tracing library:
+The adapter is free of any tracing library. To trace calls, stack your own
+FastMCP middleware; the per-migration `OTELHook`s open their spans **as
+current**, so each step span nests under the call span you open:
 
 ```python
 class CallSpanMiddleware(Middleware):
@@ -210,12 +198,10 @@ class CallSpanMiddleware(Middleware):
         with self._tracer.start_as_current_span(f"{self._service}.call"):
             return await call_next(context)
 
-server.middleware = [CallSpanMiddleware(tracer, "my-service"), ConvergeMiddleware(discovery)]
+server.middleware = [CallSpanMiddleware(tracer, "my-service")]
 ```
 
-Because the per-migration `OTELHook`s open their spans **as current**, each step
-span nests under the call span your middleware opened. See
-[Telemetry & Hooks](telemetry.md).
+See [Telemetry & Hooks](telemetry.md) for the per-step `OTELHook`.
 
 ## Injected parameters
 

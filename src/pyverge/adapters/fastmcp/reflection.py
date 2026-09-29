@@ -4,7 +4,7 @@ import inspect
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeAlias
 
 from fastmcp.prompts.base import PromptArgument
 from fastmcp.prompts.function_prompt import FunctionPrompt
@@ -19,16 +19,17 @@ from .injection import InjectionDetector, injected_names
 if TYPE_CHECKING:
     from fastmcp import FastMCP
 
+#: A policy declared in a primitive's ``meta`` — the JSON-representable subset of
+#: a pyverge target policy: a named/pinned version, or a per-kind mapping.
+Policy: TypeAlias = str | dict[str, str]
+
 
 @dataclass(frozen=True)
 class ReflectedNode:
-    """A versioned physical entity, normalized for the version graph.
+    """A versioned primitive, normalized for the version graph.
 
-    Emitted by a provider's :meth:`ComponentReflection.reflect`. Discovery
-    consumes nodes only — it never reads a FastMCP primitive's internals. The
-    node is also the schema→versionable bridge: :meth:`versionable` drops the
-    injected (wired) parameters, injects the identity fields under the
-    adapter's configured property names, and wraps the result through the
+    Bridges the reflected schema to a versionable: drops injected (wired)
+    parameters, injects the identity fields, and wraps the result through the
     provider's adapter.
     """
 
@@ -38,14 +39,14 @@ class ReflectedNode:
     schema: dict[str, Any]
     injected: frozenset[str]
     handler: Callable[..., Any] | None
+    policy: Policy | None = None
 
     def _identity(self) -> tuple[str, str]:
-        """Return the ``(kind_property, version_property)`` field names."""
         adapter = self.provider.adapter
         return adapter.kind_property, adapter.version_property
 
     def compliant(self) -> dict[str, Any]:
-        """Return the schema with injected params dropped and identity injected."""
+        """Schema with injected params dropped and identity fields injected."""
         document = {**self.schema}
         properties = dict(document.get("properties", {}))
         for name in self.injected:
@@ -61,17 +62,15 @@ class ReflectedNode:
         return document
 
     def fields(self) -> frozenset[str]:
-        """Return the reflected payload fields, minus the identity fields."""
+        """Payload fields, minus the identity fields."""
         identity = set(self._identity())
         return frozenset(set(self.compliant().get("properties", {})) - identity)
 
     def versionable(self) -> Versionable:
-        """Wrap the compliant schema into a node via the provider's adapter.
+        """Wrap the compliant schema into a versionable via the provider's adapter.
 
-        A schema-based adapter materializes the document into a model; a typed
-        adapter that refuses a raw schema yields a meta node carrying the
-        schema-derived ``fields`` instead, so the engine can still reconcile it
-        against the model the host registered.
+        A typed adapter that refuses a raw schema yields a meta node carrying the
+        schema-derived ``fields`` instead, so the engine can still reconcile it.
         """
         adapter = self.provider.adapter
         try:
@@ -90,22 +89,11 @@ class ReflectedNode:
 
 
 class ComponentReflection(ABC):
-    """Factory for one host primitive type: traverse, emit nodes, materialize.
+    """One host primitive type: traverse its entities, emit nodes, materialize.
 
-    One provider per primitive type — a tool, a prompt or a resource — bridging
-    the host's primitive type and pyverge's version graph. It traverses the
-    server's physical entities of its type (its *tree*) and emits one
-    :class:`ReflectedNode` per entity **marked for versioning**; the unmarked
-    ones are invisible to discovery, so discovery stays free of any FastMCP
-    object shape and consumes nodes, never primitives.
-
-    The provider is bound once with the manager's model adapter (for
-    schema→versionable work) and an optional injection detector. Kind and
-    version come from the entity itself. :meth:`reflect` yields only physical
-    nodes: a virtual component is synthesized from the registered graph, so
-    returning it here would make discovery unable to tell a host-declared
-    entity from one it already materialized. :meth:`virtual` materializes that
-    synthesized primitive for a registered version with no physical entity.
+    :meth:`reflect` yields a node per versioned primitive; unversioned ones are
+    skipped. :meth:`virtual` materializes a primitive for a registered version
+    with no physical entity. Both are bound to one model adapter.
     """
 
     def __init__(
@@ -116,28 +104,20 @@ class ComponentReflection(ABC):
 
     @property
     def adapter(self) -> ModelAdapter:
-        """The bound model adapter."""
         return self._adapter
-
-    # -- traversal ----------------------------------------------------------
 
     @abstractmethod
     def components(self, server: FastMCP) -> AsyncIterator[Any]:
         """Yield every physical entity of this provider's type from *server*."""
 
     async def reflect(self, server: FastMCP) -> AsyncIterator[ReflectedNode]:
-        """Emit a node per physical entity marked for versioning.
-
-        An entity is marked when it declares a version. Unmarked entities are
-        skipped — they belong to no version graph.
-        """
         async for component in self.components(server):
             node = self.node(component)
             if node is not None:
                 yield node
 
     def node(self, component: Any) -> ReflectedNode | None:
-        """Normalize *component*, or ``None`` when it is not marked for versioning."""
+        """Normalize *component*, or ``None`` when it declares no version."""
         version = self.version(component)
         if version is None:
             return None
@@ -148,25 +128,38 @@ class ComponentReflection(ABC):
             schema=self.schema(component),
             injected=self.injected(component),
             handler=self.handler(component),
+            policy=self.policy(component),
         )
 
-    # -- primitive reading --------------------------------------------------
+    def policy(self, component: Any) -> Policy | None:
+        """The convergence policy declared in the component's ``meta``, if any.
+
+        Accepts a version string or a per-kind mapping (the JSON subset of a
+        pyverge target policy); anything else is ignored.
+        """
+        meta = getattr(component, "meta", None)
+        if not isinstance(meta, dict):
+            return None
+        declared = meta.get("policy")
+        if isinstance(declared, str):
+            return declared
+        if isinstance(declared, dict) and all(
+            isinstance(k, str) and isinstance(v, str) for k, v in declared.items()
+        ):
+            return declared
+        return None
 
     def kind(self, component: Any) -> str:
-        """Return the entity's kind (its identity key)."""
         return str(component.name)
 
     def version(self, component: Any) -> str | None:
-        """Return the entity's version, or ``None`` when it is not marked."""
         version = getattr(component, "version", None)
         return None if version is None else str(version)
 
     def handler(self, component: Any) -> Callable[..., Any] | None:
-        """Return the callable behind *component*, or ``None`` if it has none."""
         return getattr(component, "fn", None) or getattr(component, "run", None)
 
     def injected(self, component: Any) -> frozenset[str]:
-        """Return the names of the component's injected (wired) parameters."""
         handler = self.handler(component)
         if handler is None:
             return frozenset()
@@ -176,34 +169,28 @@ class ComponentReflection(ABC):
     def schema(self, component: Any) -> dict[str, Any]:
         """Return the component's input schema document."""
 
-    # -- factory ------------------------------------------------------------
-
     @abstractmethod
     def virtual(
         self, server: FastMCP, kind: str, version: str, schema: dict, fn: Callable
     ) -> Any:
-        """Materialize a virtual *kind*@*version* primitive on *server*.
+        """Materialize a virtual ``kind@version`` primitive on *server*.
 
         The schema is the registered model's JSON schema (identity fields
-        already dropped); *fn* is the converging indirection.
+        dropped); *fn* is the converging callable.
         """
-
-    # -- helpers ------------------------------------------------------------
 
     @staticmethod
     def schema_fields(schema: dict) -> list[str]:
-        """Return the field names of a JSON schema document."""
         return list(schema.get("properties", {}))
 
     @staticmethod
     def signature(fn: Callable, names: list[str], *, required_first: bool) -> Callable:
         """Wrap *fn* so FastMCP's ``from_function`` sees one parameter per field.
 
-        The converging indirection is ``**kwargs``-only, but the FastMCP
-        factories validate the component's parameters against the callable's
-        signature. This exposes each schema field as a parameter (the first one
-        required when *required_first*, for a resource URI's path parameter)
-        and forwards everything.
+        The converging callable is ``**kwargs``-only, but the FastMCP factories
+        validate parameters against the signature. This exposes each schema
+        field as a parameter (the first required when *required_first*, for a
+        resource URI's path parameter).
         """
 
         def indirection(**kwargs):
@@ -276,8 +263,8 @@ class PromptReflection(ComponentReflection):
         prompt = FunctionPrompt.from_function(
             self.signature(fn, names, required_first=False), name=kind, version=version
         )
-        # The factory derives the arguments from ``fn``'s signature; the
-        # registered model's schema is the contract, so it replaces them.
+        # The factory derives arguments from ``fn``'s signature; the registered
+        # model's schema is the contract, so it replaces them.
         prompt.arguments = [
             PromptArgument(
                 name=name,
@@ -292,8 +279,8 @@ class PromptReflection(ComponentReflection):
 class ResourceReflection(ComponentReflection):
     """Reflect FastMCP resources and templates (their ``parameters`` schema).
 
-    *uri_scheme* is the prefix a virtual resource's URI template uses (e.g.
-    ``"weather://"``), so virtual templates match the physical ones.
+    *uri_scheme* prefixes a virtual resource's URI template, so virtual
+    templates match the physical ones.
     """
 
     def __init__(
@@ -328,12 +315,10 @@ class ResourceReflection(ComponentReflection):
         )
 
     def uri_template_for(self, kind: str, schema: dict) -> str:
-        """Return the URI template a virtual resource for *schema* exposes.
+        """URI template a virtual resource for *schema* exposes.
 
-        The template mirrors the physical shape: *uri_scheme* is the prefix
-        (e.g. ``"weather://"``), the first property is the path parameter (a
-        template needs at least one), the rest are optional query parameters.
-        Without a scheme, the kind namespaces the path.
+        The first property is the path parameter, the rest optional query
+        parameters. Without a scheme, the kind namespaces the path.
         """
         names = self.schema_fields(schema)
         if not names:
@@ -355,9 +340,8 @@ class ResourceReflection(ComponentReflection):
             name=kind,
             version=version,
         )
-        # The factory derives the schema from ``fn``'s signature (the URI
-        # parameters); the registered model's schema is the contract, so it
-        # replaces the derived one.
+        # The factory derives parameters from ``fn``'s signature; the registered
+        # model's schema is the contract, so it replaces them.
         template.parameters = schema
         return server.add_template(template)
 

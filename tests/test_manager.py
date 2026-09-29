@@ -594,7 +594,7 @@ class TestSharedEngine:
         version: str,
     ) -> None:
         manager_instance = manager()
-        manager_instance.store_model(model)  # ty: ignore
+        manager_instance.store_model(model)
 
         expected = f"User:{version}"
         assert [str(v) for v in manager_instance.registry.versions] == [expected]

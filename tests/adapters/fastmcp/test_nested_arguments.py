@@ -1,18 +1,17 @@
-"""End-to-end: a tool whose arguments embed versioned models.
+"""End-to-end: a tool whose registered model references versioned kinds.
 
-A plain tool (stable signature) carries an argument that is a versioned model.
-The middleware converges every embedded entry to its chain's latest version
-before the handler runs. A declared-but-unregistered nested kind, and a schema
-that drifts from its registered model, each fail the discovery lifecycle at
-startup.
+A per-kind policy on the tool's ``meta`` drives nested convergence; a
+declared-but-unregistered nested kind, and a schema that drifts from its
+registered model, each fail the discovery lifecycle at startup.
 """
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 import pytest
 import semver
-from conftest import Case
-from fastmcp import FastMCP
+from fastmcp import Client, FastMCP
 from pydantic import create_model
 
 from pyverge import Manager
@@ -22,56 +21,16 @@ from pyverge.migration import MigrationSettings, PydanticModelAdapter
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
     AddressV2,
+    AddressV3,
+    ContactV1,
+    ContactV2,
+    PersonV1,
+    PersonV2,
     migrate_address_100_200,
+    migrate_address_300_200,
+    migrate_contact_100_200,
+    preserve_children_person,
 )
-
-EMBEDDED = Case(
-    id="embedded",
-    kind="search",
-    handler=lambda location: {"location": location},
-    policies={},
-    args={
-        "location": {
-            "kind": "Address",
-            "version": "1.0.0",
-            "street": "S",
-            "city": "C",
-        }
-    },
-    expected={
-        "location": {
-            "kind": "Address",
-            "version": "2.0.0",
-            "street": "S",
-            "city": "C",
-            "country": None,
-            "postal_code": None,
-        }
-    },
-)
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "model_adapter, registry, case",
-    [
-        pytest.param(
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "nested_test",
-                [AddressV1, AddressV2],
-                [((AddressV1, AddressV2), migrate_address_100_200)],
-            ],
-            EMBEDDED,
-            id="pydantic",
-        ),
-    ],
-    indirect=["model_adapter", "registry", "case"],
-)
-async def test_embedded_model_converges_before_the_handler(client, case: Case) -> None:
-    result = await client.call_tool(case.kind, case.args)
-    assert result.structured_content == case.expected
 
 
 async def _run_lifecycle(discovery: ToolDiscovery, server: FastMCP) -> None:
@@ -156,3 +115,89 @@ class TestSchemaConflict:
 
         with pytest.raises(ModelConflictError, match=r"primitive 'search_weather'@"):
             await _run_lifecycle(discovery, mcp)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "nested_test",
+                [
+                    PersonV1,
+                    PersonV2,
+                    AddressV1,
+                    AddressV2,
+                    AddressV3,
+                    ContactV1,
+                    ContactV2,
+                ],
+                [
+                    ((PersonV1, PersonV2), preserve_children_person),
+                    ((AddressV1, AddressV2), migrate_address_100_200),
+                    ((AddressV3, AddressV2), migrate_address_300_200),
+                    ((ContactV1, ContactV2), migrate_contact_100_200),
+                ],
+            ],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+async def test_per_kind_policy_drives_nested_convergence(manager) -> None:
+    """A per-kind policy converges each embedded kind to its own target.
+
+    The tool is pinned to ``latest``; the embedded ``Address`` is pinned to
+    ``2.0.0`` even though ``3.0.0`` is the latest — so the nested entry
+    downgrades while the outer payload converges forward.
+    """
+    instance = manager()
+    discovery = ToolDiscovery(instance, [ToolReflection(instance.adapter)])
+
+    @asynccontextmanager
+    async def app_lifespan(server: FastMCP):
+        await discovery.search(server)
+        discovery.register()
+        await discovery.enrich(server)
+        yield {}
+
+    server = FastMCP("TestServer", lifespan=app_lifespan)
+
+    @server.tool(
+        name="Person",
+        version="2.0.0",
+        meta={"policy": {"*": "latest", "Address": "2.0.0"}},
+    )
+    def person(
+        name: str,
+        address: dict,
+        contacts: list[dict],
+        email: str | None = None,
+    ) -> dict:
+        return {"name": name, "address": address, "contacts": contacts}
+
+    async with Client(server) as client:
+        result = await client.call_tool(
+            "Person",
+            {
+                "name": "A",
+                "address": {
+                    "kind": "Address",
+                    "version": "3.0.0",
+                    "street": "S",
+                    "city": "C",
+                    "country": "X",
+                    "postal_code": "1",
+                    "region": "R",
+                },
+                "contacts": [{"kind": "Contact", "version": "1.0.0", "phone": "1"}],
+            },
+            version="1.0.0",
+        )
+
+    address = result.structured_content["address"]
+    assert address["version"] == "2.0.0"
+    assert "region" not in address
