@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
-from typing import cast
+from typing import Any, cast
 
 import pendulum
+from pydantic import BaseModel
 from semver import Version
 
-from pyverge.types import VersionValue
+from pyverge.types import ModelVersionKey, VersionValue
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,14 @@ class BaseModelAdapter:
     ) -> None:
         self._version_property = version_property
         self._kind_property = kind_property
+
+    def version(self, model_cls: type[Any]) -> str:
+        """Return the model's version string. Implemented by concrete adapters."""
+        raise NotImplementedError
+
+    def kind(self, model_cls: type[Any]) -> str:
+        """Return the model's kind. Implemented by concrete adapters."""
+        raise NotImplementedError
 
     @classmethod
     def of(cls, value: str | VersionValue) -> VersionValue:
@@ -61,3 +70,60 @@ class BaseModelAdapter:
             "Expected semver (e.g. '1.0.0') or ISO date (e.g. '2024-06-01')."
         )
         raise ValueError(msg)
+
+    def references(self, model_cls: type[Any]) -> frozenset[ModelVersionKey]:
+        """Return every versioned ``(kind, version)`` the model's fields declare.
+
+        Walks the field annotations recursively and collects **all** model
+        classes they mention — every member of a ``Union``, ``list`` items,
+        through ``Annotated`` wrappers — unlike ``resolve_model``, which
+        collapses a union to its first member.  A model that declares three
+        versions of a nested kind therefore reports all three.
+
+        Only versioned nested models contribute (an unversioned ``BaseModel``
+        has an empty ``kind`` and is skipped).  Cycles are tolerated.
+        """
+        found: set[ModelVersionKey] = set()
+        self._collect_references(model_cls, found, set())
+        return frozenset(found)
+
+    def _collect_references(
+        self,
+        model_cls: type[Any],
+        found: set[ModelVersionKey],
+        seen: set[int],
+    ) -> None:
+        if not (isinstance(model_cls, type) and issubclass(model_cls, BaseModel)):
+            return
+        if id(model_cls) in seen:
+            return
+        seen.add(id(model_cls))
+
+        for name in model_cls.model_fields:
+            annotation = model_cls.model_fields[name].annotation
+            for nested in self._iter_models(annotation):
+                if nested is model_cls:
+                    continue
+                kind = self.kind(nested)
+                if not kind:
+                    continue
+                try:
+                    version = self.of(self.version(nested))
+                except (TypeError, ValueError):
+                    continue
+                found.add((kind, version))
+                self._collect_references(nested, found, seen)
+
+    def _iter_models(self, annotation: Any) -> list[type[BaseModel]]:
+        """Return every ``BaseModel`` class mentioned in *annotation*.
+
+        Unwraps ``Annotated``, ``Union``/``Optional`` and ``list``/``tuple``
+        containers, collecting all members rather than the first.
+        """
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            return [annotation]
+
+        models: list[type[BaseModel]] = []
+        for arg in getattr(annotation, "__args__", ()):
+            models.extend(self._iter_models(arg))
+        return models

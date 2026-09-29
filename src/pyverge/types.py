@@ -129,6 +129,11 @@ class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co, VModel_
     @property
     def model(self) -> type[VModel_co]: ...
 
+    @property
+    def references(self) -> frozenset[ModelVersionKey]:
+        """Versioned ``(kind, version)`` pairs the model's fields declare."""
+        ...
+
 
 @runtime_checkable
 class Transitional(Orderable, Protocol[VersionValue_co, VSource_co, VTarget_co]):
@@ -331,6 +336,15 @@ class ModelAdapter(Protocol):
     def field_model(
         self, parent_model: type[Any], field_name: str
     ) -> type[ModelBase] | None: ...
+    def references(self, model_cls: type[Any]) -> frozenset[ModelVersionKey]:
+        """Return every versioned ``(kind, version)`` the model's fields declare.
+
+        Walks annotations recursively and collects **all** model classes they
+        mention — every ``Union`` member, ``list`` items — not just the first,
+        so a model declaring several versions of a nested kind reports all.
+        """
+        ...
+
     def versionable(
         self,
         model_cls: type[VModel_co] | None,

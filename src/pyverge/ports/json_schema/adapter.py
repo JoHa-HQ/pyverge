@@ -50,7 +50,16 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
     def to_pydantic(
         self, document: dict[str, Any], *, class_name: str = "Model"
     ) -> type[ModelBase]:
-        """Materialize a Pydantic model from a schema document, cached by content."""
+        """Materialize a Pydantic model from a schema document, cached by content.
+
+        The generated module may define multiple classes for nested/referenced
+        schemas (via ``$defs``/``definitions``); each is rebuilt against the
+        module namespace so forward references resolve to concrete classes
+        rather than staying ``ForwardRef``.
+
+        Returns:
+            The materialized model class for *class_name*.
+        """
         key = json.dumps(document, sort_keys=True)
         if key not in self._cache:
             source = generate(
@@ -60,8 +69,19 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             )
             namespace: dict[str, Any] = {}
             exec(str(source), namespace)
+            self._rebuild(namespace)
             self._cache[key] = namespace[class_name]
         return self._cache[key]
+
+    @staticmethod
+    def _rebuild(namespace: dict[str, Any]) -> None:
+        """Resolve forward references for every model in the generated module."""
+        for obj in list(namespace.values()):
+            if isinstance(obj, type) and issubclass(obj, ModelBase):
+                try:
+                    obj.model_rebuild(_types_namespace=namespace)
+                except Exception:  # best-effort; generic models skip rebuild
+                    continue
 
     def _field_default(self, model_cls: type[ModelBase], name: str) -> str:
         """Return the field's default value, mirroring the Pydantic adapter."""
@@ -151,6 +171,7 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             _model=model,
             _value=self.of(self.version(model)),
             _kind=self.kind(model),
+            references=self.references(model),
         )
 
     def diff(

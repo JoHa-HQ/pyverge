@@ -10,7 +10,7 @@ from pyverge.core.exceptions import (
     ModelNotFoundError,
     RegistryError,
 )
-from pyverge.core.versioning import SentinelEdge
+from pyverge.core.versioning import SentinelEdge, VersionNode
 from pyverge.types import (
     Attachable,
     Comparable,
@@ -19,6 +19,7 @@ from pyverge.types import (
     MigrationFunc,
     ModelBase,
     ModelKind,
+    ModelVersionKey,
     ProviderBase,
     Transitional,
     Versionable,
@@ -207,6 +208,25 @@ class Registry(Generic[VersionValue, ProviderBase]):
     def has_model(self: Self, key: Comparable) -> bool:
         idx = bisect.bisect_left(self._by_versions, key)
         return idx < len(self._by_versions) and self._by_versions[idx] == key
+
+    def missing_references(
+        self: Self, node: Versionable[VersionValue, ProviderBase]
+    ) -> frozenset[ModelVersionKey]:
+        """Return the ``(kind, version)`` pairs *node* declares but that are absent.
+
+        *node* must itself be registered.  A declared reference that is not in
+        the registry is a latent bug: the payload walker silently skips
+        unregistered kinds, so a versionable child can never be converged.
+        """
+        registered = self.get_model(node)
+        missing = []
+        for kind, version in registered.references:
+            sentinel = VersionNode[VersionValue, ProviderBase](
+                _model=None, _value=version, _kind=kind
+            )
+            if not self.has_model(sentinel):
+                missing.append((kind, version))
+        return frozenset(missing)
 
     def _find_edge(
         self: Self,

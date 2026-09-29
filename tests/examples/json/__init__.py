@@ -45,6 +45,47 @@ USER_V2026_03_01 = _schema("User", "2026-03-01", {"name": {"type": "string"}})
 
 ADDRESS_V1_0_0 = _schema("Address", "1.0.0", {"street": {"type": "string"}})
 ADDRESS_V2_0_0 = _schema("Address", "2.0.0", {"street": {"type": "string"}})
+ADDRESS_V3_0_0 = _schema("Address", "3.0.0", {"street": {"type": "string"}})
+
+
+def _object(kind: str, version: str, props: dict[str, Any]) -> dict[str, Any]:
+    """A pure object schema (no top-level identity keys) for ``definitions``."""
+    return {
+        "type": "object",
+        "properties": {
+            "kind": {"type": "string", "default": kind},
+            "version": {"type": "string", "default": version},
+            **props,
+        },
+    }
+
+
+#: A ``Person`` whose ``address`` field references a *union* of three Address
+#: versions via ``oneOf``.  Mirrors the Pydantic discriminated union in
+#: ``semver_nested``: a reference walk must surface all three, not just the
+#: first.  The referenced schemas live under ``definitions`` so the JSON
+#: adapter can materialize them.
+PERSON_V1_0_0 = {
+    "type": "object",
+    "properties": {
+        "kind": {"type": "string", "default": "Person"},
+        "version": {"type": "string", "default": "1.0.0"},
+        "name": {"type": "string"},
+        "address": {
+            "oneOf": [
+                {"$ref": "#/definitions/AddressV1"},
+                {"$ref": "#/definitions/AddressV2"},
+                {"$ref": "#/definitions/AddressV3"},
+            ]
+        },
+    },
+    "required": ["name", "address"],
+    "definitions": {
+        "AddressV1": _object("Address", "1.0.0", {"street": {"type": "string"}}),
+        "AddressV2": _object("Address", "2.0.0", {"street": {"type": "string"}}),
+        "AddressV3": _object("Address", "3.0.0", {"street": {"type": "string"}}),
+    },
+}
 
 INVALID_BETA = _schema("User", "beta.7", {"name": {"type": "string"}})
 INVALID_ALPHA = _schema("User", "0.0.0.alpha7", {"name": {"type": "string"}})
