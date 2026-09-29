@@ -8,20 +8,24 @@ it sees the raw signature::
     @inject
     def search_weather(city: str, weather: WeatherService = Provide[...]) -> dict: ...
 
-Each decorator also works as a plain factory: ``tool(fn, name=...)``.
+Each decorator is overloaded: given a function it returns the built component
+(the ``@tool`` bare form); given only options it returns a decorator
+(``@tool(name=...)`` / the factory ``tool(fn, name=...)``).
 """
 
 from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
-from typing import Any
+from typing import Any, overload
 
 from fastmcp.prompts.function_prompt import FunctionPrompt
 from fastmcp.resources.template import FunctionResourceTemplate
 from fastmcp.tools.function_tool import FunctionTool
 
 from .injection import InjectionDetector, injected_names
+
+Fn = Callable[..., Any]
 
 
 def hide_injected(fn: Any, detector: InjectionDetector | None = None) -> set[str]:
@@ -41,82 +45,125 @@ def hide_injected(fn: Any, detector: InjectionDetector | None = None) -> set[str
     return names
 
 
-def _build(fn: Any, detector: InjectionDetector | None, factory, **kwargs: Any):
+def _build(fn: Fn, detector: InjectionDetector | None, factory: Fn, **kwargs: Any):
     hide_injected(fn, detector)
     return factory(fn, **kwargs)
 
 
+@overload
 def tool(
-    fn: Callable[..., Any] | None = None,
+    fn: Fn,
+    *,
+    name: str | None = ...,
+    version: str | int | None = ...,
+    detector: InjectionDetector | None = ...,
+    **kwargs: Any,
+) -> FunctionTool: ...
+@overload
+def tool(
+    fn: None = None,
+    *,
+    name: str | None = ...,
+    version: str | int | None = ...,
+    detector: InjectionDetector | None = ...,
+    **kwargs: Any,
+) -> Callable[[Fn], FunctionTool]: ...
+def tool(
+    fn: Fn | None = None,
     *,
     name: str | None = None,
     version: str | int | None = None,
     detector: InjectionDetector | None = None,
     **kwargs: Any,
-) -> FunctionTool | Callable[[Callable[..., Any]], FunctionTool]:
+) -> FunctionTool | Callable[[Fn], FunctionTool]:
     """Build a ``FunctionTool`` with injected parameters hidden."""
-
-    def decorate(func: Callable[..., Any]) -> FunctionTool:
-        return _build(
-            func,
-            detector,
-            FunctionTool.from_function,
-            name=name,
-            version=version,
-            **kwargs,
-        )
-
-    return decorate(fn) if fn is not None else decorate
+    return _decorator(
+        fn, FunctionTool.from_function, detector, name=name, version=version, **kwargs
+    )
 
 
+@overload
 def prompt(
-    fn: Callable[..., Any] | None = None,
+    fn: Fn,
+    *,
+    name: str | None = ...,
+    version: str | int | None = ...,
+    detector: InjectionDetector | None = ...,
+    **kwargs: Any,
+) -> FunctionPrompt: ...
+@overload
+def prompt(
+    fn: None = None,
+    *,
+    name: str | None = ...,
+    version: str | int | None = ...,
+    detector: InjectionDetector | None = ...,
+    **kwargs: Any,
+) -> Callable[[Fn], FunctionPrompt]: ...
+def prompt(
+    fn: Fn | None = None,
     *,
     name: str | None = None,
     version: str | int | None = None,
     detector: InjectionDetector | None = None,
     **kwargs: Any,
-) -> FunctionPrompt | Callable[[Callable[..., Any]], FunctionPrompt]:
+) -> FunctionPrompt | Callable[[Fn], FunctionPrompt]:
     """Build a ``FunctionPrompt`` with injected parameters hidden."""
-
-    def decorate(func: Callable[..., Any]) -> FunctionPrompt:
-        return _build(
-            func,
-            detector,
-            FunctionPrompt.from_function,
-            name=name,
-            version=version,
-            **kwargs,
-        )
-
-    return decorate(fn) if fn is not None else decorate
+    return _decorator(
+        fn, FunctionPrompt.from_function, detector, name=name, version=version, **kwargs
+    )
 
 
+@overload
 def resource(
-    fn: Callable[..., Any] | None = None,
+    fn: Fn,
+    *,
+    uri_template: str,
+    name: str | None = ...,
+    version: str | int | None = ...,
+    detector: InjectionDetector | None = ...,
+    **kwargs: Any,
+) -> FunctionResourceTemplate: ...
+@overload
+def resource(
+    fn: None = None,
+    *,
+    uri_template: str,
+    name: str | None = ...,
+    version: str | int | None = ...,
+    detector: InjectionDetector | None = ...,
+    **kwargs: Any,
+) -> Callable[[Fn], FunctionResourceTemplate]: ...
+def resource(
+    fn: Fn | None = None,
     *,
     uri_template: str,
     name: str | None = None,
     version: str | int | None = None,
     detector: InjectionDetector | None = None,
     **kwargs: Any,
-) -> (
-    FunctionResourceTemplate | Callable[[Callable[..., Any]], FunctionResourceTemplate]
-):
+) -> FunctionResourceTemplate | Callable[[Fn], FunctionResourceTemplate]:
     """Build a ``FunctionResourceTemplate`` with injected parameters hidden."""
+    return _decorator(
+        fn,
+        FunctionResourceTemplate.from_function,
+        detector,
+        uri_template=uri_template,
+        name=name,
+        version=version,
+        **kwargs,
+    )
 
-    def decorate(func: Callable[..., Any]) -> FunctionResourceTemplate:
-        return _build(
-            func,
-            detector,
-            FunctionResourceTemplate.from_function,
-            uri_template=uri_template,
-            name=name,
-            version=version,
-            **kwargs,
-        )
 
-    return decorate(fn) if fn is not None else decorate
+def _decorator(
+    fn: Fn | None, factory: Fn, detector: InjectionDetector | None, **kwargs: Any
+):
+    """Return the built component for *fn*, or the decorator when *fn* is ``None``."""
+
+    def decorate(func: Fn):
+        return _build(func, detector, factory, **kwargs)
+
+    return decorate if fn is None else decorate(fn)
 
 
 __all__ = ["hide_injected", "prompt", "resource", "tool"]
