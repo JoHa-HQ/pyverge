@@ -8,14 +8,15 @@ from .graph import (
     V1,
     V2,
     V3,
+    V4,
     build_manager,
 )
-from .models import SearchWeather, WeatherBriefing, WeatherReading
+from .models import Coordinates, SearchWeather, WeatherBriefing, WeatherReading
 from .weather import CityNotFound, CurrentWeather, WeatherClient, WeatherService
 
 #: The newest version — the physical tool's version, and the anchor older
 #: versions are reconstructed from.
-ANCHOR_VERSION = V3
+ANCHOR_VERSION = V4
 
 __all__ = [
     "ALL_VERSIONS",
@@ -25,7 +26,9 @@ __all__ = [
     "V1",
     "V2",
     "V3",
+    "V4",
     "CityNotFound",
+    "Coordinates",
     "CurrentWeather",
     "SearchWeather",
     "WeatherBriefing",

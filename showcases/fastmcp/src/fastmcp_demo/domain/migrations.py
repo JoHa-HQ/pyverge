@@ -6,6 +6,7 @@ versions. They are grouped as documented tables so each graph reads as the
 API's schema history::
 
     search_weather    v1 (temp) --add_humidity--> v2 (+humidity) --add_wind--> v3
+                      --add_coordinates--> v4 (+coordinates)
     weather_briefing  v1 (city) --add_style--> v2 (+style)
     weather_reading   v1 (city) --add_units--> v2 (+units)
 """
@@ -15,9 +16,6 @@ from __future__ import annotations
 from collections.abc import Callable
 
 Migration = Callable[[dict], dict]
-
-
-# -- search_weather (tool) ---------------------------------------------------
 
 
 def add_humidity(data: dict) -> dict:
@@ -44,7 +42,16 @@ def drop_humidity(data: dict) -> dict:
     return data
 
 
-# -- weather_briefing (prompt) -----------------------------------------------
+def add_coordinates(data: dict) -> dict:
+    """v3 -> v4: the record gained resolved coordinates (city lookup)."""
+    return {**data, "coordinates": None}
+
+
+def drop_coordinates(data: dict) -> dict:
+    """v4 -> v3: discard coordinates for a caller on the older schema."""
+    data = dict(data)
+    del data["coordinates"]
+    return data
 
 
 def add_style(data: dict) -> dict:
@@ -57,9 +64,6 @@ def drop_style(data: dict) -> dict:
     data = dict(data)
     del data["style"]
     return data
-
-
-# -- weather_reading (resource) ----------------------------------------------
 
 
 def add_units(data: dict) -> dict:
