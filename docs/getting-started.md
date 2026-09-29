@@ -1,5 +1,7 @@
 # Getting Started
 
+Pyverge is a runtime schema-evolution engine that lets independently deployed producers and consumers exchange versioned payloads without requiring synchronized releases.
+
 ## Installation
 
 ```bash
