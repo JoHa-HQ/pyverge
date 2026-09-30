@@ -41,8 +41,10 @@ jobs:
           python-version: "3.11"
       - name: Resolve index URLs
         id: index
+        env:
+          INDEX: ${{ inputs.index }}
         run: |
-          case "${{ inputs.index }}" in
+          case "$INDEX" in
             testpypi)
               echo "publish-url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
               echo "check-url=https://test.pypi.org/simple/" >> "$GITHUB_OUTPUT"
@@ -54,25 +56,32 @@ jobs:
               echo "simple-url=https://pypi.org/simple/" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "Unknown index: ${{ inputs.index }}" >&2
+              echo "Unknown index: $INDEX" >&2
               exit 1
               ;;
           esac
       - name: Build package
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            export SETUPTOOLS_SCM_PRETEND_VERSION="${{ inputs.version }}"
+          if [ -n "$PACKAGE_VERSION" ]; then
+            export SETUPTOOLS_SCM_PRETEND_VERSION="$PACKAGE_VERSION"
           fi
           uv build --no-sources
       - name: Publish to ${{ inputs.index }}
+        env:
+          PUBLISH_URL: ${{ steps.index.outputs.publish-url }}
+          CHECK_URL: ${{ steps.index.outputs.check-url }}
         run: |
           uv publish dist/* \
-            --publish-url "${{ steps.index.outputs.publish-url }}" \
-            --check-url "${{ steps.index.outputs.check-url }}"
+            --publish-url "$PUBLISH_URL" \
+            --check-url "$CHECK_URL"
       - name: Verify install from ${{ inputs.index }}
+        env:
+          INDEX_SIMPLE_URL: ${{ steps.index.outputs.simple-url }}
         run: |
           uv run --no-project --prerelease allow \
             --with pyverge \
-            --default-index "${{ steps.index.outputs.simple-url }}" \
+            --default-index "$INDEX_SIMPLE_URL" \
             --index https://pypi.org/simple/ \
             -- python -c "import pyverge; print('installed', pyverge.__version__)"
