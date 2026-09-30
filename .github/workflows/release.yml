@@ -40,6 +40,12 @@ jobs:
       - name: Bump version, changelog, and tag
         id: version
         run: |
+          if git log -1 --pretty=%s | grep -qE 'release v?[0-9]+\.[0-9]+\.[0-9]+|\[skip ci\]'; then
+            echo "Latest commit is a release commit, no bump needed."
+            echo "version=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
@@ -118,8 +124,9 @@ jobs:
     needs: [tag, release]
     if: ${{ needs.tag.outputs.version != 'none' && needs.tag.outputs.version != '' }}
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
-      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -135,7 +142,4 @@ jobs:
           name: dist
           path: dist/
       - name: Publish to PyPI
-        env:
-          UV_PUBLISH_URL: https://upload.pypi.org/legacy/
-          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: uv publish dist/*

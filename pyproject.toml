@@ -47,6 +47,12 @@ fastmcp = [
   "dependency-injector>=4.49.1"
 ]
 
+[project.urls]
+Homepage = "https://github.com/JoHa-HQ/pyverge"
+Repository = "https://github.com/JoHa-HQ/pyverge"
+Changelog = "https://github.com/JoHa-HQ/pyverge/blob/main/CHANGELOG.md"
+Issues = "https://github.com/JoHa-HQ/pyverge/issues"
+
 [project.scripts]
 pyverge = "pyverge.cli.main:app"
 

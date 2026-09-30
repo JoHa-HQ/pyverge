@@ -1,5 +1,9 @@
 # pyverge
 
+[![PyPI version](https://img.shields.io/pypi/v/pyverge.svg)](https://pypi.org/project/pyverge/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/pyverge.svg)](https://pypi.org/project/pyverge/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pyverge.svg)](https://pypi.org/project/pyverge/)
+
 Schema evolution and migrations for versioned data models. Version your
 models, define migrations between versions, and converge payloads to a target
 schema at runtime.
@@ -13,10 +17,13 @@ marshmallow, MessagePack, etc.) plug in the same way.
 
 ```bash
 # Core library (versioned registry, migration engine, diffing)
-pip install git+https://github.com/JoHa-HQ/pyverge.git
+pip install pyverge
 
 # With CLI (init, validate, migrate, diff, export commands)
-pip install "git+https://github.com/JoHa-HQ/pyverge.git#egg=pyverge[cli]"
+pip install "pyverge[cli]"
+
+# With MCP tool server
+pip install "pyverge[fastmcp]"
 ```
 
 Development dependencies are managed as a dependency group; install them with
