@@ -12,13 +12,18 @@ concurrency:
 jobs:
   publish:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: testpypi
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/_publish.yaml
-    with:
-      index: testpypi
-      environment: testpypi
-      publish-url: https://test.pypi.org/legacy/
-      check-url: https://test.pypi.org/simple/
-      simple-url: https://test.pypi.org/simple/
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/publish
+        with:
+          index: TestPyPI
+          publish-url: https://test.pypi.org/legacy/
+          check-url: https://test.pypi.org/simple/
+          simple-url: https://test.pypi.org/simple/

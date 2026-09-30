@@ -9,16 +9,25 @@ on:
         description: Git tag to publish
         required: true
 
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   publish:
+    runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       contents: read
       id-token: write
-    uses: ./.github/workflows/_publish.yaml
-    with:
-      index: pypi
-      environment: pypi
-      publish-url: https://upload.pypi.org/legacy/
-      check-url: https://pypi.org/simple/
-      simple-url: https://pypi.org/simple/
-      ref: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - uses: ./.github/actions/publish
+        with:
+          index: PyPI
+          publish-url: https://upload.pypi.org/legacy/
+          check-url: https://pypi.org/simple/
+          simple-url: https://pypi.org/simple/
