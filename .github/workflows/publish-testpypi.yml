@@ -1,0 +1,35 @@
+name: TestPyPI Publish (manual)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: testpypi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - name: Build package with unique dev version
+        env:
+          SETUPTOOLS_SCM_PRETEND_VERSION: 0.10.0.dev${{ github.run_number }}
+        run: uv build --no-sources
+      - name: Publish to TestPyPI
+        run: uv publish dist/* --publish-url https://test.pypi.org/legacy/
+      - name: Verify install from TestPyPI
+        run: |
+          uv run --no-project \
+            --default-index https://test.pypi.org/simple/ \
+            --index https://pypi.org/simple/ \
+            -- python -c "import pyverge; print('installed', pyverge.__version__)"
