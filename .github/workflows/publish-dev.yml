@@ -10,28 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    outputs:
-      value: ${{ steps.derive.outputs.value }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: astral-sh/setup-uv@v10.0.1
-        with:
-          python-version: "3.11"
-      - name: Derive PyPI-safe dev version
-        id: derive
-        run: |
-          # --strip-dev drops the "+g<sha>" local label and trailing .devN that
-          # PyPI rejects; append the run number so re-runs never collide.
-          BASE=$(uv run --quiet --no-project --with setuptools-scm -- \
-            python -m setuptools_scm --strip-dev)
-          echo "value=${BASE}.dev${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-
   publish:
-    needs: version
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -43,4 +22,3 @@ jobs:
       publish-url: https://test.pypi.org/legacy/
       check-url: https://test.pypi.org/simple/
       simple-url: https://test.pypi.org/simple/
-      version: ${{ needs.version.outputs.value }}

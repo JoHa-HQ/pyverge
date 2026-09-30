@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
@@ -12,7 +12,7 @@ dev = [
   "pre-commit>=4.0",
   "commitizen>=4.16.2",
   "hatch>=1.16.5",
-  "hatch-vcs>=0.5.0",
+  "uv-dynamic-versioning>=0.14.1",
   "syrupy>=5.2.0",
   "pytest-stub>=1.1.0",
   "typing-extensions>=4.15.0"
@@ -63,14 +63,20 @@ tag_format = "v$version"
 version_schema = "semver"
 update_changelog_on_bump = true
 
-[tool.hatch.build.hooks.vcs]
-version-file = "src/pyverge/_version.py"
+[tool.hatch.build.hooks.version]
+path = "src/pyverge/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyverge"]
 
 [tool.hatch.version]
-source = "vcs"
+source = "uv-dynamic-versioning"
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

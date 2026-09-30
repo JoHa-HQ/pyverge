@@ -28,11 +28,6 @@ on:
         required: false
         type: string
         default: ""
-      version:
-        description: Override package version (optional)
-        required: false
-        type: string
-        default: ""
 
 permissions: {}
 
@@ -52,13 +47,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Build package
-        env:
-          PACKAGE_VERSION: ${{ inputs.version }}
-        run: |
-          if [ -n "$PACKAGE_VERSION" ]; then
-            export SETUPTOOLS_SCM_PRETEND_VERSION="$PACKAGE_VERSION"
-          fi
-          uv build --no-sources
+        run: uv build --no-sources
       - name: Publish to ${{ inputs.index }}
         env:
           PUBLISH_URL: ${{ inputs.publish-url }}
