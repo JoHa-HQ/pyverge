@@ -10,7 +10,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.derive.outputs.value }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - name: Derive PyPI-safe dev version
+        id: derive
+        run: |
+          # hatch-vcs/SCM appends a "+g<sha>" local label that PyPI rejects.
+          # Take the clean SCM version, drop its .devN, and use the workflow
+          # run number so re-runs never collide.
+          CLEAN=$(uv run --quiet --no-project --with setuptools-scm -- python -c \
+            "from setuptools_scm import get_version; print(get_version(local_scheme='no-local-version'))")
+          BASE=${CLEAN%%.dev*}
+          echo "value=${BASE}.dev${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
   publish:
+    needs: version
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
@@ -22,4 +45,4 @@ jobs:
       publish-url: https://test.pypi.org/legacy/
       check-url: https://test.pypi.org/simple/
       simple-url: https://test.pypi.org/simple/
-      version: 0.10.0.dev${{ github.run_number }}
+      version: ${{ needs.version.outputs.value }}
