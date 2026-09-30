@@ -21,15 +21,17 @@ jobs:
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
-      - name: Build package with unique dev version
-        env:
-          SETUPTOOLS_SCM_PRETEND_VERSION: 0.10.0.dev${{ github.run_number }}
+      - name: Build package (hatch-vcs dev version)
         run: uv build --no-sources
       - name: Publish to TestPyPI
-        run: uv publish dist/* --publish-url https://test.pypi.org/legacy/
+        run: |
+          uv publish dist/* \
+            --publish-url https://test.pypi.org/legacy/ \
+            --check-url https://test.pypi.org/simple/
       - name: Verify install from TestPyPI
         run: |
-          uv run --no-project \
+          uv run --no-project --prerelease allow \
+            --with pyverge \
             --default-index https://test.pypi.org/simple/ \
             --index https://pypi.org/simple/ \
             -- python -c "import pyverge; print('installed', pyverge.__version__)"
