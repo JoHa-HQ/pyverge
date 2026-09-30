@@ -24,12 +24,10 @@ jobs:
       - name: Derive PyPI-safe dev version
         id: derive
         run: |
-          # hatch-vcs/SCM appends a "+g<sha>" local label that PyPI rejects.
-          # Take the clean SCM version, drop its .devN, and use the workflow
-          # run number so re-runs never collide.
-          CLEAN=$(uv run --quiet --no-project --with setuptools-scm -- python -c \
-            "from setuptools_scm import get_version; print(get_version(local_scheme='no-local-version'))")
-          BASE=${CLEAN%%.dev*}
+          # --strip-dev drops the "+g<sha>" local label and trailing .devN that
+          # PyPI rejects; append the run number so re-runs never collide.
+          BASE=$(uv run --quiet --no-project --with setuptools-scm -- \
+            python -m setuptools_scm --strip-dev)
           echo "value=${BASE}.dev${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
   publish:
