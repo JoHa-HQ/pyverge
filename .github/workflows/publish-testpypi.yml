@@ -1,6 +1,8 @@
-name: TestPyPI Publish (manual)
+name: Publish Dev (TestPyPI)
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -8,9 +10,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-publish:
+  publish-dev:
     runs-on: ubuntu-latest
-    environment: pypi
+    environment: testpypi
     permissions:
       id-token: write
       contents: read
@@ -21,7 +23,10 @@ jobs:
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
-      - name: Build package (hatch-vcs dev version)
+      - name: Build dev package for TestPyPI
+        env:
+          # PyPI rejects local version labels (+g<sha>); use a clean, unique dev version.
+          SETUPTOOLS_SCM_PRETEND_VERSION: 0.10.0.dev${{ github.run_number }}
         run: uv build --no-sources
       - name: Publish to TestPyPI
         run: |
