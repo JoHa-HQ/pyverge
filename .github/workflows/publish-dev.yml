@@ -1,0 +1,22 @@
+name: Publish Dev (TestPyPI)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-dev-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/_publish.yaml
+    with:
+      index: testpypi
+      environment: testpypi
+      version: 0.10.0.dev${{ github.run_number }}

@@ -1,0 +1,77 @@
+name: _Publish
+
+on:
+  workflow_call:
+    inputs:
+      index:
+        description: Target package index (testpypi or pypi)
+        required: true
+        type: string
+      environment:
+        description: GitHub environment used for OIDC publishing
+        required: true
+        type: string
+      ref:
+        description: Git ref to build from (defaults to caller ref)
+        required: false
+        type: string
+        default: ""
+      version:
+        description: Override package version (optional)
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.ref }}
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - name: Resolve index URLs
+        id: index
+        run: |
+          case "${{ inputs.index }}" in
+            testpypi)
+              echo "publish-url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
+              echo "check-url=https://test.pypi.org/simple/" >> "$GITHUB_OUTPUT"
+              echo "simple-url=https://test.pypi.org/simple/" >> "$GITHUB_OUTPUT"
+              ;;
+            pypi)
+              echo "publish-url=https://upload.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
+              echo "check-url=https://pypi.org/simple/" >> "$GITHUB_OUTPUT"
+              echo "simple-url=https://pypi.org/simple/" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Unknown index: ${{ inputs.index }}" >&2
+              exit 1
+              ;;
+          esac
+      - name: Build package
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            export SETUPTOOLS_SCM_PRETEND_VERSION="${{ inputs.version }}"
+          fi
+          uv build --no-sources
+      - name: Publish to ${{ inputs.index }}
+        run: |
+          uv publish dist/* \
+            --publish-url "${{ steps.index.outputs.publish-url }}" \
+            --check-url "${{ steps.index.outputs.check-url }}"
+      - name: Verify install from ${{ inputs.index }}
+        run: |
+          uv run --no-project --prerelease allow \
+            --with pyverge \
+            --default-index "${{ steps.index.outputs.simple-url }}" \
+            --index https://pypi.org/simple/ \
+            -- python -c "import pyverge; print('installed', pyverge.__version__)"

@@ -1,0 +1,21 @@
+name: Publish Release (PyPI)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to publish
+        required: true
+
+jobs:
+  publish:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/_publish.yaml
+    with:
+      index: pypi
+      environment: pypi
+      ref: ${{ github.event.release.tag_name || inputs.tag }}
