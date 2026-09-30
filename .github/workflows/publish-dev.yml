@@ -19,4 +19,7 @@ jobs:
     with:
       index: testpypi
       environment: testpypi
+      publish-url: https://test.pypi.org/legacy/
+      check-url: https://test.pypi.org/simple/
+      simple-url: https://test.pypi.org/simple/
       version: 0.10.0.dev${{ github.run_number }}

@@ -4,11 +4,23 @@ on:
   workflow_call:
     inputs:
       index:
-        description: Target package index (testpypi or pypi)
+        description: Human-readable index name, used in step labels
         required: true
         type: string
       environment:
         description: GitHub environment used for OIDC publishing
+        required: true
+        type: string
+      publish-url:
+        description: Upload endpoint of the target index
+        required: true
+        type: string
+      check-url:
+        description: Simple index URL used to skip duplicate uploads
+        required: true
+        type: string
+      simple-url:
+        description: Simple index URL used to verify the install
         required: true
         type: string
       ref:
@@ -39,27 +51,6 @@ jobs:
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
-      - name: Resolve index URLs
-        id: index
-        env:
-          INDEX: ${{ inputs.index }}
-        run: |
-          case "$INDEX" in
-            testpypi)
-              echo "publish-url=https://test.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
-              echo "check-url=https://test.pypi.org/simple/" >> "$GITHUB_OUTPUT"
-              echo "simple-url=https://test.pypi.org/simple/" >> "$GITHUB_OUTPUT"
-              ;;
-            pypi)
-              echo "publish-url=https://upload.pypi.org/legacy/" >> "$GITHUB_OUTPUT"
-              echo "check-url=https://pypi.org/simple/" >> "$GITHUB_OUTPUT"
-              echo "simple-url=https://pypi.org/simple/" >> "$GITHUB_OUTPUT"
-              ;;
-            *)
-              echo "Unknown index: $INDEX" >&2
-              exit 1
-              ;;
-          esac
       - name: Build package
         env:
           PACKAGE_VERSION: ${{ inputs.version }}
@@ -70,15 +61,15 @@ jobs:
           uv build --no-sources
       - name: Publish to ${{ inputs.index }}
         env:
-          PUBLISH_URL: ${{ steps.index.outputs.publish-url }}
-          CHECK_URL: ${{ steps.index.outputs.check-url }}
+          PUBLISH_URL: ${{ inputs.publish-url }}
+          CHECK_URL: ${{ inputs.check-url }}
         run: |
           uv publish dist/* \
             --publish-url "$PUBLISH_URL" \
             --check-url "$CHECK_URL"
       - name: Verify install from ${{ inputs.index }}
         env:
-          INDEX_SIMPLE_URL: ${{ steps.index.outputs.simple-url }}
+          INDEX_SIMPLE_URL: ${{ inputs.simple-url }}
         run: |
           uv run --no-project --prerelease allow \
             --with pyverge \
