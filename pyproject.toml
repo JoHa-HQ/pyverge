@@ -25,6 +25,12 @@ description = "Migration orchestration framework"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13"
+]
 dependencies = [
   "pydantic[email,timezone]>=2.11",
   "pydantic-extra-types[phonenumbers]>=2.9",
@@ -72,12 +78,6 @@ packages = ["src/pyverge"]
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
 
-[tool.uv-dynamic-versioning]
-vcs = "git"
-style = "pep440"
-bump = true
-format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80 --doctest-modules"
@@ -107,3 +107,9 @@ max-complexity = 10
 "tests/test_engine.py" = ["PLR0913"]
 "tests/test_graph.py" = ["PLR0913"]
 "tests/test_version_property.py" = ["PLR0913"]
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"
