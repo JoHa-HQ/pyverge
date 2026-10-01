@@ -1,0 +1,49 @@
+name: Publish Python package
+description: Build a wheel/sdist and publish it to a Python package index.
+
+inputs:
+  publish-url:
+    description: Upload endpoint of the target index.
+    required: true
+  check-url:
+    description: Simple index URL used to skip duplicate uploads.
+    required: true
+  simple-url:
+    description: Simple index URL used to verify the install.
+    required: true
+  index:
+    description: Human-readable index name, used in step labels.
+    required: true
+  python-version:
+    description: Python version to build with.
+    required: false
+    default: "3.11"
+
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v10.0.1
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Build package
+      shell: bash
+      run: uv build --no-sources
+    - name: Publish to ${{ inputs.index }}
+      shell: bash
+      env:
+        PUBLISH_URL: ${{ inputs.publish-url }}
+        CHECK_URL: ${{ inputs.check-url }}
+      run: |
+        uv publish dist/* \
+          --publish-url "$PUBLISH_URL" \
+          --check-url "$CHECK_URL"
+    - name: Verify install from ${{ inputs.index }}
+      shell: bash
+      env:
+        SIMPLE_URL: ${{ inputs.simple-url }}
+      run: |
+        uv run --no-project --prerelease allow \
+          --with pyverge \
+          --default-index "$SIMPLE_URL" \
+          --index https://pypi.org/simple/ \
+          -- python -c "import pyverge; print('installed', pyverge.__version__)"

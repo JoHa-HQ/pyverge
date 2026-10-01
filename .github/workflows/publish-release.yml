@@ -1,0 +1,33 @@
+name: Publish Release (PyPI)
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to publish
+        required: true
+
+concurrency:
+  group: publish-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
+      - uses: ./.github/actions/publish
+        with:
+          index: PyPI
+          publish-url: https://upload.pypi.org/legacy/
+          check-url: https://pypi.org/simple/
+          simple-url: https://pypi.org/simple/

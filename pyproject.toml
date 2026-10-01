@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling", "uv-dynamic-versioning"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
@@ -12,7 +12,7 @@ dev = [
   "pre-commit>=4.0",
   "commitizen>=4.16.2",
   "hatch>=1.16.5",
-  "hatch-vcs>=0.5.0",
+  "uv-dynamic-versioning>=0.14.1",
   "syrupy>=5.2.0",
   "pytest-stub>=1.1.0",
   "typing-extensions>=4.15.0"
@@ -25,6 +25,12 @@ description = "Migration orchestration framework"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
+classifiers = [
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13"
+]
 dependencies = [
   "pydantic[email,timezone]>=2.11",
   "pydantic-extra-types[phonenumbers]>=2.9",
@@ -50,6 +56,12 @@ fastmcp = [
 [project.scripts]
 pyverge = "pyverge.cli.main:app"
 
+[project.urls]
+Homepage = "https://github.com/JoHa-HQ/pyverge"
+Repository = "https://github.com/JoHa-HQ/pyverge"
+Changelog = "https://github.com/JoHa-HQ/pyverge/blob/main/CHANGELOG.md"
+Issues = "https://github.com/JoHa-HQ/pyverge/issues"
+
 [tool.commitizen]
 name = "cz_conventional_commits"
 version_provider = "scm"
@@ -57,14 +69,14 @@ tag_format = "v$version"
 version_schema = "semver"
 update_changelog_on_bump = true
 
-[tool.hatch.build.hooks.vcs]
-version-file = "src/pyverge/_version.py"
+[tool.hatch.build.hooks.version]
+path = "src/pyverge/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pyverge"]
 
 [tool.hatch.version]
-source = "vcs"
+source = "uv-dynamic-versioning"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -95,3 +107,9 @@ max-complexity = 10
 "tests/test_engine.py" = ["PLR0913"]
 "tests/test_graph.py" = ["PLR0913"]
 "tests/test_version_property.py" = ["PLR0913"]
+
+[tool.uv-dynamic-versioning]
+vcs = "git"
+style = "pep440"
+bump = true
+format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"

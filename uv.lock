@@ -765,6 +765,18 @@ wheels = [
 ]
 
 [[package]]
+name = "dunamai"
+version = "1.26.2"
+source = {registry = "https://pypi.org/simple"}
+dependencies = [
+  {name = "packaging"}
+]
+sdist = {url = "https://files.pythonhosted.org/packages/12/18/020d3b27a10450ddb11429f637404e8ea67ecf4d9fd999d4f1d553f25506/dunamai-1.26.2.tar.gz", hash = "sha256:84ea45eddf9bb4b40df7610b1b22a03137365e6257dbf9d7b72128fdccca564c", size = 46536, upload-time = "2026-08-02T03:32:50.276Z"}
+wheels = [
+  {url = "https://files.pythonhosted.org/packages/f0/31/2aaabe7d03f395c7b6d955f09a4d1440a2c49920abea42fde88cacc2ef97/dunamai-1.26.2-py3-none-any.whl", hash = "sha256:4234be3a90c3ec13ecf75d94a2248068e5a3018e8112892fcd9f3a1f287c9c32", size = 27478, upload-time = "2026-08-02T03:32:49.348Z"}
+]
+
+[[package]]
 name = "email-validator"
 version = "2.3.0"
 source = {registry = "https://pypi.org/simple"}
@@ -979,19 +991,6 @@ dependencies = [
 sdist = {url = "https://files.pythonhosted.org/packages/d2/02/ce9c4c439fa3f195b21b4b5bb18b44d1076297c86477ef7e3d2de6064ec3/hatch-1.16.5.tar.gz", hash = "sha256:57bdeeaa72577859ce37091a5449583875331c06f9cb6af9077947ad40b3a1de", size = 5220741, upload-time = "2026-02-27T18:45:31.21Z"}
 wheels = [
   {url = "https://files.pythonhosted.org/packages/e4/8a/11ae7e271870f0ad8fa0012e4265982bebe0fdc21766b161fb8b8fc3aefc/hatch-1.16.5-py3-none-any.whl", hash = "sha256:d9b8047f2cd10d3349eb6e8f278ad728a04f91495aace305c257d5c2747188fb", size = 141269, upload-time = "2026-02-27T18:45:29.573Z"}
-]
-
-[[package]]
-name = "hatch-vcs"
-version = "0.5.0"
-source = {registry = "https://pypi.org/simple"}
-dependencies = [
-  {name = "hatchling"},
-  {name = "setuptools-scm"}
-]
-sdist = {url = "https://files.pythonhosted.org/packages/6b/b0/4cc743d38adbee9d57d786fa496ed1daadb17e48589b6da8fa55717a0746/hatch_vcs-0.5.0.tar.gz", hash = "sha256:0395fa126940340215090c344a2bf4e2a77bcbe7daab16f41b37b98c95809ff9", size = 11424, upload-time = "2025-05-27T05:16:04.49Z"}
-wheels = [
-  {url = "https://files.pythonhosted.org/packages/5f/48/1f85cee4b7b4f40b9b814b1febbc661bda6ced9649e410a0b74f6e415dd0/hatch_vcs-0.5.0-py3-none-any.whl", hash = "sha256:b49677dbdc597460cc22d01b27ab3696f5e16a21ecf2700fb01bc28e1f2a04a7", size = 8507, upload-time = "2025-05-27T05:16:03.184Z"}
 ]
 
 [[package]]
@@ -2169,7 +2168,6 @@ dependencies = [
 dev = [
   {name = "commitizen"},
   {name = "hatch"},
-  {name = "hatch-vcs"},
   {name = "pre-commit"},
   {name = "pytest"},
   {name = "pytest-cov"},
@@ -2178,7 +2176,8 @@ dev = [
   {name = "syrupy"},
   {name = "toml-sort"},
   {name = "ty"},
-  {name = "typing-extensions"}
+  {name = "typing-extensions"},
+  {name = "uv-dynamic-versioning"}
 ]
 
 [package.metadata]
@@ -2203,7 +2202,6 @@ provides-extras = ["cli", "fastmcp"]
 dev = [
   {name = "commitizen", specifier = ">=4.16.2"},
   {name = "hatch", specifier = ">=1.16.5"},
-  {name = "hatch-vcs", specifier = ">=0.5.0"},
   {name = "pre-commit", specifier = ">=4.0"},
   {name = "pytest", specifier = ">=8.3"},
   {name = "pytest-cov", specifier = ">=5.0"},
@@ -2212,7 +2210,8 @@ dev = [
   {name = "syrupy", specifier = ">=5.2.0"},
   {name = "toml-sort", specifier = ">=0.24"},
   {name = "ty", specifier = ">=0.0.1a5"},
-  {name = "typing-extensions", specifier = ">=4.15.0"}
+  {name = "typing-extensions", specifier = ">=4.15.0"},
+  {name = "uv-dynamic-versioning", specifier = ">=0.14.1"}
 ]
 
 [package.optional-dependencies]
@@ -2549,29 +2548,6 @@ wheels = [
 ]
 
 [[package]]
-name = "setuptools"
-version = "82.0.1"
-source = {registry = "https://pypi.org/simple"}
-sdist = {url = "https://files.pythonhosted.org/packages/4f/db/cfac1baf10650ab4d1c111714410d2fbb77ac5a616db26775db562c8fab2/setuptools-82.0.1.tar.gz", hash = "sha256:7d872682c5d01cfde07da7bccc7b65469d3dca203318515ada1de5eda35efbf9", size = 1152316, upload-time = "2026-03-09T12:47:17.221Z"}
-wheels = [
-  {url = "https://files.pythonhosted.org/packages/9d/76/f789f7a86709c6b087c5a2f52f911838cad707cc613162401badc665acfe/setuptools-82.0.1-py3-none-any.whl", hash = "sha256:a59e362652f08dcd477c78bb6e7bd9d80a7995bc73ce773050228a348ce2e5bb", size = 1006223, upload-time = "2026-03-09T12:47:15.026Z"}
-]
-
-[[package]]
-name = "setuptools-scm"
-version = "10.0.5"
-source = {registry = "https://pypi.org/simple"}
-dependencies = [
-  {name = "packaging"},
-  {name = "setuptools"},
-  {name = "vcs-versioning"}
-]
-sdist = {url = "https://files.pythonhosted.org/packages/a5/b1/2a6a8ecd6f9e263754036a0b573360bdbd6873b595725e49e11139722041/setuptools_scm-10.0.5.tar.gz", hash = "sha256:bbba8fe754516cdefd017f4456721775e6ef9662bd7887fb52ae26813d4838c3", size = 56748, upload-time = "2026-03-27T15:57:05.751Z"}
-wheels = [
-  {url = "https://files.pythonhosted.org/packages/5c/e1/342c4434df56aa537f6ce7647eefee521d96fbb828b08acd709865767652/setuptools_scm-10.0.5-py3-none-any.whl", hash = "sha256:f611037d8aae618221503b8fa89319f073438252ae3420e01c9ceec249131a0a", size = 21695, upload-time = "2026-03-27T15:57:03.969Z"}
-]
-
-[[package]]
 name = "shellingham"
 version = "1.5.4"
 source = {registry = "https://pypi.org/simple"}
@@ -2877,6 +2853,21 @@ wheels = [
 ]
 
 [[package]]
+name = "uv-dynamic-versioning"
+version = "0.14.1"
+source = {registry = "https://pypi.org/simple"}
+dependencies = [
+  {name = "dunamai"},
+  {name = "hatchling"},
+  {name = "jinja2"},
+  {name = "tomlkit"}
+]
+sdist = {url = "https://files.pythonhosted.org/packages/6f/c8/fa500ee29af69cfeeea5ff6d6597919f1989b2e3f1a236c3006bdb21d320/uv_dynamic_versioning-0.14.1.tar.gz", hash = "sha256:8642db686ce5c50417035e7a257ac73b7e5c3a7a32c33e45bd7e36ba22eeb648", size = 42153, upload-time = "2026-08-18T10:50:14.069Z"}
+wheels = [
+  {url = "https://files.pythonhosted.org/packages/2f/8c/98ca22d2e282d2c0a4d1fad3faece26c9cb695d23f5d255ae93398d594ca/uv_dynamic_versioning-0.14.1-py3-none-any.whl", hash = "sha256:f9db710cc2ce9dccf06fab958ad10c45cae43cff70e3eccaa89365b040e98306", size = 11083, upload-time = "2026-08-18T10:50:13.095Z"}
+]
+
+[[package]]
 name = "uvicorn"
 version = "0.54.0"
 source = {registry = "https://pypi.org/simple"}
@@ -2887,18 +2878,6 @@ dependencies = [
 sdist = {url = "https://files.pythonhosted.org/packages/da/34/30e9280707135d2cfc589dfff3cb796bd07a3aeb1a3e415ba09dd89d7bb4/uvicorn-0.54.0.tar.gz", hash = "sha256:a2e33cbfaa0306f8e6b0c13e0cb89d7d7a2da3e62b90c66e18c33d9807b28620", size = 112283, upload-time = "2026-09-25T06:52:37.601Z"}
 wheels = [
   {url = "https://files.pythonhosted.org/packages/38/0c/b54a4fdd7f90a3af8b02ebc9ce6712c2c208b7926a2f7bad95c33ebbe943/uvicorn-0.54.0-py3-none-any.whl", hash = "sha256:505bdb0f318731d45f1f712071fc781a8981f6847a31c902c9f5e652d4f67faf", size = 87427, upload-time = "2026-09-25T06:52:35.829Z"}
-]
-
-[[package]]
-name = "vcs-versioning"
-version = "1.1.1"
-source = {registry = "https://pypi.org/simple"}
-dependencies = [
-  {name = "packaging"}
-]
-sdist = {url = "https://files.pythonhosted.org/packages/49/42/d97a7795055677961c63a1eef8e7b19d5968ed992ed3a70ab8eb012efad8/vcs_versioning-1.1.1.tar.gz", hash = "sha256:fabd75a3cab7dd8ac02fe24a3a9ba936bf258667b5a62ed468c9a1da0f5775bc", size = 97575, upload-time = "2026-03-27T20:42:41.613Z"}
-wheels = [
-  {url = "https://files.pythonhosted.org/packages/e6/60/73603fbcdbe5e803855bcce4414f94eaeed449083bd8183e67161af78188/vcs_versioning-1.1.1-py3-none-any.whl", hash = "sha256:b541e2ba79fc6aaa3850f8a7f88af43d97c1c80649c01142ee4146eddbc599e4", size = 79851, upload-time = "2026-03-27T20:42:40.45Z"}
 ]
 
 [[package]]
