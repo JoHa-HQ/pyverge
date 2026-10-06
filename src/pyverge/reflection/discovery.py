@@ -3,36 +3,16 @@ from __future__ import annotations
 import ast
 import inspect
 import textwrap
-from typing import Any, Generic, Protocol, runtime_checkable
+from typing import Any, Generic
 
-from pyverge.ports.json_patch import JsonPatch
-from pyverge.reflection.diff import Diff
-from pyverge.types import (
+from pyverge.core.types import (
     MigrationFunc,
-    MigrationFunc_co,
     Versionable,
     VersionValue,
-    VSource_co,
-    VTarget_co,
 )
-
-
-@runtime_checkable
-class DiffDiscovery(Protocol[VersionValue, MigrationFunc_co]):
-    """Discover the structural change a migration encodes as a :class:`Diff`.
-
-    Implementations are format-specific: one reads a JSON Patch, another
-    parses a Python callable's AST.  The engine selects a strategy per
-    migration and uses the resulting :class:`Diff` to reconstruct missing
-    model versions.
-    """
-
-    def discover(
-        self,
-        migration: MigrationFunc_co,
-        source: Versionable[VersionValue, VSource_co],
-        target: Versionable[VersionValue, VTarget_co],
-    ) -> Diff[VersionValue, VSource_co, VTarget_co]: ...
+from pyverge.providers.json_patch import JsonPatch
+from pyverge.reflection.diff import Diff
+from pyverge.reflection.types import DiffDiscovery
 
 
 class JsonPatchDiffDiscovery(Generic[VersionValue]):
@@ -52,9 +32,9 @@ class JsonPatchDiffDiscovery(Generic[VersionValue]):
     def discover(
         self,
         migration: JsonPatch,
-        source: Versionable[VersionValue, VSource_co],
-        target: Versionable[VersionValue, VTarget_co],
-    ) -> Diff[VersionValue, VSource_co, VTarget_co]:
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
+    ) -> Diff[VersionValue]:
         added: list[str] = []
         removed: list[str] = []
         modified: dict[str, dict[str, Any]] = {}
@@ -111,13 +91,13 @@ class CallableDiffDiscovery(Generic[VersionValue]):
     def discover(
         self,
         migration: MigrationFunc,
-        source: Versionable[VersionValue, VSource_co],
-        target: Versionable[VersionValue, VTarget_co],
-    ) -> Diff[VersionValue, VSource_co, VTarget_co]:
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
+    ) -> Diff[VersionValue]:
         try:
             src = inspect.getsource(migration)
         except (OSError, TypeError):
-            return Diff(source=source, target=target)
+            return Diff(source=source, target=target, origin="migration")
         tree = ast.parse(textwrap.dedent(src))
         added: list[str] = []
         removed: list[str] = []
@@ -189,9 +169,9 @@ class CompositeDiffDiscovery(Generic[VersionValue]):
     def discover(
         self,
         migration: JsonPatch | MigrationFunc,
-        source: Versionable[VersionValue, VSource_co],
-        target: Versionable[VersionValue, VTarget_co],
-    ) -> Diff[VersionValue, VSource_co, VTarget_co]:
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
+    ) -> Diff[VersionValue]:
         if isinstance(migration, JsonPatch):
             return self._json_patch.discover(migration, source, target)
         return self._callable.discover(migration, source, target)

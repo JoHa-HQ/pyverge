@@ -1,28 +1,31 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
+from typing import Any
 
 from datamodel_code_generator import InputFileType, generate
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from pyverge.core.versioning import VersionNode
-from pyverge.ports.base import BaseModelAdapter
-from pyverge.reflection.diff import Diff
-from pyverge.types import (
+from pyverge.core.render import JsonPatchRender
+from pyverge.core.types import (
     Diffable,
-    ModelBase,
+    ModelData,
+    ModelHandle,
+    ModelVersionKey,
     Versionable,
     VersionValue,
-    VModel,
-    VSource_co,
-    VTarget_co,
 )
+from pyverge.core.versioning import (
+    VersionNode,
+)
+from pyverge.providers.base import AbstractModelAdapter
+from pyverge.providers.json_patch.migration import JsonPatchMigration
+from pyverge.reflection.diff import Diff
 
 
-class JsonSchemaModelAdapter(BaseModelAdapter):
+class JsonSchemaModelAdapter(AbstractModelAdapter):
     """Adapter for models defined as JSON Schema documents.
 
     Converts a schema document to a Pydantic model via
@@ -36,11 +39,11 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
         kind_property: str = "kind",
     ) -> None:
         super().__init__(version_property, kind_property)
-        self._cache: dict[str, type[ModelBase]] = {}
+        self._cache: dict[str, ModelHandle] = {}
 
     def to_pydantic(
         self, document: dict[str, Any], *, class_name: str = "Model"
-    ) -> type[ModelBase]:
+    ) -> ModelHandle:
         """Materialize a Pydantic model from a schema document, cached by content.
 
         The generated module may define multiple classes for nested/referenced
@@ -68,13 +71,13 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
     def _rebuild(namespace: dict[str, Any]) -> None:
         """Resolve forward references for every model in the generated module."""
         for obj in list(namespace.values()):
-            if isinstance(obj, type) and issubclass(obj, ModelBase):
+            if isinstance(obj, type) and issubclass(obj, BaseModel):
                 try:
                     obj.model_rebuild(_types_namespace=namespace)
                 except Exception:  # best-effort; generic models skip rebuild
                     continue
 
-    def _field_default(self, model_cls: type[ModelBase], name: str) -> str:
+    def _field_default(self, model_cls: ModelHandle, name: str) -> str:
         """Return the field's default value, mirroring the Pydantic adapter."""
         field_info: FieldInfo | None = model_cls.model_fields.get(name)
         if field_info is None:
@@ -84,14 +87,38 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             return ""
         return default if isinstance(default, str) else str(default)
 
-    def version(self, model_cls: type[ModelBase]) -> str:
+    def version(self, model_cls: ModelHandle) -> str:
         return self._field_default(model_cls, self._version_property)
 
-    def kind(self, model_cls: type[ModelBase]) -> str:
+    def kind(self, model_cls: ModelHandle) -> str:
         return self._field_default(model_cls, self._kind_property)
 
+    def identify(self, model_cls: ModelHandle) -> bool:
+        """Return whether *model_cls* is a Pydantic model this adapter owns."""
+        return isinstance(model_cls, type) and issubclass(model_cls, BaseModel)
+
+    def can_handle(
+        self,
+        container: Any,
+        *,
+        fields: frozenset[str] | None = None,
+    ) -> bool:
+        """Report whether *container* is a materialized schema model.
+
+        With *fields*, also require the model to declare every one of them.
+        """
+        if not (isinstance(container, type) and issubclass(container, BaseModel)):
+            return False
+        if fields is None:
+            return True
+        return fields <= set(container.model_fields)
+
+    def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
+        """Build a typed Pydantic instance from a migrated payload."""
+        return container.model_validate(data)
+
     def finalize(
-        self, target_model: type[ModelBase], data: dict[str, Any]
+        self, target_model: ModelHandle, data: dict[str, Any]
     ) -> dict[str, Any]:
         """Apply model defaults and validate/serialize via the Pydantic model."""
         return target_model.model_validate(data).model_dump(by_alias=True)
@@ -99,7 +126,7 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
     def validate(
         self,
         data: dict[str, Any],
-        container: type[ModelBase],
+        container: ModelHandle,
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
@@ -108,7 +135,7 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             return container.model_validate(data, strict=True).model_dump(by_alias=True)
         return container.model_validate(data).model_dump(by_alias=True)
 
-    def resolve_model(self, annotation: Any) -> type[ModelBase] | None:
+    def resolve_model(self, annotation: Any) -> ModelHandle | None:
         """Return the first concrete ``BaseModel`` subclass inside *annotation*."""
         if isinstance(annotation, type) and issubclass(annotation, BaseModel):
             return annotation
@@ -123,21 +150,61 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
         return None
 
     def field_model(
-        self, parent_model: type[ModelBase], field_name: str
-    ) -> type[ModelBase] | None:
+        self, parent_model: ModelHandle, field_name: str
+    ) -> ModelHandle | None:
         """Return the model class for *field_name* on the Pydantic model, if any."""
         field_info = parent_model.model_fields.get(field_name)
         if field_info is None:
             return None
         return self.resolve_model(field_info.annotation)
 
+    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
+        """Return every versioned ``(kind, version)`` the model's fields declare."""
+        found: set[ModelVersionKey] = set()
+        self._collect_references(model_cls, found, set())
+        return frozenset(found)
+
+    def _collect_references(
+        self,
+        model_cls: ModelHandle,
+        found: set[Any],
+        seen: set[int],
+    ) -> None:
+        if not (isinstance(model_cls, type) and issubclass(model_cls, BaseModel)):
+            return
+        if id(model_cls) in seen:
+            return
+        seen.add(id(model_cls))
+        for name in model_cls.model_fields:
+            annotation = model_cls.model_fields[name].annotation
+            for nested in self._iter_models(annotation):
+                if nested is model_cls:
+                    continue
+                kind = self.kind(nested)
+                if not kind:
+                    continue
+                try:
+                    version = self.of(self.version(nested))
+                except (TypeError, ValueError):
+                    continue
+                found.add((kind, version))
+                self._collect_references(nested, found, seen)
+
+    def _iter_models(self, annotation: Any) -> list[ModelHandle]:
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+            return [annotation]
+        models: list[ModelHandle] = []
+        for arg in getattr(annotation, "__args__", ()):
+            models.extend(self._iter_models(arg))
+        return models
+
     def versionable(
         self,
-        model_cls: type[VModel] | dict[str, Any] | None,
+        model_cls: ModelHandle | dict[str, Any] | None,
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> Versionable[VersionValue, VModel]:
+    ) -> Versionable[VersionValue]:
         """Build a ``VersionNode`` wrapping the schema's Pydantic model.
 
         A JSON schema document is materialized into a Pydantic model first;
@@ -148,17 +215,17 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
         if model_cls is None:
             if kind is None or version is None:
                 raise ValueError("kind and version are required for a meta versionable")
-            return VersionNode[VersionValue, VModel](
+            return VersionNode[VersionValue](
                 _model=None,
                 _value=self.of(version),
                 _kind=kind,
             )
-        model: type[VModel]
+        model: ModelHandle
         if isinstance(model_cls, dict):
-            model = cast(type[VModel], self.to_pydantic(model_cls))
+            model = self.to_pydantic(model_cls)
         else:
             model = model_cls
-        return VersionNode[VersionValue, VModel](
+        return VersionNode[VersionValue](
             _model=model,
             _value=self.of(self.version(model)),
             _kind=self.kind(model),
@@ -168,11 +235,11 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
 
     def diff(
         self,
-        source: Versionable[VersionValue, VSource_co],
-        target: Versionable[VersionValue, VTarget_co],
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
         *,
         is_backward_compatible: bool = False,
-    ) -> Diff[VersionValue, VSource_co, VTarget_co]:
+    ) -> Diff[VersionValue]:
         """Compute a diff between two schema versions via their Pydantic models.
 
         A meta endpoint (``model is None``) yields a plain ``Diff`` with empty
@@ -190,13 +257,11 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             is_backward_compatible=is_backward_compatible,
         )
 
-    def materialize(
+    def materialize_model(
         self,
-        anchor: type[ModelBase],
         diff: Diffable[VersionValue],
-        version: VersionValue,
-    ) -> type[ModelBase]:
-        """Materialize a schema model for *version* from an *anchor* and a *diff*.
+    ) -> ModelHandle:
+        """Materialize a schema model from a diff's anchor and target version.
 
         The anchor's JSON Schema document is rebuilt: removed fields are
         dropped from ``properties``/``required``, added fields are appended
@@ -204,6 +269,8 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
         pinned to the reconstructed version.  The document is then
         re-materialized into a Pydantic model.
         """
+        anchor = diff.source.model
+        version = diff.target.version[1]
         document = anchor.model_json_schema()
         properties = document.setdefault("properties", {})
         required = document.get("required", [])
@@ -236,6 +303,18 @@ class JsonSchemaModelAdapter(BaseModelAdapter):
             document, class_name=f"ModelV{str(version).replace('.', '')}"
         )
 
+    def materialize_migration(
+        self,
+        diff: Diffable[VersionValue],
+    ) -> JsonPatchMigration:
+        """Materialize an RFC 6902 JSON Patch migration from a diff."""
+        spec = {
+            "from": str(diff.source.version[1]),
+            "to": str(diff.target.version[1]),
+            "ops": JsonPatchRender(diff)(),
+        }
+        return JsonPatchMigration(spec)
+
 
 def _json_type(annotation: Any) -> str:
     """Map a Python annotation to a JSON Schema type name."""
@@ -256,11 +335,11 @@ def _json_type(annotation: Any) -> str:
 
 
 def _pydantic_diff_pair(
-    source: Versionable[VersionValue, VSource_co],
-    target: Versionable[VersionValue, VTarget_co],
+    source: Versionable[VersionValue],
+    target: Versionable[VersionValue],
     *,
     is_backward_compatible: bool = False,
-) -> Diff[VersionValue, VSource_co, VTarget_co]:
+) -> Diff[VersionValue]:
     """Compute a :class:`Diff` by comparing two Pydantic models' fields."""
     if source.strategy != target.strategy:
         raise ValueError(

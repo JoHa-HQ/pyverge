@@ -262,11 +262,8 @@ class Engine(Generic[VersionValue]):
         except ModelNotFoundError:
             pass
 
-        if self.settings.on_missing != "reconstruct_model":
-            raise ModelNotFoundError(
-                registry.name,
-                endpoint.version,
-            )
+        if strategy_for(self.settings.on_missing, adapter=self.adapter) is None:
+            raise ModelNotFoundError(registry.name, endpoint.version)
 
         try:
             anchor = registry.get_model(other)
@@ -281,13 +278,45 @@ class Engine(Generic[VersionValue]):
                 endpoint.version,
             )
 
-        self.reconstruct(anchor, endpoint, func)
+        outcome = self.reflect(anchor, endpoint, migration=func)
+        if outcome.model is not None:
+            registry.store_model(outcome.model)
         return registry.get_model(endpoint)
+
+    def reflect(
+        self: Self,
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
+        *,
+        migration: JsonPatch | MigrationFunc | None = None,
+        is_backward_compatible: bool = False,
+        strategy: ReconstructionStrategy | None = None,
+    ) -> Reconstruction:
+        """Uniform reflection: build a diff and materialize the artifact.
+
+        ``migration`` selects the migration-origin path; absent it, the diff is
+        computed from the two concrete schemas.  The strategy is selected from
+        ``settings.on_missing`` (explicit), else the diff's origin.
+        """
+        return self._reflection().reflect(
+            source,
+            target,
+            migration=migration,
+            is_backward_compatible=is_backward_compatible,
+            strategy=strategy,
+        )
+
+    def _reflection(self: Self) -> Reflection:
+        return Reflection(
+            self.adapter,
+            self.discovery,
+            on_missing=self.settings.on_missing,
+        )
 
     def reconstruct(
         self: Self,
-        anchor: Versionable[VersionValue, ModelBase],
-        target: Versionable[VersionValue, ModelBase],
+        anchor: Versionable[VersionValue],
+        target: Versionable[VersionValue],
         migration: JsonPatch | MigrationFunc,
     ) -> None:
         """Reconstruct and store a missing model for *target*.
@@ -295,16 +324,14 @@ class Engine(Generic[VersionValue]):
         Applies the migration diff to the *anchor* model and stores the result at
         *target*'s version (inverted when the anchor is the newer endpoint).
         """
-        diff = self.discovery.discover(migration, anchor, target)
-        if anchor.version > target.version:
-            diff = diff.inverted()
-        model = self.adapter.materialize(anchor.model, diff, target.version[1])
-        self.registry.store_model(self.adapter.versionable(model))
+        outcome = self.reflect(anchor, target, migration=migration)
+        if outcome.model is not None:
+            self.registry.store_model(outcome.model)
 
     def propose_migration(
         self: Self,
-        source: Versionable[VersionValue, ModelBase],
-        target: Versionable[VersionValue, ModelBase],
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
         *,
         is_backward_compatible: bool = False,
     ) -> JsonPatchMigration:
@@ -329,28 +356,25 @@ class Engine(Generic[VersionValue]):
             )
         if source.model is None or target.model is None:
             raise ModelNotFoundError(self.registry.name, source.version)
-        diff = self.adapter.diff(
+        outcome = self.reflect(
             source,
             target,
             is_backward_compatible=is_backward_compatible,
+            strategy=MigrationReflection(self.adapter),
         )
-        spec = {
-            "from": str(source.version[1]),
-            "to": str(target.version[1]),
-            "ops": JsonPatchRender(diff)(),
-        }
-        return JsonPatchMigration(spec)
+        assert outcome.migration is not None  # proposal always yields a spec
+        return outcome.migration
 
     def get_migration(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase],
+        key: Transitional[VersionValue],
     ) -> Migratable:
         """Return the registered migration for *key*."""
         return self.registry.get_migration_by_edge(key)
 
     def remove_migration(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase],
+        key: Transitional[VersionValue],
         *,
         force: bool = False,
     ) -> None:
