@@ -210,7 +210,7 @@ def test_compound_key_max_depth_exceeded_for_nested_entry(
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_pydantic_walker_requires_container(
+def test_walker_incompatible_container_fails_fast(
     model_adapter,
     discovery_settings,
     registry,
@@ -218,8 +218,25 @@ def test_pydantic_walker_requires_container(
     walker = PydanticWalker(
         registry, settings=discovery_settings, adapter=model_adapter
     )
-    with pytest.raises(DiscoveryValidationError, match="container model"):
-        list(walker.discover({}, target_resolver=skip_target_resolver(registry)))
+    with pytest.raises(DiscoveryValidationError, match="recognized model type"):
+        list(
+            walker.discover(
+                {}, container=dict, target_resolver=skip_target_resolver(registry)
+            )
+        )
+
+
+def test_walker_containerless_when_none(
+    model_adapter,
+    discovery_settings,
+    registry,
+) -> None:
+    walker = PydanticWalker(
+        registry, settings=discovery_settings, adapter=model_adapter
+    )
+    assert (
+        list(walker.discover({}, target_resolver=skip_target_resolver(registry))) == []
+    )
 
 
 @pytest.mark.parametrize(
@@ -486,7 +503,7 @@ def test_engine_explicit_target_versionable(
 )
 def test_engine_target_policy(
     engine: Engine[types.VersionValue],
-    resolver_factory: Callable[[Registry[semver.Version, BaseModel]], Any],
+    resolver_factory: Callable[[Registry[semver.Version]], Any],
     expected_version: str,
 ) -> None:
     payload = {

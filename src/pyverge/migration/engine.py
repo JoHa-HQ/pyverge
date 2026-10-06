@@ -475,7 +475,7 @@ class Engine(Generic[VersionValue]):
         effective_on_missing = on_version_not_found or self.settings.on_missing_path
         vp = version_property or self.settings.version_property
 
-        graph = self.graph_builder.build(
+        plan = self.graph_builder.build(
             data,
             container=container,
             target_resolver=target,
