@@ -1,32 +1,21 @@
-import bisect
-from typing import Any, Generic, Self, cast, overload
+from typing import Any, Generic, Self, overload
 
 from pyverge.core.exceptions import (
-    MigrationError,
     MigrationNotFoundError,
     MissingReferenceError,
-    ModelConflictError,
     ModelNotFoundError,
     RegistryError,
 )
-from pyverge.core.render import JsonPatchRender
 from pyverge.core.settings import MigrationSettings
-from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
-from pyverge.ports.json_patch import JsonPatch
-from pyverge.ports.json_patch.migration import JsonPatchMigration
-from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
-from pyverge.types import (
+from pyverge.core.types import (
     Attachable,
     Comparable,
     DirectionViolationStrategy,
-    Executor,
     Migratable,
     MigrationDirectionStrategy,
-    MigrationEntry,
     MigrationFunc,
-    ModelAdapter,
-    ModelBase,
     ModelData,
+    ModelHandle,
     ModelKind,
     TargetResolver,
     Transitional,
@@ -35,6 +24,27 @@ from pyverge.types import (
     VersionPair,
     VersionValue,
 )
+from pyverge.core.versioning import (
+    SentinelEdge,
+    VersionEdge,
+)
+from pyverge.migration.types import (
+    Executor,
+    MigrationEntry,
+)
+from pyverge.providers.json_patch import JsonPatch
+from pyverge.providers.json_patch.migration import JsonPatchMigration
+from pyverge.providers.types import (
+    ModelAdapter,
+)
+from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
+from pyverge.reflection.reconstruction import (
+    MigrationReflection,
+    Reconstruction,
+    ReconstructionStrategy,
+    strategy_for,
+)
+from pyverge.reflection.reflection import Reflection
 
 from .graph import GraphBuilder
 from .registry import Registry
@@ -53,9 +63,9 @@ class Engine(Generic[VersionValue]):
 
     def __init__(
         self: Self,
-        registry: Registry[VersionValue, ModelBase],
+        registry: Registry[VersionValue],
         settings: MigrationSettings,
-        default_executor: Executor,
+        default_executor: Executor[VersionValue],
         graph_builder: GraphBuilder[VersionValue],
         adapter: ModelAdapter,
         entry_migration: MigrationEntry[VersionValue] | None = None,
@@ -70,122 +80,61 @@ class Engine(Generic[VersionValue]):
             CompositeDiffDiscovery()
         )
 
-    def _resolve_model_key(
-        self: Self,
-        key: Any,
-    ) -> VersionNode[VersionValue, ModelBase]:
-        """Normalize a model key to a version node form."""
-        if isinstance(key, tuple):
-            kind, value = key
-            return VersionNode[VersionValue, ModelBase](
-                _model=None, _value=value, _kind=kind
-            )
-        if isinstance(key, VersionNode):
-            return cast(VersionNode[VersionValue, ModelBase], key)
-        if isinstance(key, type) and issubclass(key, ModelBase):
-            versionable = self.registry.get_model_by_class(key)
-            return VersionNode[VersionValue, ModelBase](
-                _model=None,
-                _value=versionable.version[1],
-                _kind=versionable.kind,
-            )
-        return VersionNode[VersionValue, ModelBase](
-            _model=None, _value=key.version[1], _kind=key.kind
-        )
-
     def __contains__(self, index: Any) -> bool:
-        """Check membership of a model version or migration edge."""
-        if isinstance(index, slice):
-            try:
-                from_v = self.get_model(self._resolve_model_key(index.start))
-                to_v = self.get_model(self._resolve_model_key(index.stop))
-                self.find_migration_path(from_v, to_v)
-                return True
-            except (MigrationError, ModelNotFoundError, RegistryError, TypeError):
-                return False
+        """Check membership of a typed model version or migration edge.
 
-        return self._contains_migration(index) or self._contains_model_key(index)
-
-    def _contains_migration(self, index: Any) -> bool:
-        """Check membership of a single migration edge key."""
+        Typed only: fluent keys (raw tuples, bare model classes) and slices are
+        sugar the manager owns.
+        """
         try:
-            edge_key = (
-                index
-                if isinstance(index, SentinelEdge)
-                else SentinelEdge.from_pair(*index)
-            )
-            return self.registry.has_migration(edge_key)
-        except (
-            MigrationNotFoundError,
-            ModelNotFoundError,
-            RegistryError,
-            TypeError,
-            AttributeError,
-        ):
-            return False
-
-    def _contains_model_key(self, index: Any) -> bool:
-        """Check membership of a single model key."""
-        try:
-            resolved = self._resolve_model_key(index)
-            return self.registry.get_model(resolved) is not None
-        except (ModelNotFoundError, TypeError):
+            return index in self.registry
+        except (ModelNotFoundError, MigrationNotFoundError, RegistryError, TypeError):
             return False
 
     @overload
-    def __getitem__(self, index: slice) -> list[Migratable]: ...
+    def __getitem__(
+        self, index: Versionable[VersionValue]
+    ) -> Versionable[VersionValue]: ...
 
     @overload
-    def __getitem__(self, index: SentinelEdge | tuple) -> Migratable: ...
+    def __getitem__(
+        self, index: Migratable[VersionValue]
+    ) -> Migratable[VersionValue]: ...
 
-    def __getitem__(self, index: Any) -> Migratable | list[Migratable]:
-        """Select a migration or a path of migrations."""
-        if isinstance(index, slice):
-            from_v = self.get_model(self._resolve_model_key(index.start))
-            to_v = self.get_model(self._resolve_model_key(index.stop))
-            path = self.find_migration_path(from_v, to_v)
-            return [
-                self.registry.get_migration_by_edge(SentinelEdge.from_pair(src, dst))
-                for src, dst in path
-            ]
+    @overload
+    def __getitem__(
+        self, index: SentinelEdge[VersionValue]
+    ) -> Migratable[VersionValue]: ...
 
-        if isinstance(index, (SentinelEdge, tuple)):
-            edge_key = (
-                index
-                if isinstance(index, SentinelEdge)
-                else SentinelEdge.from_pair(*index)
-            )
-            return self.registry.get_migration_by_edge(edge_key)
-
-        raise RegistryError(
-            self.registry.name, f"Unsupported index type: {type(index)}"
-        )
+    def __getitem__(
+        self, index: Any
+    ) -> Versionable[VersionValue] | Migratable[VersionValue]:
+        """Select a typed model version or migration."""
+        return self.registry[index]
 
     def store_model(
         self: Self,
-        version: Versionable[VersionValue, ModelBase],
-    ) -> Versionable[VersionValue, ModelBase]:
-        """Register a model version, reconciling against an existing one.
+        version: Versionable[VersionValue],
+    ) -> Versionable[VersionValue]:
+        """Register a model version via the strict store.
 
-        An identical re-registration (same ``fields`` surface) is a no-op; a
-        different surface raises :class:`ModelConflictError`.
+        A duplicate ``(kind, version)`` fails loudly — re-registration is a
+        caller error.  Use :meth:`reconcile_model` for an idempotent fallback.
         """
-        try:
-            existing = self.registry.get_model(version)
-        except ModelNotFoundError:
-            return self.registry.store_model(version)
-        if existing.fields != version.fields:
-            raise ModelConflictError(
-                self.registry.name,
-                version.version,
-                existing.fields,
-                version.fields,
-            )
-        return existing
+        return self.registry.store_model(version)
+
+    def reconcile_model(
+        self: Self,
+        version: Versionable[VersionValue],
+    ) -> Versionable[VersionValue]:
+        """Register a model version, treating an identical re-registration as a
+        no-op and raising :class:`ModelConflictError` on a differing surface.
+        """
+        return self.registry.reconcile_model(version)
 
     def validate(
         self: Self,
-        version: Versionable[VersionValue, ModelBase] | None = None,
+        version: Versionable[VersionValue] | None = None,
     ) -> None:
         """Validate that registered models' declared references are registered.
 
@@ -209,16 +158,24 @@ class Engine(Generic[VersionValue]):
     def get_model(
         self: Self,
         key: Comparable[VersionValue],
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         """Return the model matching *key*."""
         return self.registry.get_model(key)
 
     def get_model_by_class(
         self: Self,
-        cls: type[ModelBase],
-    ) -> Versionable[VersionValue, ModelBase]:
-        """Return the model matching the Pydantic class *cls*."""
-        return self.registry.get_model_by_class(cls)
+        cls: ModelHandle,
+    ) -> Versionable[VersionValue]:
+        """Return the model matching *cls*, resolving through the adapter."""
+        if not self.adapter.identify(cls):
+            raise ModelNotFoundError(self.registry.name, cls)
+        return self.registry.get_model_by_handle(cls)
+
+    def remove_model_by_class(self: Self, cls: ModelHandle) -> None:
+        """Remove the model matching *cls*, resolving through the adapter."""
+        if not self.adapter.identify(cls):
+            raise ModelNotFoundError(self.registry.name, cls)
+        self.registry.remove_model_by_handle(cls)
 
     def remove_model(
         self: Self,
@@ -230,20 +187,20 @@ class Engine(Generic[VersionValue]):
     def get_latest_model(
         self: Self,
         kind: ModelKind,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         """Most recent version for *kind*."""
         return self.registry.latest(kind)
 
     def get_earliest_model(
         self: Self,
         kind: ModelKind,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         """Earliest version for *kind*."""
         return self.registry.earliest(kind)
 
     def store_migration(
         self: Self,
-        key: VersionPair[VersionValue, ModelBase],
+        key: VersionPair[VersionValue],
         func: MigrationFunc,
         *,
         backward_compatible: bool = False,
@@ -288,16 +245,16 @@ class Engine(Generic[VersionValue]):
 
     def _resolve(
         self: Self,
-        endpoint: Versionable[VersionValue, ModelBase],
+        endpoint: Versionable[VersionValue],
         *,
-        other: Versionable[VersionValue, ModelBase],
+        other: Versionable[VersionValue],
         func: MigrationFunc,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         """Return *endpoint*, reconstructing it when it is not registered.
 
         A registered endpoint is returned as-is; an unregistered one is
-        reconstructed from *other*'s model when ``on_missing ==
-        "reconstruct_model"``, else ``ModelNotFoundError``.
+        reconstructed from *other*'s model when ``on_missing`` selects the
+        model-reconstruction strategy, else ``ModelNotFoundError``.
         """
         registry = self.registry
         try:
@@ -305,11 +262,8 @@ class Engine(Generic[VersionValue]):
         except ModelNotFoundError:
             pass
 
-        if self.settings.on_missing != "reconstruct_model":
-            raise ModelNotFoundError(
-                registry.name,
-                endpoint.version,
-            )
+        if strategy_for(self.settings.on_missing, adapter=self.adapter) is None:
+            raise ModelNotFoundError(registry.name, endpoint.version)
 
         try:
             anchor = registry.get_model(other)
@@ -324,13 +278,45 @@ class Engine(Generic[VersionValue]):
                 endpoint.version,
             )
 
-        self.reconstruct(anchor, endpoint, func)
+        outcome = self.reflect(anchor, endpoint, migration=func)
+        if outcome.model is not None:
+            registry.store_model(outcome.model)
         return registry.get_model(endpoint)
+
+    def reflect(
+        self: Self,
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
+        *,
+        migration: JsonPatch | MigrationFunc | None = None,
+        is_backward_compatible: bool = False,
+        strategy: ReconstructionStrategy | None = None,
+    ) -> Reconstruction:
+        """Uniform reflection: build a diff and materialize the artifact.
+
+        ``migration`` selects the migration-origin path; absent it, the diff is
+        computed from the two concrete schemas.  The strategy is selected from
+        ``settings.on_missing`` (explicit), else the diff's origin.
+        """
+        return self._reflection().reflect(
+            source,
+            target,
+            migration=migration,
+            is_backward_compatible=is_backward_compatible,
+            strategy=strategy,
+        )
+
+    def _reflection(self: Self) -> Reflection:
+        return Reflection(
+            self.adapter,
+            self.discovery,
+            on_missing=self.settings.on_missing,
+        )
 
     def reconstruct(
         self: Self,
-        anchor: Versionable[VersionValue, ModelBase],
-        target: Versionable[VersionValue, ModelBase],
+        anchor: Versionable[VersionValue],
+        target: Versionable[VersionValue],
         migration: JsonPatch | MigrationFunc,
     ) -> None:
         """Reconstruct and store a missing model for *target*.
@@ -338,16 +324,14 @@ class Engine(Generic[VersionValue]):
         Applies the migration diff to the *anchor* model and stores the result at
         *target*'s version (inverted when the anchor is the newer endpoint).
         """
-        diff = self.discovery.discover(migration, anchor, target)
-        if anchor.version > target.version:
-            diff = diff.inverted()
-        model = self.adapter.materialize(anchor.model, diff, target.version[1])
-        self.registry.store_model(self.adapter.versionable(model))
+        outcome = self.reflect(anchor, target, migration=migration)
+        if outcome.model is not None:
+            self.registry.store_model(outcome.model)
 
     def propose_migration(
         self: Self,
-        source: Versionable[VersionValue, ModelBase],
-        target: Versionable[VersionValue, ModelBase],
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
         *,
         is_backward_compatible: bool = False,
     ) -> JsonPatchMigration:
@@ -372,28 +356,25 @@ class Engine(Generic[VersionValue]):
             )
         if source.model is None or target.model is None:
             raise ModelNotFoundError(self.registry.name, source.version)
-        diff = self.adapter.diff(
+        outcome = self.reflect(
             source,
             target,
             is_backward_compatible=is_backward_compatible,
+            strategy=MigrationReflection(self.adapter),
         )
-        spec = {
-            "from": str(source.version[1]),
-            "to": str(target.version[1]),
-            "ops": JsonPatchRender(diff)(),
-        }
-        return JsonPatchMigration(spec)
+        assert outcome.migration is not None  # proposal always yields a spec
+        return outcome.migration
 
     def get_migration(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase],
+        key: Transitional[VersionValue],
     ) -> Migratable:
         """Return the registered migration for *key*."""
         return self.registry.get_migration_by_edge(key)
 
     def remove_migration(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase],
+        key: Transitional[VersionValue],
         *,
         force: bool = False,
     ) -> None:
@@ -422,41 +403,7 @@ class Engine(Generic[VersionValue]):
         to_version: Versionable,
     ) -> None:
         """Remove all migrations on edges between *from_version* and *to_version*."""
-        registry = self.registry
-
-        if from_version.version[0] != to_version.version[0]:
-            raise RegistryError(
-                registry.name,
-                f"Cannot remove range across kinds: "
-                f"{from_version.version[0]} != {to_version.version[0]}",
-            )
-
-        kind_versions = registry.kind_versions(from_version.version[0])
-        lo = bisect.bisect_left(kind_versions, from_version)
-        hi = bisect.bisect_left(kind_versions, to_version)
-
-        keys_to_remove: list[SentinelEdge] = []
-        for i in range(lo, hi):
-            edge_key = SentinelEdge.from_pair(kind_versions[i], kind_versions[i + 1])
-            if not self.registry.has_migration(edge_key):
-                continue
-            if self.registry.is_adjacent(edge_key):
-                msg = (
-                    f"Cannot remove critical migration {edge_key.source}→"
-                    f"{edge_key.target} in range. Remove it individually with "
-                    "force=True or remove hooks first."
-                )
-                raise RegistryError(registry.name, msg)
-            if registry.has_hooks(edge_key):
-                raise RegistryError(
-                    registry.name,
-                    f"Cannot remove migration {edge_key.source}→{edge_key.target}. "
-                    "Remove hooks first.",
-                )
-            keys_to_remove.append(edge_key)
-
-        for edge_key in keys_to_remove:
-            registry.remove_migration(edge_key)
+        self.registry.remove_migration_range(from_version, to_version)
 
     def delete_kind(self: Self, kind: ModelKind) -> None:
         """Remove all models and migrations for *kind*."""
@@ -496,57 +443,11 @@ class Engine(Generic[VersionValue]):
         to_version: Versionable,
     ) -> list[tuple[Versionable, Versionable]]:
         """Return a complete migration chain between two versions."""
-        registry = self.registry
-
-        if from_version.kind != to_version.kind:
-            raise RegistryError(
-                registry.name,
-                f"Cannot find path across kinds: "
-                f"{from_version.kind} != {to_version.kind}",
-            )
-
-        kind_versions = registry.kind_versions(from_version.kind)
-
-        if from_version not in kind_versions:
-            raise MigrationError(
-                registry.name,
-                from_version,
-                to_version,
-                f"Version {from_version} is not registered",
-            )
-        if to_version not in kind_versions:
-            raise MigrationError(
-                registry.name,
-                (from_version, to_version),
-            )
-
-        lo = kind_versions.index(from_version)
-        hi = kind_versions.index(to_version)
-        if lo == hi:
-            return []
-
-        step = 1 if lo < hi else -1
-        path: list[tuple[Versionable, Versionable]] = []
-        current = from_version
-        while lo != hi:
-            nxt = kind_versions[lo + step]
-            edge_key = SentinelEdge.from_pair(current, nxt)
-            if registry.has_migration(edge_key):
-                path.append((current, nxt))
-                current = nxt
-                lo += step
-            else:
-                raise MigrationError(
-                    registry.name,
-                    current,
-                    nxt,
-                    f"No migration key is found ({current}, {nxt})",
-                )
-        return path
+        return self.registry.migration_path(from_version, to_version)
 
     def add_hook(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase],
+        key: Transitional[VersionValue],
         hook: Attachable,
     ) -> None:
         """Register a hook for a migration step."""
@@ -555,7 +456,7 @@ class Engine(Generic[VersionValue]):
 
     def remove_hook(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase],
+        key: Transitional[VersionValue],
         hook: Attachable | None = None,
     ) -> None:
         """Remove hooks for a migration step."""
@@ -564,7 +465,7 @@ class Engine(Generic[VersionValue]):
 
     def clear_hooks(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase] | None = None,
+        key: Transitional[VersionValue] | None = None,
     ) -> None:
         """Clear hooks from the registry."""
         if key is None:
@@ -578,13 +479,13 @@ class Engine(Generic[VersionValue]):
         data: ModelData,
         target: TargetResolver,
         *,
-        container: type[ModelBase] | None = None,
+        container: ModelHandle | None = None,
         version_property: str | None = None,
         depth_limit: int | None = None,
         direction: MigrationDirectionStrategy | None = None,
         on_direction_violation: DirectionViolationStrategy | None = None,
         on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | None = None,
+        executor: Executor[VersionValue] | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> ModelData:
         """Converge every versioned entry in *data* to match the target.
@@ -598,7 +499,7 @@ class Engine(Generic[VersionValue]):
         effective_on_missing = on_version_not_found or self.settings.on_missing_path
         vp = version_property or self.settings.version_property
 
-        graph = self.graph_builder.build(
+        plan = self.graph_builder.build(
             data,
             container=container,
             target_resolver=target,
@@ -609,8 +510,7 @@ class Engine(Generic[VersionValue]):
         active_entry_migration = entry_migration or self.entry_migration
 
         return active_executor.run(
-            data,
-            graph,
+            plan,
             registry=self.registry,
             entry_migration=active_entry_migration,
             adapter=self.adapter,

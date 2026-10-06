@@ -6,12 +6,11 @@ import jsonpatch
 import pendulum
 import pytest
 import semver
-from pydantic import BaseModel
 
+from pyverge import types
 from pyverge.core import (
     VersioningSettings,
     VersionNode,
-    types,
 )
 from pyverge.migration import (
     Diff,
@@ -20,6 +19,9 @@ from pyverge.migration import (
     PydanticDiff,
     PydanticModelAdapter,
     Registry,
+)
+from pyverge.providers.types import (
+    ModelHandle,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -242,8 +244,8 @@ class TestPydanticDiff:
         self,
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
-        source_model: type[types.VModel],
-        target_model: type[types.VModel],
+        source_model: ModelHandle,
+        target_model: ModelHandle,
     ) -> None:
         """from_pair detects a field present in target but not source."""
         source = envelope_model(model_adapter, versioning_settings, source_model)
@@ -265,8 +267,8 @@ class TestPydanticDiff:
         self,
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
-        source_model: type[types.VModel],
-        target_model: type[types.VModel],
+        source_model: ModelHandle,
+        target_model: ModelHandle,
     ) -> None:
         """from_pair detects a field present in source but not target."""
         source = envelope_model(model_adapter, versioning_settings, source_model)
@@ -358,15 +360,15 @@ class TestPydanticDiff:
     @pytest.mark.parametrize(
         "registry, version",
         [
-            [Registry[semver.Version, BaseModel](), "0.1.0"],
-            [Registry[pendulum.Date, BaseModel](), "2024-01-01"],
+            [Registry[semver.Version](), "0.1.0"],
+            [Registry[pendulum.Date](), "2024-01-01"],
         ],
     )
     def test_meta_endpoint_produces_empty_diff(
         self,
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         version: str,
     ) -> None:
         """A meta endpoint yields a plain Diff with empty predicates."""
@@ -463,7 +465,7 @@ class TestJsonSchemaModelAdapter:
 
     def test_meta_endpoint_empty_diff(self) -> None:
         adapter = JsonSchemaModelAdapter()
-        meta_node = VersionNode[semver.Version, BaseModel](
+        meta_node = VersionNode[semver.Version](
             _model=None, _value=semver.Version(0, 1, 0), _kind="User"
         )
         real = adapter.versionable(

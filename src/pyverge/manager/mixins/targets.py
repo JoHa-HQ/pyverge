@@ -4,7 +4,19 @@ from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
 from pyverge.core.exceptions import ModelNotFoundError, RegistryError
-from pyverge.core.versioning import VersionNode
+from pyverge.core.types import (
+    ModelKind,
+    TargetResolver,
+    Versionable,
+    VersionValue,
+)
+from pyverge.core.versioning import (
+    VersionNode,
+)
+from pyverge.manager.types import (
+    TargetPolicy,
+    TargetSpec,
+)
 from pyverge.migration.engine import Engine
 from pyverge.migration.policy import (
     earliest_target_resolver,
@@ -13,21 +25,11 @@ from pyverge.migration.policy import (
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.types import (
-    ModelBase,
-    ModelKind,
-    TargetPolicy,
-    TargetResolver,
-    TargetSpec,
-    Versionable,
-    VersionValue,
-    VersionValue_co,
-    VModel_co,
+from pyverge.providers.types import (
+    ModelHandle,
 )
 
 if TYPE_CHECKING:
-    from pydantic import BaseModel
-
     from . import ManagerState
 
 
@@ -92,7 +94,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @classmethod
     def _compile_model(
         cls: type[ManagerState[VersionValue]],
-        spec: type[ModelBase],
+        spec: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
@@ -103,7 +105,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @classmethod
     def _model_resolver(
         cls: type[ManagerState[VersionValue]],
-        model_cls: type[BaseModel],
+        model_cls: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
@@ -120,8 +122,8 @@ class TargetResolutionMixin(Generic[VersionValue]):
             ) from exc
 
         def resolve(
-            current: Versionable[VersionValue_co, VModel_co],
-        ) -> Versionable[VersionValue_co, VModel_co] | None:
+            current: Versionable[VersionValue],
+        ) -> Versionable[VersionValue] | None:
             if current.kind != target.kind:
                 raise RegistryError(
                     registry.name,
@@ -153,11 +155,11 @@ class TargetResolutionMixin(Generic[VersionValue]):
             ) from None
 
         def resolve(
-            current: Versionable[VersionValue_co, VModel_co],
-        ) -> Versionable[VersionValue_co, VModel_co] | None:
-            sentinel: Versionable[VersionValue_co, VModel_co] = cast(
-                Versionable[VersionValue_co, VModel_co],
-                VersionNode[VersionValue_co, VModel_co](
+            current: Versionable[VersionValue],
+        ) -> Versionable[VersionValue] | None:
+            sentinel: Versionable[VersionValue] = cast(
+                Versionable[VersionValue],
+                VersionNode[VersionValue](
                     _model=None, _value=parsed, _kind=current.kind
                 ),
             )
@@ -208,7 +210,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     ) -> TargetResolver:
         """Resolve a model class to its version, else keep a bare class as-is."""
         engine = engine or cls._default_engine
-        if issubclass(target, ModelBase):
+        if engine.adapter.identify(target):
             return cls.compile_target_spec(target, engine=engine)
         # A bare class is callable: preserve the old resolver fallback.
         return cast(TargetResolver, target)

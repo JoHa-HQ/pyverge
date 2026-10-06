@@ -9,11 +9,11 @@ import pytest
 import semver
 from pydantic import BaseModel
 
+from pyverge import types
 from pyverge.core import (
     DiscoverySettings,
     MaxDepthExceededError,
     MigrationSettings,
-    types,
 )
 from pyverge.migration import (
     GraphEntry,
@@ -384,13 +384,13 @@ class TestGraphBuilder:
     def test_skipped_payloads(
         self,
         graph_builder,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         payload: dict,
         label: str,
     ) -> None:
         graph = graph_builder.build(
             payload, target_resolver=latest_target_resolver(registry)
-        )
+        ).graph
 
         assert len(graph) == 0, f"{label} should not produce entries"
         assert not graph, f"{label} graph should be falsy"
@@ -409,14 +409,14 @@ class TestGraphBuilder:
     def test_flat_versioned_entry(
         self,
         graph_builder,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         model_adapter: PydanticModelAdapter,
         migration_settings: MigrationSettings,
     ) -> None:
         graph = graph_builder.build(
             {"kind": "Person", "version": "1.0.0", "name": "Alice"},
             target_resolver=latest_target_resolver(registry),
-        )
+        ).graph
 
         assert len(graph) == 1
         entry = graph.entry_at(())
@@ -440,12 +440,12 @@ class TestGraphBuilder:
     def test_entry_steps_resolved_from_source_to_target(
         self,
         graph_builder,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
     ) -> None:
         graph = graph_builder.build(
             {"kind": "Person", "version": "1.0.0", "name": "Alice"},
             target_resolver=latest_target_resolver(registry),
-        )
+        ).graph
 
         entry = graph.entry_at(())
         assert entry is not None
@@ -594,7 +594,7 @@ class TestGraphBuilder:
     def test_custom_property_names(
         self,
         graph_builder,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         migration_settings: MigrationSettings,
     ) -> None:
         # The custom property name cannot be pre-registered through the shared
@@ -609,7 +609,7 @@ class TestGraphBuilder:
         graph = graph_builder.build(
             {"doc": {"kind": "Item", "schema_version": "1.0.0", "name": "X"}},
             target_resolver=latest_target_resolver(registry),
-        )
+        ).graph
 
         assert len(graph) == 1
         assert graph.entry_at(("doc",)) is not None
@@ -633,7 +633,7 @@ class TestGraphBuilder:
     def test_max_migration_depth_within_limit(
         self,
         graph_builder,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
     ) -> None:
         """Entries at or within the configured max_depth are all accepted."""
         graph = graph_builder.build(
@@ -649,7 +649,7 @@ class TestGraphBuilder:
                 },
             },
             target_resolver=latest_target_resolver(registry),
-        )
+        ).graph
 
         EXPECTED_ENTRIES = 2
         assert len(graph) == EXPECTED_ENTRIES
@@ -678,7 +678,7 @@ class TestGraphBuilder:
     def test_max_depth_exceeded(
         self,
         graph_builder,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         build_depth: int | None,
     ) -> None:
         """A nested versioned entry beyond the active depth limit raises."""
@@ -699,7 +699,7 @@ class TestGraphBuilder:
                 payload,
                 target_resolver=latest_target_resolver(registry),
                 max_depth=build_depth,
-            )
+            ).graph
 
         assert exc_info.value.kind == "Address"
         assert exc_info.value.max_depth == 0
@@ -723,7 +723,7 @@ class TestGraphBuilder:
     def test_max_depth_override_relaxes_limit(
         self,
         graph_builder,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
     ) -> None:
         """A per-call max_depth takes precedence over the configured limit."""
         graph = graph_builder.build(
@@ -740,7 +740,7 @@ class TestGraphBuilder:
             },
             target_resolver=latest_target_resolver(registry),
             max_depth=1,
-        )
+        ).graph
 
         EXPECTED_ENTRIES = 2
         assert len(graph) == EXPECTED_ENTRIES
@@ -784,7 +784,7 @@ class TestGraphBuilder:
                 }
             },
             target_resolver=lambda current: person_target,
-        )
+        ).graph
 
         person = graph.entry_at(("document",))
         assert person is not None

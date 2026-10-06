@@ -7,10 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pyverge import types
 from pyverge.core import (
     DiscoverySettings,
     MigrationError,
-    types,
 )
 from pyverge.migration import (
     DefaultMigrationEntry,
@@ -39,7 +39,7 @@ class TestDefaultMigrationEntry:
         return envelope_model(model_adapter, discovery_settings, PersonV2)
 
     @pytest.fixture
-    def entry(self, source: Any, target: Any) -> GraphEntry[Any, Any]:
+    def entry(self, source: Any, target: Any) -> GraphEntry[Any]:
         return GraphEntry(
             path=(),
             source=source,
@@ -79,7 +79,7 @@ class TestDefaultMigrationEntry:
     def test_raises_on_direction_violation(
         self,
         model_adapter: PydanticModelAdapter,
-        entry: GraphEntry[Any, Any],
+        entry: GraphEntry[Any],
         execute_step: MagicMock,
     ) -> None:
         strategy = DefaultMigrationEntry()
@@ -101,7 +101,7 @@ class TestDefaultMigrationEntry:
     def test_skips_on_direction_violation(
         self,
         model_adapter: PydanticModelAdapter,
-        entry: GraphEntry[Any, Any],
+        entry: GraphEntry[Any],
         execute_step: MagicMock,
     ) -> None:
         strategy = DefaultMigrationEntry()
@@ -124,7 +124,7 @@ class TestDefaultMigrationEntry:
     def test_executes_steps(
         self,
         model_adapter: PydanticModelAdapter,
-        entry: GraphEntry[Any, Any],
+        entry: GraphEntry[Any],
         source: Any,
         target: Any,
         execute_step: MagicMock,
@@ -149,7 +149,7 @@ class TestDefaultMigrationEntry:
     def test_calls_adapter_finalize(
         self,
         model_adapter: PydanticModelAdapter,
-        entry: GraphEntry[Any, Any],
+        entry: GraphEntry[Any],
         execute_step: MagicMock,
     ) -> None:
         finalized_entry = GraphEntry(
@@ -181,7 +181,7 @@ class TestDefaultMigrationEntry:
     def test_skips_on_missing_migration(
         self,
         model_adapter: PydanticModelAdapter,
-        entry: GraphEntry[Any, Any],
+        entry: GraphEntry[Any],
         execute_step: MagicMock,
     ) -> None:
         execute_step.side_effect = MigrationError(
@@ -209,7 +209,7 @@ class TestDefaultMigrationEntry:
     def test_raises_on_missing_migration(
         self,
         model_adapter: PydanticModelAdapter,
-        entry: GraphEntry[Any, Any],
+        entry: GraphEntry[Any],
         execute_step: MagicMock,
     ) -> None:
         execute_step.side_effect = MigrationError(

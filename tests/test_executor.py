@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
+from dataclasses import replace
 
 import pytest
 import semver
+from pydantic import BaseModel
 
+from pyverge import types
 from pyverge.core import (
+    DiscoveryValidationError,
     MigrationError,
     MigrationNotFoundError,
     RegistryError,
     VersionNode,
-    types,
 )
 from pyverge.migration import (
     Engine,
@@ -26,6 +29,9 @@ from pyverge.migration import (
     latest_target_resolver,
     multi_target_resolver,
     skip_target_resolver,
+)
+from pyverge.providers.types import (
+    ModelHandle,
 )
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
@@ -191,7 +197,7 @@ class TestStepExecutor:
     def test_execute_step_runs_registered_migration_and_updates_version(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.ModelBase]],
+        models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
             engine.adapter,
@@ -227,7 +233,7 @@ class TestStepExecutor:
     def test_execute_step_raises_when_migration_missing(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.ModelBase]],
+        models: list[ModelHandle],
     ) -> None:
         source, target = [
             envelope_model(engine.adapter, engine.settings, model) for model in models
@@ -631,9 +637,7 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
 def test_target_resolver_converges_end_to_end(
     engine: Engine[types.VersionValue],
     payload: dict,
-    resolver_factory: Callable[
-        [Registry[types.VersionValue, types.ModelBase]], types.TargetResolver
-    ],
+    resolver_factory: Callable[[Registry[types.VersionValue]], types.TargetResolver],
     expected_error: type[Exception] | None,
     snapshot,
 ) -> None:
@@ -646,3 +650,50 @@ def test_target_resolver_converges_end_to_end(
     result = engine.migrate(payload, target=resolver_factory(engine.registry))
 
     assert result == snapshot
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "test", [PersonV1, PersonV2], []],
+            id="pydantic_person_v1_v2",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_executor_gate_rejects_field_shallow_container(
+    engine: Engine[types.VersionValue],
+) -> None:
+    """The executor fails fast when the plan's container cannot cover fields.
+
+    A container that the adapter recognizes but that omits the target's fields
+    must raise before any migration executes — the gate lives in the executor.
+    """
+    engine.store_migration(
+        (
+            envelope_model(engine.adapter, engine.settings, PersonV1),
+            envelope_model(engine.adapter, engine.settings, PersonV2),
+        ),
+        preserve_children_person,
+    )
+
+    payload = {"document": {"kind": "Person", "version": "1.0.0", "name": "Alice"}}
+    plan = engine.graph_builder.build(
+        payload,
+        target_resolver=latest_target_resolver(engine.registry),
+    )
+    # Force a container that recognizes the type but declares no fields.
+    shallow = replace(plan, container=type("Empty", (BaseModel,), {}))
+    with pytest.raises(DiscoveryValidationError, match="incompatible"):
+        engine.default_executor.run(
+            shallow,
+            registry=engine.registry,
+            entry_migration=engine.entry_migration,
+            adapter=engine.adapter,
+            version_property=engine.settings.version_property,
+            direction=engine.settings.direction,
+            on_direction_violation=engine.settings.on_direction_violation,
+            on_missing_path=engine.settings.on_missing_path,
+        )

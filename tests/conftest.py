@@ -10,6 +10,12 @@ from pyverge.core import (
     MigrationSettings,
     VersioningSettings,
 )
+from pyverge.core.types import (
+    VersionValue,
+)
+from pyverge.manager.types import (
+    ResolverFactory,
+)
 from pyverge.migration import (
     CompoundKeyWalker,
     DefaultMigrationEntry,
@@ -22,12 +28,11 @@ from pyverge.migration import (
     Registry,
     SequentialExecutor,
 )
-from pyverge.types import (
-    ModelAdapter,
-    ModelBase,
-    ResolverFactory,
-    VersionValue,
+from pyverge.migration.types import (
     Walker,
+)
+from pyverge.providers.types import (
+    ModelAdapter,
 )
 from tests.utils import register_models
 from tests.utils.engine import register_migrations
@@ -94,9 +99,9 @@ def registry(
     request: pytest.FixtureRequest,
     model_adapter: PydanticModelAdapter,
     migration_settings: MigrationSettings,
-) -> Registry[VersionValue, ModelBase]:
+) -> Registry[VersionValue]:
     _strategy, name, models, migrations = request.param
-    registry = Registry[VersionValue, ModelBase](name=name)
+    registry = Registry[VersionValue](name=name)
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
     if migrations:
@@ -106,7 +111,7 @@ def registry(
 
 @pytest.fixture
 def walker(
-    registry: Registry[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
     migration_settings: MigrationSettings,
     model_adapter: PydanticModelAdapter,
 ) -> Walker:
@@ -124,7 +129,7 @@ def walker(
 
 @pytest.fixture
 def graph_builder(
-    registry: Registry[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
     migration_settings: MigrationSettings,
     model_adapter: ModelAdapter,
 ) -> GraphBuilder[VersionValue]:
@@ -140,13 +145,13 @@ def graph_builder(
 def migration_graph(
     request: pytest.FixtureRequest,
     graph_builder: GraphBuilder[VersionValue],
-    registry: Registry[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
 ) -> MigrationGraph[VersionValue]:
     resolver_factory, payload = cast("tuple[ResolverFactory, dict]", request.param)
     return graph_builder.build(
         payload,
         target_resolver=resolver_factory(registry),
-    )
+    ).graph
 
 
 @pytest.fixture

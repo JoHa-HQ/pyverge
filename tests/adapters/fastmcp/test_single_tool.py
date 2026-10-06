@@ -23,7 +23,7 @@ from pyverge.adapters.fastmcp import (
     ToolReflection,
 )
 from pyverge.migration import PydanticModelAdapter
-from pyverge.ports import JsonSchemaModelAdapter
+from pyverge.providers import JsonSchemaModelAdapter
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.semver import (
     UserV1,

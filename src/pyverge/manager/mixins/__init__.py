@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from .engine import EngineLifecycleMixin
+from .lookup import LookupMixin
 from .migrate import MigrateMixin
 from .migrations import MigrationStoreMixin
 from .models import ModelStoreMixin
@@ -11,24 +12,24 @@ from .targets import TargetResolutionMixin
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from pydantic import BaseModel
-
-    from pyverge.migration.engine import Engine
-    from pyverge.types import (
+    from pyverge.core.types import (
         Diffable,
-        ManagerClassState,
-        ManagerInstanceState,
         ManagerMigrationKey,
-        MigrationKeyInput,  # noqa: F401
+        ModelHandle,
         ModelKind,
         ModelPair,
-        TargetPolicy,
         TargetResolver,
-        TargetSpec,
         Versionable,
         VersionValue,
-        VModel,
     )
+    from pyverge.core.versioning import VersionNode
+    from pyverge.manager.types import (
+        ManagerClassState,
+        ManagerInstanceState,
+        TargetPolicy,
+        TargetSpec,
+    )
+    from pyverge.migration.engine import Engine
 
     class ManagerState(
         ManagerInstanceState[VersionValue],
@@ -37,12 +38,22 @@ if TYPE_CHECKING:
     ):
         """Typing-only view of the composed manager shared by the mixins."""
 
+        @classmethod
+        def _resolve_model_key(cls, key: object) -> VersionNode[VersionValue]: ...
+
+        @classmethod
+        def _normalize_index(cls, index: object) -> object: ...
+
+        def migration_path(
+            self, from_version: object, to_version: object
+        ) -> list[tuple[Versionable[VersionValue], Versionable[VersionValue]]]: ...
+
         def get_model(
             self,
-            key: tuple[ModelKind, VersionValue] | type[VModel],
+            key: tuple[ModelKind, VersionValue] | ModelHandle,
             *,
             engine: Engine[VersionValue] | None = None,
-        ) -> Versionable[VersionValue, VModel]: ...
+        ) -> Versionable[VersionValue]: ...
 
         def get(
             self,
@@ -50,16 +61,16 @@ if TYPE_CHECKING:
             version: str,
             *,
             engine: Engine[VersionValue] | None = None,
-        ) -> Versionable[VersionValue, VModel]: ...
+        ) -> Versionable[VersionValue]: ...
 
         def missing_references(
             self,
-            version: Versionable[VersionValue, VModel],
+            version: Versionable[VersionValue],
         ) -> frozenset: ...
 
         def validate_graph(
             self,
-            version: Versionable[VersionValue, VModel] | None = None,
+            version: Versionable[VersionValue] | None = None,
         ) -> None: ...
 
         def attach_hooks(self, hooks: Iterable) -> None: ...
@@ -99,7 +110,7 @@ if TYPE_CHECKING:
         @classmethod
         def _model_resolver(
             cls,
-            model_cls: type[BaseModel],
+            model_cls: ModelHandle,
             *,
             engine: Engine[VersionValue] | None = None,
         ) -> TargetResolver: ...
@@ -115,6 +126,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "EngineLifecycleMixin",
+    "LookupMixin",
     "MigrateMixin",
     "MigrationStoreMixin",
     "ModelStoreMixin",

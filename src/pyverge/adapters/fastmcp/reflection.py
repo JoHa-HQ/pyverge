@@ -12,7 +12,12 @@ from fastmcp.resources.template import FunctionResourceTemplate
 from fastmcp.tools.function_tool import FunctionTool
 
 from pyverge.core import VersionNode
-from pyverge.types import ModelAdapter, Versionable
+from pyverge.core.types import (
+    Versionable,
+)
+from pyverge.providers.types import (
+    ModelAdapter,
+)
 
 from .injection import InjectionDetector, injected_names
 
@@ -80,7 +85,7 @@ class ReflectedNode:
                 version=self.version,
             )
         except (AttributeError, TypeError, ValueError):
-            return VersionNode[Any, Any](
+            return VersionNode[Any](
                 _model=None,
                 _value=adapter.of(self.version),
                 _kind=self.kind,

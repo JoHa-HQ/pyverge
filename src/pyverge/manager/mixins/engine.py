@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generic
 
-from pyverge.types import VersionValue
+from pyverge.core.types import (
+    VersionValue,
+)
 
 if TYPE_CHECKING:
+    from pyverge.manager.types import (
+        ManagerClassState,
+        ManagerInstanceState,
+    )
     from pyverge.migration.engine import Engine
-    from pyverge.types import ManagerClassState, ManagerInstanceState
 
 
 class EngineLifecycleMixin(Generic[VersionValue]):
