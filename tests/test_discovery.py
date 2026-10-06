@@ -8,7 +8,7 @@ import pytest
 from pydantic import BaseModel
 
 from pyverge.migration import PydanticModelAdapter
-from pyverge.ports.json_patch import JsonPatch
+from pyverge.providers.json_patch import JsonPatch
 from pyverge.reflection.discovery import (
     CallableDiffDiscovery,
     CompositeDiffDiscovery,

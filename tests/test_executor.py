@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Callable
+from dataclasses import replace
 
 import pytest
 import semver
+from pydantic import BaseModel
 
+from pyverge import types
 from pyverge.core import (
+    DiscoveryValidationError,
     MigrationError,
     MigrationNotFoundError,
     RegistryError,
     VersionNode,
-    types,
 )
 from pyverge.migration import (
     Engine,
@@ -26,6 +29,9 @@ from pyverge.migration import (
     latest_target_resolver,
     multi_target_resolver,
     skip_target_resolver,
+)
+from pyverge.providers.types import (
+    ModelHandle,
 )
 from tests.examples.pydantic.semver_nested import (
     AddressV1,

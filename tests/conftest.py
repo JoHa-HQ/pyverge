@@ -10,6 +10,12 @@ from pyverge.core import (
     MigrationSettings,
     VersioningSettings,
 )
+from pyverge.core.types import (
+    VersionValue,
+)
+from pyverge.manager.types import (
+    ResolverFactory,
+)
 from pyverge.migration import (
     CompoundKeyWalker,
     DefaultMigrationEntry,
@@ -22,12 +28,11 @@ from pyverge.migration import (
     Registry,
     SequentialExecutor,
 )
-from pyverge.types import (
-    ModelAdapter,
-    ModelBase,
-    ResolverFactory,
-    VersionValue,
+from pyverge.migration.types import (
     Walker,
+)
+from pyverge.providers.types import (
+    ModelAdapter,
 )
 from tests.utils import register_models
 from tests.utils.engine import register_migrations

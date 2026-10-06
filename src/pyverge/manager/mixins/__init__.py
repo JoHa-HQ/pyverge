@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal, Protocol
 
 from .engine import EngineLifecycleMixin
+from .lookup import LookupMixin
 from .migrate import MigrateMixin
 from .migrations import MigrationStoreMixin
 from .models import ModelStoreMixin
@@ -115,6 +116,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "EngineLifecycleMixin",
+    "LookupMixin",
     "MigrateMixin",
     "MigrationStoreMixin",
     "ModelStoreMixin",

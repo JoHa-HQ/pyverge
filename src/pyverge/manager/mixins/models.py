@@ -3,16 +3,19 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast, overload
 
-from pyverge.core.versioning import VersionNode
-from pyverge.types import (
+from pyverge.core.types import (
     Comparable,
-    ModelBase,
     ModelKey,
     ModelKind,
     ModelVersionKey,
     Versionable,
     VersionValue,
-    VModel,
+)
+from pyverge.core.versioning import (
+    VersionNode,
+)
+from pyverge.providers.types import (
+    ModelHandle,
 )
 
 if TYPE_CHECKING:

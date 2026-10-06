@@ -6,12 +6,11 @@ import jsonpatch
 import pendulum
 import pytest
 import semver
-from pydantic import BaseModel
 
+from pyverge import types
 from pyverge.core import (
     VersioningSettings,
     VersionNode,
-    types,
 )
 from pyverge.migration import (
     Diff,
@@ -20,6 +19,9 @@ from pyverge.migration import (
     PydanticDiff,
     PydanticModelAdapter,
     Registry,
+)
+from pyverge.providers.types import (
+    ModelHandle,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,

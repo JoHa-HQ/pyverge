@@ -3,9 +3,7 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast
 
-from pyverge.core.versioning import SentinelEdge
-from pyverge.ports import JsonPatchMigration
-from pyverge.types import (
+from pyverge.core.types import (
     Attachable,
     ManagerMigrationKey,
     Migratable,
@@ -13,8 +11,11 @@ from pyverge.types import (
     MigrationKeyInput,
     ModelPair,
     VersionValue,
-    VModel,
 )
+from pyverge.core.versioning import (
+    SentinelEdge,
+)
+from pyverge.providers import JsonPatchMigration
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

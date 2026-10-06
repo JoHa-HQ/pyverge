@@ -1,32 +1,21 @@
-import bisect
-from typing import Any, Generic, Self, cast, overload
+from typing import Any, Generic, Self, overload
 
 from pyverge.core.exceptions import (
-    MigrationError,
     MigrationNotFoundError,
     MissingReferenceError,
-    ModelConflictError,
     ModelNotFoundError,
     RegistryError,
 )
-from pyverge.core.render import JsonPatchRender
 from pyverge.core.settings import MigrationSettings
-from pyverge.core.versioning import SentinelEdge, VersionEdge, VersionNode
-from pyverge.ports.json_patch import JsonPatch
-from pyverge.ports.json_patch.migration import JsonPatchMigration
-from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
-from pyverge.types import (
+from pyverge.core.types import (
     Attachable,
     Comparable,
     DirectionViolationStrategy,
-    Executor,
     Migratable,
     MigrationDirectionStrategy,
-    MigrationEntry,
     MigrationFunc,
-    ModelAdapter,
-    ModelBase,
     ModelData,
+    ModelHandle,
     ModelKind,
     TargetResolver,
     Transitional,
@@ -35,6 +24,27 @@ from pyverge.types import (
     VersionPair,
     VersionValue,
 )
+from pyverge.core.versioning import (
+    SentinelEdge,
+    VersionEdge,
+)
+from pyverge.migration.types import (
+    Executor,
+    MigrationEntry,
+)
+from pyverge.providers.json_patch import JsonPatch
+from pyverge.providers.json_patch.migration import JsonPatchMigration
+from pyverge.providers.types import (
+    ModelAdapter,
+)
+from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
+from pyverge.reflection.reconstruction import (
+    MigrationReflection,
+    Reconstruction,
+    ReconstructionStrategy,
+    strategy_for,
+)
+from pyverge.reflection.reflection import Reflection
 
 from .graph import GraphBuilder
 from .registry import Registry
@@ -53,9 +63,9 @@ class Engine(Generic[VersionValue]):
 
     def __init__(
         self: Self,
-        registry: Registry[VersionValue, ModelBase],
+        registry: Registry[VersionValue],
         settings: MigrationSettings,
-        default_executor: Executor,
+        default_executor: Executor[VersionValue],
         graph_builder: GraphBuilder[VersionValue],
         adapter: ModelAdapter,
         entry_migration: MigrationEntry[VersionValue] | None = None,
@@ -230,20 +240,20 @@ class Engine(Generic[VersionValue]):
     def get_latest_model(
         self: Self,
         kind: ModelKind,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         """Most recent version for *kind*."""
         return self.registry.latest(kind)
 
     def get_earliest_model(
         self: Self,
         kind: ModelKind,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         """Earliest version for *kind*."""
         return self.registry.earliest(kind)
 
     def store_migration(
         self: Self,
-        key: VersionPair[VersionValue, ModelBase],
+        key: VersionPair[VersionValue],
         func: MigrationFunc,
         *,
         backward_compatible: bool = False,
@@ -288,16 +298,16 @@ class Engine(Generic[VersionValue]):
 
     def _resolve(
         self: Self,
-        endpoint: Versionable[VersionValue, ModelBase],
+        endpoint: Versionable[VersionValue],
         *,
-        other: Versionable[VersionValue, ModelBase],
+        other: Versionable[VersionValue],
         func: MigrationFunc,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         """Return *endpoint*, reconstructing it when it is not registered.
 
         A registered endpoint is returned as-is; an unregistered one is
-        reconstructed from *other*'s model when ``on_missing ==
-        "reconstruct_model"``, else ``ModelNotFoundError``.
+        reconstructed from *other*'s model when ``on_missing`` selects the
+        model-reconstruction strategy, else ``ModelNotFoundError``.
         """
         registry = self.registry
         try:
@@ -555,7 +565,7 @@ class Engine(Generic[VersionValue]):
 
     def remove_hook(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase],
+        key: Transitional[VersionValue],
         hook: Attachable | None = None,
     ) -> None:
         """Remove hooks for a migration step."""
@@ -564,7 +574,7 @@ class Engine(Generic[VersionValue]):
 
     def clear_hooks(
         self: Self,
-        key: Transitional[VersionValue, ModelBase, ModelBase] | None = None,
+        key: Transitional[VersionValue] | None = None,
     ) -> None:
         """Clear hooks from the registry."""
         if key is None:
@@ -578,13 +588,13 @@ class Engine(Generic[VersionValue]):
         data: ModelData,
         target: TargetResolver,
         *,
-        container: type[ModelBase] | None = None,
+        container: ModelHandle | None = None,
         version_property: str | None = None,
         depth_limit: int | None = None,
         direction: MigrationDirectionStrategy | None = None,
         on_direction_violation: DirectionViolationStrategy | None = None,
         on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | None = None,
+        executor: Executor[VersionValue] | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> ModelData:
         """Converge every versioned entry in *data* to match the target.
@@ -609,8 +619,7 @@ class Engine(Generic[VersionValue]):
         active_entry_migration = entry_migration or self.entry_migration
 
         return active_executor.run(
-            data,
-            graph,
+            plan,
             registry=self.registry,
             entry_migration=active_entry_migration,
             adapter=self.adapter,

@@ -8,12 +8,11 @@ from typing import Any
 import pendulum
 import pytest
 import semver
-from pydantic import BaseModel
 
+from pyverge import types
 from pyverge.core import (
     DiscoveryValidationError,
     MaxDepthExceededError,
-    types,
 )
 from pyverge.migration import (
     CompoundKeyWalker,

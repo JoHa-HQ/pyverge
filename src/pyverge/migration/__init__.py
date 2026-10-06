@@ -26,9 +26,14 @@ from pyverge.core import (
     VersionNode,
     get_at,
     set_at,
-    types,
 )
-from pyverge.ports import (
+from pyverge.migration.types import (
+    Entry,
+    Executor,
+    MigrationEntry,
+    RunnableMigration,
+)
+from pyverge.providers import (
     JsonPatchMigration,
     JsonSchemaModelAdapter,
     PydanticDiff,
@@ -41,11 +46,10 @@ from pyverge.reflection import (
     DiffDiscovery,
     JsonPatchDiffDiscovery,
 )
-from pyverge.types import MigrationEntry
 
 from .engine import Engine
 from .executor import LevelParallelExecutor, SequentialExecutor, StepExecutor
-from .graph import GraphBuilder, GraphEntry, MigrationGraph
+from .graph import GraphBuilder, GraphEntry, MigrationGraph, MigrationPlan
 from .policy import (
     earliest_target_resolver,
     fixed_target_resolver,
@@ -55,7 +59,7 @@ from .policy import (
 )
 from .registry import Registry
 from .strategy import DefaultMigrationEntry
-from .walker import CompoundKeyWalker, PydanticWalker
+from .walker import CompoundKeyWalker, PydanticWalker, Walker
 
 __all__ = [
     "CallableDiffDiscovery",
@@ -69,6 +73,8 @@ __all__ = [
     "DiscoveryValidationError",
     "Engine",
     "EngineError",
+    "Entry",
+    "Executor",
     "ExplicitStep",
     "GraphBuilder",
     "GraphEntry",
@@ -86,6 +92,7 @@ __all__ = [
     "MigrationMissingFieldError",
     "MigrationNotFoundError",
     "MigrationPathIntegrityError",
+    "MigrationPlan",
     "MigrationSettings",
     "MissingReferenceError",
     "ModelAlreadyRegisteredError",
@@ -97,6 +104,7 @@ __all__ = [
     "PydanticWalker",
     "Registry",
     "RegistryError",
+    "RunnableMigration",
     "SentinelEdge",
     "SequentialExecutor",
     "StepExecutor",
@@ -104,6 +112,8 @@ __all__ = [
     "VersionNode",
     "VersionedModelError",
     "VersioningSettings",
+    "Walker",
+    "WalkerProtocol",
     "earliest_target_resolver",
     "fixed_target_resolver",
     "get_at",
@@ -111,5 +121,4 @@ __all__ = [
     "multi_target_resolver",
     "set_at",
     "skip_target_resolver",
-    "types",
 ]

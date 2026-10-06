@@ -4,7 +4,9 @@ from typing import Any
 
 import jsonpatch
 
-from pyverge.types import ModelData
+from pyverge.core.types import (
+    ModelData,
+)
 
 
 class SetDefaultOperation(jsonpatch.PatchOperation):

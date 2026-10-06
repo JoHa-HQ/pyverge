@@ -1,10 +1,10 @@
 from collections.abc import Sequence
 from typing import Any, Self
 
-from ..types import (
+from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
     MigrationKey,
-    ModelBase,
+    ModelHandle,
     ModelVersionKey,
     VersionValue,
 )
@@ -61,7 +61,7 @@ class ModelNotFoundError(RegistryError):
     def __init__(
         self: Self,
         registry_name: str,
-        key: ModelVersionKey | type[ModelBase],
+        key: ModelVersionKey | ModelHandle,
     ) -> None:
         """Initializes ModelNotFoundError."""
         self.key = key

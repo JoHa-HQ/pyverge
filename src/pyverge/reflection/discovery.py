@@ -87,6 +87,7 @@ class JsonPatchDiffDiscovery(Generic[VersionValue]):
             added_fields=sorted(added),
             removed_fields=sorted(removed),
             modified_fields=modified,
+            origin="migration",
         )
 
 
@@ -166,6 +167,7 @@ class CallableDiffDiscovery(Generic[VersionValue]):
             added_fields=sorted(added),
             removed_fields=sorted(removed),
             modified_fields=modified,
+            origin="migration",
         )
 
 

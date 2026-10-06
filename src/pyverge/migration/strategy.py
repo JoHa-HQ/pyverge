@@ -4,12 +4,10 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generic
 
 from pyverge.core.exceptions import MigrationError
-from pyverge.types import (
+from pyverge.core.types import (
     DirectionViolationStrategy,
     MigrationDirectionStrategy,
-    ModelBase,
     ModelData,
-    RunnableMigration,
     VersionMissingStrategy,
     VersionValue,
 )

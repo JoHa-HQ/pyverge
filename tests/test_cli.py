@@ -10,8 +10,10 @@ from typer.testing import CliRunner
 
 from pyverge import Manager
 from pyverge.cli.main import app
+from pyverge.core.types import (
+    VersionValue,
+)
 from pyverge.migration import JsonSchemaModelAdapter, PydanticModelAdapter
-from pyverge.types import VersionValue
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.semver import UserV1, UserV2, UserV3
 from tests.utils import ManagerContext

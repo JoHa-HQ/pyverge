@@ -7,10 +7,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from pyverge import types
 from pyverge.core import (
     DiscoverySettings,
     MigrationError,
-    types,
 )
 from pyverge.migration import (
     DefaultMigrationEntry,

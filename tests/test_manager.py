@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Callable
+from typing import Literal, cast
 
 import pendulum
 import pytest
@@ -16,22 +17,27 @@ from pyverge.core import (
     RegistryError,
     VersioningSettings,
 )
+from pyverge.core.types import (
+    ManagerMigrationKey,
+    Migratable,
+    MigrationKeyInput,
+    ModelPair,
+    Versionable,
+    VersionValue,
+)
+from pyverge.manager.types import (
+    ManagerClassState,
+    ManagerInstanceState,
+)
 from pyverge.migration import (
     Engine,
     PydanticModelAdapter,
     PydanticWalker,
 )
-from pyverge.ports import JsonSchemaModelAdapter
-from pyverge.types import (
-    ManagerClassState,
-    ManagerInstanceState,
-    ManagerMigrationKey,
-    MigrationKeyInput,
+from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.providers.types import (
     ModelAdapter,
-    ModelBase,
-    ModelPair,
-    VersionValue,
-    VModel,
+    ModelHandle,
 )
 from tests.examples.json import (
     USER_V1_0_0,

@@ -4,7 +4,19 @@ from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
 from pyverge.core.exceptions import ModelNotFoundError, RegistryError
-from pyverge.core.versioning import VersionNode
+from pyverge.core.types import (
+    ModelKind,
+    TargetResolver,
+    Versionable,
+    VersionValue,
+)
+from pyverge.core.versioning import (
+    VersionNode,
+)
+from pyverge.manager.types import (
+    TargetPolicy,
+    TargetSpec,
+)
 from pyverge.migration.engine import Engine
 from pyverge.migration.policy import (
     earliest_target_resolver,

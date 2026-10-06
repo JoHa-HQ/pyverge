@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..types import ModelData
+from .types import ModelData
 
 
 class Path(tuple[str | int, ...]):
