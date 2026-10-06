@@ -105,7 +105,7 @@ class MigrateMixin(Generic[VersionValue]):
         )
         if container is None:
             return migrated
-        return container.model_validate(migrated)
+        return self.engine.adapter.instantiate(container, migrated)
 
     def info(
         self: ManagerState[VersionValue],

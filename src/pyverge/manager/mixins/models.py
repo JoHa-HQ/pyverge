@@ -31,10 +31,10 @@ class ModelStoreMixin(Generic[VersionValue]):
     @classmethod
     def store_model(
         cls: type[ManagerState[VersionValue]],
-        key: type[VModel],
+        key: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, VModel]:
+    ) -> Versionable[VersionValue]:
         """Register a model version through the engine."""
         engine = engine or cls._default_engine
         return engine.store_model(engine.adapter.versionable(key))
@@ -43,21 +43,44 @@ class ModelStoreMixin(Generic[VersionValue]):
     @classmethod
     def _(
         cls: type[ManagerState[VersionValue]],
-        version: VersionNode[VersionValue, ModelBase],
+        version: VersionNode[VersionValue],
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, ModelBase]:
-        """Register an already-built versionable, reconciling on collision.
-
-        Accepts a versionable an adapter built elsewhere (e.g. a reflected
-        schema) and routes it through the engine's reconcile-then-store.
-        """
+    ) -> Versionable[VersionValue]:
+        """Register an already-built versionable (strict; duplicates fail)."""
         engine = engine or cls._default_engine
         return engine.store_model(version)
 
+    @singledispatchmethod
+    @classmethod
+    def reconcile_model(
+        cls: type[ManagerState[VersionValue]],
+        key: ModelHandle,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Versionable[VersionValue]:
+        """Register a model, reconciling an identical re-registration.
+
+        The idempotent fallback to :meth:`store_model`: an identical surface is
+        a no-op, a differing one raises :class:`ModelConflictError`.
+        """
+        engine = engine or cls._default_engine
+        return engine.reconcile_model(engine.adapter.versionable(key))
+
+    @reconcile_model.register(VersionNode)
+    @classmethod
+    def _(
+        cls: type[ManagerState[VersionValue]],
+        version: VersionNode[VersionValue],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Versionable[VersionValue]:
+        engine = engine or cls._default_engine
+        return engine.reconcile_model(version)
+
     def missing_references(
         self: ManagerState[VersionValue],
-        version: Versionable[VersionValue, VModel],
+        version: Versionable[VersionValue],
     ) -> frozenset[ModelVersionKey]:
         """Return the versioned ``(kind, version)`` pairs *version* declares
         but that are not registered."""
@@ -65,7 +88,7 @@ class ModelStoreMixin(Generic[VersionValue]):
 
     def validate_graph(
         self: ManagerState[VersionValue],
-        version: Versionable[VersionValue, VModel] | None = None,
+        version: Versionable[VersionValue] | None = None,
     ) -> None:
         """Validate registered models' declared references are registered.
 
@@ -80,7 +103,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         kind: ModelKind | None = None,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> list[Versionable[VersionValue, VModel]]:
+    ) -> list[Versionable[VersionValue]]:
         """Return registered versions, optionally filtered by *kind*."""
         engine = engine or cls._default_engine
         if kind is None:
@@ -90,22 +113,22 @@ class ModelStoreMixin(Generic[VersionValue]):
     @overload
     @classmethod
     def get_model(
-        cls, key: type[VModel], *, engine: Engine[VersionValue] | None = None
-    ) -> Versionable[VersionValue, VModel]: ...
+        cls, key: ModelHandle, *, engine: Engine[VersionValue] | None = None
+    ) -> Versionable[VersionValue]: ...
     @overload
     @classmethod
     def get_model(
         cls, key: ModelKey, *, engine: Engine[VersionValue] | None = None
-    ) -> Versionable[VersionValue, ModelBase]: ...
+    ) -> Versionable[VersionValue]: ...
 
     @singledispatchmethod
     @classmethod
     def get_model(
         cls: type[ManagerState[VersionValue]],
-        key: type[VModel],
+        key: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, VModel]:
+    ) -> Versionable[VersionValue]:
         """Return a registered model version; a bare class is looked up by class."""
         engine = engine or cls._default_engine
         return engine.get_model_by_class(key)
@@ -117,7 +140,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         key: ModelKey,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
         return engine.get_model(
             engine.adapter.versionable(None, kind=key.kind, version=key.version)
@@ -130,13 +153,13 @@ class ModelStoreMixin(Generic[VersionValue]):
         key: Comparable[VersionValue],
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, ModelBase]: ...
+    ) -> Versionable[VersionValue]: ...
 
     @overload
     @classmethod
     def get_latest_model(
         cls, key: ModelKind, *, engine: Engine[VersionValue] | None = None
-    ) -> Versionable[VersionValue, ModelBase]: ...
+    ) -> Versionable[VersionValue]: ...
 
     @singledispatchmethod
     @classmethod
@@ -145,7 +168,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         key: Comparable[VersionValue],
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
         return engine.get_model(key)
 
@@ -156,7 +179,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         key: ModelKind,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
         return engine.get_latest_model(key)
 
@@ -167,12 +190,12 @@ class ModelStoreMixin(Generic[VersionValue]):
         key: Comparable[VersionValue],
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, ModelBase]: ...
+    ) -> Versionable[VersionValue]: ...
     @overload
     @classmethod
     def get_earliest_model(
         cls, key: ModelKind, *, engine: Engine[VersionValue] | None = None
-    ) -> Versionable[VersionValue, ModelBase]: ...
+    ) -> Versionable[VersionValue]: ...
 
     @singledispatchmethod
     @classmethod
@@ -181,7 +204,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         key: Comparable[VersionValue],
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
         return engine.get_model(key)
 
@@ -192,7 +215,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         key: ModelKind,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, ModelBase]:
+    ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
         return engine.get_earliest_model(key)
 
@@ -203,7 +226,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         version: str,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue, VModel]:
+    ) -> Versionable[VersionValue]:
         """Return the registered versionable for ``kind``@``version``."""
         engine = engine or cls._default_engine
         key = ModelKey(kind, cast(VersionValue, engine.adapter.of(version)))

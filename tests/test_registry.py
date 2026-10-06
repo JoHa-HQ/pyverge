@@ -4,28 +4,34 @@ Most behaviors are exercised for both the semver (pydantic) and chrono/JSON
 (``JsonSchemaModelAdapter`` + ``pendulum.Date``) strategies.
 """
 
+from dataclasses import replace
+
 import pendulum
 import pytest
 import semver
-from pydantic import BaseModel
 
+from pyverge import types
 from pyverge.core import (
     MigrationAlreadyRegisteredError,
+    MigrationError,
     MigrationHook,
     MigrationNotFoundError,
     ModelAlreadyRegisteredError,
+    ModelConflictError,
     ModelNotFoundError,
     RegistryError,
     SentinelEdge,
     VersioningSettings,
     VersionNode,
-    types,
 )
 from pyverge.migration import (
     PydanticModelAdapter,
     Registry,
 )
-from pyverge.ports import JsonSchemaModelAdapter
+from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.providers.types import (
+    ModelHandle,
+)
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -83,8 +89,8 @@ class TestModel:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel_co],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, model)
         assert registry.get_model(version).model is version.model
@@ -116,8 +122,8 @@ class TestModel:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel_co]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, cls) for cls in models
@@ -151,8 +157,8 @@ class TestModel:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        latest: type[types.VModel_co],
+        registry: Registry[types.VersionValue],
+        latest: ModelHandle,
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, latest)
         assert registry.latest(version.version[0]).model == version.model
@@ -177,7 +183,7 @@ class TestModel:
     )
     def test_get_nonexistent_model_raises(
         self,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         key: types.ModelVersionKey,
     ) -> None:
         with pytest.raises(ModelNotFoundError, match="not found"):
@@ -205,8 +211,8 @@ class TestModel:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        target: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        target: ModelHandle,
     ) -> None:
         with pytest.raises(ModelNotFoundError):
             registry.get_model(
@@ -219,8 +225,12 @@ class TestModel:
             pytest.param(
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV1], []],
-                UserV1,
-                id="semver_model_class",
+                VersionNode(
+                    _model=None,
+                    _value=semver.Version.parse("1.0.0"),
+                    _kind="User",
+                ),
+                id="semver_version_node_v1",
             ),
             pytest.param(
                 PydanticModelAdapter,
@@ -247,7 +257,7 @@ class TestModel:
     )
     def test_model_contains(
         self,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         predicate: types.LookupKey,
     ) -> None:
         assert predicate in registry
@@ -266,11 +276,11 @@ class TestModel:
     )
     def test_model_class_not_in_registry(
         self,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         with pytest.raises(ModelNotFoundError):
-            registry.get_model_by_class(model)
+            registry.get_model_by_handle(model)
 
     @pytest.mark.parametrize(
         "model_adapter, registry",
@@ -290,7 +300,7 @@ class TestModel:
     )
     def test_latest_model_empty_raises(
         self,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
     ) -> None:
         with pytest.raises(RegistryError):
             registry.latest("User")
@@ -317,8 +327,8 @@ class TestModel:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         """The registry is a store: a duplicate registration raises.
 
@@ -352,8 +362,8 @@ class TestModel:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, model)
         assert version in registry
@@ -383,8 +393,8 @@ class TestModel:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         with pytest.raises(RegistryError, match="is not registered"):
             registry.remove_model(
@@ -413,8 +423,8 @@ class TestModel:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, model)
         registry.clear_models()
@@ -442,7 +452,7 @@ class TestModel:
     def test_meta_version_registers(
         self,
         model_adapter: types.ModelAdapter,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         version: str,
     ) -> None:
         """A meta version registers by (kind, version) with no concrete model."""
@@ -475,7 +485,7 @@ class TestModel:
     def test_meta_and_real_versions_order_together(
         self,
         model_adapter: types.ModelAdapter,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
         meta_versions: list[str],
         expected: list[str],
     ) -> None:
@@ -500,12 +510,12 @@ class TestModel:
     )
     def test_copy_preserves_model_class_lookup(
         self,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         """A copied registry keeps class-based lookups."""
         clone = registry.copy()
-        assert clone.get_model_by_class(model).model is model
+        assert clone.get_model_by_handle(model).model is model
 
 
 class TestMigration:
@@ -536,8 +546,8 @@ class TestMigration:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         def _migrate(data: dict) -> dict:
             return data
@@ -573,8 +583,8 @@ class TestMigration:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         with pytest.raises(MigrationNotFoundError):
             edge = edge_from_models(
@@ -618,8 +628,8 @@ class TestMigration:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         def _migrate(data: dict) -> dict:
             return data
@@ -657,8 +667,8 @@ class TestMigration:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         with pytest.raises(MigrationNotFoundError):
             fake_key = edge_from_models(
@@ -702,8 +712,8 @@ class TestMigration:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         key = edge_from_models(
             model_adapter,
@@ -751,8 +761,8 @@ class TestHooks:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
@@ -794,8 +804,8 @@ class TestHooks:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
@@ -834,8 +844,8 @@ class TestHooks:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         hook1 = MigrationHook()
         hook2 = MigrationHook()
@@ -881,8 +891,8 @@ class TestHooks:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
@@ -924,8 +934,8 @@ class TestHooks:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
@@ -968,8 +978,8 @@ class TestHooks:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
         expected_amount: int,
     ) -> None:
         edge = edge_from_models(
@@ -1014,8 +1024,8 @@ class TestHooks:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
@@ -1056,8 +1066,8 @@ class TestVersionEdgeIndex:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1099,8 +1109,8 @@ class TestVersionEdgeIndex:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1148,8 +1158,8 @@ class TestVersionEdgeIndex:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         """VersionNode keys hit the same bucket."""
         versions = [
@@ -1195,8 +1205,8 @@ class TestVersionEdgeIndex:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1245,8 +1255,8 @@ class TestVersionEdgeIndex:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1288,8 +1298,8 @@ class TestVersionEdgeIndex:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1338,8 +1348,8 @@ class TestVersionEdgeIndex:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1381,8 +1391,8 @@ class TestVersionEdgeIndex:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1427,8 +1437,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1453,7 +1463,7 @@ class TestEdgePairLookup:
     )
     def test_kind_versions_unknown_returns_empty(
         self,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
     ) -> None:
         assert registry.kind_versions("Nope") == []
 
@@ -1489,8 +1499,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1538,8 +1548,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1580,8 +1590,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1623,8 +1633,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1660,8 +1670,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1701,8 +1711,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        models: list[type[types.ModelBase]],
-        registry: Registry[types.VersionValue, BaseModel],
+        models: list[ModelHandle],
+        registry: Registry[types.VersionValue],
     ) -> None:
         pair = [
             envelope_model(model_adapter, versioning_settings, model)
@@ -1743,8 +1753,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1789,8 +1799,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1833,8 +1843,8 @@ class TestEdgePairLookup:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
@@ -1882,8 +1892,8 @@ class TestMigrationHookGuard:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
@@ -1930,8 +1940,8 @@ class TestMigrationHookGuard:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        models: list[type[types.VModel]],
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
@@ -2022,8 +2032,8 @@ class TestReferences:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
         expected: frozenset[types.ModelVersionKey],
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
@@ -2051,8 +2061,8 @@ class TestReferences:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         """Every declared union member is reached, not just the first."""
         node = envelope_model(model_adapter, versioning_settings, model)
@@ -2062,7 +2072,7 @@ class TestReferences:
     def test_meta_node_references_nothing(
         self,
         model_adapter: types.ModelAdapter,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
     ) -> None:
         """A meta version carries no concrete model, so it references nothing."""
         meta = meta_versionable(model_adapter, "User", "1.0.0")
@@ -2090,8 +2100,8 @@ class TestReferences:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
         copied = registry.copy(name="copy")
@@ -2123,8 +2133,8 @@ class TestReferences:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
         children: tuple,
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
@@ -2154,8 +2164,8 @@ class TestReferences:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
         assert registry.missing_references(node) == self.ADDRESS_VERSIONS
@@ -2184,8 +2194,8 @@ class TestReferences:
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue, BaseModel],
-        model: type[types.VModel],
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
         one_child: object,
     ) -> None:
         """Registering one ``Address`` version leaves the other two missing."""
@@ -2201,8 +2211,161 @@ class TestReferences:
     def test_missing_references_unknown_node_raises(
         self,
         model_adapter: types.ModelAdapter,
-        registry: Registry[types.VersionValue, BaseModel],
+        registry: Registry[types.VersionValue],
     ) -> None:
         unregistered = meta_versionable(model_adapter, "User", "9.9.9")
         with pytest.raises(ModelNotFoundError):
             registry.missing_references(unregistered)
+
+
+class TestNeutralGraphOps:
+    """Registry owns low-level graph traversal and reconciliation."""
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2, UserV3],
+                    [
+                        ((UserV1, UserV2), lambda d: d),
+                        ((UserV2, UserV3), lambda d: d),
+                    ],
+                ],
+                [UserV1, UserV2, UserV3],
+                id="pydantic_semver",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_migration_path_forward_and_backward(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
+    ) -> None:
+        versions = [
+            envelope_model(model_adapter, versioning_settings, m) for m in models
+        ]
+        forward = registry.migration_path(versions[0], versions[2])
+        assert forward == [(versions[0], versions[1]), (versions[1], versions[2])]
+        assert registry.migration_path(versions[0], versions[0]) == []
+        with pytest.raises(MigrationError):
+            registry.migration_path(versions[2], versions[0])
+
+    def test_migration_path_unregistered_raises(
+        self,
+        model_adapter: types.ModelAdapter,
+        registry: Registry[types.VersionValue],
+    ) -> None:
+        missing = meta_versionable(model_adapter, "User", "9.9.9")
+        other = meta_versionable(model_adapter, "User", "9.9.8")
+        with pytest.raises(MigrationError):
+            registry.migration_path(missing, other)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV1, UserV2, UserV3],
+                    [
+                        ((UserV1, UserV2), lambda d: d),
+                        ((UserV2, UserV3), lambda d: d),
+                    ],
+                ],
+                [UserV1, UserV2, UserV3],
+                id="pydantic_semver",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_remove_migration_range_refuses_critical_edge(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
+    ) -> None:
+        versions = [
+            envelope_model(model_adapter, versioning_settings, m) for m in models
+        ]
+        with pytest.raises(RegistryError):
+            registry.remove_migration_range(versions[0], versions[2])
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
+                UserV1,
+                id="pydantic_semver",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_reconcile_identical_is_noop(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
+    ) -> None:
+        again = registry.reconcile_model(
+            envelope_model(model_adapter, versioning_settings, model)
+        )
+        assert registry.get_model(again) is again
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
+                UserV1,
+                id="pydantic_semver",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_reconcile_conflicting_surface_raises(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
+    ) -> None:
+        registered = envelope_model(model_adapter, versioning_settings, model)
+        incoming = replace(registered, fields=registered.fields | {"extra"})
+        with pytest.raises(ModelConflictError):
+            registry.reconcile_model(incoming)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1], []],
+                UserV1,
+                id="pydantic_semver",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_handle_lookup_and_removal(
+        self,
+        registry: Registry[types.VersionValue],
+        model: ModelHandle,
+    ) -> None:
+        assert registry.get_model_by_handle(model).model is model
+        registry.remove_model_by_handle(model)
+        with pytest.raises(ModelNotFoundError):
+            registry.get_model_by_handle(model)

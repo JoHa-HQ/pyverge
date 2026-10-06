@@ -82,7 +82,7 @@ class Manager(
         return self.engine.settings
 
     @property
-    def registry(self) -> Registry[VersionValue, ModelBase]:
+    def registry(self) -> Registry[VersionValue]:
         """Return the instance registry."""
         return self.engine.registry
 
@@ -117,7 +117,7 @@ class Manager(
                 to :class:`~pyverge.migration.DefaultMigrationEntry`.
         """
         if walker is None:
-            registry = Registry[VersionValue, ModelBase]()
+            registry = Registry[VersionValue]()
             active_walker = CompoundKeyWalker(
                 registry, settings=settings, adapter=adapter
             )

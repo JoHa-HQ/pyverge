@@ -157,7 +157,7 @@ class TestClassLevelRegistration:
     def test_migration_decorator(
         self,
         manager: type[Manager[VersionValue]],
-        key: tuple[str, str, str] | tuple[ModelBase, ModelBase],
+        key: tuple[str, str, str] | tuple[ModelHandle, ModelHandle],
     ) -> None:
 
         @manager.migration(*key, backward_compatible=True)
@@ -205,7 +205,7 @@ class TestClassLevelRegistration:
     def test_hook_decorator(
         self,
         manager: type[Manager[semver.Version]],
-        key: tuple[str, str, str] | tuple[ModelBase, ModelBase],
+        key: tuple[str, str, str] | tuple[ModelHandle, ModelHandle],
         anchor: str,
     ) -> None:
         class CountingHook(MigrationHook):
@@ -217,7 +217,7 @@ class TestClassLevelRegistration:
 
         hook = CountingHook()
 
-        @manager.hook(*key, hook)  # ty: ignore[invalid-argument-type]
+        @manager.hook(*key, hook)
         class _HookMarker:
             pass
 
@@ -382,7 +382,7 @@ class TestInstanceFacade:
     def test_find_model_hit(
         self,
         manager: type[Manager[VersionValue]],
-        model: type[VModel],
+        model: ModelHandle,
     ) -> None:
         instance = manager()
         version = envelope_model(
@@ -550,6 +550,208 @@ class TestLookupHelpers:
     ) -> None:
         assert [n.model for n in manager.list_versions("User")] == expected
         assert manager.list_versions("Missing") == []
+
+
+class TestFluentLookup:
+    """Manager owns the fluent lookup sugar; engine/registry are typed-only."""
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry", "models", "key_factory", "expected"),
+        [
+            (
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                lambda versions: UserV1,
+                True,
+            ),
+            (
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                lambda versions: UserV3,
+                False,
+            ),
+            (
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                lambda versions: (versions[0].kind, versions[0].version[1]),
+                True,
+            ),
+            (
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                lambda versions: ("User", semver.Version(9, 9, 9)),
+                False,
+            ),
+            (
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                lambda versions: (versions[0], versions[1]),
+                True,
+            ),
+            (
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                lambda versions: (versions[1], versions[0]),
+                False,
+            ),
+            (
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2, UserV3],
+                    [
+                        ((UserV1, UserV2), lambda d: d),
+                        ((UserV2, UserV3), lambda d: d),
+                    ],
+                ],
+                [UserV1, UserV2, UserV3],
+                lambda versions: slice(versions[0].version, versions[2].version),
+                True,
+            ),
+            (
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2, UserV3],
+                    [
+                        ((UserV1, UserV2), lambda d: d),
+                        ((UserV2, UserV3), lambda d: d),
+                    ],
+                ],
+                [UserV1, UserV2, UserV3],
+                lambda versions: slice(versions[2].version, versions[0].version),
+                False,
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_contains_fluent_keys(
+        self,
+        manager: type[Manager],
+        models: list[ModelHandle],
+        key_factory: Callable[..., object],
+        expected: bool,
+    ) -> None:
+        instance = manager()
+        versions = [
+            envelope_model(instance.engine.adapter, instance.engine.settings, m)
+            for m in models
+        ]
+        assert (key_factory(versions) in instance) is expected
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry", "models", "selector", "kind"),
+        [
+            (
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                lambda versions: UserV1,
+                "model",
+            ),
+            (
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                lambda versions: (versions[0].kind, versions[0].version[1]),
+                "model",
+            ),
+            (
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), lambda d: d)],
+                ],
+                [UserV1, UserV2],
+                lambda versions: (versions[0], versions[1]),
+                "edge",
+            ),
+            (
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2, UserV3],
+                    [
+                        ((UserV1, UserV2), lambda d: d),
+                        ((UserV2, UserV3), lambda d: d),
+                    ],
+                ],
+                [UserV1, UserV2, UserV3],
+                lambda versions: slice(versions[0].version, versions[2].version),
+                "path",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_getitem_fluent_keys(
+        self,
+        manager: type[Manager],
+        models: list[ModelHandle],
+        selector: Callable[..., object],
+        kind: str,
+    ) -> None:
+        instance = manager()
+        versions = [
+            envelope_model(instance.engine.adapter, instance.engine.settings, m)
+            for m in models
+        ]
+        result = instance[selector(versions)]
+        if kind == "model":
+            assert cast(Versionable, result).model in set(models)
+        elif kind == "edge":
+            assert cast(Migratable, result).func is not None
+        else:
+            branch = cast(list[Migratable], result)
+            assert len(branch) == len(models) - 1
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry", "models"),
+        [
+            (
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2, UserV3],
+                    [
+                        ((UserV1, UserV2), lambda d: d),
+                        ((UserV2, UserV3), lambda d: d),
+                    ],
+                ],
+                [UserV1, UserV2, UserV3],
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_migration_path_fluent(
+        self,
+        manager: type[Manager],
+        models: list[ModelHandle],
+    ) -> None:
+        instance = manager()
+        path = instance.migration_path(UserV1, UserV3)
+        assert len(path) == 2  # noqa: PLR2004
 
 
 class TestSharedEngine:
