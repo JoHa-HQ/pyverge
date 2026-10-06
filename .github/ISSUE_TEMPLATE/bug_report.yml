@@ -1,0 +1,75 @@
+name: Bug report
+description: Report a defect in pyverge
+title: "[Bug]: <short description>"
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please search
+        [existing issues](https://github.com/JoHa-HQ/pyverge/issues) first.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: context
+      description: |
+        What happened? A clear, concise description of the defect.
+        Why does it matter? The impact, and the expected vs. actual behavior.
+        Where does it occur? The component/adapter and the environment in which
+        you hit it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproducible example
+      description: |
+        The smallest script that reproduces the issue. Include the model,
+        migration registration, and the `migrate` call.
+      render: python
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead. Include the full error/traceback below.
+    validations:
+      required: true
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback
+      description: Paste the full stack trace, if any.
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: pyverge-version
+    attributes:
+      label: pyverge version
+      description: "`python -c \"import pyverge; print(pyverge.__version__)\"`"
+      placeholder: "0.9.1"
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      description: "`python --version`"
+      placeholder: "3.12.4"
+    validations:
+      required: true

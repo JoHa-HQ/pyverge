@@ -45,10 +45,13 @@ process for contributing code, documentation, and ideas.
    uv run ty check src/pyverge
    ```
 
-5. **Commit** with a clear message following [Conventional Commits](https://www.conventionalcommits.org/):
+5. **Commit** with a clear message following [Conventional Commits](https://www.conventionalcommits.org/),
+   scoped by issue number:
    ```bash
-   git commit -m "feat: add new migration hook type"
+   git commit -m "feat(#56): add new migration hook type"
    ```
+   The scope is the issue the work addresses, so the history links commits to
+   their issue (e.g. `fix(#62): ...`).
 
 6. **Push** and open a pull request.
 
