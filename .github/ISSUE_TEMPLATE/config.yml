@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/JoHa-HQ/pyverge/tree/main/docs
+    about: Usage guides, concepts, and API docs.
+  - name: Contributing guide
+    url: https://github.com/JoHa-HQ/pyverge/blob/main/CONTRIBUTING.md
+    about: How to set up, test, and submit changes.
+  - name: Questions & discussion
+    url: https://github.com/JoHa-HQ/pyverge/discussions
+    about: Ask questions and discuss ideas with the community.
