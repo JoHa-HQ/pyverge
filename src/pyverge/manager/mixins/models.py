@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Generic, cast, overload
 
 from pyverge.core.types import (
     Comparable,
+    ModelData,
     ModelKey,
     ModelKind,
     ModelVersionKey,
@@ -119,6 +120,35 @@ class ModelStoreMixin(Generic[VersionValue]):
         """Return the kinds that have at least one registered version."""
         engine = engine or cls._default_engine
         return engine.get_entities()
+
+    @classmethod
+    def identifies(
+        cls: type[ManagerState[VersionValue]],
+        key: ModelHandle,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> bool:
+        """Return whether *key* is a versionable model this manager can handle."""
+        engine = engine or cls._default_engine
+        return engine.adapter.identify(key)
+
+    @classmethod
+    def dump(
+        cls: type[ManagerState[VersionValue]],
+        value: object,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> ModelData:
+        """Return *value* as a payload mapping.
+
+        A mapping passes through; a provider model is serialized by the adapter
+        (the inverse of ``instantiate``). The façade used by the publish seam to
+        turn a handler's returned model back into a payload.
+        """
+        if isinstance(value, dict):
+            return cast("ModelData", value)
+        engine = engine or cls._default_engine
+        return engine.adapter.dump(value)
 
     @overload
     @classmethod

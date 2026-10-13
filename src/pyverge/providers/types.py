@@ -101,6 +101,15 @@ class ModelAdapter(Protocol):
         """Build a typed container instance from a migrated payload."""
         ...
 
+    def dump(self, model: object) -> ModelData:
+        """Serialize a provider model into a payload mapping.
+
+        The inverse of :meth:`instantiate`. Used where a typed instance (e.g. a
+        handler's return value) must become a payload again before it can be
+        converged or published.
+        """
+        ...
+
     def identify(self, model_cls: ModelHandle) -> bool:
         """Return whether the provider owns *model_cls*.
 

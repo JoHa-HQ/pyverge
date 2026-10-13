@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from pydantic import BaseModel, create_model
 from pydantic.fields import FieldInfo
@@ -98,6 +98,14 @@ class PydanticModelAdapter(AbstractModelAdapter):
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
         """Build a typed Pydantic instance from a migrated payload."""
         return container.model_validate(data)
+
+    def dump(self, model: object) -> ModelData:
+        """Serialize a Pydantic instance into a payload mapping."""
+        if not isinstance(model, BaseModel):
+            raise TypeError(
+                f"Cannot serialize {type(model).__name__}: expected a Pydantic model"
+            )
+        return cast("ModelData", model.model_dump(by_alias=True))
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
