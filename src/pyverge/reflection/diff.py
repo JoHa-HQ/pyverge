@@ -4,28 +4,33 @@ from dataclasses import dataclass, field
 from typing import Any, Generic
 
 from pyverge.core.render import JsonPatchRender
-from pyverge.types import (
+from pyverge.core.types import (
+    DiffOrigin,
     MigrationKey,
     Renderable,
     Versionable,
     VersionValue,
-    VSource_co,
-    VTarget_co,
 )
+
+__all__ = ["Diff", "DiffOrigin"]
 
 
 @dataclass(frozen=True)
-class Diff(Generic[VersionValue, VSource_co, VTarget_co]):
+class Diff(Generic[VersionValue]):
     """Differences between two model versions — data with queryable predicates.
 
     Provider-agnostic.  Provider-specific construction (e.g.
     :class:`PydanticDiff.from_pair`) computes the predicate data and returns a
     ``Diff``.  A meta version (an endpoint with no concrete model) is a plain
     ``Diff`` with empty predicates.
+
+    ``origin`` records how the diff was produced: ``"migration"`` when
+    discovered from a registered migration, ``"schema"`` when computed from two
+    concrete schemas.
     """
 
-    source: Versionable[VersionValue, VSource_co]
-    target: Versionable[VersionValue, VTarget_co]
+    source: Versionable[VersionValue]
+    target: Versionable[VersionValue]
     added_fields: list[str] = field(default_factory=list)
     removed_fields: list[str] = field(default_factory=list)
     modified_fields: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -33,6 +38,7 @@ class Diff(Generic[VersionValue, VSource_co, VTarget_co]):
     unchanged_fields: list[str] = field(default_factory=list)
     renderer: type[JsonPatchRender] = field(default=JsonPatchRender)
     is_backward_compatible: bool = False
+    origin: DiffOrigin = "schema"
 
     @property
     def kind(self) -> str:
@@ -111,7 +117,7 @@ class Diff(Generic[VersionValue, VSource_co, VTarget_co]):
         """Render this diff using the configured strategy."""
         return self.renderer(self)
 
-    def inverted(self) -> Diff[VersionValue, VSource_co, VTarget_co]:
+    def inverted(self) -> Diff[VersionValue]:
         """Return the inverse diff: added/removed fields swap.
 
         Used to reconstruct a version from an anchor when the migration edge

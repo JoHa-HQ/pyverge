@@ -3,9 +3,7 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast
 
-from pyverge.core.versioning import SentinelEdge
-from pyverge.ports import JsonPatchMigration
-from pyverge.types import (
+from pyverge.core.types import (
     Attachable,
     ManagerMigrationKey,
     Migratable,
@@ -13,8 +11,11 @@ from pyverge.types import (
     MigrationKeyInput,
     ModelPair,
     VersionValue,
-    VModel,
 )
+from pyverge.core.versioning import (
+    SentinelEdge,
+)
+from pyverge.providers import JsonPatchMigration
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -142,7 +143,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         key: MigrationKeyInput,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Migratable[VersionValue, VModel, VModel]:
+    ) -> Migratable[VersionValue]:
         raise TypeError(f"Unsupported migration key: {key!r}")
 
     @get_migration.register(ModelPair)
@@ -152,7 +153,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         key: ModelPair,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Migratable[VersionValue, VModel, VModel]:
+    ) -> Migratable[VersionValue]:
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
@@ -165,7 +166,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         key: ManagerMigrationKey,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Migratable[VersionValue, VModel, VModel]:
+    ) -> Migratable[VersionValue]:
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (

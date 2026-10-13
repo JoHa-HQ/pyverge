@@ -3,61 +3,58 @@ from __future__ import annotations
 from typing import Literal
 
 from pyverge.core.exceptions import RegistryError
-from pyverge.types import (
-    ModelBase,
+from pyverge.core.types import (
     ModelKind,
     TargetResolver,
     Versionable,
     VersionValue,
-    VersionValue_co,
-    VModel_co,
 )
 
 from .registry import Registry
 
 
 def skip_target_resolver(
-    registry: Registry[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
 ) -> TargetResolver:
     """A resolver that always skips (returns ``None``)."""
 
     def resolve(
-        current: Versionable[VersionValue_co, VModel_co],
-    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        current: Versionable[VersionValue],
+    ) -> Versionable[VersionValue] | None:
         return None
 
     return resolve
 
 
 def latest_target_resolver(
-    registry: Registry[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
 ) -> TargetResolver:
     """A resolver that converges to the latest registered version per kind."""
 
     def resolve(
-        current: Versionable[VersionValue_co, VModel_co],
-    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        current: Versionable[VersionValue],
+    ) -> Versionable[VersionValue] | None:
         return registry.latest(current.kind)
 
     return resolve
 
 
 def earliest_target_resolver(
-    registry: Registry[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
 ) -> TargetResolver:
     """A resolver that converges to the earliest registered version per kind."""
 
     def resolve(
-        current: Versionable[VersionValue_co, VModel_co],
-    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        current: Versionable[VersionValue],
+    ) -> Versionable[VersionValue] | None:
         return registry.earliest(current.kind)
 
     return resolve
 
 
 def fixed_target_resolver(
-    registry: Registry[VersionValue, ModelBase],
-    target: Versionable[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
+    target: Versionable[VersionValue],
 ) -> TargetResolver:
     """A resolver that always returns *target* for its kind.
 
@@ -70,8 +67,8 @@ def fixed_target_resolver(
         )
 
     def resolve(
-        current: Versionable[VersionValue_co, VModel_co],
-    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        current: Versionable[VersionValue],
+    ) -> Versionable[VersionValue] | None:
         if current.kind != target.kind:
             raise RegistryError(
                 registry.name,
@@ -96,8 +93,8 @@ def multi_target_resolver(
     }
 
     def resolve(
-        current: Versionable[VersionValue_co, VModel_co],
-    ) -> Versionable[VersionValue_co, VModel_co] | None:
+        current: Versionable[VersionValue],
+    ) -> Versionable[VersionValue] | None:
         resolver = by_kind.get(current.kind, fallback)
         if resolver is None:
             return None

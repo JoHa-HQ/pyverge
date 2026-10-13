@@ -7,32 +7,33 @@ from pyverge.core import (
     VersioningSettings,
     VersionNode,
 )
+from pyverge.core.types import (
+    MigrationFunc,
+    VersionValue,
+)
 from pyverge.migration import (
     PydanticDiff,
     Registry,
 )
-from pyverge.types import (
-    MigrationFunc,
+from pyverge.providers.types import (
     ModelAdapter,
-    ModelBase,
-    VersionValue,
-    VModel,
+    ModelHandle,
 )
 
 
 def envelope_model(
     adapter: ModelAdapter,
     versioning_settings: VersioningSettings,
-    model_cls: type[VModel] | dict[str, Any],
-) -> VersionNode[VersionValue, ModelBase]:
+    model_cls: ModelHandle | dict[str, Any],
+) -> VersionNode[VersionValue]:
     """Build a versionable from a model class or a JSON schema.
 
     A JSON schema document is materialized into a Pydantic model first; a
     model class is wrapped directly.
     """
     return cast(
-        VersionNode[VersionValue, ModelBase],
-        adapter.versionable(cast("type[VModel]", model_cls)),
+        VersionNode[VersionValue],
+        adapter.versionable(cast("ModelHandle", model_cls)),
     )
 
 
@@ -40,9 +41,9 @@ def meta_versionable(
     adapter: ModelAdapter,
     kind: str,
     version: str,
-) -> VersionNode[VersionValue, ModelBase]:
+) -> VersionNode[VersionValue]:
     """Build a meta version: a ``(kind, version)`` pair with no concrete model."""
-    return VersionNode[VersionValue, ModelBase](
+    return VersionNode[VersionValue](
         _model=None,
         _value=cast(VersionValue, adapter.of(version)),
         _kind=kind,
@@ -52,12 +53,12 @@ def meta_versionable(
 def edge_from_models(  # noqa: PLR0913
     adapter: ModelAdapter,
     versioning_settings: VersioningSettings,
-    source_model: type[VModel] | dict[str, Any],
-    target_model: type[VModel] | dict[str, Any],
+    source_model: ModelHandle | dict[str, Any],
+    target_model: ModelHandle | dict[str, Any],
     *,
     func: MigrationFunc,
     backward_compatible: bool = False,
-) -> VersionEdge[VersionValue, ModelBase, ModelBase]:
+) -> VersionEdge[VersionValue]:
     """Build a VersionEdge from model classes or JSON schemas.
 
     *source_model*/*target_model* are either Pydantic model classes or JSON
@@ -80,17 +81,17 @@ def edge_from_models(  # noqa: PLR0913
 
 def register_models(
     adapter: ModelAdapter,
-    registry: Registry[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
     settings: VersioningSettings,
-    *models: type[VModel],
+    *models: ModelHandle,
 ) -> None:
     for model_cls in models:
         registry.store_model(adapter.versionable(model_cls))
 
 
-_Migration = tuple[tuple[type[ModelBase], ...], MigrationFunc]
+_Migration = tuple[tuple[type[ModelHandle], ...], MigrationFunc]
 _BackwardCompatibleMigration = tuple[
-    tuple[type[ModelBase], ...],
+    tuple[type[ModelHandle], ...],
     MigrationFunc,
     bool,
 ]
@@ -98,7 +99,7 @@ _BackwardCompatibleMigration = tuple[
 
 def _parse_migration(
     migration: _Migration | _BackwardCompatibleMigration,
-) -> tuple[tuple[type[ModelBase], ...], MigrationFunc, bool]:
+) -> tuple[tuple[type[ModelHandle], ...], MigrationFunc, bool]:
     """Normalize either migration form to ``(pair, func, compatible)``."""
     match migration:
         case (pair, func):
@@ -111,7 +112,7 @@ def _parse_migration(
 
 def register_migrations(
     adapter: ModelAdapter,
-    registry: Registry[VersionValue, ModelBase],
+    registry: Registry[VersionValue],
     *migrations: _Migration | _BackwardCompatibleMigration,
 ) -> None:
     """Register migrations, each optionally marked backward compatible.

@@ -8,7 +8,9 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from pyverge.types import ManagerMigrationKey
+from pyverge.core.types import (
+    ManagerMigrationKey,
+)
 
 from ._helpers import (
     load_json_file,

@@ -3,18 +3,20 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Protocol, overload
 
-from pydantic import BaseModel
-
-from pyverge.ports import JsonPatchMigration
-from pyverge.types import (
+from pyverge.core.types import (
     Attachable,
-    ManagerClassState,
     ManagerMigrationKey,
     MigrationFunc,
     MigrationKeyInput,
     ModelPair,
     VersionValue,
-    VModel,
+)
+from pyverge.manager.types import (
+    ManagerClassState,
+)
+from pyverge.providers import JsonPatchMigration
+from pyverge.providers.types import (
+    ModelHandle,
 )
 
 if TYPE_CHECKING:
@@ -28,11 +30,11 @@ class MigrationDecorator(Protocol):
     def __call__(self, func: JsonPatchMigration) -> JsonPatchMigration: ...
 
 
-class ModelDecorator(Protocol[VModel]):
+class ModelDecorator(Protocol):
     @overload
-    def __call__(self) -> Callable[[type[VModel]], type[VModel]]: ...
+    def __call__(self) -> Callable[[ModelHandle], ModelHandle]: ...
     @overload
-    def __call__(self, model_cls: type[VModel]) -> type[VModel]: ...
+    def __call__(self, model_cls: ModelHandle) -> ModelHandle: ...
 
 
 class MigrationKeyDecorator:
@@ -87,15 +89,15 @@ class ModelStoreDecorator:
         self._owner = owner
 
     @overload
-    def __call__(self) -> Callable[[type[VModel]], type[VModel]]: ...
+    def __call__(self) -> Callable[[ModelHandle], ModelHandle]: ...
     @overload
-    def __call__(self, model_cls: type[VModel]) -> type[VModel]: ...
+    def __call__(self, model_cls: ModelHandle) -> ModelHandle: ...
     def __call__(
-        self, model_cls: type[VModel] | None = None
-    ) -> type[VModel] | Callable[[type[VModel]], type[VModel]]:
+        self, model_cls: ModelHandle | None = None
+    ) -> ModelHandle | Callable[[ModelHandle], ModelHandle]:
         if model_cls is None:
             return self.__call__
-        if not (isinstance(model_cls, type) and issubclass(model_cls, BaseModel)):
+        if not isinstance(model_cls, type):
             raise TypeError("manager.model expects no args or a model class")
         self._owner.store_model(model_cls)
         return model_cls
@@ -116,7 +118,7 @@ class _ModelDescriptor:
         self,
         obj: type[Manager[VersionValue]],
         objtype: type | None = None,
-    ) -> ModelDecorator[VModel]:
+    ) -> ModelDecorator:
         owner: type[ManagerClassState[VersionValue]] = obj
         if owner is None:
             raise TypeError("Manager descriptor used without an owner class")
@@ -214,15 +216,15 @@ class _HookDescriptor:
         self,
         obj: type[Manager[VersionValue]],
         objtype: type | None = None,
-    ) -> Callable[..., Callable[[type[VModel]], type[VModel]]]:
+    ) -> Callable[..., Callable[[ModelHandle], ModelHandle]]:
         owner: type[ManagerClassState[VersionValue]] = obj
         if owner is None:
             raise TypeError("Manager descriptor used without an owner class")
 
-        def decorator(*args: Any) -> Callable[[type[VModel]], type[VModel]]:
+        def decorator(*args: Any) -> Callable[[ModelHandle], ModelHandle]:
             key, hook = self._hook_key(args)
 
-            def wrapper(marker: type[VModel]) -> type[VModel]:
+            def wrapper(marker: ModelHandle) -> ModelHandle:
                 owner.add_hook(key, hook)
                 return marker
 

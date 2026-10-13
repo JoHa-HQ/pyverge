@@ -4,14 +4,18 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from pyverge.core import MissingReferenceError, ModelConflictError
+from pyverge.core.types import (
+    Attachable,
+)
 from pyverge.manager import Manager
-from pyverge.types import Attachable
 
 from .converge import Converger
 from .reflection import ComponentReflection, Policy, ReflectedNode
 
 if TYPE_CHECKING:
-    from pyverge.types import TargetPolicy
+    from pyverge.manager.types import (
+        TargetPolicy,
+    )
 
 
 class ToolDiscovery:
@@ -85,7 +89,7 @@ class ToolDiscovery:
         """
         for (kind, version), node in self._nodes.items():
             try:
-                self._manager.store_model(node.versionable())
+                self._manager.reconcile_model(node.versionable())
             except ModelConflictError as error:
                 raise ModelConflictError(
                     error.registry_name,

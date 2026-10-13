@@ -3,24 +3,28 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pyverge.core.settings import MigrationSettings
+from pyverge.core.types import (
+    VersionValue,
+)
 from pyverge.migration.engine import Engine
 from pyverge.migration.executor import SequentialExecutor
 from pyverge.migration.graph import GraphBuilder
 from pyverge.migration.registry import Registry
 from pyverge.migration.strategy import DefaultMigrationEntry
-from pyverge.migration.walker import CompoundKeyWalker
-from pyverge.types import (
+from pyverge.migration.types import (
     Executor,
     MigrationEntry,
-    ModelAdapter,
-    ModelBase,
-    VersionValue,
     Walker,
+)
+from pyverge.migration.walker import CompoundKeyWalker
+from pyverge.providers.types import (
+    ModelAdapter,
 )
 
 from .descriptors import ManagerMeta
 from .mixins import (
     EngineLifecycleMixin,
+    LookupMixin,
     MigrateMixin,
     MigrationStoreMixin,
     ModelStoreMixin,
@@ -33,6 +37,7 @@ class Manager(
     TargetResolutionMixin[VersionValue],
     ModelStoreMixin[VersionValue],
     MigrationStoreMixin[VersionValue],
+    LookupMixin[VersionValue],
     MigrateMixin[VersionValue],
     metaclass=ManagerMeta,
 ):
@@ -77,7 +82,7 @@ class Manager(
         return self.engine.settings
 
     @property
-    def registry(self) -> Registry[VersionValue, ModelBase]:
+    def registry(self) -> Registry[VersionValue]:
         """Return the instance registry."""
         return self.engine.registry
 
@@ -112,7 +117,7 @@ class Manager(
                 to :class:`~pyverge.migration.DefaultMigrationEntry`.
         """
         if walker is None:
-            registry = Registry[VersionValue, ModelBase]()
+            registry = Registry[VersionValue]()
             active_walker = CompoundKeyWalker(
                 registry, settings=settings, adapter=adapter
             )

@@ -2,32 +2,29 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Generic, Self, cast
+from typing import Any, Generic, Self, cast
 
-from ..types import (
+from .exceptions import MigrationError
+from .types import (
     Comparable,
     Diffable,
     Migratable,
     MigrationFunc,
     MigrationKey,
     ModelData,
+    ModelHandle,
     ModelKind,
     ModelVersionKey,
-    Versionable,
-    VersionValue_co,
-    VModel_co,
-    VSource_co,
-    VTarget_co,
+    VersionValue,
 )
-from .exceptions import MigrationError
 
 
 @total_ordering
 @dataclass(frozen=True, slots=True)
-class VersionNode(Generic[VersionValue_co, VModel_co]):
+class VersionNode(Generic[VersionValue]):
     """A model version that can be either semver or ISO date.
 
-    Optionally carries the model class so the registry can treat
+    Optionally carries the model handle so the registry can treat
     ``(version, kind)`` as a single comparable unit.  A ``None`` model
     denotes a meta version: a ``(kind, version)`` pair with no concrete
     model content.
@@ -45,22 +42,22 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
     ``(kind, version)``.
     """
 
-    _model: type[VModel_co] | None
-    _value: VersionValue_co
+    _model: ModelHandle | None
+    _value: VersionValue
     _kind: ModelKind
     references: frozenset[ModelVersionKey] = frozenset()
     fields: frozenset[str] = frozenset()
 
     @property
-    def strategy(self) -> type[VersionValue_co]:
+    def strategy(self) -> type[VersionValue]:
         return type(self._value)
 
     @property
-    def model(self) -> type[VModel_co] | None:
+    def model(self) -> ModelHandle | None:
         return self._model
 
     @property
-    def version(self) -> tuple[ModelKind, VersionValue_co]:
+    def version(self) -> tuple[ModelKind, VersionValue]:
         return self._kind, self._value
 
     @property
@@ -77,7 +74,7 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        other_c = cast(Comparable[VersionValue_co], other)
+        other_c = cast(Comparable[VersionValue], other)
         return self.version < other_c.version
 
     def __eq__(self, other: object) -> bool:
@@ -89,7 +86,7 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        other_c = cast(Comparable[VersionValue_co], other)
+        other_c = cast(Comparable[VersionValue], other)
         return self.version == other_c.version
 
     def __gt__(self, other: object) -> bool:
@@ -101,7 +98,7 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
             raise TypeError(
                 f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
             )
-        other_c = cast(Comparable[VersionValue_co], other)
+        other_c = cast(Comparable[VersionValue], other)
         return self.version > other_c.version
 
     def __hash__(self) -> int:
@@ -111,22 +108,25 @@ class VersionNode(Generic[VersionValue_co, VModel_co]):
         return f"{self._kind}:{self._value}"
 
     def __repr__(self) -> str:
-        model = self.model.__name__ if self.model is not None else "meta"
+        if self.model is not None:
+            model = getattr(self.model, "__name__", "meta")
+        else:
+            model = "meta"
         return f"VersionNode[{self.strategy.__name__}, {model}]({self._value}, {self._kind})"  # noqa: E501
 
 
 @total_ordering
 @dataclass(frozen=True, slots=True)
-class VersionEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
+class VersionEdge(Generic[VersionValue]):
     """A directed migration edge connecting two versions of the same kind.
 
     Holds its ``source``/``target`` endpoints and the ``diff`` computed for
     the transition between them.
     """
 
-    source: Versionable[VersionValue_co, VSource_co]
-    target: Versionable[VersionValue_co, VTarget_co]
-    diff: Diffable[VersionValue_co]
+    source: Any
+    target: Any
+    diff: Diffable[VersionValue]
     func: MigrationFunc
 
     @property
@@ -170,7 +170,7 @@ class VersionEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
 
 
 @total_ordering
-class SentinelEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
+class SentinelEdge(Generic[VersionValue]):
     """Lightweight value-only sentinel for searching across edges."""
 
     __slots__ = ("_source", "_target")
@@ -184,9 +184,7 @@ class SentinelEdge(Generic[VersionValue_co, VSource_co, VTarget_co]):
         self._target = target
 
     @classmethod
-    def from_version_edge(
-        cls, edge: Migratable[VersionValue_co, VSource_co, VTarget_co]
-    ) -> Self:
+    def from_version_edge(cls, edge: Migratable[VersionValue]) -> Self:
         return cls(edge.source, edge.target)
 
     @classmethod

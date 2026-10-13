@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pyverge.types import ModelData
+from pyverge.core.types import (
+    ModelData,
+)
 
 
 def _schema(kind: str, version: str, props: dict[str, Any]) -> dict[str, Any]:

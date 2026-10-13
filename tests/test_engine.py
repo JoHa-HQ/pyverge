@@ -10,6 +10,7 @@ import pendulum
 import pytest
 import semver
 
+from pyverge import types
 from pyverge.core import (
     MigrationAlreadyRegisteredError,
     MigrationHook,
@@ -21,7 +22,6 @@ from pyverge.core import (
     RegistryError,
     SentinelEdge,
     VersionNode,
-    types,
 )
 from pyverge.migration import (
     Engine,
@@ -32,6 +32,9 @@ from pyverge.migration import (
     earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,
+)
+from pyverge.providers.types import (
+    ModelHandle,
 )
 from tests.examples.json import (
     ADDRESS_V1_0_0,
@@ -81,7 +84,7 @@ class TestModelManagement:
         subtests: pytest.Subtests,
         migration_settings: MigrationSettings,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         for model in models:
             with subtests.test(f"model={model.__name__}"):
@@ -116,7 +119,7 @@ class TestModelManagement:
             pytest.param(
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV1], []],
-                lambda engine: engine.store_model(
+                lambda engine: engine.reconcile_model(
                     replace(
                         envelope_model(engine.adapter, engine.settings, UserV1),
                         fields=frozenset({"conflict"}),
@@ -128,7 +131,7 @@ class TestModelManagement:
             pytest.param(
                 PydanticModelAdapter,
                 [pendulum.Date, "test", [UserV20250310], []],
-                lambda engine: engine.store_model(
+                lambda engine: engine.reconcile_model(
                     replace(
                         envelope_model(engine.adapter, engine.settings, UserV20250310),
                         fields=frozenset({"conflict"}),
@@ -140,7 +143,7 @@ class TestModelManagement:
             pytest.param(
                 JsonSchemaModelAdapter,
                 [semver.Version, "test", [USER_V0_1_1_DEV_7], []],
-                lambda engine: engine.store_model(
+                lambda engine: engine.reconcile_model(
                     replace(
                         envelope_model(
                             engine.adapter, engine.settings, USER_V0_1_1_DEV_7
@@ -186,13 +189,13 @@ class TestModelManagement:
         model_adapter: types.ModelAdapter,
         migration_settings: MigrationSettings,
         engine: Engine[types.VersionValue],
-        model: type[types.VModel],
+        model: ModelHandle,
     ) -> None:
         """A conflict exposes the diff and a resolution hint."""
         registered = envelope_model(model_adapter, migration_settings, model)
         incoming = replace(registered, fields=registered.fields | {"extra_field"})
         with pytest.raises(ModelConflictError) as raised:
-            engine.store_model(incoming)
+            engine.reconcile_model(incoming)
         error = raised.value
         assert error.extra == {"extra_field"}
         assert error.missing == frozenset()
@@ -222,10 +225,10 @@ class TestModelManagement:
         model_adapter: types.ModelAdapter,
         migration_settings: MigrationSettings,
         engine: Engine[types.VersionValue],
-        model: type[types.VModel],
+        model: ModelHandle,
     ) -> None:
         """The engine reconciles: an identical re-registration is a no-op."""
-        again = engine.store_model(
+        again = engine.reconcile_model(
             envelope_model(model_adapter, migration_settings, model)
         )
         assert engine.get_model(again) is again
@@ -345,7 +348,7 @@ class TestModelManagement:
     def test_model_latest(
         self,
         engine: Engine[types.VersionValue],
-        model: type[types.VModel],
+        model: ModelHandle,
         expected_error: type[Exception] | None,
     ) -> None:
         version = envelope_model(engine.adapter, engine.settings, model)
@@ -370,13 +373,12 @@ class TestModelManagement:
     def test_contains_version_tuple(
         self,
         engine: Engine[types.VersionValue],
-        model: type[types.VModel],
+        model: ModelHandle,
     ) -> None:
         version = envelope_model(engine.adapter, engine.settings, model)
         assert version in engine
-
-        assert version.version in engine
-        assert (version.kind, "0.0.0-not-registered") not in engine
+        # Typed-only: a raw (kind, version) tuple is manager sugar, not engine.
+        assert (version.kind, version.version[1]) not in engine
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model",
@@ -393,7 +395,7 @@ class TestModelManagement:
     def test_remove_model_by_versionable(
         self,
         engine: Engine[types.VersionValue],
-        model: type[types.ModelBase],
+        model: ModelHandle,
     ) -> None:
         version = envelope_model(engine.adapter, engine.settings, model)
         engine.remove_model(version)
@@ -414,7 +416,7 @@ class TestModelManagement:
     def test_remove_model_referenced_by_migration_raises(
         self,
         engine: Engine[semver.Version],
-        models: type[types.VModel],
+        models: ModelHandle,
     ) -> None:
         version = envelope_model(engine.adapter, engine.settings, models)
         with pytest.raises(RegistryError):
@@ -450,7 +452,7 @@ class TestMigrationManagement:
     def test_store_and_get_by_versionable_pair(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
@@ -496,7 +498,7 @@ class TestMigrationManagement:
     def test_store_across_kinds_raises(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(engine.adapter, engine.settings, model) for model in models
@@ -685,7 +687,7 @@ class TestMigrationManagement:
     def test_store_duplicate_raises(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         with pytest.raises(MigrationAlreadyRegisteredError):
@@ -706,7 +708,7 @@ class TestMigrationManagement:
     def test_get_missing_raises(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         with pytest.raises(MigrationNotFoundError):
@@ -727,7 +729,7 @@ class TestMigrationManagement:
     def test_remove_non_critical_ok(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
 
@@ -760,7 +762,7 @@ class TestMigrationManagement:
     def test_remove_critical_raises(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         with pytest.raises(RegistryError, match="critical"):
@@ -781,7 +783,7 @@ class TestMigrationManagement:
     def test_remove_critical_with_force(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
@@ -808,7 +810,7 @@ class TestMigrationManagement:
     def test_remove_missing_raises(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
@@ -832,7 +834,7 @@ class TestMigrationManagement:
     def test_remove_range_critical_raises(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
@@ -858,7 +860,7 @@ class TestMigrationManagement:
     def test_remove_range_skips_gaps(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         """Range over consecutive pairs with no edges is a no-op."""
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
@@ -883,7 +885,7 @@ class TestMigrationManagement:
     def test_delete_kind_removes_all(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
@@ -938,7 +940,7 @@ class TestMigrationManagement:
     def test_add_and_remove_hook(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
+        models: list[ModelHandle],
         scenario: str,
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
@@ -984,7 +986,7 @@ class TestReflection:
     def test_reconstructs_missing_model_on_store_migration(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.ModelBase]],
+        models: list[ModelHandle],
     ) -> None:
         real, meta = (
             envelope_model(engine.adapter, engine.settings, models[0]),
@@ -1028,7 +1030,7 @@ class TestReflection:
     def test_skips_reconstruction_when_disabled(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.ModelBase]],
+        models: list[ModelHandle],
     ) -> None:
         real = envelope_model(engine.adapter, engine.settings, models[0])
         meta = engine.adapter.versionable(None, kind="User", version="1.0.0")
@@ -1042,40 +1044,34 @@ class TestReflection:
         assert stored.model is None
 
 
-class TestLookupConvenience:
-    """Engine operator overloads for model / edge / path lookup."""
+class TestLookupTyped:
+    """Engine operator overloads operate on typed keys only."""
 
     @pytest.mark.parametrize(
-        "model_adapter, registry, models, key_cases",
+        "model_adapter, registry, model",
         [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2, UserV3], []],
-                [UserV1, UserV2, UserV3],
-                lambda versions, models: [
-                    (versions[0].version, True),
-                    (models[0], True),
-                    (("unknown", 0), False),
-                ],
-                id="model_key_pydantic_semver",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [
-                    pendulum.Date,
-                    "test",
-                    [UserV20250310, UserV20251231, UserV20260228],
-                    [],
-                ],
-                [UserV20250310, UserV20251231, UserV20260228],
-                lambda versions, models: [
-                    (versions[0].version, True),
-                    (models[0], True),
-                    (("unknown", 0), False),
-                ],
-                id="model_key_pydantic_pendulum",
-            ),
-            pytest.param(
+            [PydanticModelAdapter, [semver.Version, "test", [UserV1], []], UserV1],
+            [
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "test", [USER_V0_1_1_DEV_7], []],
+                USER_V0_1_1_DEV_7,
+            ],
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_contains_typed_node(
+        self,
+        engine: Engine[types.VersionValue],
+        model: ModelHandle,
+    ) -> None:
+        version = envelope_model(engine.adapter, engine.settings, model)
+        assert version in engine
+        assert engine[version].model is version.model
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            [
                 PydanticModelAdapter,
                 [
                     semver.Version,
@@ -1084,113 +1080,18 @@ class TestLookupConvenience:
                     [((UserV1, UserV2), lambda d: d)],
                 ],
                 [UserV1, UserV2],
-                lambda versions, models: [
-                    ((versions[0], versions[1]), True),
-                    ((versions[1], versions[0]), False),
-                ],
-                id="migration_edge_pydantic_semver",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [
-                    pendulum.Date,
-                    "test",
-                    [UserV20250310, UserV20251231],
-                    [((UserV20250310, UserV20251231), lambda d: d)],
-                ],
-                [UserV20250310, UserV20251231],
-                lambda versions, models: [
-                    ((versions[0], versions[1]), True),
-                    ((versions[1], versions[0]), False),
-                ],
-                id="migration_edge_pydantic_pendulum",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2, UserV3],
-                    [
-                        ((UserV1, UserV2), lambda d: d),
-                        ((UserV2, UserV3), lambda d: d),
-                    ],
-                ],
-                [UserV1, UserV2, UserV3],
-                lambda versions, models: [
-                    (slice(versions[0].version, versions[2].version), True),
-                    (slice(versions[0].version, versions[1].version), True),
-                    (slice(versions[2].version, versions[0].version), False),
-                ],
-                id="migration_path_slice_pydantic_semver",
-            ),
+            ],
         ],
         indirect=["model_adapter", "registry"],
     )
-    def test_contains(
+    def test_getitem_typed_sentinel_edge(
         self,
         engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
-        key_cases: Callable[..., list[tuple[Any, bool]]],
+        models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
-        for key, expected in key_cases(versions, models):
-            assert (key in engine) is expected
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, models, scenario",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                "edge",
-                id="edge_pydantic_semver",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [pendulum.Date, "test", [UserV20250310, UserV20251231], []],
-                [UserV20250310, UserV20251231],
-                "edge",
-                id="edge_pydantic_pendulum",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2, UserV3], []],
-                [UserV1, UserV2, UserV3],
-                "path",
-                id="path_pydantic_semver",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_getitem(
-        self,
-        engine: Engine[types.VersionValue],
-        models: list[type[types.VModel]],
-        scenario: str,
-    ) -> None:
-        versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
-
-        def _migrate(d: dict) -> dict:
-            return {"migrated": True}
-
-        def _migrate_12(d: dict) -> dict:
-            return d
-
-        def _migrate_23(d: dict) -> dict:
-            return d
-
-        if scenario == "path":
-            engine.store_migration((versions[0], versions[1]), _migrate_12)
-            engine.store_migration((versions[1], versions[2]), _migrate_23)
-
-            path = engine[slice(versions[0].version, versions[2].version)]
-            assert [e.func for e in path] == [_migrate_12, _migrate_23]
-            return
-
-        engine.store_migration((versions[0], versions[1]), _migrate)
-        assert engine[(versions[0], versions[1])].func is _migrate
+        key = SentinelEdge.from_pair(versions[0], versions[1])
+        assert engine[key].func is not None
 
 
 class TestMigrationEntryIntegration:

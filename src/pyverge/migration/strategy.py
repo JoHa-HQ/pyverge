@@ -4,12 +4,10 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, Generic
 
 from pyverge.core.exceptions import MigrationError
-from pyverge.types import (
+from pyverge.core.types import (
     DirectionViolationStrategy,
     MigrationDirectionStrategy,
-    ModelBase,
     ModelData,
-    RunnableMigration,
     VersionMissingStrategy,
     VersionValue,
 )
@@ -17,25 +15,24 @@ from pyverge.types import (
 from .graph import GraphEntry
 
 if TYPE_CHECKING:
-    from pyverge.types import ModelAdapter
+    from pyverge.migration.types import (
+        RunnableMigration,
+    )
+    from pyverge.providers.types import (
+        ModelAdapter,
+    )
 
 
-class _DefaultMigrationTask:
+class _DefaultMigrationTask(Generic[VersionValue]):
     """Runnable migration produced by :class:`DefaultMigrationEntry`."""
 
     def __init__(
         self,
-        entry: GraphEntry[Any, ModelBase],
+        entry: GraphEntry[VersionValue],
         current: ModelData,
         *,
         execute_step: Callable[
-            [
-                Any,
-                Any,
-                ModelData,
-                tuple[Any, ...],
-                str,
-            ],
+            [Any, Any, ModelData, tuple[Any, ...], str],
             ModelData,
         ],
         adapter: ModelAdapter,
@@ -92,17 +89,11 @@ class DefaultMigrationEntry(Generic[VersionValue]):
 
     def migrate(
         self,
-        entry: GraphEntry[VersionValue, ModelBase],
+        entry: GraphEntry[VersionValue],
         current: ModelData,
         *,
         execute_step: Callable[
-            [
-                Any,
-                Any,
-                ModelData,
-                tuple[Any, ...],
-                str,
-            ],
+            [Any, Any, ModelData, tuple[Any, ...], str],
             ModelData,
         ],
         adapter: ModelAdapter,

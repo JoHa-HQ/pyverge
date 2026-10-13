@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
-from ..types import Comparable
+from .types import Comparable
 
 
 class MigrationHook:

@@ -3,19 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Generic
 
-from pydantic import BaseModel
-
 from pyverge.core.exceptions import MaxDepthExceededError, RegistryError
 from pyverge.core.settings import DiscoverySettings
-from pyverge.core.versioning import SentinelEdge
-from pyverge.types import (
+from pyverge.core.types import (
     Attachable,
-    ModelBase,
+    ModelHandle,
     ModelKind,
     TargetResolver,
     Versionable,
     VersionValue,
-    VModel_co,
+)
+from pyverge.core.versioning import (
+    SentinelEdge,
+)
+from pyverge.migration.types import (
     Walker,
 )
 
@@ -23,7 +24,7 @@ from .registry import Registry
 
 
 @dataclass(frozen=True, slots=True)
-class GraphEntry(Generic[VersionValue, VModel_co]):
+class GraphEntry(Generic[VersionValue]):
     """A single versioned entry discovered in a payload.
 
     ``steps`` is the resolved migration path, ``hooks`` the per-step hooks, and
@@ -31,17 +32,17 @@ class GraphEntry(Generic[VersionValue, VModel_co]):
     """
 
     path: tuple[str | int, ...]
-    source: Versionable[VersionValue, VModel_co]
-    target: Versionable[VersionValue, VModel_co]
+    source: Versionable[VersionValue]
+    target: Versionable[VersionValue]
     steps: tuple[
         tuple[
-            Versionable[VersionValue, VModel_co],
-            Versionable[VersionValue, VModel_co],
+            Versionable[VersionValue],
+            Versionable[VersionValue],
         ],
         ...,
     ] = ()
     hooks: tuple[tuple[Attachable, ...], ...] = ()
-    target_model: type[VModel_co] | None = None
+    target_model: Any | None = None
 
     @property
     def kind(self) -> ModelKind:
@@ -61,18 +62,18 @@ class MigrationGraph(Generic[VersionValue]):
     groups.
     """
 
-    def __init__(self, entries: list[GraphEntry[VersionValue, BaseModel]]) -> None:
+    def __init__(self, entries: list[GraphEntry[VersionValue]]) -> None:
         self._entries = entries
-        self._by_path: dict[
-            tuple[str | int, ...], GraphEntry[VersionValue, BaseModel]
-        ] = {e.path: e for e in entries}
+        self._by_path: dict[tuple[str | int, ...], GraphEntry[VersionValue]] = {
+            e.path: e for e in entries
+        }
 
     @property
-    def entries(self) -> list[GraphEntry[VersionValue, BaseModel]]:
+    def entries(self) -> list[GraphEntry[VersionValue]]:
         """All discovered versioned entries (build order)."""
         return list(self._entries)
 
-    def topological_order(self) -> list[GraphEntry[VersionValue, BaseModel]]:
+    def topological_order(self) -> list[GraphEntry[VersionValue]]:
         """Entries in migration order: children before parents.
 
         A child's path strictly extends its parent's, so sorting by path length
@@ -83,7 +84,7 @@ class MigrationGraph(Generic[VersionValue]):
             key=lambda e: (-len(e.path), e.path),
         )
 
-    def execution_levels(self) -> list[list[GraphEntry[VersionValue, BaseModel]]]:
+    def execution_levels(self) -> list[list[GraphEntry[VersionValue]]]:
         """Entries grouped by execution wave: leaves first, roots last.
 
         Entries within a wave are independent and can migrate in parallel.
@@ -103,15 +104,15 @@ class MigrationGraph(Generic[VersionValue]):
                 children[parent_path].append(entry.path)
                 pending[parent_path] += 1
 
-        current: list[GraphEntry[VersionValue, BaseModel]] = [
+        current: list[GraphEntry[VersionValue]] = [
             entries_by_path[p] for p, count in pending.items() if count == 0
         ]
-        levels: list[list[GraphEntry[VersionValue, BaseModel]]] = []
+        levels: list[list[GraphEntry[VersionValue]]] = []
 
         while current:
             current.sort(key=lambda e: e.path)
             levels.append(current)
-            next_wave: list[GraphEntry[VersionValue, BaseModel]] = []
+            next_wave: list[GraphEntry[VersionValue]] = []
             for entry in current:
                 parent_path = self._parent_path(entry.path)
                 if parent_path is None:
@@ -133,10 +134,10 @@ class MigrationGraph(Generic[VersionValue]):
                 parent = prefix
         return parent
 
-    def independent_roots(self) -> list[GraphEntry[VersionValue, BaseModel]]:
+    def independent_roots(self) -> list[GraphEntry[VersionValue]]:
         """Root entry of each disjoint component — no other path is its prefix."""
         all_paths = {e.path for e in self._entries}
-        roots: list[GraphEntry[VersionValue, BaseModel]] = []
+        roots: list[GraphEntry[VersionValue]] = []
         for entry in self._entries:
             prefix: tuple[str | int, ...] = ()
             is_root = True
@@ -149,9 +150,7 @@ class MigrationGraph(Generic[VersionValue]):
                 roots.append(entry)
         return roots
 
-    def entry_at(
-        self, path: tuple[str | int, ...]
-    ) -> GraphEntry[VersionValue, BaseModel] | None:
+    def entry_at(self, path: tuple[str | int, ...]) -> GraphEntry[VersionValue] | None:
         """Return the entry at *path*, or ``None``."""
         return self._by_path.get(path)
 
@@ -165,6 +164,27 @@ class MigrationGraph(Generic[VersionValue]):
         return f"MigrationGraph(entries={len(self._entries)})"
 
 
+@dataclass(frozen=True)
+class MigrationPlan(Generic[VersionValue]):
+    """A discovered migration plan: the graph plus its execution context.
+
+    Produced by :meth:`GraphBuilder.build` and consumed by an :class:`Executor`.
+    Carries the discovered graph, the original payload, and the container the
+    payload was guided by (``None`` for containerless discovery).  The executor
+    owns the pre-execution compatibility gate over ``container`` + ``graph``.
+    """
+
+    data: dict[str, Any]
+    graph: MigrationGraph[VersionValue]
+    container: ModelHandle | None = None
+
+    def __len__(self) -> int:
+        return len(self.graph)
+
+    def __bool__(self) -> bool:
+        return bool(self.graph)
+
+
 class GraphBuilder(Generic[VersionValue]):
     """Builds a :class:`MigrationGraph` by scanning a payload for versioned dicts.
 
@@ -173,16 +193,16 @@ class GraphBuilder(Generic[VersionValue]):
 
     def __init__(
         self,
-        registry: Registry[VersionValue, ModelBase],
+        registry: Registry[VersionValue],
         settings: DiscoverySettings,
-        walker: Walker,
+        walker: Walker[VersionValue],
     ) -> None:
         self._registry = registry
         self._settings = settings
         self._walker = walker
 
     @property
-    def walker(self) -> Walker:
+    def walker(self) -> Walker[VersionValue]:
         """The configured payload walker."""
         return self._walker
 
@@ -191,18 +211,19 @@ class GraphBuilder(Generic[VersionValue]):
         data: dict[str, Any],
         *,
         target_resolver: TargetResolver,
-        container: type[BaseModel] | None = None,
+        container: type[Any] | None = None,
         max_depth: int | None = None,
-    ) -> MigrationGraph[VersionValue]:
-        """Scan *data* and return a migration graph of versioned entries.
+    ) -> MigrationPlan[VersionValue]:
+        """Scan *data* and return a :class:`MigrationPlan`.
 
-        *max_depth* overrides ``max_migration_depth`` for this call
+        The plan carries the discovered graph, the payload, and the guiding
+        container.  *max_depth* overrides ``max_migration_depth`` for this call
         (``0`` = top-level only, ``-1`` = unlimited).
         """
         active_walker = self._walker
         default_depth = self._settings.max_migration_depth
         limit = default_depth if max_depth is None else max_depth
-        entries: list[GraphEntry[VersionValue, BaseModel]] = []
+        entries: list[GraphEntry[VersionValue]] = []
 
         for prefix, depth, source in active_walker.discover(
             data,
@@ -239,17 +260,17 @@ class GraphBuilder(Generic[VersionValue]):
                 )
             )
 
-        return MigrationGraph(entries)
+        return MigrationPlan(
+            data=data,
+            graph=MigrationGraph(entries),
+            container=container,
+        )
 
     def _resolve_migration_path(
         self,
-        source: Versionable[VersionValue, BaseModel],
-        target: Versionable[VersionValue, BaseModel],
-    ) -> list[
-        tuple[
-            Versionable[VersionValue, BaseModel], Versionable[VersionValue, BaseModel]
-        ]
-    ]:
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
+    ) -> list[tuple[Versionable[VersionValue], Versionable[VersionValue]]]:
         """Adjacent migration steps between *source* and *target*, for hooks.
 
         Uses the registry's sorted version list; an edge without an explicit
@@ -274,12 +295,7 @@ class GraphBuilder(Generic[VersionValue]):
                 self._registry.name,
                 f"Target version {target} is not registered for kind {target.kind}",
             ) from exc
-        path: list[
-            tuple[
-                Versionable[VersionValue, BaseModel],
-                Versionable[VersionValue, BaseModel],
-            ]
-        ] = []
+        path: list[tuple[Versionable[VersionValue], Versionable[VersionValue]]] = []
         step = lo
         current = source
         while step < hi:

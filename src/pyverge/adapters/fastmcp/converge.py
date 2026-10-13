@@ -3,8 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from pyverge.core.types import (
+    ModelData,
+)
 from pyverge.manager import Manager
-from pyverge.types import ModelData, TargetPolicy
+from pyverge.manager.types import (
+    TargetPolicy,
+)
 
 _KIND = "kind"
 _VERSION = "version"

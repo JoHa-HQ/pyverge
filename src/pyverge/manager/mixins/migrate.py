@@ -3,21 +3,27 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast, overload
 
-from pyverge.types import (
+from pyverge.core.types import (
     Diffable,
     DirectionViolationStrategy,
-    Executor,
     ManagerMigrationKey,
     MigrationDirectionStrategy,
-    MigrationEntry,
     ModelData,
     ModelKey,
     ModelKind,
     ModelPair,
-    TargetPolicy,
-    TContainer,
     VersionMissingStrategy,
     VersionValue,
+)
+from pyverge.manager.types import (
+    TargetPolicy,
+)
+from pyverge.migration.types import (
+    Executor,
+    MigrationEntry,
+)
+from pyverge.providers.types import (
+    TContainer,
 )
 
 if TYPE_CHECKING:
@@ -99,7 +105,7 @@ class MigrateMixin(Generic[VersionValue]):
         )
         if container is None:
             return migrated
-        return container.model_validate(migrated)
+        return self.engine.adapter.instantiate(container, migrated)
 
     def info(
         self: ManagerState[VersionValue],
