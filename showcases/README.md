@@ -28,6 +28,9 @@ involved, wrap a real driver in a thin adapter.
 - [FastMCP + OpenTelemetry](fastmcp/README.md) — a versioned FastMCP server with
   a self-driving demo and a Jaeger dashboard via `docker compose`. Shipped and
   runnable.
+- [FastStream](faststream/README.md) — converge versioned message bodies before a
+  subscriber handler runs, via the subscriber `decoder`, driven through
+  `TestKafkaBroker`. Shipped and runnable.
 
 ## What's glue vs. engine
 
