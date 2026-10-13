@@ -1,3 +1,9 @@
+## v0.9.2 (2026-10-13)
+
+### Refactor
+
+- **#66**: decouple the engine core from integration layer. improve internal api (#67)
+
 ## v0.9.1 (2026-10-01)
 
 ### Fix
