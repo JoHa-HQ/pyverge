@@ -1,0 +1,1 @@
+"""FastStream adapter benchmarks."""
