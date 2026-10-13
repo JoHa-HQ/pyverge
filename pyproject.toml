@@ -18,7 +18,7 @@ dev = [
   "typing-extensions>=4.15.0",
   "faststream[kafka]>=0.7.7",
   "pytest-benchmark>=4.0",
-  "hypothesis>=6.130",
+  "hypothesis>=6.130"
 ]
 
 [project]
