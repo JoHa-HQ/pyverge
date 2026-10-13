@@ -15,7 +15,10 @@ dev = [
   "uv-dynamic-versioning>=0.14.1",
   "syrupy>=5.2.0",
   "pytest-stub>=1.1.0",
-  "typing-extensions>=4.15.0"
+  "typing-extensions>=4.15.0",
+  "faststream[kafka]>=0.7.7",
+  "pytest-benchmark>=4.0",
+  "hypothesis>=6.130",
 ]
 
 [project]
@@ -52,6 +55,9 @@ fastmcp = [
   "fastmcp>=4",
   "dependency-injector>=4.49.1"
 ]
+faststream = [
+  "faststream>=0.7"
+]
 
 [project.scripts]
 pyverge = "pyverge.cli.main:app"
@@ -80,6 +86,7 @@ source = "uv-dynamic-versioning"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_files = ["test_*.py", "bench_*.py"]
 addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80 --doctest-modules"
 
 [tool.ruff]
