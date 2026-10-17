@@ -551,6 +551,24 @@ class TestLookupHelpers:
         assert [n.model for n in manager.list_versions("User")] == expected
         assert manager.list_versions("Missing") == []
 
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [
+            (
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV2, AddressV1, UserV1],
+                    [((UserV1, UserV2), migrate_v1_to_v2)],
+                ],
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_get_entities(self, manager: type[Manager]) -> None:
+        assert manager.get_entities() == ["Address", "User"]
+
 
 class TestFluentLookup:
     """Manager owns the fluent lookup sugar; engine/registry are typed-only."""

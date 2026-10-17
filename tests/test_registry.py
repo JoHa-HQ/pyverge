@@ -50,6 +50,7 @@ from tests.examples.pydantic.semver import (
     UserV2,
     UserV3,
     UserV200Beta1,
+    migrate_v1_to_v2,
 )
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
@@ -129,6 +130,58 @@ class TestModel:
             envelope_model(model_adapter, versioning_settings, cls) for cls in models
         ]
         assert registry.versions == sorted(versions)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, expected",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [], []],
+                [],
+                id="empty",
+            ),
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "semver_test",
+                    [UserV2, AddressV1, UserV1],
+                    [((UserV1, UserV2), migrate_v1_to_v2)],
+                ],
+                ["Address", "User"],
+                id="with_and_without_migrations",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_entities(
+        self,
+        registry: Registry[types.VersionValue],
+        expected: list[str],
+    ) -> None:
+        assert registry.entities == expected
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, AddressV1], []],
+                id="semver",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_entities_drop_a_removed_kind(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+    ) -> None:
+        registry.remove_model(
+            envelope_model(model_adapter, versioning_settings, AddressV1)
+        )
+        assert registry.entities == ["User"]
 
     @pytest.mark.parametrize(
         "model_adapter, registry, latest",

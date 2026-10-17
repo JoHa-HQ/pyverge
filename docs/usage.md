@@ -10,6 +10,7 @@ manager.get("User", "1.0.0")        # the registered versionable
 manager.get_latest("User")          # highest registered version for the kind
 manager.list_versions("User")        # all registered versions for the kind
 manager.list_versions()              # all registered versions across kinds
+manager.get_entities()               # all kinds with registered versions
 ```
 
 ## Validation

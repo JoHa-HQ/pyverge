@@ -120,6 +120,11 @@ class Registry(Generic[VersionValue]):
         return list(self._migrations.keys())
 
     @property
+    def entities(self: Self) -> list[ModelKind]:
+        """All model kinds that have at least one registered version."""
+        return sorted(kind for kind, versions in self._by_kinds.items() if versions)
+
+    @property
     def latest_version(self) -> Versionable[VersionValue]:
         """The most recently registered version overall."""
         if not self._by_versions:
