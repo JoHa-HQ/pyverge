@@ -198,6 +198,10 @@ class Engine(Generic[VersionValue]):
         """Earliest version for *kind*."""
         return self.registry.earliest(kind)
 
+    def get_entities(self: Self) -> list[ModelKind]:
+        """Kinds that have at least one registered version."""
+        return self.registry.entities
+
     def store_migration(
         self: Self,
         key: VersionPair[VersionValue],

@@ -110,6 +110,16 @@ class ModelStoreMixin(Generic[VersionValue]):
             return engine.registry.versions
         return engine.registry.kind_versions(kind)
 
+    @classmethod
+    def get_entities(
+        cls: type[ManagerState[VersionValue]],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> list[ModelKind]:
+        """Return the kinds that have at least one registered version."""
+        engine = engine or cls._default_engine
+        return engine.get_entities()
+
     @overload
     @classmethod
     def get_model(
