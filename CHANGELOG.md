@@ -1,3 +1,9 @@
+## v0.10.0 (2026-10-18)
+
+### Feat
+
+- **#71**: list registered entities on manager (#72)
+
 ## v0.9.2 (2026-10-13)
 
 ### Refactor
