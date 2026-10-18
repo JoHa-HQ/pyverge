@@ -118,7 +118,7 @@ class ModelStoreMixin(Generic[VersionValue]):
     ) -> list[ModelKind]:
         """Return the kinds that have at least one registered version."""
         engine = engine or cls._default_engine
-        return engine.registry.entities
+        return engine.get_entities()
 
     @overload
     @classmethod
