@@ -90,7 +90,13 @@ if TYPE_CHECKING:
             engine: Engine[VersionValue] | None = None,
         ) -> ModelData: ...
 
-        def attach_hooks(self, hooks: Iterable) -> None: ...
+        @classmethod
+        def attach_hooks(
+            cls,
+            hooks: Iterable,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> None: ...
 
         @classmethod
         def compile_target_spec(
