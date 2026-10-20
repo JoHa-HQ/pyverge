@@ -208,6 +208,44 @@ def migrate_v2_to_v3(data: dict) -> dict:
 A `ValidationError` from the **target** model during `migrate` is a symptom of a
 non-total edge — fix the migration or the source model, don't widen the target.
 
+### Type the payload shapes
+
+Migrations receive and return plain dicts, but each version has a precise shape.
+Document it with `TypedDict`: static-only, no runtime cost, and it keeps the
+migration body readable (key access, required keys) while the engine's diff
+discovery and reconstruction continue to parse the body.
+
+```python
+from typing import Literal, TypedDict, cast
+
+
+class UserData(TypedDict):
+    kind: Literal["User"]
+    name: str
+    email: str
+
+
+class UserV1Data(UserData):
+    version: Literal["1.0.0"]
+
+
+class UserV2Data(UserData):
+    version: Literal["2.0.0"]
+    age: int | None
+
+
+def add_age(data: UserV1Data) -> UserV2Data:
+    return {**data, "age": None}
+```
+
+- `TypedDict` is erased at runtime; migrations still receive and return dicts.
+- The engine's diff discovery parses the function body: a returned dict literal,
+  or subscript assignments/deletes on the parameter named `data`. Keep that name
+  (or return a dict literal) so reconstruction still sees the change.
+- A type checker may not prove that a dict-building transform returns the target
+  `TypedDict` (for example, when the `Literal` version changes); add a narrow
+  `cast` or a targeted ignore where the transform is exact.
+
 ### Guard totality with a property test
 
 Generate source instances and assert the edge succeeds. This catches tightened

@@ -36,7 +36,7 @@ calling convention of FastStream's own.
 
 ```python
 import asyncio
-from typing import Literal
+from typing import Literal, TypedDict, cast
 
 import semver
 from faststream import FastStream
@@ -58,15 +58,30 @@ class Order(BaseModel):
     currency: str = "USD"
 
 
-# 2. The migrations that connect the two versions.
-def add_currency(data: dict) -> dict:
+# 2. Typed payload shapes per version, and the migrations between them.
+class OrderData(TypedDict):
+    kind: Literal["Order"]
+    order_id: str
+    total: float
+
+
+class OrderV1Data(OrderData):
+    version: Literal["1.0.0"]
+
+
+class OrderV2Data(OrderData):
+    version: Literal["2.0.0"]
+    currency: str
+
+
+def add_currency(data: OrderV1Data) -> OrderV2Data:
     return {**data, "currency": "USD"}
 
 
-def drop_currency(data: dict) -> dict:
+def drop_currency(data: OrderV2Data) -> OrderV1Data:
     data = dict(data)
     del data["currency"]
-    return data
+    return cast(OrderV1Data, data)
 
 
 manager = Manager[semver.Version].configure(
@@ -79,8 +94,8 @@ manager.store_migration(ManagerMigrationKey("Order", "2.0.0", "1.0.0"), drop_cur
 broker = KafkaBroker("localhost:9092")
 
 
-# 3. One handler: consume at `latest`, produce at `1.0.0`.
-@subscriber(broker, "in-topic", manager=manager, target="latest")
+# 3. One handler on multiple topics: consume at `latest`, produce at `1.0.0`.
+@subscriber(broker, "orders.v1", "orders.v2", manager=manager, target="latest")
 @publisher(broker, "out-topic", manager=manager, target="1.0.0")
 async def handle(order: Order) -> Order:
     return order
@@ -91,9 +106,10 @@ app = FastStream(broker, on_startup=[Reflector(manager)])
 
 async def main() -> None:
     async with TestKafkaBroker(broker) as br:
+        # Either versioned topic reaches the same handler.
         await br.publish(
             {"kind": "Order", "version": "1.0.0", "order_id": "1", "total": 9.9},
-            "in-topic",
+            "orders.v1",
         )
     # handle() received the v2 shape (currency filled in) and published a v1
     # payload on `out-topic`.
@@ -101,6 +117,10 @@ async def main() -> None:
 
 asyncio.run(main())
 ```
+
+The `TypedDict`s are a documentation/IDE aid; migrations still receive and return
+plain dicts at runtime. See
+[Migrations → Type the payload shapes](migration.md#type-the-payload-shapes).
 
 ## The seams
 
@@ -113,7 +133,8 @@ Registers the endpoint with a convergence `decoder` and binds the handler's type
 payload parameter to the served version. Parsing is FastStream's — a two-parameter
 decoder composes with the endpoint's default decoder, so any content type works
 and pyverge only converges. Optional `binder=` overrides how the parameter is
-bound.
+bound. A handler may subscribe to **several topics** (`*topics`); each body is
+converged independently before it reaches the same handler.
 
 ### `publisher(broker, *topics, manager=..., target=...)`
 
@@ -124,6 +145,45 @@ and passed through unchanged.
 
 Stacking `@subscriber(...)` over `@publisher(...)` gives an in/out bridge; the
 in-target and out-target may differ.
+
+## Routing
+
+pyverge converges; it does not choose a transport. Because every payload leaves
+convergence with an explicit `(kind, version)`, routing **inside the handler** is
+deterministic.
+
+The showcase consumes both versioned input topics with **one handler** and routes
+the payload to version-specific destinations, converging once per route. The app
+assembly exposes the manager and broker in the FastStream context, so the handler
+resolves them with `Context(...)`:
+
+```python
+from typing import Annotated, Any
+
+from faststream import Context
+from pyverge import Manager
+
+
+async def handle_order(
+    event: dict[str, Any],
+    manager: Annotated[Manager, Context("manager")],
+    broker: Annotated[Any, Context("broker")],
+) -> None:
+    data = event.get("data", event)
+    await broker.publish(manager.migrate(data, target="1.0.0"), "orders.legacy")
+    await broker.publish(manager.migrate(data, target="2.0.0"), "orders.current")
+```
+
+Registered once for both input topics:
+
+```python
+@subscriber(broker, "orders.v1", "orders.v2", manager=manager, target="latest")
+```
+
+The subscriber decoder converges the inbound body to `latest`; the handler then
+converges per destination (`1.0.0` and `2.0.0`). FastStream's
+`@broker.publisher(topic)` is static, so derived destinations publish through
+`broker.publish(...)`.
 
 ## Reflection
 
