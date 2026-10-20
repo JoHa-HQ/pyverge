@@ -89,6 +89,7 @@ def publisher(
     The handler's return value is converged to *target* before publish. Extra
     *options* pass through to ``broker.publisher``.
     """
+
     def decorate(fn: Fn) -> Any:
         declared = return_model(fn)
         out_model = (

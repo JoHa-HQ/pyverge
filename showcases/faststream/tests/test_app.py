@@ -63,8 +63,9 @@ async def test_v2_event_keeps_its_currency(app, broker, test_broker) -> None:
 
 
 async def test_lifespan_reflects_the_registered_graph(app, manager) -> None:
+    expected_versions = 2
     async with app.lifespan_context():
-        assert len(manager.list_versions("Order")) == 2
+        assert len(manager.list_versions("Order")) == expected_versions
 
 
 async def test_one_handler_consumes_both_channels(app, broker, test_broker) -> None:
@@ -82,15 +83,15 @@ async def test_one_handler_consumes_both_channels(app, broker, test_broker) -> N
         await br.publish(V1, "orders.v1")
         await br.publish(V2, "orders.v2")
 
-    legacy = {item["order_id"]: item for item in seen["legacy"]}
-    current = {item["order_id"]: item for item in seen["current"]}
+    legacy_by_id = {item["order_id"]: item for item in seen["legacy"]}
+    current_by_id = {item["order_id"]: item for item in seen["current"]}
 
-    assert set(legacy) == {"1", "2"}
-    assert all(item["version"] == "1.0.0" for item in legacy.values())
-    assert all("currency" not in item for item in legacy.values())
+    assert set(legacy_by_id) == {"1", "2"}
+    assert all(item["version"] == "1.0.0" for item in legacy_by_id.values())
+    assert all("currency" not in item for item in legacy_by_id.values())
 
-    assert set(current) == {"1", "2"}
-    assert current["1"]["version"] == "2.0.0"
-    assert current["1"]["currency"] == "USD"
-    assert current["2"]["version"] == "2.0.0"
-    assert current["2"]["currency"] == "EUR"
+    assert set(current_by_id) == {"1", "2"}
+    assert current_by_id["1"]["version"] == "2.0.0"
+    assert current_by_id["1"]["currency"] == "USD"
+    assert current_by_id["2"]["version"] == "2.0.0"
+    assert current_by_id["2"]["currency"] == "EUR"

@@ -189,9 +189,7 @@ class TestNegotiation:
             "users",
             "users-latest",
             manager=instance,
-            targets=TopicTargets(
-                {"users": "1.0.0", "users-latest": "latest"}
-            ),
+            targets=TopicTargets({"users": "1.0.0", "users-latest": "latest"}),
         )
         async def handle(user: UserV2) -> None:
             seen.append(user.model_dump())

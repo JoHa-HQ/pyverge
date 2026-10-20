@@ -27,7 +27,9 @@ class Broker(StrEnum):
     @cached_property
     def broker(self):
         klass = f"{self.value.capitalize()}Broker"
-        return getattr(importlib.import_module(f"faststream.{self.value}.broker"), klass)
+        return getattr(
+            importlib.import_module(f"faststream.{self.value}.broker"), klass
+        )
 
     @cached_property
     def telemetry(self) -> TelemetryMiddleware:
@@ -94,7 +96,7 @@ def _load_payload(
 
 
 @app.callback()
-def configure(
+def configure(  # noqa: PLR0913
     ctx: typer.Context,
     broker: Annotated[Broker, typer.Argument(...)],
     dsn: Annotated[str, typer.Argument(callback=resolve_dsn)],
@@ -133,7 +135,7 @@ def configure(
 
 @app.command()
 @lambda f: wraps(f)(lambda *a, **kw: asyncio.run(f(*a, **kw)))
-async def send(
+async def send(  # noqa: PLR0913
     ctx: typer.Context,
     topic: Annotated[str, typer.Argument(help="Destination topic.")],
     payload: Annotated[

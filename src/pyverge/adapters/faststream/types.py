@@ -122,9 +122,7 @@ class HeaderParser:
             try:
                 parsed = json.loads(raw)
             except json.JSONDecodeError as exc:
-                raise NegotiationError(
-                    f"invalid version header JSON: {exc}"
-                ) from exc
+                raise NegotiationError(f"invalid version header JSON: {exc}") from exc
             return self._mapping(parsed)
         return raw
 

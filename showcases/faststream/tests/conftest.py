@@ -11,12 +11,11 @@ from faststream.kafka import TestKafkaBroker
 from faststream.nats import TestNatsBroker
 from faststream.rabbit import TestRabbitBroker
 from faststream.redis import TestRedisBroker
-
-from pyverge import Manager
-
 from faststream_demo.app.container import Container
 from faststream_demo.app.orders import ORDER_TOPICS
 from faststream_demo.cli import Broker
+
+from pyverge import Manager
 
 TEST_BROKERS: dict[Broker, type] = {
     Broker.KAFKA: TestKafkaBroker,
@@ -104,9 +103,7 @@ async def container(
     container.config.broker.convergence.header.from_value(
         request.config.getoption("version_header")
     )
-    container.config.telemetry.enabled.from_value(
-        request.config.getoption("telemetry")
-    )
+    container.config.telemetry.enabled.from_value(request.config.getoption("telemetry"))
     container.config.telemetry.service_name.from_value(
         request.config.getoption("service_name")
     )
