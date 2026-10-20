@@ -52,7 +52,7 @@ def _bench_publish(
 def test_consume_with_pyverge(benchmark: Any, loop: Any, payload: dict) -> None:
     broker = KafkaBroker("localhost:9092")
 
-    @subscriber(broker, TOPIC, manager=user_manager(), target="latest")
+    @subscriber(broker, TOPIC, manager=user_manager(), targets="latest")
     async def handle(user: UserV2) -> None: ...
 
     _bench_publish(benchmark, loop, broker, payload)

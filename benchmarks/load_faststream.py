@@ -27,7 +27,7 @@ async def load(messages: int = 20_000) -> None:
     broker = KafkaBroker("localhost:9092")
     handled = 0
 
-    @subscriber(broker, TOPIC, manager=manager, target="latest")
+    @subscriber(broker, TOPIC, manager=manager, targets="latest")
     async def handle(user: UserV2) -> None:
         nonlocal handled
         handled += 1

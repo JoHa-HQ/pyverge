@@ -51,6 +51,7 @@ class Container(containers.DeclarativeContainer):
         OrdersFeature,
         topics=config.broker.topics,
         target=config.broker.convergence.target,
+        version_header=config.broker.convergence.header,
     )
 
     application = providers.Singleton(

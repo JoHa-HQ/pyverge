@@ -21,7 +21,7 @@ def test_reflect(benchmark: Any) -> None:
     manager = user_manager()
     broker = KafkaBroker("localhost:9092")
 
-    @subscriber(broker, TOPIC, manager=manager, target="latest")
+    @subscriber(broker, TOPIC, manager=manager, targets="latest")
     async def handle(user: UserV2) -> None: ...
 
     reflector = Reflector(manager)

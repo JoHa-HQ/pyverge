@@ -1,5 +1,5 @@
 """FastStream + pyverge showcase."""
 
-from .cli import cli
+from .cli import app
 
-__all__ = ["cli"]
+__all__ = ["app"]

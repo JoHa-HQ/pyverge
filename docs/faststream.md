@@ -44,7 +44,12 @@ from faststream.kafka import KafkaBroker, TestKafkaBroker
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.adapters.faststream import Reflector, publisher, subscriber
+from pyverge.adapters.faststream import (
+    Reflector,
+    publish_to,
+    publisher,
+    subscriber,
+)
 from pyverge.migration import MigrationSettings, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
@@ -95,7 +100,13 @@ broker = KafkaBroker("localhost:9092")
 
 
 # 3. One handler on multiple topics: consume at `latest`, produce at `1.0.0`.
-@subscriber(broker, "orders.v1", "orders.v2", manager=manager, target="latest")
+@subscriber(
+    broker,
+    "orders.v1",
+    "orders.v2",
+    manager=manager,
+    targets="latest",
+)
 @publisher(broker, "out-topic", manager=manager, target="1.0.0")
 async def handle(order: Order) -> Order:
     return order
@@ -124,17 +135,57 @@ plain dicts at runtime. See
 
 ## The seams
 
-Both seams are decorators at the endpoint, with the same keyword shape
-(`manager=`, `target=`).
+Both seams are decorators at the endpoint. Subscribers use `targets=`; publishers
+use `target=`. Targets are resolved by the adapter, never by the core manager.
 
-### `subscriber(broker, *topics, manager=..., target=...)`
+### `subscriber(broker, *topics, manager=..., targets=..., header=...)`
 
-Registers the endpoint with a convergence `decoder` and binds the handler's typed
-payload parameter to the served version. Parsing is FastStream's — a two-parameter
-decoder composes with the endpoint's default decoder, so any content type works
-and pyverge only converges. Optional `binder=` overrides how the parameter is
-bound. A handler may subscribe to **several topics** (`*topics`); each body is
-converged independently before it reaches the same handler.
+Registers one subscriber per topic with a convergence `decoder` and binds the
+handler's typed payload parameter to the served version — or to a union when the
+target can vary. Parsing stays FastStream's; pyverge only converges. Optional
+`binder=` overrides how the parameter is bound.
+
+`targets=` is either one policy for every topic or a `TopicTargets` mapping:
+
+```python
+from pyverge.adapters.faststream import TopicTargets
+
+@subscriber(
+    broker,
+    "orders.v1",
+    "orders.v2",
+    manager=manager,
+    targets=TopicTargets({
+        "orders.v1": "1.0.0",
+        "orders.v2": "latest",
+    }),
+)
+async def handle(order: Order) -> None:
+    ...
+```
+
+Unlisted topics fall back to `latest`.
+
+#### Header negotiation
+
+Set `header="accept-version"` (or another name) to let a message override the
+topic target:
+
+```python
+@subscriber(broker, "orders.v1", manager=manager, header="accept-version")
+async def handle(order: Order) -> None:
+    ...
+```
+
+Accepted values: `1.0.0`, `latest`, `earliest`, `skip`, or a JSON per-kind map
+such as `{"Order": "1.0.0"}`. Precedence is:
+
+```text
+message header > topic target > endpoint target
+```
+
+A union annotation is bound automatically when the target can vary across topics
+or headers.
 
 ### `publisher(broker, *topics, manager=..., target=...)`
 
@@ -146,44 +197,60 @@ and passed through unchanged.
 Stacking `@subscriber(...)` over `@publisher(...)` gives an in/out bridge; the
 in-target and out-target may differ.
 
+### `publish_to(broker, routes={...}, manager=...)`
+
+For different targets per destination, `publish_to` converges the handler's
+return once per route and publishes separately. The handler returns the model
+unchanged; the adapter owns dumping, convergence, and publishing:
+
+```python
+@subscriber(broker, "orders.v1", "orders.v2", manager=manager)
+@publish_to(
+    broker,
+    routes={
+        "orders.legacy": "1.0.0",
+        "orders.current": "2.0.0",
+    },
+    manager=manager,
+)
+async def handle(order: Order) -> Order:
+    return order
+```
+
+`manager.dump` runs once; each route then converges independently. The wrapper
+publishes a `content-version` header with the served version.
+
 ## Routing
 
 pyverge converges; it does not choose a transport. Because every payload leaves
-convergence with an explicit `(kind, version)`, routing **inside the handler** is
-deterministic.
+convergence with an explicit `(kind, version)`, routing is deterministic.
 
-The showcase consumes both versioned input topics with **one handler** and routes
-the payload to version-specific destinations, converging once per route. The app
-assembly exposes the manager and broker in the FastStream context, so the handler
-resolves them with `Context(...)`:
+Use `publish_to` when one handler must publish to destinations with different
+target versions. The handler returns the model unchanged; the adapter dumps it
+once, converges once per route, and publishes each result.
 
 ```python
-from typing import Annotated, Any
-
-from faststream import Context
-from pyverge import Manager
-
-
-async def handle_order(
-    event: dict[str, Any],
-    manager: Annotated[Manager, Context("manager")],
-    broker: Annotated[Any, Context("broker")],
-) -> None:
-    data = event.get("data", event)
-    await broker.publish(manager.migrate(data, target="1.0.0"), "orders.legacy")
-    await broker.publish(manager.migrate(data, target="2.0.0"), "orders.current")
+@subscriber(
+    broker,
+    "orders.v1",
+    "orders.v2",
+    manager=manager,
+    targets="latest",
+)
+@publish_to(
+    broker,
+    routes={
+        "orders.legacy": "1.0.0",
+        "orders.current": "2.0.0",
+    },
+    manager=manager,
+)
+async def handle_order(order: Order) -> Order:
+    return order
 ```
 
-Registered once for both input topics:
-
-```python
-@subscriber(broker, "orders.v1", "orders.v2", manager=manager, target="latest")
-```
-
-The subscriber decoder converges the inbound body to `latest`; the handler then
-converges per destination (`1.0.0` and `2.0.0`). FastStream's
-`@broker.publisher(topic)` is static, so derived destinations publish through
-`broker.publish(...)`.
+This keeps routing declarative and removes manager/broker plumbing from the
+handler. For a single outgoing target, keep using `@publisher(...)`.
 
 ## Reflection
 
@@ -196,14 +263,21 @@ app = FastStream(broker, on_startup=[Reflector(manager)])
 
 Subscribers are registered at decoration time, so reflection runs synchronously
 before the broker connects. A subscriber whose typed parameter is not a provider
-model (e.g. `dict`) is skipped.
+model (e.g. `dict`) is skipped. Union annotations are unwrapped to their first
+concrete model for reflection.
 
 ## Target policy
 
-`target=` accepts pyverge's target policy: `"latest"` (default), `"earliest"`, a
-pinned version, or a per-kind mapping (`{"Order": "1.0.0"}`). The policy is bound
-per subscription, so different consumers (and the producer) converge to different
-versions.
+`targets=` accepts pyverge's target policy: `"latest"` (default), `"earliest"`,
+a pinned version, or a per-kind mapping (`{"Order": "1.0.0"}`).
+
+- A scalar applies to every subscribed topic.
+- `TopicTargets` applies a policy per topic.
+- `header=` adds per-message negotiation, overriding both.
+- Missing topic entries fall back to the endpoint default, `latest`.
+
+Publishers keep `target=` for a single outgoing destination; use
+`publish_to(routes=...)` for per-route targets.
 
 ## Identity and failure behavior
 

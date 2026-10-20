@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
+from urllib.parse import urlsplit
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -56,6 +57,20 @@ def tracer_resource(enabled: bool, service: str, endpoint: str) -> Iterator[Any]
             provider.shutdown()
 
 
+def normalize_dsn(dsn: str | None) -> str | None:
+    """Return the DSN in the form expected by the provider constructor.
+
+    Kafka uses ``host:port`` while RabbitMQ, NATS, and Redis accept their URI
+    forms. Scheme-less DSNs pass through unchanged.
+    """
+    if not dsn or "://" not in dsn:
+        return dsn
+    parsed = urlsplit(dsn)
+    if parsed.scheme == "kafka":
+        return parsed.netloc
+    return dsn
+
+
 async def broker_resource(
     broker_cls: type,
     dsn: str | None,
@@ -63,7 +78,8 @@ async def broker_resource(
     tracer: TracerProvider | None,
 ) -> AsyncIterator[Any]:
     """Resource: build the broker, attach telemetry when on, stop on teardown."""
-    instance = broker_cls(dsn) if dsn else broker_cls()
+    normalized = normalize_dsn(dsn)
+    instance = broker_cls(normalized) if normalized else broker_cls()
     if tracer is not None:
         instance.add_middleware(telemetry_cls(tracer_provider=tracer))
     try:
@@ -76,5 +92,6 @@ __all__ = [
     "broker_resource",
     "build_tracer_provider",
     "make_migration_hooks",
+    "normalize_dsn",
     "tracer_resource",
 ]

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import inspect
 import typing
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import wraps
 from typing import Any, cast
 
@@ -17,7 +17,6 @@ from pyverge import Manager
 from pyverge.manager.types import TargetPolicy
 from pyverge.providers.types import ModelHandle
 
-from .convergence import Converger
 from .types import Fn, PayloadDumper, ResultConverger
 
 
@@ -44,12 +43,14 @@ class ReturnConverger:
 
     def __init__(
         self,
-        converger: Converger,
+        manager: Manager,
         dump: PayloadDumper,
+        target: TargetPolicy,
         out_model: ModelHandle | None = None,
     ) -> None:
-        self._converger = converger
+        self._manager = manager
         self._dump = dump
+        self._target = target
         self._out_model = out_model
 
     def wrap(self, handler: Fn) -> Fn:
@@ -60,7 +61,7 @@ class ReturnConverger:
             result = await handler(*args, **kwargs)
             if result is None:
                 return None
-            return self._converger.converge(self._dump(result))
+            return self._manager.migrate(self._dump(result), target=self._target)
 
         if out_model is not None:
             annotations = dict(getattr(converged, "__annotations__", {}))
@@ -88,8 +89,6 @@ def publisher(
     The handler's return value is converged to *target* before publish. Extra
     *options* pass through to ``broker.publisher``.
     """
-    converger = Converger(manager, target)
-
     def decorate(fn: Fn) -> Any:
         declared = return_model(fn)
         out_model = (
@@ -98,11 +97,60 @@ def publisher(
             else None
         )
         result = result_converger or ReturnConverger(
-            converger, manager.dump, out_model=out_model
+            manager,
+            manager.dump,
+            target,
+            out_model=out_model,
         )
         return broker.publisher(*topics, **options)(result.wrap(fn))
 
     return decorate
 
 
-__all__ = ["ReturnConverger", "publisher", "return_model"]
+def publish_to(
+    broker: Any,
+    *,
+    routes: Mapping[str, TargetPolicy],
+    manager: Manager,
+    version_header: str = "content-version",
+) -> Callable[[Fn], Fn]:
+    """Publish one handler result to multiple topics with per-topic targets.
+
+    The handler returns a model (or mapping) unchanged. The result is dumped
+    once, then converged separately for each route before publishing.
+    """
+
+    def decorate(fn: Fn) -> Fn:
+        @wraps(fn)
+        async def routed(*args: Any, **kwargs: Any) -> None:
+            result = await fn(*args, **kwargs)
+            if result is None:
+                return
+            payload = manager.dump(result)
+            for topic, target in routes.items():
+                converged = manager.migrate(payload, target=target)
+                version = converged.get("version")
+                headers: dict[str, Any] = {}
+                if version is not None:
+                    headers[version_header] = str(version)
+                await broker.publish(converged, topic, headers=headers)
+
+        annotations = dict(getattr(fn, "__annotations__", {}))
+        annotations["return"] = type(None)
+        routed.__annotations__ = annotations
+        setattr(
+            routed,
+            "__signature__",
+            inspect.signature(fn).replace(return_annotation=type(None)),
+        )
+        return cast("Fn", routed)
+
+    return decorate
+
+
+__all__ = [
+    "ReturnConverger",
+    "publish_to",
+    "publisher",
+    "return_model",
+]

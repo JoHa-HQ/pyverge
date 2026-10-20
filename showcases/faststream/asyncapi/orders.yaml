@@ -14,11 +14,6 @@ defaultContentType: application/json
 
 channels:
   orders.v1:
-    publish:
-      operationId: publishOrderV1
-      summary: Publish a v1 Order CloudEvent.
-      message:
-        $ref: "#/components/messages/OrderEventV1"
     subscribe:
       operationId: receiveOrderV1
       summary: Consume v1 Order CloudEvents.
@@ -26,11 +21,6 @@ channels:
         $ref: "#/components/messages/OrderEventV1"
 
   orders.v2:
-    publish:
-      operationId: publishOrderV2
-      summary: Publish a v2 Order CloudEvent.
-      message:
-        $ref: "#/components/messages/OrderEventV2"
     subscribe:
       operationId: receiveOrderV2
       summary: Consume v2 Order CloudEvents.
@@ -97,7 +87,7 @@ components:
               version: "2.0.0"
               order_id: ord_102
               total: 99.5
-              currency: USD
+              currency: EUR
               address:
                 kind: Address
                 version: "2.0.0"

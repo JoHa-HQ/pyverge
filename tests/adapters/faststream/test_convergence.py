@@ -16,8 +16,9 @@ from faststream import FastStream
 from faststream.kafka import KafkaBroker, TestKafkaBroker
 
 from pyverge.adapters.faststream import (
-    Converger,
     Reflector,
+    TopicTargets,
+    publish_to,
     publisher,
     subscriber,
 )
@@ -123,7 +124,7 @@ class TestProduce:
         instance = manager()
         out: list[dict[str, Any]] = []
 
-        @subscriber(broker, "in-topic", manager=instance, target="latest")
+        @subscriber(broker, "in-topic", manager=instance, targets="latest")
         @publisher(broker, "out-topic", manager=instance, target="1.0.0")
         async def handle(user: UserV2) -> UserV2:
             return user
@@ -140,7 +141,7 @@ class TestProduce:
         instance = manager()
         out: list[dict[str, Any]] = []
 
-        @subscriber(broker, "in-topic", manager=instance, target="latest")
+        @subscriber(broker, "in-topic", manager=instance, targets="latest")
         @publisher(broker, "out-topic", manager=instance, target="latest")
         async def handle(user: UserV2) -> UserV2:
             return user
@@ -154,6 +155,81 @@ class TestProduce:
         assert out == [V2_PAYLOAD]
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [pytest.param(PydanticModelAdapter, REGISTRY, id="pydantic")],
+    indirect=True,
+)
+class TestNegotiation:
+    async def test_header_selects_version(self, manager) -> None:
+        instance = manager()
+        broker = KafkaBroker("localhost:9092")
+        seen: list[dict[str, Any]] = []
+
+        @subscriber(broker, "users", manager=instance, header="accept-version")
+        async def handle(user: UserV2) -> None:
+            seen.append(user.model_dump())
+
+        async with TestKafkaBroker(broker) as br:
+            await br.publish(
+                V2_PAYLOAD,
+                "users",
+                headers={"accept-version": "1.0.0"},
+            )
+        assert seen == [V1_PAYLOAD]
+
+    async def test_per_topic_targets(self, manager) -> None:
+        instance = manager()
+        broker = KafkaBroker("localhost:9092")
+        seen: list[dict[str, Any]] = []
+
+        @subscriber(
+            broker,
+            "users",
+            "users-latest",
+            manager=instance,
+            targets=TopicTargets(
+                {"users": "1.0.0", "users-latest": "latest"}
+            ),
+        )
+        async def handle(user: UserV2) -> None:
+            seen.append(user.model_dump())
+
+        async with TestKafkaBroker(broker) as br:
+            await br.publish(V2_PAYLOAD, "users")
+            await br.publish(V2_PAYLOAD, "users-latest")
+        assert seen == [V1_PAYLOAD, V2_PAYLOAD]
+
+    async def test_publish_to_converges_each_route(self, manager) -> None:
+        instance = manager()
+        broker = KafkaBroker("localhost:9092")
+        out_v1: list[dict[str, Any]] = []
+        out_v2: list[dict[str, Any]] = []
+
+        @subscriber(broker, "in-topic", manager=instance)
+        @publish_to(
+            broker,
+            routes={"out-v1": "1.0.0", "out-v2": "latest"},
+            manager=instance,
+        )
+        async def handle(user: UserV2) -> UserV2:
+            return user
+
+        @broker.subscriber("out-v1")
+        async def sink_v1(payload: dict) -> None:
+            out_v1.append(payload)
+
+        @broker.subscriber("out-v2")
+        async def sink_v2(payload: dict) -> None:
+            out_v2.append(payload)
+
+        async with TestKafkaBroker(broker) as br:
+            await br.publish(V2_PAYLOAD, "in-topic")
+        assert out_v1 == [V1_PAYLOAD]
+        assert out_v2 == [V2_PAYLOAD]
+
+
 @pytest.mark.parametrize(
     "model_adapter, registry",
     [pytest.param(PydanticModelAdapter, FORWARD_ONLY_REGISTRY, id="pydantic")],
@@ -161,6 +237,5 @@ class TestProduce:
 )
 class TestFailures:
     def test_no_migration_path_raises(self, manager) -> None:
-        converger = Converger(manager(), "1.0.0")
         with pytest.raises(RegistryError):
-            converger.converge(V2_PAYLOAD)
+            manager().migrate(V2_PAYLOAD, target="1.0.0")

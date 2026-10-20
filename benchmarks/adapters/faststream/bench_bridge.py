@@ -33,7 +33,7 @@ def test_bridge(benchmark: Any, loop: Any, payload: dict) -> None:
     manager = user_manager()
     broker = KafkaBroker("localhost:9092")
 
-    @subscriber(broker, IN_TOPIC, manager=manager, target="latest")
+    @subscriber(broker, IN_TOPIC, manager=manager, targets="latest")
     @publisher(broker, OUT_TOPIC, manager=manager, target="1.0.0")
     async def handle(user: UserV3) -> UserV3:
         return user

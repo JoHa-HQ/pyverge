@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from faststream.kafka import TestKafkaBroker
-
 V1 = {
     "specversion": "1.0",
     "id": "1",
@@ -26,7 +24,7 @@ V2 = {
 }
 
 
-async def test_v1_event_reaches_both_targets(app, broker) -> None:
+async def test_v1_event_reaches_both_targets(app, broker, test_broker) -> None:
     seen: dict[str, dict] = {}
 
     @broker.subscriber("orders.legacy")
@@ -37,7 +35,7 @@ async def test_v1_event_reaches_both_targets(app, broker) -> None:
     async def current(payload: dict) -> None:
         seen["current"] = payload
 
-    async with TestKafkaBroker(broker) as br:
+    async with test_broker(broker) as br:
         await br.publish(V1, "orders.v1")
 
     assert seen["legacy"]["version"] == "1.0.0"
@@ -46,7 +44,7 @@ async def test_v1_event_reaches_both_targets(app, broker) -> None:
     assert seen["current"]["currency"] == "USD"
 
 
-async def test_v2_event_keeps_its_currency(app, broker) -> None:
+async def test_v2_event_keeps_its_currency(app, broker, test_broker) -> None:
     seen: dict[str, dict] = {}
 
     @broker.subscriber("orders.legacy")
@@ -57,7 +55,7 @@ async def test_v2_event_keeps_its_currency(app, broker) -> None:
     async def current(payload: dict) -> None:
         seen["current"] = payload
 
-    async with TestKafkaBroker(broker) as br:
+    async with test_broker(broker) as br:
         await br.publish(V2, "orders.v2")
 
     assert "currency" not in seen["legacy"]
@@ -67,3 +65,32 @@ async def test_v2_event_keeps_its_currency(app, broker) -> None:
 async def test_lifespan_reflects_the_registered_graph(app, manager) -> None:
     async with app.lifespan_context():
         assert len(manager.list_versions("Order")) == 2
+
+
+async def test_one_handler_consumes_both_channels(app, broker, test_broker) -> None:
+    seen: dict[str, list[dict]] = {"legacy": [], "current": []}
+
+    @broker.subscriber("orders.legacy")
+    async def legacy(payload: dict) -> None:
+        seen["legacy"].append(payload)
+
+    @broker.subscriber("orders.current")
+    async def current(payload: dict) -> None:
+        seen["current"].append(payload)
+
+    async with test_broker(broker) as br:
+        await br.publish(V1, "orders.v1")
+        await br.publish(V2, "orders.v2")
+
+    legacy = {item["order_id"]: item for item in seen["legacy"]}
+    current = {item["order_id"]: item for item in seen["current"]}
+
+    assert set(legacy) == {"1", "2"}
+    assert all(item["version"] == "1.0.0" for item in legacy.values())
+    assert all("currency" not in item for item in legacy.values())
+
+    assert set(current) == {"1", "2"}
+    assert current["1"]["version"] == "2.0.0"
+    assert current["1"]["currency"] == "USD"
+    assert current["2"]["version"] == "2.0.0"
+    assert current["2"]["currency"] == "EUR"

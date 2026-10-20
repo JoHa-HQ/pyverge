@@ -41,7 +41,7 @@ def broker(request, broker_settings, manager, payloads) -> KafkaBroker:
     instance = manager()
     broker = KafkaBroker(broker_settings)
 
-    @subscriber(broker, "users", manager=instance, target=target)
+    @subscriber(broker, "users", manager=instance, targets=target)
     async def handle(user: UserV2) -> None:
         payloads.append(user.model_dump())
 

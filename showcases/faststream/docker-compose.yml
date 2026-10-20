@@ -58,13 +58,12 @@ services:
     ports:
       - "6379:6379"
 
-  # --- Microcks: AsyncAPI mocking/testing (Kafka) ---------------------------
-  # Enable with: docker compose --profile kafka --profile microcks up -d
-  # UI: http://localhost:8080  (specs auto-imported from ./config)
+  # --- Microcks: AsyncAPI mocking/testing -----------------------------------
+  # Global service: starts alongside Jaeger/OTel in every run.
+  # UI: http://localhost:8080  (specs auto-imported from ./asyncapi)
 
   microcks-mongo:
     image: mongo:4.4.29
-    profiles: [microcks]
     volumes:
       - microcks-mongo-data:/data/db
     healthcheck:
@@ -75,7 +74,6 @@ services:
 
   microcks-postman:
     image: quay.io/microcks/microcks-postman-runtime:0.8.0
-    profiles: [microcks]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       start_period: 5s
@@ -83,9 +81,30 @@ services:
       timeout: 3s
       retries: 3
 
+  microcks-import:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      - microcks
+    volumes:
+      - ./asyncapi:/specs:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for attempt in $(seq 1 120); do
+          if curl --fail --silent --show-error \
+            -F "file=@/specs/orders.yaml" \
+            -F "mainArtifact=true" \
+            http://microcks:8080/api/artifact/upload; then
+            echo "Imported orders.yaml";
+            exit 0;
+          fi;
+          sleep 2;
+        done;
+        echo "Microcks import failed" >&2;
+        exit 1
+
   microcks:
     image: quay.io/microcks/microcks:nightly
-    profiles: [microcks]
     depends_on:
       - microcks-mongo
       - microcks-postman
@@ -96,28 +115,28 @@ services:
       - ./asyncapi:/deployments/config
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATA_MONGODB_URI=mongodb://microcks-mongo:27017
-      - SPRING_DATA_MONGODB_DATABASE=microcks
+      - SPRING_MONGODB_URI=mongodb://microcks-mongo:27017
+      - SPRING_MONGODB_DATABASE=microcks
       - POSTMAN_RUNNER_URL=http://microcks-postman:3000
       - TEST_CALLBACK_URL=http://microcks:8080
       - SERVICES_UPDATE_INTERVAL=0 0 0/2 * * *
       - KEYCLOAK_ENABLED=false
       - ASYNC_MINION_URL=http://microcks-async-minion:8081
-      # Default Kafka broker; register RabbitMQ/NATS/Redis in Microcks
-      # (Administration > Brokers) to swap the transport per run.
-      - KAFKA_BOOTSTRAP_SERVER=kafka:29092
+      # AsyncAPI binding is explicit; no KAFKA default.
+      - ASYNC_API_DEFAULT_BINDING=${MICROCKS_BROKER_BINDING:?set MICROCKS_BROKER_BINDING}
+      # Internal Microcks event bus (service updates + async triggers).
+      - KAFKA_BOOTSTRAP_SERVER=${MICROCKS_KAFKA_BOOTSTRAP_SERVER:?set MICROCKS_KAFKA_BOOTSTRAP_SERVER}
 
   microcks-async-minion:
     image: quay.io/microcks/microcks-async-minion:nightly
-    profiles: [microcks]
     depends_on:
       - microcks
-    ports:
-      - "8081:8081"
     volumes:
-      - ./asyncapi:/deployments/config
+      - ./microcks/async-minion.properties:/deployments/config/application.properties:ro
     environment:
       - QUARKUS_PROFILE=docker-compose
+      - MICROCKS_KAFKA_BOOTSTRAP_SERVER=${MICROCKS_KAFKA_BOOTSTRAP_SERVER:?set MICROCKS_KAFKA_BOOTSTRAP_SERVER}
+      - MICROCKS_BROKER_BINDING=${MICROCKS_BROKER_BINDING:?set MICROCKS_BROKER_BINDING}
     restart: on-failure
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/q/health/ready"]
