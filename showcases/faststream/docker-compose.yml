@@ -1,19 +1,17 @@
 name: pyverge-faststream-showcase
 
 services:
-  # OpenTelemetry Collector — receives OTLP from the demo and forwards spans.
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.116.1
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
     ports:
-      - "4317:4317" # OTLP gRPC — the demo exports here
-      - "4318:4318" # OTLP HTTP
+      - "4317:4317"
+      - "4318:4318"
     depends_on:
       - jaeger
 
-  # Jaeger — trace storage + dashboard UI.
   jaeger:
     image: jaegertracing/all-in-one:1.62.0
     environment:
@@ -21,20 +19,20 @@ services:
     ports:
       - "16686:16686" # Jaeger UI — http://localhost:16686
 
-  # Brokers — each under a profile; pick one, e.g. `--profile kafka`.
   kafka:
     image: confluentinc/cp-kafka:8.0.0
     profiles: [kafka]
     ports:
-      - "9092:9092"
+      - "9092:9092" # host clients (EXTERNAL)
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://127.0.0.1:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # INTERNAL for other containers (Microcks), EXTERNAL for the host.
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
@@ -59,3 +57,74 @@ services:
     profiles: [redis]
     ports:
       - "6379:6379"
+
+  # --- Microcks: AsyncAPI mocking/testing (Kafka) ---------------------------
+  # Enable with: docker compose --profile kafka --profile microcks up -d
+  # UI: http://localhost:8080  (specs auto-imported from ./config)
+
+  microcks-mongo:
+    image: mongo:4.4.29
+    profiles: [microcks]
+    volumes:
+      - microcks-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 1s
+      retries: 3
+
+  microcks-postman:
+    image: quay.io/microcks/microcks-postman-runtime:0.8.0
+    profiles: [microcks]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      start_period: 5s
+      interval: 20s
+      timeout: 3s
+      retries: 3
+
+  microcks:
+    image: quay.io/microcks/microcks:nightly
+    profiles: [microcks]
+    depends_on:
+      - microcks-mongo
+      - microcks-postman
+    ports:
+      - "8080:8080" # UI / API — http://localhost:8080
+      - "9090:9090"
+    volumes:
+      - ./asyncapi:/deployments/config
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATA_MONGODB_URI=mongodb://microcks-mongo:27017
+      - SPRING_DATA_MONGODB_DATABASE=microcks
+      - POSTMAN_RUNNER_URL=http://microcks-postman:3000
+      - TEST_CALLBACK_URL=http://microcks:8080
+      - SERVICES_UPDATE_INTERVAL=0 0 0/2 * * *
+      - KEYCLOAK_ENABLED=false
+      - ASYNC_MINION_URL=http://microcks-async-minion:8081
+      # Default Kafka broker; register RabbitMQ/NATS/Redis in Microcks
+      # (Administration > Brokers) to swap the transport per run.
+      - KAFKA_BOOTSTRAP_SERVER=kafka:29092
+
+  microcks-async-minion:
+    image: quay.io/microcks/microcks-async-minion:nightly
+    profiles: [microcks]
+    depends_on:
+      - microcks
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./asyncapi:/deployments/config
+    environment:
+      - QUARKUS_PROFILE=docker-compose
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/q/health/ready"]
+      start_period: 10s
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+volumes:
+  microcks-mongo-data:

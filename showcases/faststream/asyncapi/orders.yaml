@@ -1,0 +1,182 @@
+asyncapi: 2.6.0
+
+info:
+  title: Orders
+  version: 2.0.0
+  description: >
+    Versioned `Order` events (v1/v2) wrapped in CloudEvents, one channel per
+    version. `data` holds the model; `Address` is a nested versioned kind
+    (v1/v2). The FastStream app registers a single handler on both topics and
+    pyverge converges `data` to the consumer's target. Broker endpoints are
+    configuration, not contract.
+
+defaultContentType: application/json
+
+channels:
+  orders.v1:
+    publish:
+      operationId: publishOrderV1
+      summary: Publish a v1 Order CloudEvent.
+      message:
+        $ref: "#/components/messages/OrderEventV1"
+    subscribe:
+      operationId: receiveOrderV1
+      summary: Consume v1 Order CloudEvents.
+      message:
+        $ref: "#/components/messages/OrderEventV1"
+
+  orders.v2:
+    publish:
+      operationId: publishOrderV2
+      summary: Publish a v2 Order CloudEvent.
+      message:
+        $ref: "#/components/messages/OrderEventV2"
+    subscribe:
+      operationId: receiveOrderV2
+      summary: Consume v2 Order CloudEvents.
+      message:
+        $ref: "#/components/messages/OrderEventV2"
+
+components:
+  messages:
+    OrderEventV1:
+      name: OrderEventV1
+      title: Order CloudEvent v1
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.json"
+          - type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/OrderV1"
+      examples:
+        - name: order-v1
+          payload:
+            specversion: "1.0"
+            id: 1b4e28ba-2fa1-11d2-883f-0016d3cca427
+            source: /pyverge/showcase
+            type: com.pyverge.order.created
+            datacontenttype: application/json
+            time: "2026-10-13T12:00:00Z"
+            data:
+              kind: Order
+              version: "1.0.0"
+              order_id: ord_101
+              total: 99.5
+              address:
+                kind: Address
+                version: "1.0.0"
+                street: Main St 1
+                city: Berlin
+
+    OrderEventV2:
+      name: OrderEventV2
+      title: Order CloudEvent v2
+      contentType: application/json
+      payload:
+        allOf:
+          - $ref: "https://raw.githubusercontent.com/cloudevents/spec/main/cloudevents/formats/cloudevents.json"
+          - type: object
+            required: [data]
+            properties:
+              data:
+                $ref: "#/components/schemas/OrderV2"
+      examples:
+        - name: order-v2
+          payload:
+            specversion: "1.0"
+            id: 2c5f39cb-3ab2-22e3-994a-1127e4ddb538
+            source: /pyverge/showcase
+            type: com.pyverge.order.created
+            datacontenttype: application/json
+            time: "2026-10-13T12:01:00Z"
+            data:
+              kind: Order
+              version: "2.0.0"
+              order_id: ord_102
+              total: 99.5
+              currency: USD
+              address:
+                kind: Address
+                version: "2.0.0"
+                street: Main St 1
+                city: Berlin
+                country: DE
+
+  schemas:
+    OrderV1:
+      type: object
+      required: [kind, version, order_id, total, address]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          const: Order
+        version:
+          type: string
+          const: "1.0.0"
+        order_id:
+          type: string
+        total:
+          type: number
+        address:
+          $ref: "#/components/schemas/AddressV1"
+
+    OrderV2:
+      type: object
+      required: [kind, version, order_id, total, address]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          const: Order
+        version:
+          type: string
+          const: "2.0.0"
+        order_id:
+          type: string
+        total:
+          type: number
+        currency:
+          type: string
+          default: USD
+          description: Added in 2.0.0.
+        address:
+          $ref: "#/components/schemas/AddressV2"
+
+    AddressV1:
+      type: object
+      required: [kind, version, street]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          const: Address
+        version:
+          type: string
+          const: "1.0.0"
+        street:
+          type: string
+        city:
+          type: string
+
+    AddressV2:
+      type: object
+      required: [kind, version, street]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          const: Address
+        version:
+          type: string
+          const: "2.0.0"
+        street:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+          description: Added in 2.0.0.

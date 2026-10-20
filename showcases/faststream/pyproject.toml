@@ -16,7 +16,8 @@ requires-python = ">=3.11"
 dependencies = [
   "pyverge",
   "faststream[kafka,rabbit,nats,redis]>=0.7",
-  "pydantic-settings>=2.0"
+  "typer>=0.12",
+  "dependency-injector>=4.49.1"
 ]
 
 [tool.hatch.build.targets.wheel]
