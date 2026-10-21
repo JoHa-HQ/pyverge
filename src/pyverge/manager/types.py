@@ -125,6 +125,21 @@ class ManagerInstanceState(Protocol[VersionValue]):
     @property
     def adapter(self) -> ModelAdapter: ...
 
+    def delegate(
+        self,
+        data: ModelData,
+        target: TargetPolicy = "latest",
+        *,
+        container: type[TContainer] | None = None,
+        version_property: str | None = None,
+        depth_limit: int | None = None,
+        direction: MigrationDirectionStrategy | None = None,
+        on_direction_violation: DirectionViolationStrategy | None = None,
+        on_version_not_found: VersionMissingStrategy | None = None,
+        executor: Executor | AsyncExecutor | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
+    ) -> MigrationRun[VersionValue]: ...
+
     def prepare(
         self,
         data: ModelData,

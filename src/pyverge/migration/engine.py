@@ -495,6 +495,7 @@ class Engine(Generic[VersionValue]):
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor[VersionValue] | AsyncExecutor[VersionValue] | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
+        materialize: bool = False,
     ) -> MigrationRun[VersionValue]:
         """Build a runnable migration without executing it.
 
@@ -528,4 +529,5 @@ class Engine(Generic[VersionValue]):
             direction=effective_direction,
             on_direction_violation=effective_on_direction_violation,
             on_missing_path=effective_on_missing,
+            materialize=materialize,
         )

@@ -89,13 +89,42 @@ class MigrateMixin(Generic[VersionValue]):
     ) -> MigrationRun[VersionValue]:
         """Build a runnable migration without executing it.
 
-        Context is passed later to ``run``/``arun``. The returned run yields a
-        payload dict; ``migrate``/``amigrate`` apply container instantiation.
+        Context is passed later to ``run``/``arun``. The run materializes the
+        container when one was supplied.
         """
         resolved_target = self._resolve_target_policy(target, engine=self.engine)
         return self.engine.prepare(
             data,
             target=resolved_target,
+            container=container,
+            version_property=version_property,
+            depth_limit=depth_limit,
+            direction=direction,
+            on_direction_violation=on_direction_violation,
+            on_version_not_found=on_version_not_found,
+            executor=executor,
+            entry_migration=entry_migration,
+            materialize=True,
+        )
+
+    def delegate(  # noqa: PLR0913
+        self: ManagerState[VersionValue],
+        data: ModelData,
+        target: TargetPolicy = "latest",
+        *,
+        container: type[TContainer] | None = None,
+        version_property: str | None = None,
+        depth_limit: int | None = None,
+        direction: MigrationDirectionStrategy | None = None,
+        on_direction_violation: DirectionViolationStrategy | None = None,
+        on_version_not_found: VersionMissingStrategy | None = None,
+        executor: Executor | AsyncExecutor | None = None,
+        entry_migration: MigrationEntry[VersionValue] | None = None,
+    ) -> MigrationRun[VersionValue]:
+        """Return a prepared run; execution is delegated to the caller."""
+        return self.prepare(
+            data,
+            target,
             container=container,
             version_property=version_property,
             depth_limit=depth_limit,
@@ -145,10 +174,7 @@ class MigrateMixin(Generic[VersionValue]):
             executor=executor,
             entry_migration=entry_migration,
         )
-        migrated = run.run(context=context)
-        if container is None:
-            return migrated
-        return self.engine.adapter.instantiate(container, migrated)
+        return run.run(context=context)
 
     async def amigrate(  # noqa: PLR0913
         self: ManagerState[VersionValue],
@@ -178,10 +204,7 @@ class MigrateMixin(Generic[VersionValue]):
             executor=executor,
             entry_migration=entry_migration,
         )
-        migrated = await run.arun(context=context)
-        if container is None:
-            return migrated
-        return self.engine.adapter.instantiate(container, migrated)
+        return await run.arun(context=context)
 
     def info(
         self: ManagerState[VersionValue],

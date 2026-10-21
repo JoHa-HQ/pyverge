@@ -49,9 +49,12 @@ class MigrationRun(Generic[VersionValue]):
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
         backend: ExecutionBackend[VersionValue] | None = None,
+        materialize: bool = False,
     ) -> None:
         self.plan = plan
         self.executor = executor
+        self._adapter = adapter
+        self._materialize_enabled = materialize
         self._backend: ExecutionBackend[VersionValue] = backend or (
             LocalExecutionBackend(
                 registry=registry,
@@ -69,39 +72,47 @@ class MigrationRun(Generic[VersionValue]):
         """Whether this run is bound to an async executor."""
         return isinstance(self.executor, AsyncExecutor)
 
+    def _materialize(self, data: ModelData) -> Any:
+        """Apply the plan's container, if any, to the migrated payload."""
+        if not self._materialize_enabled or self.plan.container is None:
+            return data
+        return self._adapter.instantiate(self.plan.container, data)
+
     def run(
         self,
         *,
         context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> ModelData:
-        """Execute synchronously."""
+    ) -> Any:
+        """Execute synchronously and materialize the plan's container."""
         if self.is_async:
             raise AsyncExecutionRequired(
                 "This migration was prepared for async execution; use arun()"
             )
-        return cast("SyncExecutionStrategy[VersionValue]", self.executor).execute(
+        data = cast("SyncExecutionStrategy[VersionValue]", self.executor).execute(
             self.plan,
             self._backend,
             context=_as_context(context),
         )
+        return self._materialize(data)
 
     async def arun(
         self,
         *,
         context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> ModelData:
-        """Execute asynchronously."""
+    ) -> Any:
+        """Execute asynchronously and materialize the plan's container."""
         if not self.is_async:
             raise SyncExecutionRequired(
                 "This migration was prepared for sync execution; use run()"
             )
-        return await cast(
+        data = await cast(
             "AsyncExecutionStrategy[VersionValue]", self.executor
         ).aexecute(
             self.plan,
             self._backend,
             context=_as_context(context),
         )
+        return self._materialize(data)
 
 
 def _as_context(

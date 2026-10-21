@@ -156,14 +156,19 @@ loop creation.
 Context is supplied when the run executes, so one prepared run can be reused:
 
 ```python
-run = manager.prepare(payload)
+run = manager.delegate(payload)
 
 first = run.run(context={"tenant_id": "tenant_a"})
 second = run.run(context={"tenant_id": "tenant_b"})
 ```
 
-Async runs use `await run.arun(context=...)`. `run()` on an async run raises
-`AsyncExecutionRequired`; `arun()` on a sync run raises `SyncExecutionRequired`.
+`manager.prepare` is the underlying form; `manager.delegate` is the same
+deferred execution seam. Async runs use `await run.arun(context=...)`. `run()`
+on an async run raises `AsyncExecutionRequired`; `arun()` on a sync run raises
+`SyncExecutionRequired`.
+
+When `container=` is supplied, the run returns the typed container instance
+after migration — materialization belongs to the run, not the manager.
 
 ### Async hooks
 
