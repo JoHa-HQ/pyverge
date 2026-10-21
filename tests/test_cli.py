@@ -405,6 +405,57 @@ class TestCommands:
         assert graph["metadata"]["manifest_version"] == "1.0"
         assert all(c in "0123456789abcdef" for c in graph["metadata"]["content_hash"])
 
+    def test_manifest_compares_baseline(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        baseline = tmp_path / "baseline.json"
+        current = tmp_path / "current.json"
+
+        with ManagerContext(manager_name, manager()):
+            generated = runner.invoke(
+                app, ["manifest", "-m", f"{manager_name}:manager"]
+            )
+            assert generated.exit_code == 0
+            baseline.write_text(generated.stdout)
+
+            matched = runner.invoke(
+                app,
+                [
+                    "manifest",
+                    "-m",
+                    f"{manager_name}:manager",
+                    "--output",
+                    str(current),
+                    "--baseline",
+                    str(baseline),
+                ],
+            )
+            assert matched.exit_code == 0
+
+            envelope = json.loads(baseline.read_text())
+            first_node = next(iter(envelope["graph"]["nodes"]))
+            del envelope["graph"]["nodes"][first_node]
+            baseline.write_text(json.dumps(envelope))
+
+            diverged = runner.invoke(
+                app,
+                [
+                    "manifest",
+                    "-m",
+                    f"{manager_name}:manager",
+                    "--output",
+                    str(current),
+                    "--baseline",
+                    str(baseline),
+                ],
+            )
+
+        assert diverged.exit_code == 1
+
     def test_export_manifest(
         self,
         runner: CliRunner,
