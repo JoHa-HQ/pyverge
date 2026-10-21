@@ -391,9 +391,7 @@ class TestCommands:
         manager_name: str,
     ) -> None:
         with ManagerContext(manager_name, manager()):
-            result = runner.invoke(
-                app, ["manifest", "-m", f"{manager_name}:manager"]
-            )
+            result = runner.invoke(app, ["manifest", "-m", f"{manager_name}:manager"])
 
         assert result.exit_code == 0
         envelope = json.loads(result.stdout)
