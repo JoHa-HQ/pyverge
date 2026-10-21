@@ -1,8 +1,10 @@
 from .context import EMPTY_CONTEXT, MigrationContext
 from .exceptions import (
+    AsyncExecutionRequired,
     DiscoveryError,
     DiscoveryValidationError,
     EngineError,
+    ExecutionModeError,
     MaxDepthExceededError,
     MigrationAlreadyRegisteredError,
     MigrationError,
@@ -14,13 +16,11 @@ from .exceptions import (
     ModelConflictError,
     ModelNotFoundError,
     RegistryError,
+    SyncExecutionRequired,
     VersionedModelError,
 )
-from .hooks import MigrationHook
 from .path import Path, get_at, set_at
-from .render import JsonPatchRender
 from .settings import DiscoverySettings, MigrationSettings, VersioningSettings
-from .steps import ExplicitStep
 from .types import (
     MIGRATION_PAIR_LEN,
     Attachable,
@@ -58,6 +58,7 @@ from .versioning import SentinelEdge, VersionEdge, VersionNode
 __all__ = [
     "EMPTY_CONTEXT",
     "MIGRATION_PAIR_LEN",
+    "AsyncExecutionRequired",
     "Attachable",
     "Comparable",
     "Diffable",
@@ -66,8 +67,7 @@ __all__ = [
     "DiscoverySettings",
     "DiscoveryValidationError",
     "EngineError",
-    "ExplicitStep",
-    "JsonPatchRender",
+    "ExecutionModeError",
     "LookupKey",
     "ManagerKey",
     "ManagerMigrationKey",
@@ -78,7 +78,6 @@ __all__ = [
     "MigrationDirectionStrategy",
     "MigrationError",
     "MigrationFunc",
-    "MigrationHook",
     "MigrationKey",
     "MigrationKeyInput",
     "MigrationMissingFieldError",
@@ -100,6 +99,7 @@ __all__ = [
     "RegistryError",
     "Renderable",
     "SentinelEdge",
+    "SyncExecutionRequired",
     "TargetResolver",
     "TargetStrategy",
     "Transitional",

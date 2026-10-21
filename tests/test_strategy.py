@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -13,7 +14,9 @@ from pyverge.core import (
     MigrationError,
 )
 from pyverge.migration import (
+    DefaultEntryPlanner,
     DefaultMigrationEntry,
+    EntryMigrationTask,
     GraphEntry,
     PydanticModelAdapter,
 )
@@ -147,6 +150,56 @@ class TestDefaultMigrationEntry:
             source, target, current, (), "version", None
         )
         assert result == {"version": "2.0.0"}
+
+    def test_planner_returns_task_without_executing(
+        self,
+        model_adapter: PydanticModelAdapter,
+        entry: GraphEntry[Any],
+        execute_step: MagicMock,
+    ) -> None:
+        planner = DefaultEntryPlanner()
+
+        task = planner.migrate(
+            entry,
+            {"version": "1.0.0"},
+            execute_step=execute_step,
+            adapter=model_adapter,
+            version_property="version",
+            direction="any",
+            on_direction_violation="raise",
+            on_missing_path="raise",
+        )
+
+        assert isinstance(task, EntryMigrationTask)
+        execute_step.assert_not_called()
+
+        task.run()
+        execute_step.assert_called_once()
+
+    def test_async_planner_returns_task_without_executing(
+        self,
+        model_adapter: PydanticModelAdapter,
+        entry: GraphEntry[Any],
+    ) -> None:
+        aexecute_step = AsyncMock(return_value={"version": "2.0.0"})
+        planner = DefaultEntryPlanner()
+
+        task = planner.amigrate(
+            entry,
+            {"version": "1.0.0"},
+            aexecute_step=aexecute_step,
+            adapter=model_adapter,
+            version_property="version",
+            direction="any",
+            on_direction_violation="raise",
+            on_missing_path="raise",
+        )
+
+        assert isinstance(task, EntryMigrationTask)
+        aexecute_step.assert_not_called()
+
+        asyncio.run(task.arun())
+        aexecute_step.assert_called_once()
 
     def test_calls_adapter_finalize(
         self,

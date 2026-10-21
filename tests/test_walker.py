@@ -44,7 +44,7 @@ from tests.examples.pydantic.semver import (
     migrate_v1_to_v2,
     migrate_v2_to_v3,
 )
-from tests.utils import envelope_model
+from tests.utils import envelope_model, run_engine
 
 
 @pytest.mark.parametrize(
@@ -368,7 +368,7 @@ def test_engine_migrates_to_latest(
             "role": "user",
         }
     }
-    result = engine.migrate(payload, target=latest_target_resolver(engine.registry))
+    result = run_engine(engine, payload, target=latest_target_resolver(engine.registry))
     assert result["document"]["version"] == expected_version
     assert result["document"]["age"] == expected_age
 
@@ -402,7 +402,8 @@ def test_engine_container_guided_migration(engine: Engine[types.VersionValue]) -
             "role": "user",
         }
     }
-    result = engine.migrate(
+    result = run_engine(
+        engine,
         payload,
         target=latest_target_resolver(engine.registry),
         container=UserContainer,
@@ -445,7 +446,7 @@ def test_engine_explicit_target_versionable(
             "role": "user",
         }
     }
-    result = engine.migrate(payload, target=target)
+    result = run_engine(engine, payload, target=target)
     assert result["document"]["version"] == "2.0.0"
     assert result["document"]["age"] is None
 
@@ -516,7 +517,7 @@ def test_engine_target_policy(
         }
     }
     resolver = resolver_factory(engine.registry)  # ty: ignore[invalid-argument-type]
-    result = engine.migrate(payload, target=resolver)
+    result = run_engine(engine, payload, target=resolver)
     assert result["document"]["version"] == expected_version
 
 
@@ -553,7 +554,7 @@ def test_engine_no_op_when_source_equals_target(
             "status": "active",
         }
     }
-    result = engine.migrate(payload, target=latest_target_resolver(engine.registry))
+    result = run_engine(engine, payload, target=latest_target_resolver(engine.registry))
     assert result["document"]["version"] == "3.0.0"
 
 
@@ -596,7 +597,8 @@ def test_engine_forward_direction_policy_skip(
         engine.registry,
         envelope_model(model_adapter, discovery_settings, UserV1),
     )
-    result = engine.migrate(
+    result = run_engine(
+        engine,
         payload,
         target=target,
         direction="forward",
@@ -646,7 +648,8 @@ def test_engine_any_direction_policy(
         engine.registry,
         envelope_model(model_adapter, discovery_settings, UserV1),
     )
-    result = engine.migrate(
+    result = run_engine(
+        engine,
         payload,
         target=target,
     )
@@ -681,5 +684,5 @@ def test_chrono_engine_migrates_to_latest(
             "role": "user",
         }
     }
-    result = engine.migrate(payload, target=latest_target_resolver(engine.registry))
+    result = run_engine(engine, payload, target=latest_target_resolver(engine.registry))
     assert result["document"]["version"] == "2025-12-31"

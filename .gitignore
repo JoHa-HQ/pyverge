@@ -231,3 +231,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# MkDocs build output
+site/
+
+# CI showcase build output
+showcases/ci/target/

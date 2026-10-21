@@ -244,6 +244,18 @@ class EngineError(Exception):
         super().__init__(msg)
 
 
+class ExecutionModeError(EngineError):
+    """Raised when a run's execution mode does not match the entrypoint."""
+
+
+class AsyncExecutionRequired(ExecutionModeError):
+    """Raised when a sync entrypoint is used with an async executor."""
+
+
+class SyncExecutionRequired(ExecutionModeError):
+    """Raised when an async entrypoint is used with a sync executor."""
+
+
 class DiscoveryError(EngineError):
     """Raised when payload discovery fails."""
 

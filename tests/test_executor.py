@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 from collections.abc import Callable
 from dataclasses import replace
+from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import semver
@@ -13,14 +16,25 @@ from pyverge.core import (
     DiscoveryValidationError,
     MigrationError,
     MigrationNotFoundError,
+    MigrationSettings,
     RegistryError,
     VersionNode,
 )
+from pyverge.core.types import ModelData
+from pyverge.executor import StepRequest
 from pyverge.migration import (
+    AsyncLevelParallelExecutor,
+    AsyncSequentialExecutor,
+    DefaultEntryPlanner,
     Engine,
+    ExecutionPolicy,
+    GraphEntry,
     JsonPatchMigration,
     LevelParallelExecutor,
+    LocalExecutionBackend,
     MigrationContext,
+    MigrationGraph,
+    MigrationPlan,
     PydanticModelAdapter,
     Registry,
     SequentialExecutor,
@@ -48,7 +62,7 @@ from tests.examples.pydantic.semver_nested import (
     preserve_children_person,
     promote_address,
 )
-from tests.utils import edge_from_models, envelope_model
+from tests.utils import edge_from_models, envelope_model, run_engine
 
 
 @pytest.mark.parametrize(
@@ -100,7 +114,8 @@ def test_executor_returns_new_payload(
         }
     }
 
-    result = engine.migrate(
+    result = run_engine(
+        engine,
         payload,
         target=latest_target_resolver(engine.registry),
         executor=executor,
@@ -171,7 +186,8 @@ def test_executor_noop_when_source_is_target(
         }
     }
 
-    result = engine.migrate(
+    result = run_engine(
+        engine,
         payload,
         target=latest_target_resolver(engine.registry),
         executor=executor,
@@ -350,7 +366,7 @@ def test_sequential_executor_runs_in_topological_order(
         }
     }
 
-    engine.migrate(payload, target=latest_target_resolver(engine.registry))
+    run_engine(engine, payload, target=latest_target_resolver(engine.registry))
 
     # Address is nested inside Person, so it must run before Person.
     assert order == ["address", "person"]
@@ -409,7 +425,7 @@ def test_executor_propagates_migration_error(
     }
 
     with pytest.raises(MigrationError, match="Migration failed"):
-        engine.migrate(payload, target=latest_target_resolver(engine.registry))
+        run_engine(engine, payload, target=latest_target_resolver(engine.registry))
 
 
 @pytest.mark.parametrize(
@@ -451,7 +467,8 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
         }
     }
 
-    result = engine.migrate(
+    result = run_engine(
+        engine,
         payload,
         target=latest_target_resolver(engine.registry),
         executor=LevelParallelExecutor(max_workers=2),
@@ -692,13 +709,13 @@ def test_target_resolver_converges_end_to_end(
     expected_error: type[Exception] | None,
     snapshot,
 ) -> None:
-    """Every resolver policy drives ``engine.migrate`` to its target version."""
+    """Every resolver policy drives ``engine.prepare`` to its target version."""
     if expected_error is not None:
         with pytest.raises(expected_error):
-            engine.migrate(payload, target=resolver_factory(engine.registry))
+            run_engine(engine, payload, target=resolver_factory(engine.registry))
         return
 
-    result = engine.migrate(payload, target=resolver_factory(engine.registry))
+    result = run_engine(engine, payload, target=resolver_factory(engine.registry))
 
     assert result == snapshot
 
@@ -738,7 +755,7 @@ def test_executor_gate_rejects_field_shallow_container(
     # Force a container that recognizes the type but declares no fields.
     shallow = replace(plan, container=type("Empty", (BaseModel,), {}))
     with pytest.raises(DiscoveryValidationError, match="incompatible"):
-        engine.default_executor.run(
+        SequentialExecutor().run(
             shallow,
             registry=engine.registry,
             entry_migration=engine.entry_migration,
@@ -748,3 +765,210 @@ def test_executor_gate_rejects_field_shallow_container(
             on_direction_violation=engine.settings.on_direction_violation,
             on_missing_path=engine.settings.on_missing_path,
         )
+
+
+class TestExecutionPolicy:
+    @pytest.mark.parametrize(
+        "settings, expected",
+        [
+            pytest.param(MigrationSettings(), SequentialExecutor, id="sync-sequential"),
+            pytest.param(
+                MigrationSettings(parallel_workers=2),
+                LevelParallelExecutor,
+                id="sync-parallel",
+            ),
+            pytest.param(
+                MigrationSettings(execution_mode="async"),
+                AsyncSequentialExecutor,
+                id="async-sequential",
+            ),
+            pytest.param(
+                MigrationSettings(execution_mode="async", parallel_workers=2),
+                AsyncLevelParallelExecutor,
+                id="async-parallel",
+            ),
+        ],
+    )
+    def test_builds_executor_from_settings(
+        self, settings: MigrationSettings, expected: type
+    ) -> None:
+        assert isinstance(ExecutionPolicy(settings).build(), expected)
+
+
+class TestLocalExecutionBackend:
+    def test_run_entry_delegates_to_entry_planner(self) -> None:
+        task = MagicMock()
+        task.run.return_value = {"name": "Bob"}
+        entry_migration = MagicMock()
+        entry_migration.migrate.return_value = task
+        adapter = MagicMock()
+        entry = MagicMock()
+        context = MigrationContext.empty()
+
+        backend = LocalExecutionBackend(
+            registry=MagicMock(),
+            entry_migration=entry_migration,
+            adapter=adapter,
+            version_property="version",
+            direction="any",
+            on_direction_violation="raise",
+            on_missing_path="raise",
+        )
+
+        result = backend.run_entry(entry, {"name": "Alice"}, context)
+
+        assert result == {"name": "Bob"}
+        entry_migration.migrate.assert_called_once()
+        task.run.assert_called_once_with()
+
+    def test_ensure_compatible_delegates_to_adapter(self) -> None:
+        adapter = MagicMock()
+        backend = LocalExecutionBackend(
+            registry=MagicMock(),
+            entry_migration=DefaultEntryPlanner(),
+            adapter=adapter,
+            version_property="version",
+            direction="any",
+            on_direction_violation="raise",
+            on_missing_path="raise",
+        )
+        plan = MagicMock()
+
+        backend.ensure_compatible(plan)
+
+        adapter.ensure_compatible.assert_called_once_with(
+            plan.container, fields=plan.target_fields
+        )
+
+    def test_arun_entry_delegates_to_async_planner(self) -> None:
+        class _Task:
+            async def arun(self) -> dict:
+                return {"name": "Bob"}
+
+        class _Entry:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def amigrate(self, *args: object, **kwargs: object) -> _Task:
+                self.calls += 1
+                return _Task()
+
+        entry_migration = _Entry()
+        backend = LocalExecutionBackend(
+            registry=MagicMock(),
+            entry_migration=entry_migration,
+            adapter=MagicMock(),
+            version_property="version",
+            direction="any",
+            on_direction_violation="raise",
+            on_missing_path="raise",
+        )
+
+        result = asyncio.run(backend.arun_entry(MagicMock(), {"name": "Alice"}))
+
+        assert result == {"name": "Bob"}
+        assert entry_migration.calls == 1
+
+
+class _RecordingBackend:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str | int, ...]] = []
+
+    def ensure_compatible(self, plan: object) -> None:
+        pass
+
+    def run_entry(
+        self,
+        entry: GraphEntry,
+        current: ModelData,
+        context: MigrationContext | None,
+    ) -> ModelData:
+        self.calls.append(entry.path)
+        return {"value": 2}
+
+    async def arun_entry(
+        self,
+        entry: GraphEntry,
+        current: ModelData,
+        context: MigrationContext | None,
+    ) -> ModelData:
+        self.calls.append(entry.path)
+        return {"value": 2}
+
+
+@pytest.fixture
+def execution_plan(request: pytest.FixtureRequest) -> MigrationPlan:
+    """Plan fixture parametrized over discovered paths."""
+    paths: tuple[tuple[str, ...], ...] = request.param
+    entries = [
+        GraphEntry(path=path, source=MagicMock(), target=MagicMock()) for path in paths
+    ]
+    return MigrationPlan(
+        data={path[0]: {"value": 1} for path in paths},
+        graph=MigrationGraph(entries),
+    )
+
+
+@pytest.fixture
+def recording_backend() -> _RecordingBackend:
+    """Backend that records which entry paths the strategies invoke."""
+    return _RecordingBackend()
+
+
+class TestStrategiesUseBackend:
+    @pytest.mark.parametrize(
+        "execution_plan",
+        [pytest.param((("a",), ("b",)), id="two-entries")],
+        indirect=True,
+    )
+    @pytest.mark.parametrize(
+        "executor, run_async",
+        [
+            pytest.param(SequentialExecutor(), False, id="sync-sequential"),
+            pytest.param(
+                LevelParallelExecutor(max_workers=2), False, id="sync-parallel"
+            ),
+            pytest.param(AsyncSequentialExecutor(), True, id="async-sequential"),
+            pytest.param(
+                AsyncLevelParallelExecutor(max_workers=2),
+                True,
+                id="async-parallel",
+            ),
+        ],
+    )
+    def test_strategy_executes_through_backend(
+        self,
+        executor: Any,
+        run_async: bool,
+        execution_plan: MigrationPlan,
+        recording_backend: _RecordingBackend,
+    ) -> None:
+        if run_async:
+            result = asyncio.run(
+                executor.aexecute(
+                    execution_plan,
+                    recording_backend,
+                )
+            )
+        else:
+            result = executor.execute(execution_plan, recording_backend)
+
+        assert result == {"a": {"value": 2}, "b": {"value": 2}}
+        assert sorted(recording_backend.calls) == [("a",), ("b",)]
+
+
+class TestRemoteContract:
+    def test_step_request_is_a_serializable_value(self) -> None:
+        request = StepRequest(
+            kind="User",
+            from_version="1.0.0",
+            to_version="2.0.0",
+            payload={"kind": "User", "version": "1.0.0"},
+            context={"tenant": "t"},
+        )
+
+        assert request.kind == "User"
+        assert request.from_version == "1.0.0"
+        assert request.to_version == "2.0.0"
+        assert request.payload == {"kind": "User", "version": "1.0.0"}
+        assert request.context == {"tenant": "t"}

@@ -4,35 +4,23 @@
 [![PyPI downloads](https://img.shields.io/pypi/dm/pyverge.svg)](https://pypi.org/project/pyverge/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyverge.svg)](https://pypi.org/project/pyverge/)
 
-Schema evolution and migrations for versioned data models. Version your
-models, define migrations between versions, and converge payloads to a target
-schema at runtime.
-
-The engine is provider-agnostic: it works on plain dicts and only touches a
-model library through the `ModelAdapter` seam. Pydantic and JSON Schema
-adapters ship today; adapters for other providers (dataclasses, attrs,
-marshmallow, MessagePack, etc.) plug in the same way.
+Schema evolution and migrations for versioned data. Register model versions,
+define migrations between them, and converge payloads to a target schema at
+runtime. The engine is provider-agnostic; Pydantic and JSON Schema adapters ship
+today.
 
 ## Installation
 
 ```bash
-# Core library (versioned registry, migration engine, diffing)
-pip install pyverge
-
-# With CLI (init, validate, migrate, diff, export commands)
-pip install "pyverge[cli]"
-
-# With MCP tool server
-pip install "pyverge[fastmcp]"
-
-# With FastStream messaging adapter
-pip install "pyverge[faststream]"
+pip install pyverge                 # core library
+pip install "pyverge[cli]"          # CLI
+pip install "pyverge[fastmcp]"      # MCP tool server
+pip install "pyverge[faststream]"   # messaging adapter
 ```
 
-Development dependencies are managed as a dependency group; install them with
-`uv sync --group dev` (or `hatch`/your tool's equivalent).
+Development: `uv sync --group dev`.
 
-## Quick Start
+## Quick start
 
 ```python
 from typing import Literal
@@ -41,19 +29,14 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import (
-    MigrationSettings,
-    PydanticModelAdapter,
-)
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
-# A manager binds a version strategy to an adapter and settings.
 UserManager = Manager[semver.Version].configure(
     MigrationSettings(),
     PydanticModelAdapter(),
 )
 
 
-# Register versioned models. Version and kind are read from the class itself.
 @UserManager.model()
 class UserV1(BaseModel):
     kind: Literal["User"] = "User"
@@ -71,101 +54,97 @@ class UserV2(BaseModel):
     age: int | None = None
 
 
-# Register a migration between two versions.
 @UserManager.migration("User", "1.0.0", "2.0.0")
 def add_age(data: dict, context=None) -> dict:
     return {**data, "age": None}
 
 
-manager = UserManager()
-
-# Migrate data — converges every versioned entry to the configured target.
-migrated = manager.migrate(
+migrated = UserManager().migrate(
     {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"}
 )
-# -> {"kind": "User", "version": "2.0.0", "name": "Alice", "email": "a@b.com", "age": None}
+# {"kind": "User", "version": "2.0.0", "name": "Alice", "email": "a@b.com", "age": None}
 ```
+
+### Async and prepared runs
+
+```python
+result = await manager.amigrate(payload)
+
+run = manager.delegate(payload)
+first = run.run(context={"tenant_id": "tenant_a"})
+second = run.run(context={"tenant_id": "tenant_b"})
+```
+
+`migrate`/`amigrate` execute immediately. `delegate` and `prepare` return a
+reusable `MigrationRun`. Execution policy comes from settings:
+
+```python
+MigrationSettings(execution_mode="async", parallel_workers=4)
+```
+
+## Migration formats
+
+| Format | Use when | Context |
+| --- | --- | --- |
+| JSON Patch | structural changes | no |
+| JSONata | declarative expressions | planned |
+| Python callable | imperative logic | yes |
 
 ## CLI
 
 ```bash
-# Requires: pip install "pyverge[cli]"
-
-pyverge init          # Bootstrap a new project
-pyverge validate      # Validate data against a schema version
-pyverge migrate       # Migrate data between versions
-pyverge diff          # Show differences between versions
-pyverge export        # Export JSON Schema definitions
-pyverge info          # List registered models and versions
-pyverge managers      # List available managers from configuration
+pyverge init                                       # scaffold project
+pyverge doctor --manager myapp.models:UserManager  # registry health
+pyverge validate data.json --manager myapp.models:UserManager \
+  --schema User --version 1.0.0
+pyverge migrate data.json --manager myapp.models:UserManager --target latest
+pyverge migrate data.json --manager myapp.models:UserManager --check
+pyverge compat --manager myapp.models:UserManager --fail-on-breaking
+pyverge manifest --manager myapp.models:UserManager > manifest.json
+pyverge diff --manager myapp.models:UserManager --from 1.0.0 --to 2.0.0
+pyverge export --manager myapp.models:UserManager
+pyverge info --manager myapp.models:UserManager
 ```
 
-Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
-`pyproject.toml`), pointing at the module that defines your manager.
+Managers are `module:object_path` and may be an instance, configured subclass,
+or zero-arg factory. Runtime schemas require a factory that builds the manager
+from their source.
 
-```toml
-# pyverge.toml
-[managers]
-user = "myapp.models:UserManager"
-```
+`manifest` is a CLI-only contract: it emits a JGF v2 graph envelope with node
+schema hashes, migration hashes, and a content hash. Lifespan/startup does not
+write it. CI commands (`doctor`, `validate`, `migrate --check`, `compat`)
+return non-zero on failure. Config auto-discovery is not wired yet.
 
-```bash
-pyverge info          # List registered models and versions
-pyverge validate data.json --manager user --version 1.0.0
-pyverge migrate data.json --manager user --to latest
-pyverge diff --manager user --from 1.0.0 --to 2.0.0
-pyverge export --manager user --version 2.0.0 > schema.json
-```
+See [CLI Reference](docs/cli.md).
 
 ## Features
 
-- **Versioned model registry** — decorator-based registration with semver or ISO date versioning
-- **Model reflection** — when a migration endpoint has no concrete model, the engine reconstructs it from the other endpoint's model and the migration diff (`on_missing="reconstruct_model"`), so every version in a chain is materializable
-- **Migration proposal** — when you hold both models but no migration, `Engine.propose_migration` diffs their schemas into a declarative JSON Patch to review (`on_missing="reconstruct_migration"`). The two reconstruction strategies are mutually exclusive
-- **Provider adapters** — pluggable `ModelAdapter`; Pydantic and JSON Schema ship today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
-- **Declarative migrations** — express a migration as an RFC 6902 JSON Patch op list (plus `set_default`/`coerce`/`map`/`split`), compiled into a `MigrationFunc` via `JsonPatchMigration`; JSON Patch stays context-free for portability
-- **Runtime context** — pass tenant ids, timestamps, rates via `migrate(context=...)`; runtime callables receive the same read-only view at every step
-- **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
-- **Target policies** — converge to `latest`, `earliest`, a pinned version, or per-kind overrides
-- **Executors** — sequential or level-parallel batch convergence
-- **Model diffing** — breaking-change detection with JSON Patch rendering
-- **Migration hooks** — observability via before/after/error callbacks, plus an OpenTelemetry hook
-- **FastMCP adapter** — version FastMCP tools, prompts, and resources: reflect each versioned primitive into the graph and converge every call to the policy target
-- **FastStream adapter** — converge versioned message bodies before a subscriber handler runs, through the subscriber `decoder`, with startup reflection of each handler's declared payload model
+- **Versioned registry** — semver or ISO date versions, decorator registration
+- **Convergent engine** — graph-driven migration of nested versioned entries
+- **Declarative migrations** — JSON Patch or Python callables; JSONata planned
+- **Runtime context** — shared read-only bindings across every step
+- **Sync/async executors** — sequential or level-parallel; prepared runs
+- **Reflection** — reconstruct missing models or propose migrations from diffs
+- **Compatibility** — `CompatibilityReport`, breaking-change checks, JSON Patch rendering
+- **Graph manifest** — JGF v2 snapshot with stable hashes for CI divergence checks
+- **Adapters** — FastMCP tools/prompts/resources and FastStream messages
+- **Hooks** — before/after/error callbacks, async-aware, OpenTelemetry hook
 
 ## Documentation
 
 - [Getting Started](docs/getting-started.md)
-- [Managers](docs/managers.md)
-- [Concepts](docs/concepts.md)
-- [Execution Flow](docs/execution-flow.md)
-- [Target Policy](docs/target-policy.md)
-- [Migrations](docs/migration.md)
-- [Telemetry & Hooks](docs/telemetry.md)
-- [FastMCP Integration](docs/fastmcp.md)
-- [FastStream Integration](docs/faststream.md)
-- [Testing](docs/testing.md)
-- [Benchmarking](docs/benchmarking.md)
-- [Common Usage Patterns](docs/usage.md)
-- [Scenarios](docs/scenarios.md)
+- [Managers](docs/managers.md) · [Concepts](docs/concepts.md)
+- [Migrations](docs/migration.md) · [Migration Formats](docs/migration-formats.md)
+- [Runtime & Execution](docs/runtime.md) · [Execution Flow](docs/execution-flow.md)
+- [Target Policy](docs/target-policy.md) · [Compatibility](docs/compatibility.md)
+- [CLI Reference](docs/cli.md) · [Telemetry & Hooks](docs/telemetry.md)
+- [FastMCP](docs/fastmcp.md) · [FastStream](docs/faststream.md)
+- [Testing](docs/testing.md) · [Benchmarking](docs/benchmarking.md)
+- [Usage Patterns](docs/usage.md) · [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)
 
 ## Plan
 
-Items intentionally out of scope for this documentation pass, tracked here for
-follow-up:
-
-- **CLI/manager facade alignment** — `Manager` now exposes `get`,
-  `get_latest`, and `list_versions`. The CLI still expects `validate_data`,
-  `diff`, `list_models`, `dump_schemas`, and
-  `migrate(data, schema, from_version, to_version)` before those commands
-  work end-to-end.
-- **Additional model providers** — adapters for dataclasses, attrs, marshmallow,
-  and MessagePack
-- **Real-source integrations** — `showcases/` projects wiring for document
-  storage (converge on read), Kafka consumers, RabbitMQ/streams workers, and
-  MQTT/IoT gateways on the high-level `Manager` API, with thin adapters
-  around real drivers (`motor`, `confluent-kafka`, `aio-pika`, `paho-mqtt`).
-  The transport glue is not shipped yet.
-- **API reference** — an auto-generated API reference page will be restored
-  once the SDK surface is stable.
+- Additional model adapters: dataclasses, attrs, marshmallow, MessagePack
+- Real-source showcase drivers: MongoDB, Kafka, RabbitMQ, MQTT
+- Generated API reference once the SDK surface stabilizes

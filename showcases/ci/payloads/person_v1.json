@@ -1,0 +1,13 @@
+{
+  "document": {
+    "kind": "Person",
+    "version": "1.0.0",
+    "name": "Alice",
+    "address": {
+      "kind": "Address",
+      "version": "1.0.0",
+      "street": "Main Street 1",
+      "city": "Paris"
+    }
+  }
+}

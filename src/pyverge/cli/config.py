@@ -23,11 +23,27 @@ def resolve_manager(spec: str) -> Manager:
     obj: Any = module
     for part in object_path.split("."):
         obj = getattr(obj, part)
-    if not isinstance(obj, Manager):
+
+    if isinstance(obj, Manager):
+        return obj
+    if isinstance(obj, type) and issubclass(obj, Manager):
+        if obj is Manager:
+            raise ConfigError("Manager spec points at the unconfigured base Manager")
+        candidate = obj()
+    elif callable(obj):
+        candidate = obj()
+    else:
         raise ConfigError(
-            f"Manager '{spec}' resolved to {type(obj).__name__}, expected a Manager"
+            f"Manager '{spec}' resolved to {type(obj).__name__}, "
+            "expected a Manager, Manager subclass, or zero-arg factory"
         )
-    return obj
+
+    if not isinstance(candidate, Manager):
+        raise ConfigError(
+            f"Manager factory '{spec}' returned {type(candidate).__name__}, "
+            "expected a Manager"
+        )
+    return candidate
 
 
 def _import_module(cwd: Path, module_path: str) -> ModuleType:

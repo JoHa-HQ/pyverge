@@ -85,7 +85,7 @@ packages = ["src/pyverge"]
 source = "uv-dynamic-versioning"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "benchmarks/tests"]
 python_files = ["test_*.py", "bench_*.py"]
 addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80 --doctest-modules"
 
@@ -101,15 +101,21 @@ select = ["C90", "E", "F", "I", "PL", "RUF", "UP"]
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
+"src/pyverge/executor/local/backend.py" = ["PLR0913"]
+"src/pyverge/executor/local/entry.py" = ["PLR0913"]
+"src/pyverge/executor/local/strategy/parallel.py" = ["PLR0913"]
+"src/pyverge/executor/run.py" = ["PLR0913"]
+"src/pyverge/executor/local/strategy/sequential.py" = ["PLR0913"]
+"src/pyverge/executor/local/step.py" = ["PLR0913"]
+"src/pyverge/executor/types.py" = ["PLR0913"]
+"src/pyverge/executor/ports.py" = ["PLR0913"]
 "src/pyverge/migration/engine.py" = ["PLR0913", "C901"]
-"src/pyverge/migration/executor.py" = ["PLR0913"]
-"src/pyverge/migration/strategy.py" = ["PLR0913"]
 "src/pyverge/migration/walker.py" = ["C901", "PLR0912", "PLR0913"]
 "src/pyverge/core/types.py" = ["PLR0913"]
-"src/pyverge/migration/types.py" = ["PLR0913"]
 "src/pyverge/manager/types.py" = ["PLR0913"]
 "src/pyverge/types.py" = ["PLR0913"]
 "src/pyverge/reflection/discovery.py" = ["C901", "PLR0912"]
+"src/pyverge/cli/commands/*.py" = ["C901", "PLR0912", "PLR0913"]
 "src/pyverge/providers/json_schema/adapter.py" = ["PLR0911"]
 "tests/utils.py" = ["PLR0913"]
 "tests/test_engine.py" = ["PLR0913"]

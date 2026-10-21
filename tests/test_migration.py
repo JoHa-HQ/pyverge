@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import jsonpatch
 import pendulum
 import pytest
@@ -24,6 +26,7 @@ from pyverge.migration import (
 from pyverge.providers.types import (
     ModelHandle,
 )
+from pyverge.reflection import CompatibilityReport
 from tests.examples.pydantic.chrono import (
     UserV20250310,
     UserV20251231,
@@ -546,3 +549,86 @@ class TestJsonSchemaDiff:
             pass
         else:
             raise AssertionError("expected cross-kind error")
+
+
+class TestCompatibilityReport:
+    def _report(
+        self,
+        *,
+        added: list[str] | None = None,
+        removed: list[str] | None = None,
+        modified: dict[str, dict[str, Any]] | None = None,
+        added_info: dict[str, dict[str, Any]] | None = None,
+        backward_compatible: bool = False,
+    ) -> CompatibilityReport:
+        source = VersionNode(
+            _model=None,
+            _value=semver.Version.parse("1.0.0"),
+            _kind="User",
+        )
+        target = VersionNode(
+            _model=None,
+            _value=semver.Version.parse("2.0.0"),
+            _kind="User",
+        )
+        diff = Diff(
+            source=source,
+            target=target,
+            added_fields=added or [],
+            removed_fields=removed or [],
+            modified_fields=modified or {},
+            added_field_info=added_info or {},
+            is_backward_compatible=backward_compatible,
+        )
+        return CompatibilityReport.from_diff(
+            diff,
+            identity_fields=frozenset({"kind", "version"}),
+        )
+
+    def test_optional_addition_is_not_breaking(self) -> None:
+        report = self._report(
+            added=["age"],
+            added_info={"age": {"required": False}},
+        )
+
+        assert report.added_fields == ("age",)
+        assert report.breaking is False
+
+    def test_required_addition_is_breaking(self) -> None:
+        report = self._report(
+            added=["age"],
+            added_info={"age": {"required": True}},
+        )
+
+        assert report.breaking is True
+
+    def test_removed_field_is_breaking(self) -> None:
+        report = self._report(removed=["age"])
+
+        assert report.removed_fields == ("age",)
+        assert report.breaking is True
+
+    def test_type_change_is_breaking(self) -> None:
+        report = self._report(
+            modified={"name": {"type_changed": {"from": str, "to": int}}}
+        )
+
+        assert report.modified_fields == ("name",)
+        assert report.breaking is True
+
+    def test_identity_changes_are_ignored(self) -> None:
+        report = self._report(
+            added=["version"],
+            modified={"version": {"type_changed": {"from": str, "to": str}}},
+        )
+
+        assert report.added_fields == ()
+        assert report.modified_fields == ()
+        assert report.breaking is False
+
+    def test_declared_backward_compatible_overrides_structure(self) -> None:
+        report = self._report(removed=["age"], backward_compatible=True)
+
+        assert report.structural_breaking is True
+        assert report.declared_backward_compatible is True
+        assert report.breaking is False

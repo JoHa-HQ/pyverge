@@ -127,26 +127,57 @@ first, then the person — so the parent migration never sees stale children.
 
 ## Executors
 
-The engine runs the migration graph with an executor. The default is
-sequential (topological order, one entry at a time). For throughput on large
-payloads, enable level-parallel execution — independent entries within each
-topological level run concurrently:
+The engine selects an executor from `MigrationSettings`:
+
+- `parallel_workers=0` -> sequential
+- `parallel_workers>0` -> level-parallel, capped at `os.cpu_count()`
+- `execution_mode="sync"` -> thread pool
+- `execution_mode="async"` -> `asyncio.gather`
 
 ```python
 from pyverge import Manager
-from pyverge.migration import MigrationSettings
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
-    MigrationSettings(parallel_workers=4),
+    MigrationSettings(execution_mode="async", parallel_workers=4),
     PydanticModelAdapter(),
 )
+
+result = await manager.amigrate(payload)
 ```
 
-`parallel_workers` caps the thread pool per execution wave (`0` = sequential,
-capped at `os.cpu_count()`). Entries in the same wave are independent, so
-parallelism is safe: children always finish before their parents.
+Use `migrate` for sync runs and `amigrate` for async runs. Mismatches raise
+`AsyncExecutionRequired` / `SyncExecutionRequired`; there is no implicit event
+loop creation.
 
-You can also inject a custom executor per call:
+### Prepared runs
+
+`prepare` builds the plan and binds the executor without executing anything.
+Context is supplied when the run executes, so one prepared run can be reused:
+
+```python
+run = manager.delegate(payload)
+
+first = run.run(context={"tenant_id": "tenant_a"})
+second = run.run(context={"tenant_id": "tenant_b"})
+```
+
+`manager.prepare` is the underlying form; `manager.delegate` is the same
+deferred execution seam. Async runs use `await run.arun(context=...)`. `run()`
+on an async run raises `AsyncExecutionRequired`; `arun()` on a sync run raises
+`SyncExecutionRequired`.
+
+When `container=` is supplied, the run returns the typed container instance
+after migration — materialization belongs to the run, not the manager.
+
+### Async hooks
+
+Async executors detect the hook shape: an overridden `abefore_migrate`,
+`aafter_migrate`, or `aon_error` is awaited as a coroutine; otherwise the sync
+method runs in a worker thread via `asyncio.to_thread`. Sync hooks therefore
+work on both paths without blocking the event loop.
+
+You can still inject a custom executor per call:
 
 ```python
 from pyverge.migration import LevelParallelExecutor

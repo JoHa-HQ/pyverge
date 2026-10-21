@@ -169,4 +169,4 @@ understands both formats.
 - [Telemetry & Hooks](telemetry.md) — observability via hooks and OpenTelemetry.
 - [Testing](testing.md) — the time-travel topology round trip and other patterns.
 - [Concepts](concepts.md) — the problem and the approach.
-- [Showcases](../showcases/README.md) — end-to-end examples.
+- [Showcases](https://github.com/JoHa-HQ/pyverge/tree/main/showcases) — end-to-end examples.

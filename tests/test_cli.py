@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -15,7 +17,12 @@ from pyverge.core.types import (
 )
 from pyverge.migration import JsonSchemaModelAdapter, PydanticModelAdapter
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
-from tests.examples.pydantic.semver import UserV1, UserV2, UserV3
+from tests.examples.pydantic.semver import (
+    UserV1,
+    UserV2,
+    UserV3,
+    migrate_v1_to_v2,
+)
 from tests.utils import ManagerContext
 
 
@@ -241,3 +248,230 @@ class TestDiffCommand:
 
             assert result.exit_code == 0
             assert result.stdout == snapshot
+
+
+@pytest.mark.parametrize(
+    ("model_adapter", "registry", "manager_name"),
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+            "e2e_pkg.dx.pydantic",
+            id="pydantic-manager",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+class TestCommands:
+    def test_doctor_json(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(
+                app, ["doctor", "-m", f"{manager_name}:manager", "--format", "json"]
+            )
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["status"] == "ok"
+
+    def test_doctor_resolves_runtime_factory(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            # Factory builds the manager from a runtime source.
+            setattr(sys.modules[manager_name], "create_manager", manager)
+            result = runner.invoke(
+                app,
+                [
+                    "doctor",
+                    "-m",
+                    f"{manager_name}:create_manager",
+                    "--format",
+                    "json",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["status"] == "ok"
+
+    def test_validate_batch_reports_invalid(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        valid = tmp_path / "valid.json"
+        valid.write_text('{"name": "Alice", "email": "a@example.com", "role": "user"}')
+        invalid = tmp_path / "invalid.json"
+        invalid.write_text('{"name": 1}')
+
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(
+                app,
+                [
+                    "validate",
+                    str(valid),
+                    str(invalid),
+                    "-m",
+                    f"{manager_name}:manager",
+                    "-s",
+                    "User",
+                    "-v",
+                    "1.0.0",
+                    "--format",
+                    "json",
+                ],
+            )
+
+        assert result.exit_code == 1
+        results = json.loads(result.stdout)["results"]
+        assert [item["valid"] for item in results] == [True, False]
+
+    def test_migrate_writes_output(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        source = tmp_path / "payload.json"
+        source.write_text(
+            '{"kind": "User", "version": "1.0.0", "name": "Alice", '
+            '"email": "a@example.com", "role": "user"}'
+        )
+        output = tmp_path / "migrated.json"
+
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(
+                app,
+                [
+                    "migrate",
+                    str(source),
+                    "-m",
+                    f"{manager_name}:manager",
+                    "--output",
+                    str(output),
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert json.loads(output.read_text())["version"] == "2.0.0"
+
+    def test_compat_json(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(
+                app,
+                ["compat", "-m", f"{manager_name}:manager", "--format", "json"],
+            )
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["breaking"] is False
+
+    def test_manifest_is_jgf_envelope(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(app, ["manifest", "-m", f"{manager_name}:manager"])
+
+        assert result.exit_code == 0
+        envelope = json.loads(result.stdout)
+        assert set(envelope) == {"graph"}
+        graph = envelope["graph"]
+        assert graph["directed"] is True
+        assert graph["nodes"]["User@1.0.0"]["metadata"]["kind"] == "User"
+        assert graph["edges"][0]["source"] == "User@1.0.0"
+        assert graph["edges"][0]["target"] == "User@2.0.0"
+        assert graph["edges"][0]["metadata"]["strategy"] == "callable"
+        assert graph["metadata"]["manifest_version"] == "1.0"
+        assert all(c in "0123456789abcdef" for c in graph["metadata"]["content_hash"])
+
+    def test_manifest_compares_baseline(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        baseline = tmp_path / "baseline.json"
+        current = tmp_path / "current.json"
+
+        with ManagerContext(manager_name, manager()):
+            generated = runner.invoke(
+                app, ["manifest", "-m", f"{manager_name}:manager"]
+            )
+            assert generated.exit_code == 0
+            baseline.write_text(generated.stdout)
+
+            matched = runner.invoke(
+                app,
+                [
+                    "manifest",
+                    "-m",
+                    f"{manager_name}:manager",
+                    "--output",
+                    str(current),
+                    "--baseline",
+                    str(baseline),
+                ],
+            )
+            assert matched.exit_code == 0
+
+            envelope = json.loads(baseline.read_text())
+            first_node = next(iter(envelope["graph"]["nodes"]))
+            del envelope["graph"]["nodes"][first_node]
+            baseline.write_text(json.dumps(envelope))
+
+            diverged = runner.invoke(
+                app,
+                [
+                    "manifest",
+                    "-m",
+                    f"{manager_name}:manager",
+                    "--output",
+                    str(current),
+                    "--baseline",
+                    str(baseline),
+                ],
+            )
+
+        assert diverged.exit_code == 1
+
+    def test_export_manifest(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(app, ["export", "-m", f"{manager_name}:manager"])
+
+        assert result.exit_code == 0
+        assert "User" in json.loads(result.stdout)["kinds"]
+
+
+def test_init_scaffolds_project(runner: CliRunner, tmp_path: Path) -> None:
+    result = runner.invoke(app, ["init", str(tmp_path), "--pyproject"])
+
+    assert result.exit_code == 0
+    assert (tmp_path / "models.py").exists()
+    assert (tmp_path / "pyproject.toml").exists()

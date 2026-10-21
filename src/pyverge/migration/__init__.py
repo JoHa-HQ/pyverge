@@ -1,15 +1,14 @@
 from pyverge.core import (
+    AsyncExecutionRequired,
     DiscoveryError,
     DiscoverySettings,
     DiscoveryValidationError,
     EngineError,
-    ExplicitStep,
-    JsonPatchRender,
+    ExecutionModeError,
     MaxDepthExceededError,
     MigrationAlreadyRegisteredError,
     MigrationContext,
     MigrationError,
-    MigrationHook,
     MigrationMissingFieldError,
     MigrationNotFoundError,
     MigrationPathIntegrityError,
@@ -21,6 +20,7 @@ from pyverge.core import (
     Path,
     RegistryError,
     SentinelEdge,
+    SyncExecutionRequired,
     VersionEdge,
     VersionedModelError,
     VersioningSettings,
@@ -28,11 +28,26 @@ from pyverge.core import (
     get_at,
     set_at,
 )
+from pyverge.executor import (
+    AsyncLevelParallelExecutor,
+    AsyncSequentialExecutor,
+    DefaultEntryPlanner,
+    DefaultMigrationEntry,
+    EntryMigrationTask,
+    ExecutionPolicy,
+    ExecutionTransport,
+    Executor,
+    LevelParallelExecutor,
+    LocalExecutionBackend,
+    MigrationEntry,
+    MigrationHook,
+    MigrationRun,
+    RunnableMigration,
+    SequentialExecutor,
+    StepExecutor,
+)
 from pyverge.migration.types import (
     Entry,
-    Executor,
-    MigrationEntry,
-    RunnableMigration,
 )
 from pyverge.providers import (
     JsonPatchMigration,
@@ -46,10 +61,10 @@ from pyverge.reflection import (
     Diff,
     DiffDiscovery,
     JsonPatchDiffDiscovery,
+    JsonPatchRender,
 )
 
 from .engine import Engine
-from .executor import LevelParallelExecutor, SequentialExecutor, StepExecutor
 from .graph import GraphBuilder, GraphEntry, MigrationGraph, MigrationPlan
 from .policy import (
     earliest_target_resolver,
@@ -59,13 +74,16 @@ from .policy import (
     skip_target_resolver,
 )
 from .registry import Registry
-from .strategy import DefaultMigrationEntry
 from .walker import CompoundKeyWalker, PydanticWalker, Walker
 
 __all__ = [
+    "AsyncExecutionRequired",
+    "AsyncLevelParallelExecutor",
+    "AsyncSequentialExecutor",
     "CallableDiffDiscovery",
     "CompositeDiffDiscovery",
     "CompoundKeyWalker",
+    "DefaultEntryPlanner",
     "DefaultMigrationEntry",
     "Diff",
     "DiffDiscovery",
@@ -75,8 +93,11 @@ __all__ = [
     "Engine",
     "EngineError",
     "Entry",
+    "EntryMigrationTask",
+    "ExecutionModeError",
+    "ExecutionPolicy",
+    "ExecutionTransport",
     "Executor",
-    "ExplicitStep",
     "GraphBuilder",
     "GraphEntry",
     "JsonPatchDiffDiscovery",
@@ -84,6 +105,7 @@ __all__ = [
     "JsonPatchRender",
     "JsonSchemaModelAdapter",
     "LevelParallelExecutor",
+    "LocalExecutionBackend",
     "MaxDepthExceededError",
     "MigrationAlreadyRegisteredError",
     "MigrationContext",
@@ -95,6 +117,7 @@ __all__ = [
     "MigrationNotFoundError",
     "MigrationPathIntegrityError",
     "MigrationPlan",
+    "MigrationRun",
     "MigrationSettings",
     "MissingReferenceError",
     "ModelAlreadyRegisteredError",
@@ -110,6 +133,7 @@ __all__ = [
     "SentinelEdge",
     "SequentialExecutor",
     "StepExecutor",
+    "SyncExecutionRequired",
     "VersionEdge",
     "VersionNode",
     "VersionedModelError",

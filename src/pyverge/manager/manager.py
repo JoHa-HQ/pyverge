@@ -6,14 +6,16 @@ from pyverge.core.settings import MigrationSettings
 from pyverge.core.types import (
     VersionValue,
 )
-from pyverge.migration.engine import Engine
-from pyverge.migration.executor import SequentialExecutor
-from pyverge.migration.graph import GraphBuilder
-from pyverge.migration.registry import Registry
-from pyverge.migration.strategy import DefaultMigrationEntry
-from pyverge.migration.types import (
+from pyverge.executor import (
+    AsyncExecutor,
+    DefaultEntryPlanner,
     Executor,
     MigrationEntry,
+)
+from pyverge.migration.engine import Engine
+from pyverge.migration.graph import GraphBuilder
+from pyverge.migration.registry import Registry
+from pyverge.migration.types import (
     Walker,
 )
 from pyverge.migration.walker import CompoundKeyWalker
@@ -94,7 +96,7 @@ class Manager(
         *,
         engine: Engine[VersionValue] | None = None,
         walker: Walker | None = None,
-        executor: Executor | None = None,
+        executor: Executor | AsyncExecutor | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> type[Manager[VersionValue]]:
         """Build a configured ``Manager`` subclass.
@@ -111,10 +113,11 @@ class Manager(
                 schema-driven walker (e.g.
                 :class:`~pyverge.migration.PydanticWalker`) to enable
                 container-guided discovery.
-            executor: Optional execution strategy.  Defaults to
-                :class:`~pyverge.migration.SequentialExecutor`.
+            executor: Optional execution strategy override. When omitted, the
+                settings-driven :class:`ExecutionPolicy` selects sequential or
+                level-parallel, sync or async.
             entry_migration: Optional per-entry migration defaults.  Defaults
-                to :class:`~pyverge.migration.DefaultMigrationEntry`.
+                to :class:`~pyverge.migration.DefaultEntryPlanner`.
         """
         if walker is None:
             registry = Registry[VersionValue]()
@@ -127,14 +130,14 @@ class Manager(
         engine = engine or Engine[VersionValue](
             registry=registry,
             settings=settings,
-            default_executor=executor or SequentialExecutor(),
+            default_executor=executor,
             graph_builder=GraphBuilder(
                 registry,
                 settings,
                 active_walker,
             ),
             adapter=adapter,
-            entry_migration=entry_migration or DefaultMigrationEntry(),
+            entry_migration=entry_migration or DefaultEntryPlanner(),
         )
         cls._default_engine = engine
         cls._default_adapter = adapter

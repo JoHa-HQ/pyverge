@@ -1,7 +1,5 @@
-from collections.abc import Mapping
 from typing import Any, Generic, Self, overload
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.exceptions import (
     MigrationNotFoundError,
     MissingReferenceError,
@@ -30,9 +28,13 @@ from pyverge.core.versioning import (
     SentinelEdge,
     VersionEdge,
 )
-from pyverge.migration.types import (
+from pyverge.executor import (
+    AsyncExecutor,
+    DefaultEntryPlanner,
+    ExecutionPolicy,
     Executor,
     MigrationEntry,
+    MigrationRun,
 )
 from pyverge.providers.json_patch import JsonPatch
 from pyverge.providers.json_patch.migration import JsonPatchMigration
@@ -50,7 +52,6 @@ from pyverge.reflection.reflection import Reflection
 
 from .graph import GraphBuilder
 from .registry import Registry
-from .strategy import DefaultMigrationEntry
 
 
 class Engine(Generic[VersionValue]):
@@ -67,7 +68,7 @@ class Engine(Generic[VersionValue]):
         self: Self,
         registry: Registry[VersionValue],
         settings: MigrationSettings,
-        default_executor: Executor[VersionValue],
+        default_executor: Executor[VersionValue] | AsyncExecutor[VersionValue] | None,
         graph_builder: GraphBuilder[VersionValue],
         adapter: ModelAdapter,
         entry_migration: MigrationEntry[VersionValue] | None = None,
@@ -76,8 +77,9 @@ class Engine(Generic[VersionValue]):
         self.settings = settings
         self.graph_builder = graph_builder
         self.default_executor = default_executor
+        self.execution_policy = ExecutionPolicy(settings)
         self.adapter = adapter
-        self.entry_migration = entry_migration or DefaultMigrationEntry()
+        self.entry_migration = entry_migration or DefaultEntryPlanner()
         self.discovery: DiffDiscovery[VersionValue, JsonPatch | MigrationFunc] = (
             CompositeDiffDiscovery()
         )
@@ -480,7 +482,7 @@ class Engine(Generic[VersionValue]):
             edge = self.registry.get_migration_by_edge(key)
             self.registry.clear_hooks(edge)
 
-    def migrate(
+    def prepare(
         self: Self,
         data: ModelData,
         target: TargetResolver,
@@ -491,15 +493,15 @@ class Engine(Generic[VersionValue]):
         direction: MigrationDirectionStrategy | None = None,
         on_direction_violation: DirectionViolationStrategy | None = None,
         on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor[VersionValue] | None = None,
+        executor: Executor[VersionValue] | AsyncExecutor[VersionValue] | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
-        context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> ModelData:
-        """Converge every versioned entry in *data* to match the target.
+        materialize: bool = False,
+    ) -> MigrationRun[VersionValue]:
+        """Build a runnable migration without executing it.
 
-        *target* must be a callable ``(current) -> Versionable | None``.
-        *context* binds runtime values for every provider in the run; it is
-        viewed, not copied.
+        The executor is taken from the per-call override, the engine default, or
+        the settings-driven :class:`ExecutionPolicy` — in that order. Context is
+        supplied later, when ``run``/``arun`` is called.
         """
         effective_direction = direction or self.settings.direction
         effective_on_direction_violation = (
@@ -514,23 +516,18 @@ class Engine(Generic[VersionValue]):
             target_resolver=target,
             max_depth=depth_limit,
         )
-
-        active_executor = executor or self.default_executor
-        active_entry_migration = entry_migration or self.entry_migration
-        active_context = (
-            context
-            if isinstance(context, MigrationContext)
-            else MigrationContext.create(context)
+        active_executor = (
+            executor or self.default_executor or self.execution_policy.build()
         )
-
-        return active_executor.run(
+        return MigrationRun(
             plan,
+            executor=active_executor,
             registry=self.registry,
-            entry_migration=active_entry_migration,
+            entry_migration=entry_migration or self.entry_migration,
             adapter=self.adapter,
             version_property=vp,
             direction=effective_direction,
             on_direction_violation=effective_on_direction_violation,
             on_missing_path=effective_on_missing,
-            context=active_context,
+            materialize=materialize,
         )

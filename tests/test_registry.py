@@ -14,7 +14,6 @@ from pyverge import types
 from pyverge.core import (
     MigrationAlreadyRegisteredError,
     MigrationError,
-    MigrationHook,
     MigrationNotFoundError,
     ModelAlreadyRegisteredError,
     ModelConflictError,
@@ -26,6 +25,7 @@ from pyverge.core import (
 )
 from pyverge.migration import (
     MigrationContext,
+    MigrationHook,
     PydanticModelAdapter,
     Registry,
 )
