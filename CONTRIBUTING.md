@@ -89,9 +89,18 @@ Releases are automated via [commitizen](https://commitizen-tools.github.io/commi
    - `fix:` → patch version bump
    - `BREAKING CHANGE:` → major version bump
 
-2. Pushing to `main` triggers the release pipeline.
+2. Merging to `main` runs the `Release` workflow plan job. It computes the
+   next version from commits and writes the proposed SHA, version, ticket, and
+   changelog to the run summary.
 
-3. The changelog is auto-generated from commit messages.
+3. The `release` environment requires reviewer approval. Approval applies to
+   that exact planned SHA/version.
+
+4. After approval, the workflow bumps the version, creates the tag, builds the
+   distribution once, publishes it to PyPI, and creates the GitHub Release.
+
+5. Pre-release tags (`vX.Y.Z-rcN`) or a manual `Publish Dev (TestPyPI)` run
+   publish to TestPyPI.
 
 ## Questions?
 

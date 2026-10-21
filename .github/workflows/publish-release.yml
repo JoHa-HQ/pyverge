@@ -1,8 +1,6 @@
-name: Publish Release (PyPI)
+name: Publish Release
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
@@ -10,7 +8,7 @@ on:
         required: true
 
 concurrency:
-  group: publish-release-${{ github.ref }}
+  group: publish-release-${{ inputs.tag }}
   cancel-in-progress: false
 
 jobs:
@@ -24,10 +22,11 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
-      - uses: ./.github/actions/publish
+          ref: ${{ inputs.tag }}
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
-          index: PyPI
-          publish-url: https://upload.pypi.org/legacy/
-          check-url: https://pypi.org/simple/
-          simple-url: https://pypi.org/simple/
+          python-version: "3.11"
+      - name: Build package
+        run: uv build --no-sources
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -1,122 +1,160 @@
-name: GitHub Release
+name: Release
 
 on:
-  workflow_dispatch:
-  pull_request:
-    types:
-      - closed
-    branches:
-      - main
+  push:
+    branches: [main]
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
+permissions:
+  contents: write
+  actions: write
+
 jobs:
-  tag:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
+  plan:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
+    outputs:
+      should_release: ${{ steps.plan.outputs.should_release }}
+      version: ${{ steps.plan.outputs.version }}
+      ticket: ${{ steps.plan.outputs.ticket }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Plan next release
+        id: plan
+        run: |
+          CURRENT=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
+          NEXT=$(uv run cz bump --get-next --yes 2>/dev/null || true)
+          NEXT=${NEXT#v}
+
+          TICKET_ID=$(git log -1 --pretty=format:"%s" | grep -oE "#[0-9]+" | head -1 || true)
+
+          if [ -z "$NEXT" ] || [ "$NEXT" = "$CURRENT" ]; then
+            echo "No release-worthy changes."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "$TICKET_ID" ]; then
+            echo "No ticket ID found in latest commit." >&2
+            exit 1
+          fi
+
+          echo "should_release=true" >> "$GITHUB_OUTPUT"
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "ticket=$TICKET_ID" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Release plan"
+            echo
+            echo "- Current: ${CURRENT:-none}"
+            echo "- Next: $NEXT"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Ticket: $TICKET_ID"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: plan
+    if: needs.plan.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
           token: ${{ secrets.PUBLISHING_PAT }}
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
-      - name: Extract ticket ID from latest commit
+      - name: Tag planned release
         run: |
-          TICKET_ID=$(git log -1 --pretty=format:"%s" | grep -oE "#[0-9]+" | head -1)
-          if [ -z "$TICKET_ID" ]; then
-            echo "No ticket ID found in latest commit. Aborting."
-            exit 1
-          fi
-          echo "TICKET_ID=$TICKET_ID" >> "$GITHUB_ENV"
-          echo "ticket_id=$TICKET_ID"
-      - name: Bump version, changelog, and tag
-        id: version
-        run: |
-          if git log -1 --pretty=%s | grep -qE 'release v?[0-9]+\.[0-9]+\.[0-9]+|\[skip ci\]'; then
-            echo "Latest commit is a release commit, no bump needed."
-            echo "version=none" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Remember the previous tag so we can list the changes in this release
-          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-
-          uv run cz bump --yes --changelog --bump-message "chore(${{ env.TICKET_ID }}): release \$new_version [skip ci]"
+          uv run cz bump "${{ needs.plan.outputs.version }}" \
+            --yes \
+            --changelog \
+            --bump-message "chore(${{ needs.plan.outputs.ticket }}): release \$new_version [skip ci]"
 
           VERSION=$(git describe --tags --abbrev=0)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "next_version=$VERSION"
-
-          # Build a human-readable list of changes since the previous release
-          if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$VERSION" ]; then
-            FEATURES=$(git log --no-merges --pretty=format:"- %s" "$PREV_TAG..HEAD~1" || true)
-          else
-            FEATURES="No previous tag found."
+          if [ "$VERSION" != "v${{ needs.plan.outputs.version }}" ]; then
+            echo "Planned version v${{ needs.plan.outputs.version }} != created tag $VERSION" >&2
+            exit 1
           fi
-          [ -z "$FEATURES" ] && FEATURES="- No conventional changes since last release."
+          if git ls-remote --tags origin "$VERSION" | grep -q "$VERSION"; then
+            echo "Tag $VERSION already exists on origin" >&2
+            exit 1
+          fi
 
-          # Amend the release commit so it actually describes what was deployed
-          git commit --amend \
-            -m "chore(${{ env.TICKET_ID }}): release $VERSION [skip ci]" \
-            -m "Features deployed:" \
-            -m "$FEATURES"
-
-          # Move the lightweight version tag to the amended commit
-          git tag -f "$VERSION"
-
-          git push origin HEAD
-          git push origin "$VERSION" --force
-      - name: Build package
+          git push origin HEAD:main
+          git push origin "$VERSION"
+      - name: Build distribution
         run: uv build
-      - name: Upload build artifacts
+      - name: Upload distribution
         uses: actions/upload-artifact@v7.0.1
         with:
           name: dist
           path: dist/
           if-no-files-found: error
-    outputs:
-      version: ${{ steps.version.outputs.version }}
 
-  release:
-    needs: tag
-    if: ${{ needs.tag.outputs.version != 'none' && needs.tag.outputs.version != '' }}
+  publish:
+    needs: [plan, release]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    steps:
+      - name: Download distribution
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  github-release:
+    needs: [plan, publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
+      actions: read
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ needs.tag.outputs.version }}
+          ref: v${{ needs.plan.outputs.version }}
       - uses: astral-sh/setup-uv@v10.0.1
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
-      - name: Download build artifacts
+      - name: Download distribution
         uses: actions/download-artifact@v8.0.1
         with:
           name: dist
           path: dist/
       - name: Generate release notes
-        run: uv run cz changelog "${{ needs.tag.outputs.version }}" > RELEASE_NOTES.md
+        run: uv run cz changelog "v${{ needs.plan.outputs.version }}" > RELEASE_NOTES.md
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.PUBLISHING_PAT }}
         run: |
-          gh release create "${{ needs.tag.outputs.version }}" \
-            --title "Release ${{ needs.tag.outputs.version }}" \
+          gh release create "v${{ needs.plan.outputs.version }}" \
+            --title "Release v${{ needs.plan.outputs.version }}" \
             --notes-file RELEASE_NOTES.md \
             dist/*
-
