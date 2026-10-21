@@ -1,5 +1,3 @@
-"""Prepared migration: plan + executor + backend, run on demand."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -91,7 +89,7 @@ class MigrationRun(Generic[VersionValue]):
         data = cast("SyncExecutionStrategy[VersionValue]", self.executor).execute(
             self.plan,
             self._backend,
-            context=_as_context(context),
+            context=cast("MigrationContext | None", context),
         )
         return self._materialize(data)
 
@@ -110,14 +108,6 @@ class MigrationRun(Generic[VersionValue]):
         ).aexecute(
             self.plan,
             self._backend,
-            context=_as_context(context),
+            context=cast("MigrationContext | None", context),
         )
         return self._materialize(data)
-
-
-def _as_context(
-    value: Mapping[str, Any] | MigrationContext | None,
-) -> MigrationContext:
-    if isinstance(value, MigrationContext):
-        return value
-    return MigrationContext.create(value)

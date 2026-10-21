@@ -174,7 +174,7 @@ class MigrateMixin(Generic[VersionValue]):
             executor=executor,
             entry_migration=entry_migration,
         )
-        return run.run(context=context)
+        return run.run(context=_as_context(context))
 
     async def amigrate(  # noqa: PLR0913
         self: ManagerState[VersionValue],
@@ -204,7 +204,7 @@ class MigrateMixin(Generic[VersionValue]):
             executor=executor,
             entry_migration=entry_migration,
         )
-        return await run.arun(context=context)
+        return await run.arun(context=_as_context(context))
 
     def info(
         self: ManagerState[VersionValue],
@@ -277,3 +277,11 @@ class MigrateMixin(Generic[VersionValue]):
             engine=engine,
         )
         return engine.adapter.diff(source, target)
+
+
+def _as_context(
+    value: Mapping[str, Any] | MigrationContext | None,
+) -> MigrationContext:
+    if isinstance(value, MigrationContext):
+        return value
+    return MigrationContext.create(value)
