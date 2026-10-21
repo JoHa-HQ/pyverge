@@ -7,7 +7,7 @@ from typing import Literal
 import pytest
 from pydantic import BaseModel
 
-from pyverge.migration import PydanticModelAdapter
+from pyverge.migration import MigrationContext, PydanticModelAdapter
 from pyverge.providers.json_patch import JsonPatch
 from pyverge.reflection.discovery import (
     CallableDiffDiscovery,
@@ -102,7 +102,7 @@ class TestCallableDiffDiscovery:
     def test_dict_unpack(self, endpoints) -> None:
         source, target = endpoints
 
-        def mig(data: dict) -> dict:
+        def mig(data: dict, context: MigrationContext | None = None) -> dict:
             return {**data, "age": None}
 
         diff = CallableDiffDiscovery().discover(mig, source, target)
@@ -111,7 +111,7 @@ class TestCallableDiffDiscovery:
     def test_assign_key(self, endpoints) -> None:
         source, target = endpoints
 
-        def mig(data: dict) -> dict:
+        def mig(data: dict, context: MigrationContext | None = None) -> dict:
             data["age"] = None
             return data
 
@@ -121,7 +121,7 @@ class TestCallableDiffDiscovery:
     def test_delete_key(self, endpoints) -> None:
         source, target = endpoints
 
-        def mig(data: dict) -> dict:
+        def mig(data: dict, context: MigrationContext | None = None) -> dict:
             del data["age"]
             return data
 
@@ -131,7 +131,7 @@ class TestCallableDiffDiscovery:
     def test_nested_write(self, endpoints) -> None:
         source, target = endpoints
 
-        def mig(data: dict) -> dict:
+        def mig(data: dict, context: MigrationContext | None = None) -> dict:
             data["address"]["city"] = "Paris"
             return data
 
@@ -150,7 +150,7 @@ class TestCompositeDiffDiscovery:
     def test_dispatches_callable(self, endpoints) -> None:
         source, target = endpoints
 
-        def mig(data: dict) -> dict:
+        def mig(data: dict, context: MigrationContext | None = None) -> dict:
             return {**data, "age": None}
 
         diff = CompositeDiffDiscovery().discover(mig, source, target)

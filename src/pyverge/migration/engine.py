@@ -1,5 +1,7 @@
+from collections.abc import Mapping
 from typing import Any, Generic, Self, overload
 
+from pyverge.core.context import MigrationContext
 from pyverge.core.exceptions import (
     MigrationNotFoundError,
     MissingReferenceError,
@@ -491,10 +493,13 @@ class Engine(Generic[VersionValue]):
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor[VersionValue] | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
+        context: Mapping[str, Any] | MigrationContext | None = None,
     ) -> ModelData:
         """Converge every versioned entry in *data* to match the target.
 
         *target* must be a callable ``(current) -> Versionable | None``.
+        *context* binds runtime values for every provider in the run; it is
+        viewed, not copied.
         """
         effective_direction = direction or self.settings.direction
         effective_on_direction_violation = (
@@ -512,6 +517,11 @@ class Engine(Generic[VersionValue]):
 
         active_executor = executor or self.default_executor
         active_entry_migration = entry_migration or self.entry_migration
+        active_context = (
+            context
+            if isinstance(context, MigrationContext)
+            else MigrationContext.create(context)
+        )
 
         return active_executor.run(
             plan,
@@ -522,4 +532,5 @@ class Engine(Generic[VersionValue]):
             direction=effective_direction,
             on_direction_violation=effective_on_direction_violation,
             on_missing_path=effective_on_missing,
+            context=active_context,
         )

@@ -4,6 +4,7 @@ from typing import Any
 
 import jsonpatch
 
+from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     ModelData,
 )
@@ -151,6 +152,10 @@ class JsonPatch(jsonpatch.JsonPatch):
         }
     )
 
-    def __call__(self, data: ModelData) -> ModelData:
+    def __call__(
+        self,
+        data: ModelData,
+        context: MigrationContext | None = None,
+    ) -> ModelData:
         """Apply the whole patch to the payload in one pass."""
         return self.apply(data)

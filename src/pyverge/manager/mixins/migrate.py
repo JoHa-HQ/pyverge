@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING, Generic, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, cast, overload
 
+from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     Diffable,
     DirectionViolationStrategy,
@@ -49,6 +51,7 @@ class MigrateMixin(Generic[VersionValue]):
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
+        context: Mapping[str, Any] | MigrationContext | None = None,
     ) -> TContainer: ...
 
     @overload
@@ -65,6 +68,7 @@ class MigrateMixin(Generic[VersionValue]):
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
+        context: Mapping[str, Any] | MigrationContext | None = None,
     ) -> ModelData: ...
 
     def migrate(  # noqa: PLR0913
@@ -80,6 +84,7 @@ class MigrateMixin(Generic[VersionValue]):
         on_version_not_found: VersionMissingStrategy | None = None,
         executor: Executor | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
+        context: Mapping[str, Any] | MigrationContext | None = None,
     ) -> ModelData | TContainer:
         """Migrate *data* to the configured target policy.
 
@@ -89,6 +94,9 @@ class MigrateMixin(Generic[VersionValue]):
 
         When *container* is given, the migrated payload is validated against it
         and a typed container instance is returned instead of a dict.
+
+        *context* binds runtime values for migration providers. It is a view
+        over the supplied mapping and is not copied per step.
         """
         resolved_target = self._resolve_target_policy(target, engine=self.engine)
         migrated = self.engine.migrate(
@@ -102,6 +110,7 @@ class MigrateMixin(Generic[VersionValue]):
             on_version_not_found=on_version_not_found,
             executor=executor,
             entry_migration=entry_migration,
+            context=context,
         )
         if container is None:
             return migrated

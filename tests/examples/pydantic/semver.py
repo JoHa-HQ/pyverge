@@ -1,6 +1,8 @@
 from enum import StrEnum
 from typing import Annotated, Literal
 
+from pyverge.core.context import MigrationContext
+
 from .base import BaseModel, Field, UserBaseModel
 
 
@@ -86,13 +88,13 @@ class UserContainer(BaseModel):
 
 
 # @SemverManager.migration(UserV1, UserV2)
-def migrate_v1_to_v2(data: dict) -> dict:
+def migrate_v1_to_v2(data: dict, context: MigrationContext | None = None) -> dict:
     data["age"] = None
     return data
 
 
 # @SemverManager.migration(UserV2, UserV3)
-def migrate_v2_to_v3(data: dict) -> dict:
+def migrate_v2_to_v3(data: dict, context: MigrationContext | None = None) -> dict:
     data["age"] = data.get("age", 0)
     data["status"] = "active"
     return data

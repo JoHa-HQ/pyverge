@@ -6,8 +6,8 @@ from typing import Any, cast
 import pendulum
 from semver import Version
 
+from pyverge.core.exceptions import DiscoveryValidationError
 from pyverge.core.types import (
-    ModelVersionKey,
     VersionValue,
 )
 
@@ -88,6 +88,33 @@ class AbstractModelAdapter:
         )
         raise ValueError(msg)
 
+    def can_handle(
+        self,
+        container: Any,
+        *,
+        fields: frozenset[str] | None = None,
+    ) -> bool:
+        """Return whether *container* is a recognized model shape."""
+        raise NotImplementedError
+
+    def ensure_compatible(
+        self,
+        container: Any,
+        *,
+        fields: frozenset[str],
+    ) -> None:
+        """Raise when *container* cannot cover the migrated *fields*."""
+        if container is None:
+            return
+        if not self.can_handle(container, fields=fields):
+            raise DiscoveryValidationError(
+                path=(),
+                message=(
+                    "container is incompatible with the migration graph: "
+                    f"cannot cover fields {sorted(fields)}"
+                ),
+            )
+
     def fields(self, model_cls: type[Any]) -> frozenset[str]:
         """Return the model's field names, minus the identity fields.
 
@@ -102,5 +129,3 @@ class AbstractModelAdapter:
             return frozenset()
         return frozenset(name for name in fields if name not in identity)
 
-
-_ = ModelVersionKey

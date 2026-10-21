@@ -9,7 +9,11 @@ from __future__ import annotations
 import semver
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.migration import (
+    MigrationContext,
+    MigrationSettings,
+    PydanticModelAdapter,
+)
 from pyverge.types import ManagerMigrationKey
 from tests.examples.pydantic.semver import (
     UserV1,
@@ -20,13 +24,13 @@ from tests.examples.pydantic.semver import (
 )
 
 
-def _drop_age(data: dict) -> dict:
+def _drop_age(data: dict, context: MigrationContext | None = None) -> dict:
     data = dict(data)
     data.pop("age", None)
     return data
 
 
-def _drop_status(data: dict) -> dict:
+def _drop_status(data: dict, context: MigrationContext | None = None) -> dict:
     data = dict(data)
     data.pop("status", None)
     return data

@@ -40,12 +40,9 @@ class ModelDecorator(Protocol):
 class MigrationKeyDecorator:
     """Bind a migration key to an owner and register decorated bodies.
 
-    Both plain migration callables and declarative
-    :class:`JsonPatchMigration` specs are passed through verbatim; no
-    normalization happens here.  The single unwrap of a spec to its executable
-    ``.patch`` happens at manager storage time in
-    ``MigrationStoreMixin._resolve_migration`` before the resolved callable
-    reaches ``Engine.store_migration``.
+    Plain callables and declarative :class:`JsonPatchMigration` specs are
+    passed through verbatim. The spec is compiled to its patch at storage
+    time.
     """
 
     def __init__(

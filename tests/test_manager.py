@@ -31,6 +31,7 @@ from pyverge.manager.types import (
 )
 from pyverge.migration import (
     Engine,
+    MigrationContext,
     PydanticModelAdapter,
     PydanticWalker,
 )
@@ -161,7 +162,7 @@ class TestClassLevelRegistration:
     ) -> None:
 
         @manager.migration(*key, backward_compatible=True)
-        def migrate(data: dict) -> dict:
+        def migrate(data: dict, context: MigrationContext | None = None) -> dict:
             return migrate_v1_to_v2(data)
 
         result = manager().migrate(_payload("1.0.0"))
@@ -283,6 +284,42 @@ class TestInstanceFacade:
         assert instance.migrate(_payload("1.0.0"))["document"]["version"] == "2.0.0"
 
     @pytest.mark.parametrize(
+        "model_adapter, registry",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2, UserV3], []],
+                id="pydantic_semver_user_v1_v2_v3",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_migrate_passes_same_context_to_every_step(
+        self, manager: type[Manager[semver.Version]]
+    ) -> None:
+        seen: list[MigrationContext] = []
+
+        def _v1_to_v2(data: dict, context: MigrationContext | None = None) -> dict:
+            assert context is not None
+            seen.append(context)
+            return migrate_v1_to_v2(data)
+
+        def _v2_to_v3(data: dict, context: MigrationContext | None = None) -> dict:
+            assert context is not None
+            seen.append(context)
+            return migrate_v2_to_v3(data)
+
+        manager.store_migration(ModelPair(UserV1, UserV2), _v1_to_v2)
+        manager.store_migration(ModelPair(UserV2, UserV3), _v2_to_v3)
+
+        result = manager().migrate(_payload("1.0.0"), context={"tenant": "tenant_99"})
+
+        first, second = seen
+        assert result["document"]["version"] == "3.0.0"
+        assert first is second
+        assert dict(first) == {"tenant": "tenant_99"}
+
+    @pytest.mark.parametrize(
         "model_adapter, registry, key",
         [
             pytest.param(
@@ -351,7 +388,7 @@ class TestInstanceFacade:
     ) -> None:
         instance = manager()
 
-        def _migrate(data: dict) -> dict:
+        def _migrate(data: dict, context: MigrationContext | None = None) -> dict:
             return data
 
         instance.store_migration(key, _migrate)
@@ -610,7 +647,7 @@ class TestFluentLookup:
                     semver.Version,
                     "test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 lambda versions: (versions[0], versions[1]),
@@ -622,7 +659,7 @@ class TestFluentLookup:
                     semver.Version,
                     "test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 lambda versions: (versions[1], versions[0]),
@@ -635,8 +672,8 @@ class TestFluentLookup:
                     "test",
                     [UserV1, UserV2, UserV3],
                     [
-                        ((UserV1, UserV2), lambda d: d),
-                        ((UserV2, UserV3), lambda d: d),
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
                     ],
                 ],
                 [UserV1, UserV2, UserV3],
@@ -650,8 +687,8 @@ class TestFluentLookup:
                     "test",
                     [UserV1, UserV2, UserV3],
                     [
-                        ((UserV1, UserV2), lambda d: d),
-                        ((UserV2, UserV3), lambda d: d),
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
                     ],
                 ],
                 [UserV1, UserV2, UserV3],
@@ -698,7 +735,7 @@ class TestFluentLookup:
                     semver.Version,
                     "test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 lambda versions: (versions[0], versions[1]),
@@ -711,8 +748,8 @@ class TestFluentLookup:
                     "test",
                     [UserV1, UserV2, UserV3],
                     [
-                        ((UserV1, UserV2), lambda d: d),
-                        ((UserV2, UserV3), lambda d: d),
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
                     ],
                 ],
                 [UserV1, UserV2, UserV3],
@@ -753,8 +790,8 @@ class TestFluentLookup:
                     "test",
                     [UserV1, UserV2, UserV3],
                     [
-                        ((UserV1, UserV2), lambda d: d),
-                        ((UserV2, UserV3), lambda d: d),
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
                     ],
                 ],
                 [UserV1, UserV2, UserV3],
@@ -1185,3 +1222,28 @@ def test_instantiated_manager_satisfies_instance_state_contract(
     assert instance.registry is configured._default_engine.registry
     assert instance.settings is migration_settings
     assert instance.adapter is model_adapter
+
+
+class TestMigrationContext:
+    def test_create_is_a_view_over_source_mapping(self) -> None:
+        source = {"tenant": "tenant_99"}
+        context = MigrationContext.create(source)
+
+        source["tenant"] = "tenant_100"
+
+        assert context["tenant"] == "tenant_100"
+
+    def test_create_is_idempotent(self) -> None:
+        context = MigrationContext.create({"tenant": "tenant_99"})
+        copy = MigrationContext.create(context)
+
+        assert copy["tenant"] == context["tenant"]
+
+    def test_create_empty(self) -> None:
+        assert MigrationContext.create(None) == MigrationContext.empty()
+
+    def test_rejects_mutation(self) -> None:
+        context = MigrationContext.create({"tenant": "tenant_99"})
+
+        with pytest.raises(TypeError):
+            context["tenant"] = "tenant_100"

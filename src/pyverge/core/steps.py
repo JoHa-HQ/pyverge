@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, Protocol
 
+from .context import MigrationContext
 from .types import (
     Attachable,
     Migratable,
@@ -18,6 +19,7 @@ class _Step(Protocol):
         self,
         data: ModelData,
         hooks: list[Attachable],
+        context: MigrationContext | None = None,
     ) -> ModelData: ...
 
 
@@ -35,13 +37,14 @@ class ExplicitStep(Generic[VersionValue]):
         self,
         data: ModelData,
         hooks: list[Attachable],
+        context: MigrationContext | None = None,
     ) -> ModelData:
         kind = self.edge.kind
         from_version = self.edge.source
         to_version = self.edge.target
         for hook in hooks:
             hook.before_migrate(str(kind), from_version, to_version, data)
-        result = self.edge(data)
+        result = self.edge(data, context)
         for hook in hooks:
             hook.after_migrate(str(kind), from_version, to_version, data, result)
         return result

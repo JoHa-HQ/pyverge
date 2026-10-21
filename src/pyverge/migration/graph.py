@@ -7,6 +7,7 @@ from pyverge.core.exceptions import MaxDepthExceededError, RegistryError
 from pyverge.core.settings import DiscoverySettings
 from pyverge.core.types import (
     Attachable,
+    MigrationDirectionStrategy,
     ModelHandle,
     ModelKind,
     TargetResolver,
@@ -43,6 +44,21 @@ class GraphEntry(Generic[VersionValue]):
     ] = ()
     hooks: tuple[tuple[Attachable, ...], ...] = ()
     target_model: Any | None = None
+
+    def allows_direction(self, direction: MigrationDirectionStrategy) -> bool:
+        """Return whether this entry may migrate under *direction*.
+
+        Direction is path-level policy: the entry owns ``source`` -> ``target``,
+        which may span several edges, so the check belongs here rather than on a
+        single-edge ``Diff``.
+        """
+        if direction == "any" or self.source == self.target:
+            return True
+        if direction == "forward":
+            return self.source < self.target
+        if direction == "backward":
+            return self.source > self.target
+        return True
 
     @property
     def kind(self) -> ModelKind:
@@ -177,6 +193,14 @@ class MigrationPlan(Generic[VersionValue]):
     data: dict[str, Any]
     graph: MigrationGraph[VersionValue]
     container: ModelHandle | None = None
+
+    @property
+    def target_fields(self) -> frozenset[str]:
+        """Every field the graph's target versions produce."""
+        fields: set[str] = set()
+        for entry in self.graph.entries:
+            fields.update(entry.target.fields)
+        return frozenset(fields)
 
     def __len__(self) -> int:
         return len(self.graph)

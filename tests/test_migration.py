@@ -16,6 +16,7 @@ from pyverge.migration import (
     Diff,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
+    MigrationContext,
     PydanticDiff,
     PydanticModelAdapter,
     Registry,
@@ -227,6 +228,21 @@ class TestCompiler:
             JsonPatchMigration(
                 {"from": "0.1.0", "to": "0.2.0", "ops": [{"op": "nope", "path": "/a"}]}
             )
+
+    def test_patch_callable_accepts_context(self) -> None:
+        migration = JsonPatchMigration(
+            {
+                "from": "0.1.0",
+                "to": "0.2.0",
+                "ops": [{"op": "add", "path": "/age", "value": 3}],
+            }
+        )
+        context = MigrationContext.create({"tenant": "t"})
+
+        assert migration.patch({"name": "Alice"}, context) == {
+            "name": "Alice",
+            "age": 3,
+        }
 
 
 class TestPydanticDiff:

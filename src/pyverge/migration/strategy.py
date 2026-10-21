@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Generic
 
+from pyverge.core.context import MigrationContext
 from pyverge.core.exceptions import MigrationError
 from pyverge.core.types import (
     DirectionViolationStrategy,
@@ -16,6 +16,7 @@ from .graph import GraphEntry
 
 if TYPE_CHECKING:
     from pyverge.migration.types import (
+        MigrationEntryCallback,
         RunnableMigration,
     )
     from pyverge.providers.types import (
@@ -31,15 +32,13 @@ class _DefaultMigrationTask(Generic[VersionValue]):
         entry: GraphEntry[VersionValue],
         current: ModelData,
         *,
-        execute_step: Callable[
-            [Any, Any, ModelData, tuple[Any, ...], str],
-            ModelData,
-        ],
+        execute_step: MigrationEntryCallback,
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
+        context: MigrationContext | None = None,
     ) -> None:
         self._entry = entry
         self._current = current
@@ -49,6 +48,7 @@ class _DefaultMigrationTask(Generic[VersionValue]):
         self._direction = direction
         self._on_direction_violation = on_direction_violation
         self._on_missing_path = on_missing_path
+        self._context = context
 
     def run(self) -> ModelData:
         entry = self._entry
@@ -57,7 +57,7 @@ class _DefaultMigrationTask(Generic[VersionValue]):
         if entry.source == entry.target:
             return current
 
-        if not _direction_allowed(entry.source, entry.target, self._direction):
+        if not entry.allows_direction(self._direction):
             if self._on_direction_violation == "raise":
                 raise MigrationError(
                     entry.kind,
@@ -71,7 +71,12 @@ class _DefaultMigrationTask(Generic[VersionValue]):
         try:
             for (step_from, step_to), hooks in zip(entry.steps, entry.hooks):
                 data = self._execute_step(
-                    step_from, step_to, data, hooks, self._version_property
+                    step_from,
+                    step_to,
+                    data,
+                    hooks,
+                    self._version_property,
+                    self._context,
                 )
         except MigrationError:
             if self._on_missing_path == "raise":
@@ -92,15 +97,13 @@ class DefaultMigrationEntry(Generic[VersionValue]):
         entry: GraphEntry[VersionValue],
         current: ModelData,
         *,
-        execute_step: Callable[
-            [Any, Any, ModelData, tuple[Any, ...], str],
-            ModelData,
-        ],
+        execute_step: MigrationEntryCallback,
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
+        context: MigrationContext | None = None,
     ) -> RunnableMigration:
         return _DefaultMigrationTask(
             entry,
@@ -111,18 +114,5 @@ class DefaultMigrationEntry(Generic[VersionValue]):
             direction=direction,
             on_direction_violation=on_direction_violation,
             on_missing_path=on_missing_path,
+            context=context,
         )
-
-
-def _direction_allowed(
-    source: Any,
-    target: Any,
-    direction: MigrationDirectionStrategy,
-) -> bool:
-    if direction == "any" or source == target:
-        return True
-    if direction == "forward":
-        return source < target
-    if direction == "backward":
-        return source > target
-    return True

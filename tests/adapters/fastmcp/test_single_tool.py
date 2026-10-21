@@ -115,7 +115,7 @@ LEAN_CALLS = (
                 semver.Version,
                 "user_test",
                 [USER_V1_0_0, USER_V2_0_0],
-                [((USER_V1_0_0, USER_V2_0_0), lambda d: {**d, "age": None})],
+                [((USER_V1_0_0, USER_V2_0_0), lambda d, _: {**d, "age": None})],
             ],
             lean_call,
             id=f"json-{lean_call.id}",

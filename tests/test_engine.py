@@ -27,6 +27,7 @@ from pyverge.migration import (
     Engine,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
+    MigrationContext,
     MigrationEntry,
     PydanticModelAdapter,
     earliest_target_resolver,
@@ -458,7 +459,7 @@ class TestMigrationManagement:
         for v in versions:
             engine.store_model(v)
 
-        def _migrate(data: dict) -> dict:
+        def _migrate(data: dict, context: MigrationContext | None = None) -> dict:
             return data
 
         engine.store_migration((versions[0], versions[1]), _migrate)
@@ -504,7 +505,7 @@ class TestMigrationManagement:
             envelope_model(engine.adapter, engine.settings, model) for model in models
         ]
         with pytest.raises(RegistryError, match="across kinds"):
-            engine.store_migration(versions, lambda d: d)  # ty: ignore[invalid-argument-type]
+            engine.store_migration(versions, lambda d, _: d)  # ty: ignore[invalid-argument-type]
 
     @pytest.mark.parametrize(
         "model_adapter, registry, meta_models, "
@@ -651,7 +652,7 @@ class TestMigrationManagement:
             real = engine.get_earliest_model(versionables[0].kind)
         for src, dst in pairwise([real, versionables[0]]):
             engine.store_migration(
-                (src, dst), lambda d: {**d, "version": str(dst.version[1])}
+                (src, dst), lambda d, _: {**d, "version": str(dst.version[1])}
             )
 
         with pytest.raises(MigrationNotFoundError):
@@ -676,7 +677,7 @@ class TestMigrationManagement:
                     semver.Version,
                     "test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="pydantic_semver_user_v1_v2",
@@ -691,7 +692,7 @@ class TestMigrationManagement:
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         with pytest.raises(MigrationAlreadyRegisteredError):
-            engine.store_migration((versions[0], versions[1]), lambda d: d)
+            engine.store_migration((versions[0], versions[1]), lambda d, _: d)
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -734,7 +735,7 @@ class TestMigrationManagement:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
 
         for pair in pairwise(versions):
-            engine.store_migration(pair, lambda d: d, backward_compatible=True)
+            engine.store_migration(pair, lambda d, _: d, backward_compatible=True)
 
         engine.remove_migration(SentinelEdge.from_pair(versions[0], versions[1]))
 
@@ -748,9 +749,9 @@ class TestMigrationManagement:
                     "test",
                     [UserV011Dev7, UserV1, UserV2, UserV3],
                     [
-                        ((UserV011Dev7, UserV1), lambda d: d),
-                        ((UserV1, UserV2), lambda d: d),
-                        ((UserV2, UserV3), lambda d: d),
+                        ((UserV011Dev7, UserV1), lambda d, _: d),
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
                     ],
                 ],
                 [UserV011Dev7, UserV1, UserV2, UserV3],
@@ -788,7 +789,7 @@ class TestMigrationManagement:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
             engine.store_model(v)
-        engine.store_migration((versions[0], versions[1]), lambda d: d)
+        engine.store_migration((versions[0], versions[1]), lambda d, _: d)
 
         edge = SentinelEdge.from_pair(versions[0], versions[1])
         engine.remove_migration(edge, force=True)
@@ -839,8 +840,8 @@ class TestMigrationManagement:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
             engine.store_model(v)
-        engine.store_migration((versions[0], versions[1]), lambda d: d)
-        engine.store_migration((versions[1], versions[2]), lambda d: d)
+        engine.store_migration((versions[0], versions[1]), lambda d, _: d)
+        engine.store_migration((versions[1], versions[2]), lambda d, _: d)
 
         with pytest.raises(RegistryError, match="critical"):
             engine.remove_migration_range(versions[0], versions[2])
@@ -890,7 +891,7 @@ class TestMigrationManagement:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
             engine.store_model(v)
-        engine.store_migration((versions[0], versions[1]), lambda d: d)
+        engine.store_migration((versions[0], versions[1]), lambda d, _: d)
 
         engine.delete_kind(versions[0].kind)
 
@@ -946,7 +947,7 @@ class TestMigrationManagement:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         for v in versions:
             engine.store_model(v)
-        engine.store_migration((versions[0], versions[1]), lambda d: d)
+        engine.store_migration((versions[0], versions[1]), lambda d, _: d)
 
         key = SentinelEdge.from_pair(versions[0], versions[1])
         if scenario == "add_remove":
@@ -1036,7 +1037,7 @@ class TestReflection:
         meta = engine.adapter.versionable(None, kind="User", version="1.0.0")
         engine.store_model(meta)
 
-        engine.store_migration((meta, real), lambda d: {**d, "age": None})
+        engine.store_migration((meta, real), lambda d, _: {**d, "age": None})
 
         stored = engine.get_model(
             VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
@@ -1077,7 +1078,7 @@ class TestLookupTyped:
                     semver.Version,
                     "test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
             ],
@@ -1107,7 +1108,7 @@ class TestMigrationEntryIntegration:
                     "test",
                     [UserV1, UserV2],
                     [
-                        ((UserV1, UserV2), lambda d: d),
+                        ((UserV1, UserV2), lambda d, _: d),
                     ],
                 ],
                 id="pydantic",

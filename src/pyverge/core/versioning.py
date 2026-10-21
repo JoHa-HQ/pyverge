@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import total_ordering
 from typing import Any, Generic, Self, cast
 
+from .context import MigrationContext
 from .exceptions import MigrationError
 from .types import (
     Comparable,
@@ -141,9 +142,13 @@ class VersionEdge(Generic[VersionValue]):
     def edge(self) -> MigrationKey:
         return (self.source, self.target)
 
-    def __call__(self, data: ModelData) -> ModelData:
+    def __call__(
+        self,
+        data: ModelData,
+        context: MigrationContext | None = None,
+    ) -> ModelData:
         try:
-            return self.func(data)
+            return self.func(data, context)
         except Exception as e:
             raise MigrationError(
                 self.kind,
