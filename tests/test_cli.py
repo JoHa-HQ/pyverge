@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -276,6 +277,29 @@ class TestCommands:
         with ManagerContext(manager_name, manager()):
             result = runner.invoke(
                 app, ["doctor", "-m", f"{manager_name}:manager", "--format", "json"]
+            )
+
+        assert result.exit_code == 0
+        assert json.loads(result.stdout)["status"] == "ok"
+
+    def test_doctor_resolves_runtime_factory(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            # Factory builds the manager from a runtime source.
+            setattr(sys.modules[manager_name], "create_manager", manager)
+            result = runner.invoke(
+                app,
+                [
+                    "doctor",
+                    "-m",
+                    f"{manager_name}:create_manager",
+                    "--format",
+                    "json",
+                ],
             )
 
         assert result.exit_code == 0
