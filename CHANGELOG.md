@@ -1,3 +1,10 @@
+## v0.12.0 (2026-10-21)
+
+### Feat
+
+- **#70**: decouple the executor. introduce cli commands for CI and developer experience. (#74)
+- **#70**: introduce a migration context (#73)
+
 ## v0.11.0 (2026-10-21)
 
 ### Feat
