@@ -384,6 +384,29 @@ class TestCommands:
         assert result.exit_code == 0
         assert json.loads(result.stdout)["breaking"] is False
 
+    def test_manifest_is_jgf_envelope(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(
+                app, ["manifest", "-m", f"{manager_name}:manager"]
+            )
+
+        assert result.exit_code == 0
+        envelope = json.loads(result.stdout)
+        assert set(envelope) == {"graph"}
+        graph = envelope["graph"]
+        assert graph["directed"] is True
+        assert graph["nodes"]["User@1.0.0"]["metadata"]["kind"] == "User"
+        assert graph["edges"][0]["source"] == "User@1.0.0"
+        assert graph["edges"][0]["target"] == "User@2.0.0"
+        assert graph["edges"][0]["metadata"]["strategy"] == "callable"
+        assert graph["metadata"]["manifest_version"] == "1.0"
+        assert all(c in "0123456789abcdef" for c in graph["metadata"]["content_hash"])
+
     def test_export_manifest(
         self,
         runner: CliRunner,
