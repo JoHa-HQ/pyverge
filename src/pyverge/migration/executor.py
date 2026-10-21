@@ -4,8 +4,8 @@ import copy
 from concurrent.futures import ThreadPoolExecutor as _ThreadPoolExecutor
 from typing import Generic
 
+from pyverge.core.context import MigrationContext
 from pyverge.core.exceptions import (
-    DiscoveryValidationError,
     MigrationError,
     MigrationNotFoundError,
 )
@@ -36,32 +36,6 @@ from .graph import GraphEntry, MigrationPlan
 from .registry import Registry
 
 
-def _check_container_compatibility(
-    adapter: ModelAdapter,
-    plan: MigrationPlan,
-) -> None:
-    """Fail fast when the plan's container cannot cover the migrated fields.
-
-    Runs before any migration: if the container is not recognized, or does not
-    declare every field the graph will produce, discovery of the migrated shape
-    cannot be trusted — raise before executing.
-    """
-    container = plan.container
-    if container is None:
-        return
-    fields: set[str] = set()
-    for entry in plan.graph.entries:
-        fields.update(entry.target.fields)
-    if not adapter.can_handle(container, fields=frozenset(fields)):
-        raise DiscoveryValidationError(
-            path=(),
-            message=(
-                "container is incompatible with the migration graph: "
-                f"cannot cover fields {sorted(fields)}"
-            ),
-        )
-
-
 class StepExecutor(Generic[VersionValue]):
     """Resolves and runs a single migration step from the registry."""
 
@@ -75,12 +49,13 @@ class StepExecutor(Generic[VersionValue]):
         data: ModelData,
         hooks: tuple[Attachable, ...],
         vp: str,
+        context: MigrationContext | None = None,
     ) -> ModelData:
         """Execute a single migration step and update the version property."""
         step = self._resolve_step(step_from, step_to)
         hooks_list = list(hooks)
         try:
-            result = step.execute(data, hooks_list)
+            result = step.execute(data, hooks_list, context)
         except MigrationError:
             raise
         except Exception as exc:
@@ -125,8 +100,9 @@ class SequentialExecutor(Executor[VersionValue]):
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
+        context: MigrationContext | None = None,
     ) -> ModelData:
-        _check_container_compatibility(adapter, plan)
+        adapter.ensure_compatible(plan.container, fields=plan.target_fields)
         graph = plan.graph
         step_executor = StepExecutor(registry)
         result = copy.deepcopy(plan.data)
@@ -141,6 +117,7 @@ class SequentialExecutor(Executor[VersionValue]):
                 direction=direction,
                 on_direction_violation=on_direction_violation,
                 on_missing_path=on_missing_path,
+                context=context,
             )
             migrated = task.run()
             _set_at_path(result, entry.path, migrated)
@@ -168,8 +145,9 @@ class LevelParallelExecutor(Executor[VersionValue]):
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
+        context: MigrationContext | None = None,
     ) -> ModelData:
-        _check_container_compatibility(adapter, plan)
+        adapter.ensure_compatible(plan.container, fields=plan.target_fields)
         graph = plan.graph
         step_executor = StepExecutor(registry)
         result = copy.deepcopy(plan.data)
@@ -187,6 +165,7 @@ class LevelParallelExecutor(Executor[VersionValue]):
                     direction=direction,
                     on_direction_violation=on_direction_violation,
                     on_missing_path=on_missing_path,
+                    context=context,
                 )
                 migrated = task.run()
                 _set_at_path(result, entry.path, migrated)
@@ -203,6 +182,7 @@ class LevelParallelExecutor(Executor[VersionValue]):
                         direction,
                         on_direction_violation,
                         on_missing_path,
+                        context,
                         entry,
                         _get_at_path(result, entry.path),
                     ): entry
@@ -230,6 +210,7 @@ def _run_task(
     direction: MigrationDirectionStrategy,
     on_direction_violation: DirectionViolationStrategy,
     on_missing_path: VersionMissingStrategy,
+    context: MigrationContext | None,
     entry: GraphEntry[VersionValue],
     current: ModelData,
 ) -> ModelData:
@@ -243,4 +224,5 @@ def _run_task(
         direction=direction,
         on_direction_violation=on_direction_violation,
         on_missing_path=on_missing_path,
+        context=context,
     ).run()

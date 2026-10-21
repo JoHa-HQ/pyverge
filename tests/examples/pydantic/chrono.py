@@ -14,6 +14,7 @@ Benefits:
 from enum import StrEnum
 from typing import Annotated, Literal
 
+from pyverge.core.context import MigrationContext
 from tests.examples.pydantic.base import BaseModel, Field, UserBaseModel
 
 # from pyverge.migration import MigrationSettings, ModelManager
@@ -94,13 +95,13 @@ class UserContainer(BaseModel):
 
 # Step 5: Register migrations at class level
 # @ChronoManager.migration(UserV20250101, UserV20250310)
-def migrate_v1_to_v2(data: dict) -> dict:
+def migrate_v1_to_v2(data: dict, context: MigrationContext | None = None) -> dict:
     data["age"] = None
     return data
 
 
 # @ChronoManager.migration(UserV20251231, UserV20260228)
-def migrate_v2_to_v3(data: dict) -> dict:
+def migrate_v2_to_v3(data: dict, context: MigrationContext | None = None) -> dict:
     data["last_name"] = data.get("last_name")
     data["beta_feature_enabled"] = False
     return data

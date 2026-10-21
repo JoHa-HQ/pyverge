@@ -83,6 +83,19 @@ class ModelAdapter(Protocol):
         """
         ...
 
+    def ensure_compatible(
+        self,
+        container: Any,
+        *,
+        fields: frozenset[str],
+    ) -> None:
+        """Raise when *container* cannot cover the migrated *fields*.
+
+        The adapter owns container compatibility: it knows which model shapes
+        it recognizes and which fields they declare.
+        """
+        ...
+
     def can_handle(
         self,
         container: Any,

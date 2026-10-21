@@ -22,6 +22,8 @@ from typing import (
 from pendulum import Date
 from semver import Version as SemVer
 
+from .context import MigrationContext
+
 # ---------------------------------------------------------------------------
 # Version axis
 # ---------------------------------------------------------------------------
@@ -62,7 +64,7 @@ ModelVersionKey: TypeAlias = tuple[ModelKind, VersionValue]
 MigrationKey: TypeAlias = tuple[VersionValue, VersionValue]
 #: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
 MIGRATION_PAIR_LEN: int = 2
-MigrationFunc: TypeAlias = Callable[[ModelData], ModelData]
+MigrationFunc: TypeAlias = Callable[[ModelData, MigrationContext | None], ModelData]
 #: How a diff came to be: discovered from a registered migration, or computed
 #: from two concrete schemas.  Selects the reflection strategy when no explicit
 #: setting applies.
@@ -199,7 +201,11 @@ class Migratable(Transitional[VersionValue_co], Protocol[VersionValue_co]):
     func: MigrationFunc
     diff: Diffable[VersionValue_co]
 
-    def __call__(self, data: ModelData) -> ModelData: ...
+    def __call__(
+        self,
+        data: ModelData,
+        context: MigrationContext | None = None,
+    ) -> ModelData: ...
 
 
 @runtime_checkable

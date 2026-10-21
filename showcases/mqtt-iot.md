@@ -59,7 +59,7 @@ class OrderV2(BaseModel):
 
 
 @OrderManager.migration("Order", "1.0.0", "2.0.0")
-def add_currency(data: dict) -> dict:
+def add_currency(data: dict, context=None) -> dict:
     return {**data, "currency": "USD"}
 
 

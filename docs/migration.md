@@ -144,7 +144,9 @@ user_v2 = manager.get("User", "2.0.0")
 proposal = manager.engine.propose_migration(user_v1, user_v2)
 
 # The proposal is a JsonPatchMigration — review it before registering.
-manager.store_migration(("User", "1.0.0", "2.0.0"), proposal)
+manager.store_migration(
+    ManagerMigrationKey("User", "1.0.0", "2.0.0"), proposal
+)
 ```
 
 The proposal is a **shape-based** diff: it captures field additions, removals
@@ -157,17 +159,27 @@ register deliberately.
 
 ## Migration formats
 
-Migrations can be Python callables or declarative RFC 6902 JSON Patch specs.
-Both are normalized into a diff by the engine's discovery strategies, so
-reconstruction works the same way regardless of format:
+Choose the simplest format that expresses the migration:
+
+1. **RFC 6902 JSON Patch** — the portable default. Pure data, no code, easiest
+   to serialize, diff, and move between runtimes. Patch ops cannot read runtime
+   context; use it for structural changes.
+2. **JSONata** — declarative expressions for string formatting, arithmetic,
+   filtering, and context-dependent values (`$tenant_id`). Planned follow-up;
+   until it lands, use a runtime callable for these cases.
+3. **Python callable** — the escape hatch. Full language and full context
+   access, but no longer portable configuration.
+
+JSON Patch and callables are normalized into a diff by the engine's discovery
+strategies, so reconstruction works the same way regardless of format:
 
 ```python
-# Python callable
-manager.store_migration(("User", "1.0.0", "2.0.0"), add_age)
+from pyverge.core import ManagerMigrationKey
+from pyverge.migration import JsonPatchMigration
 
-# Declarative JSON Patch spec
+# Declarative JSON Patch spec — preferred when no context is needed
 manager.store_migration(
-    ("User", "1.0.0", "2.0.0"),
+    ManagerMigrationKey("User", "1.0.0", "2.0.0"),
     JsonPatchMigration(
         {
             "from": "1.0.0",
@@ -176,7 +188,46 @@ manager.store_migration(
         }
     ),
 )
+
+# Runtime callable — use when the migration needs context or imperative logic
+manager.store_migration(ManagerMigrationKey("User", "1.0.0", "2.0.0"), add_age)
 ```
+
+## Runtime context
+
+A migration can read values that are only known when it runs — tenant ids,
+request timestamps, exchange rates. Pass them to `migrate`; the same
+`MigrationContext` reaches every step:
+
+```python
+result = manager.migrate(payload, context={"tenant_id": "tenant_99"})
+```
+
+The context is a read-only **view** over the mapping you pass, not a copy.
+Creation is O(1) and the same instance reaches every step. Do not mutate the
+source mapping while a migration is running.
+
+**JSON Patch does not read context.** RFC 6902 has no variables, and keeping it
+free of them is what makes it portable. If an op needs a runtime value, promote
+that migration to JSONata (declarative + context, planned) or a callable.
+
+Every runtime callable uses the same contract:
+
+```python
+from pyverge.core import ManagerMigrationKey
+
+def migrate_v1_to_v2(data, context=None):
+    data["tenant_id"] = context["tenant_id"]
+    return data
+
+manager.store_migration(
+    ManagerMigrationKey("User", "1.0.0", "2.0.0"),
+    migrate_v1_to_v2,
+)
+```
+
+`context` is always provided by the engine; the default `None` keeps direct
+calls and tests simple.
 
 ## Authoring guidelines
 
@@ -195,7 +246,7 @@ constrained so they never occur.
 ```python
 # v2: age: int | None            (any int)
 # v3: age: int = Field(ge=0)     (non-negative)
-def migrate_v2_to_v3(data: dict) -> dict:
+def migrate_v2_to_v3(data: dict, context=None) -> dict:
     age = data.get("age")
     data["age"] = 0 if age is None else max(age, 0)  # normalize, or…
     data["status"] = "active"
@@ -234,7 +285,7 @@ class UserV2Data(UserData):
     age: int | None
 
 
-def add_age(data: UserV1Data) -> UserV2Data:
+def add_age(data: UserV1Data, context=None) -> UserV2Data:
     return {**data, "age": None}
 ```
 
@@ -267,10 +318,14 @@ Backward migration across a chain works by registering a reverse edge with
 
 ```python
 # Forward edge: 0.1.0 -> 0.2.0
-manager.store_migration(("User", "0.1.0", "0.2.0"), forward_ops)
+manager.store_migration(
+    ManagerMigrationKey("User", "0.1.0", "0.2.0"), forward_ops
+)
 
 # Reverse edge: 0.2.0 -> 0.1.0 (swapped spec, own ops)
-manager.store_migration(("User", "0.2.0", "0.1.0"), reverse_ops)
+manager.store_migration(
+    ManagerMigrationKey("User", "0.2.0", "0.1.0"), reverse_ops
+)
 ```
 
 Without a registered reverse edge, a backward migration raises.

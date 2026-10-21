@@ -143,7 +143,9 @@ class TestDefaultMigrationEntry:
             on_missing_path="raise",
         ).run()
 
-        execute_step.assert_called_once_with(source, target, current, (), "version")
+        execute_step.assert_called_once_with(
+            source, target, current, (), "version", None
+        )
         assert result == {"version": "2.0.0"}
 
     def test_calls_adapter_finalize(

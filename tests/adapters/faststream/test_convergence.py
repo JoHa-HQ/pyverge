@@ -23,7 +23,7 @@ from pyverge.adapters.faststream import (
     subscriber,
 )
 from pyverge.core.exceptions import RegistryError
-from pyverge.migration import PydanticModelAdapter
+from pyverge.migration import MigrationContext, PydanticModelAdapter
 from tests.examples.pydantic.semver import (
     UserV1,
     UserV2,
@@ -31,7 +31,9 @@ from tests.examples.pydantic.semver import (
 )
 
 
-def _reverse(data: dict[str, Any]) -> dict[str, Any]:
+def _reverse(
+    data: dict[str, Any], context: MigrationContext | None = None
+) -> dict[str, Any]:
     data = dict(data)
     data.pop("age", None)
     return data

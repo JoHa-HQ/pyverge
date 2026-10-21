@@ -1,3 +1,4 @@
+from .context import EMPTY_CONTEXT, MigrationContext
 from .exceptions import (
     DiscoveryError,
     DiscoveryValidationError,
@@ -55,6 +56,7 @@ from .types import (
 from .versioning import SentinelEdge, VersionEdge, VersionNode
 
 __all__ = [
+    "EMPTY_CONTEXT",
     "MIGRATION_PAIR_LEN",
     "Attachable",
     "Comparable",
@@ -72,6 +74,7 @@ __all__ = [
     "MaxDepthExceededError",
     "Migratable",
     "MigrationAlreadyRegisteredError",
+    "MigrationContext",
     "MigrationDirectionStrategy",
     "MigrationError",
     "MigrationFunc",

@@ -1,5 +1,6 @@
 from typing import Annotated, Literal
 
+from pyverge.core.context import MigrationContext
 from tests.examples.pydantic.base import (
     AddressBaseModel,
     BaseModel,
@@ -38,18 +39,22 @@ Address = Annotated[
 ]
 
 
-def migrate_address_100_200(data: dict) -> dict:
+def migrate_address_100_200(
+    data: dict, context: MigrationContext | None = None
+) -> dict:
     data["country"] = None
     data["postal_code"] = None
     return data
 
 
-def migrate_address_300_200(data: dict) -> dict:
+def migrate_address_300_200(
+    data: dict, context: MigrationContext | None = None
+) -> dict:
     data.pop("region", None)
     return data
 
 
-def promote_address(data: dict) -> dict:
+def promote_address(data: dict, context: MigrationContext | None = None) -> dict:
     """AddressV1 -> AddressV3: add the fields the newer version introduced."""
     data.setdefault("country", None)
     data.setdefault("postal_code", None)
@@ -57,7 +62,7 @@ def promote_address(data: dict) -> dict:
     return data
 
 
-def demote_address(data: dict) -> dict:
+def demote_address(data: dict, context: MigrationContext | None = None) -> dict:
     """AddressV3 -> AddressV1: drop fields the older version does not know."""
     for field in ("country", "postal_code", "region"):
         data.pop(field, None)
@@ -82,7 +87,9 @@ Contact = Annotated[
 ]
 
 
-def migrate_contact_100_200(data: dict) -> dict:
+def migrate_contact_100_200(
+    data: dict, context: MigrationContext | None = None
+) -> dict:
     data["email"] = None
     data["preferred"] = "phone"
     return data
@@ -112,20 +119,22 @@ class PersonContainer(BaseModel):
     document: Person
 
 
-def migrate_person_100_200(data: dict) -> dict:
+def migrate_person_100_200(data: dict, context: MigrationContext | None = None) -> dict:
     data["email"] = None
     data["contacts"] = []
     return data
 
 
-def preserve_children_person(data: dict) -> dict:
+def preserve_children_person(
+    data: dict, context: MigrationContext | None = None
+) -> dict:
     """PersonV1 -> PersonV2 migration that keeps already-migrated child data."""
     data.setdefault("email", None)
     data.setdefault("contacts", [])
     return data
 
 
-def demote_person(data: dict) -> dict:
+def demote_person(data: dict, context: MigrationContext | None = None) -> dict:
     """PersonV2 -> PersonV1: drop fields the older version does not know."""
     for field in ("email", "contacts"):
         data.pop(field, None)

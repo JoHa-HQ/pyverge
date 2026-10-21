@@ -73,7 +73,7 @@ class UserV2(BaseModel):
 
 # Register a migration between two versions.
 @UserManager.migration("User", "1.0.0", "2.0.0")
-def add_age(data: dict) -> dict:
+def add_age(data: dict, context=None) -> dict:
     return {**data, "age": None}
 
 
@@ -123,7 +123,8 @@ pyverge export --manager user --version 2.0.0 > schema.json
 - **Model reflection** — when a migration endpoint has no concrete model, the engine reconstructs it from the other endpoint's model and the migration diff (`on_missing="reconstruct_model"`), so every version in a chain is materializable
 - **Migration proposal** — when you hold both models but no migration, `Engine.propose_migration` diffs their schemas into a declarative JSON Patch to review (`on_missing="reconstruct_migration"`). The two reconstruction strategies are mutually exclusive
 - **Provider adapters** — pluggable `ModelAdapter`; Pydantic and JSON Schema ship today, other providers (dataclasses, attrs, marshmallow, MessagePack) plug in the same way
-- **Declarative migrations** — express a migration as an RFC 6902 JSON Patch op list (plus `set_default`/`coerce`/`map`/`split`), compiled into a `MigrationFunc` via `JsonPatchMigration`
+- **Declarative migrations** — express a migration as an RFC 6902 JSON Patch op list (plus `set_default`/`coerce`/`map`/`split`), compiled into a `MigrationFunc` via `JsonPatchMigration`; JSON Patch stays context-free for portability
+- **Runtime context** — pass tenant ids, timestamps, rates via `migrate(context=...)`; runtime callables receive the same read-only view at every step
 - **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
 - **Target policies** — converge to `latest`, `earliest`, a pinned version, or per-kind overrides
 - **Executors** — sequential or level-parallel batch convergence

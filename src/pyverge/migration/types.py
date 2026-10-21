@@ -9,7 +9,9 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any, Protocol
 
+from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
+    Attachable,
     DirectionViolationStrategy,
     MigrationDirectionStrategy,
     ModelData,
@@ -29,7 +31,14 @@ if TYPE_CHECKING:
 Entry = tuple[tuple[str | int, ...], int, "Versionable[VersionValue]"]
 
 MigrationEntryCallback = Callable[
-    [Any, Any, ModelData, tuple[Any, ...], str],
+    [
+        Versionable,
+        Versionable,
+        ModelData,
+        tuple[Attachable, ...],
+        str,
+        MigrationContext | None,
+    ],
     ModelData,
 ]
 
@@ -75,6 +84,7 @@ class Executor(Protocol[VersionValue_co]):
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
+        context: MigrationContext | None = None,
     ) -> ModelData: ...
 
 
@@ -92,4 +102,5 @@ class MigrationEntry(Protocol[VersionValue]):
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
+        context: MigrationContext | None = None,
     ) -> RunnableMigration: ...

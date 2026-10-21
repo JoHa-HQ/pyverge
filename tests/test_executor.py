@@ -20,6 +20,7 @@ from pyverge.migration import (
     Engine,
     JsonPatchMigration,
     LevelParallelExecutor,
+    MigrationContext,
     PydanticModelAdapter,
     Registry,
     SequentialExecutor,
@@ -203,7 +204,7 @@ class TestStepExecutor:
             engine.adapter,
             engine.settings,
             *models,
-            func=lambda d: {"version": "2.0.0", "name": d.get("name")},
+            func=lambda d, _: {"version": "2.0.0", "name": d.get("name")},
         )
         engine.registry.store_migration(edge)
 
@@ -217,6 +218,56 @@ class TestStepExecutor:
         )
 
         assert result == {"version": "2.0.0", "name": "Alice"}
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [PersonV1, PersonV2], []],
+                [PersonV1, PersonV2],
+                id="pydantic_person_v1_v2",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_execute_step_passes_context_to_provider(
+        self,
+        engine: Engine[types.VersionValue],
+        models: list[ModelHandle],
+    ) -> None:
+        seen: list[MigrationContext] = []
+
+        def _migrate(data: dict, context: MigrationContext | None = None) -> dict:
+            assert context is not None
+            seen.append(context)
+            return {
+                "version": "2.0.0",
+                "name": data["name"],
+                "tenant_id": context["tenant_id"],
+            }
+
+        source, target = [
+            envelope_model(engine.adapter, engine.settings, model) for model in models
+        ]
+        engine.store_migration((source, target), _migrate)
+        context = MigrationContext.create({"tenant_id": "tenant_99"})
+
+        result = StepExecutor(engine.registry).execute_step(
+            source,
+            target,
+            {"version": "1.0.0", "name": "Alice"},
+            (),
+            "version",
+            context,
+        )
+
+        assert result == {
+            "version": "2.0.0",
+            "name": "Alice",
+            "tenant_id": "tenant_99",
+        }
+        assert seen == [context]
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -262,11 +313,11 @@ def test_sequential_executor_runs_in_topological_order(
 ) -> None:
     order: list[str] = []
 
-    def _track_person(data: dict) -> dict:
+    def _track_person(data: dict, context: MigrationContext | None = None) -> dict:
         order.append("person")
         return preserve_children_person(data)
 
-    def _track_address(data: dict) -> dict:
+    def _track_address(data: dict, context: MigrationContext | None = None) -> dict:
         order.append("address")
         return migrate_address_100_200(data)
 
@@ -309,7 +360,7 @@ def test_sequential_executor_runs_in_topological_order(
     "func_factory",
     [
         pytest.param(
-            lambda: lambda data: (_ for _ in ()).throw(RuntimeError("boom")),
+            lambda: lambda data, _: (_ for _ in ()).throw(RuntimeError("boom")),
             id="python-callable",
         ),
         pytest.param(

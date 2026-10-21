@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     ModelData,
 )
@@ -128,5 +129,7 @@ MIGRATE_CONTACT_100_200 = {
 }
 
 
-def migrate_v20250101_to_v20250310(state: ModelData) -> ModelData:
+def migrate_v20250101_to_v20250310(
+    state: ModelData, context: MigrationContext | None = None
+) -> ModelData:
     return state

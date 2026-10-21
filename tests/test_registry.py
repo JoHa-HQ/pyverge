@@ -25,6 +25,7 @@ from pyverge.core import (
     VersionNode,
 )
 from pyverge.migration import (
+    MigrationContext,
     PydanticModelAdapter,
     Registry,
 )
@@ -602,7 +603,7 @@ class TestMigration:
         registry: Registry[types.VersionValue],
         models: list[ModelHandle],
     ) -> None:
-        def _migrate(data: dict) -> dict:
+        def _migrate(data: dict, context: MigrationContext | None = None) -> dict:
             return data
 
         edge = edge_from_models(
@@ -645,7 +646,7 @@ class TestMigration:
                 versioning_settings,
                 models[0],
                 models[1],
-                func=lambda d: d,
+                func=lambda d, _: d,
             )
             registry.store_migration(edge)
 
@@ -658,7 +659,7 @@ class TestMigration:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_user_v1_v2_duplicate",
@@ -669,7 +670,7 @@ class TestMigration:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_user_2025_01_01_2025_03_10_duplicate",
@@ -684,7 +685,7 @@ class TestMigration:
         registry: Registry[types.VersionValue],
         models: list[ModelHandle],
     ) -> None:
-        def _migrate(data: dict) -> dict:
+        def _migrate(data: dict, context: MigrationContext | None = None) -> dict:
             return data
 
         edge = edge_from_models(
@@ -729,7 +730,7 @@ class TestMigration:
                 versioning_settings,
                 models[0],
                 models[1],
-                func=lambda data: data,
+                func=lambda data, _: data,
             )
             registry.get_migration(SentinelEdge.from_version_edge(fake_key))
 
@@ -742,7 +743,7 @@ class TestMigration:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_user_v1_v2",
@@ -753,7 +754,7 @@ class TestMigration:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_user_2025_01_01_2025_03_10",
@@ -773,7 +774,7 @@ class TestMigration:
             versioning_settings,
             models[0],
             models[1],
-            func=lambda data: data,
+            func=lambda data, _: data,
         )
         registry.remove_migration(SentinelEdge.from_version_edge(key))
 
@@ -791,7 +792,7 @@ class TestHooks:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_user_v1_v2",
@@ -802,7 +803,7 @@ class TestHooks:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_user_2025_01_01_2025_03_10",
@@ -818,7 +819,11 @@ class TestHooks:
         models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         key = SentinelEdge.from_version_edge(edge)
         hook = MigrationHook()
@@ -834,7 +839,7 @@ class TestHooks:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_no_hooks",
@@ -845,7 +850,7 @@ class TestHooks:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_no_hooks",
@@ -861,7 +866,11 @@ class TestHooks:
         models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         assert registry.get_hooks(edge) == []
 
@@ -874,7 +883,7 @@ class TestHooks:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_remove_one_hook",
@@ -885,7 +894,7 @@ class TestHooks:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_remove_one_hook",
@@ -903,7 +912,11 @@ class TestHooks:
         hook1 = MigrationHook()
         hook2 = MigrationHook()
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         key = SentinelEdge.from_version_edge(edge)
         for h in [hook1, hook2]:
@@ -921,7 +934,7 @@ class TestHooks:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_remove_all_hooks",
@@ -932,7 +945,7 @@ class TestHooks:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_remove_all_hooks",
@@ -948,7 +961,11 @@ class TestHooks:
         models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         registry.add_hook(edge, MigrationHook())
         registry.add_hook(edge, MigrationHook())
@@ -964,7 +981,7 @@ class TestHooks:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_missing_hook",
@@ -975,7 +992,7 @@ class TestHooks:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_missing_hook",
@@ -991,7 +1008,11 @@ class TestHooks:
         models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         key = SentinelEdge.from_version_edge(edge)
         with pytest.raises(RegistryError):
@@ -1006,7 +1027,7 @@ class TestHooks:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 2,
@@ -1018,7 +1039,7 @@ class TestHooks:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 2,
@@ -1036,7 +1057,11 @@ class TestHooks:
         expected_amount: int,
     ) -> None:
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         key = SentinelEdge.from_version_edge(edge)
         registry.add_hook(edge, MigrationHook())
@@ -1054,7 +1079,7 @@ class TestHooks:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_clear_key_hooks",
@@ -1065,7 +1090,7 @@ class TestHooks:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_clear_key_hooks",
@@ -1081,7 +1106,11 @@ class TestHooks:
         models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         key = SentinelEdge.from_version_edge(edge)
         registry.add_hook(key, MigrationHook())
@@ -1136,7 +1165,10 @@ class TestVersionEdgeIndex:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2, UserV3],
-                    [((UserV1, UserV2), lambda d: d), ((UserV2, UserV3), lambda d: d)],
+                    [
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
+                    ],
                 ],
                 [UserV1, UserV2, UserV3],
                 id="semver_chain_v1_v2_v3",
@@ -1148,8 +1180,8 @@ class TestVersionEdgeIndex:
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
                     [
-                        ((USER_V2025_01_01, USER_V2025_03_10), lambda d: d),
-                        ((USER_V2025_03_10, USER_V2025_12_31), lambda d: d),
+                        ((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d),
+                        ((USER_V2025_03_10, USER_V2025_12_31), lambda d, _: d),
                     ],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
@@ -1169,10 +1201,18 @@ class TestVersionEdgeIndex:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
         e1 = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         e2 = edge_from_models(
-            model_adapter, versioning_settings, models[1], models[2], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[1],
+            models[2],
+            func=lambda d, _: d,
         )
 
         assert registry.migrations_of(versions[0]) == {e1}
@@ -1188,7 +1228,7 @@ class TestVersionEdgeIndex:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_node_key",
@@ -1199,7 +1239,7 @@ class TestVersionEdgeIndex:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_node_key",
@@ -1232,7 +1272,10 @@ class TestVersionEdgeIndex:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2, UserV3],
-                    [((UserV1, UserV2), lambda d: d), ((UserV2, UserV3), lambda d: d)],
+                    [
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
+                    ],
                 ],
                 [UserV1, UserV2, UserV3],
                 id="semver_remove_updates_index",
@@ -1244,8 +1287,8 @@ class TestVersionEdgeIndex:
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
                     [
-                        ((USER_V2025_01_01, USER_V2025_03_10), lambda d: d),
-                        ((USER_V2025_03_10, USER_V2025_12_31), lambda d: d),
+                        ((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d),
+                        ((USER_V2025_03_10, USER_V2025_12_31), lambda d, _: d),
                     ],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
@@ -1265,10 +1308,18 @@ class TestVersionEdgeIndex:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
         e1 = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         e2 = edge_from_models(
-            model_adapter, versioning_settings, models[1], models[2], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[1],
+            models[2],
+            func=lambda d, _: d,
         )
 
         registry.remove_migration(SentinelEdge.from_version_edge(e1))
@@ -1285,7 +1336,7 @@ class TestVersionEdgeIndex:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_clear_index",
@@ -1296,7 +1347,7 @@ class TestVersionEdgeIndex:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_clear_index",
@@ -1328,7 +1379,7 @@ class TestVersionEdgeIndex:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_copy_index",
@@ -1339,7 +1390,7 @@ class TestVersionEdgeIndex:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_copy_index",
@@ -1358,7 +1409,11 @@ class TestVersionEdgeIndex:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
 
         clone = registry.copy()
@@ -1378,7 +1433,7 @@ class TestVersionEdgeIndex:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_referenced_model",
@@ -1389,7 +1444,7 @@ class TestVersionEdgeIndex:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_referenced_model",
@@ -1421,7 +1476,7 @@ class TestVersionEdgeIndex:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_remove_after_migration",
@@ -1432,7 +1487,7 @@ class TestVersionEdgeIndex:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_remove_after_migration",
@@ -1451,7 +1506,11 @@ class TestVersionEdgeIndex:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         registry.remove_migration(SentinelEdge.from_version_edge(edge))
 
@@ -1529,7 +1588,7 @@ class TestEdgePairLookup:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2, UserV3],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2, UserV3],
                 id="semver_pair_lookup",
@@ -1540,7 +1599,7 @@ class TestEdgePairLookup:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10, USER_V2025_12_31],
                 id="json_chrono_pair_lookup",
@@ -1608,7 +1667,11 @@ class TestEdgePairLookup:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         registry.store_migration(edge)
 
@@ -1663,7 +1726,7 @@ class TestEdgePairLookup:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_default_not_backward",
@@ -1674,7 +1737,7 @@ class TestEdgePairLookup:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_default_not_backward",
@@ -1734,7 +1797,7 @@ class TestEdgePairLookup:
             versioning_settings,
             models[0],
             models[1],
-            func=lambda d: d,
+            func=lambda d, _: d,
             backward_compatible=True,
         )
         registry.store_migration(edge)
@@ -1783,7 +1846,7 @@ class TestEdgePairLookup:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_pair_remove",
@@ -1794,7 +1857,7 @@ class TestEdgePairLookup:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_pair_remove",
@@ -1813,7 +1876,11 @@ class TestEdgePairLookup:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         registry.remove_migration(SentinelEdge.from_version_edge(edge))
 
@@ -1829,7 +1896,7 @@ class TestEdgePairLookup:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_pair_clear",
@@ -1840,7 +1907,7 @@ class TestEdgePairLookup:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_pair_clear",
@@ -1873,7 +1940,7 @@ class TestEdgePairLookup:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_pair_copy",
@@ -1884,7 +1951,7 @@ class TestEdgePairLookup:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_pair_copy",
@@ -1903,7 +1970,11 @@ class TestEdgePairLookup:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
 
         clone = registry.copy()
@@ -1949,7 +2020,11 @@ class TestMigrationHookGuard:
         models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         registry.store_migration(edge)
         registry.add_hook(edge, MigrationHook())
@@ -1970,7 +2045,7 @@ class TestMigrationHookGuard:
                     semver.Version,
                     "semver_test",
                     [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d: d)],
+                    [((UserV1, UserV2), lambda d, _: d)],
                 ],
                 [UserV1, UserV2],
                 id="semver_hooks_cleared",
@@ -1981,7 +2056,7 @@ class TestMigrationHookGuard:
                     pendulum.Date,
                     "json_chrono_test",
                     [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d: d)],
+                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
                 ],
                 [USER_V2025_01_01, USER_V2025_03_10],
                 id="json_chrono_hooks_cleared",
@@ -1997,7 +2072,11 @@ class TestMigrationHookGuard:
         models: list[ModelHandle],
     ) -> None:
         edge = edge_from_models(
-            model_adapter, versioning_settings, models[0], models[1], func=lambda d: d
+            model_adapter,
+            versioning_settings,
+            models[0],
+            models[1],
+            func=lambda d, _: d,
         )
         key = SentinelEdge.from_version_edge(edge)
         registry.add_hook(key, MigrationHook())
@@ -2284,8 +2363,8 @@ class TestNeutralGraphOps:
                     "semver_test",
                     [UserV1, UserV2, UserV3],
                     [
-                        ((UserV1, UserV2), lambda d: d),
-                        ((UserV2, UserV3), lambda d: d),
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
                     ],
                 ],
                 [UserV1, UserV2, UserV3],
@@ -2330,8 +2409,8 @@ class TestNeutralGraphOps:
                     "semver_test",
                     [UserV1, UserV2, UserV3],
                     [
-                        ((UserV1, UserV2), lambda d: d),
-                        ((UserV2, UserV3), lambda d: d),
+                        ((UserV1, UserV2), lambda d, _: d),
+                        ((UserV2, UserV3), lambda d, _: d),
                     ],
                 ],
                 [UserV1, UserV2, UserV3],

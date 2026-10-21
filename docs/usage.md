@@ -37,7 +37,9 @@ kind, and can render the change as an RFC 6902 JSON Patch.
 
 ```python
 # Python callable
-manager.store_migration(("User", "1.0.0", "2.0.0"), add_age)
+manager.store_migration(
+    ManagerMigrationKey("User", "1.0.0", "2.0.0"), add_age
+)
 
 # Declarative JSON Patch spec
 manager.store_migration(
