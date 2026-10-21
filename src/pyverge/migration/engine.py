@@ -30,7 +30,7 @@ from pyverge.core.versioning import (
 )
 from pyverge.executor import (
     AsyncExecutor,
-    DefaultMigrationEntry,
+    DefaultEntryPlanner,
     ExecutionPolicy,
     Executor,
     MigrationEntry,
@@ -79,7 +79,7 @@ class Engine(Generic[VersionValue]):
         self.default_executor = default_executor
         self.execution_policy = ExecutionPolicy(settings)
         self.adapter = adapter
-        self.entry_migration = entry_migration or DefaultMigrationEntry()
+        self.entry_migration = entry_migration or DefaultEntryPlanner()
         self.discovery: DiffDiscovery[VersionValue, JsonPatch | MigrationFunc] = (
             CompositeDiffDiscovery()
         )

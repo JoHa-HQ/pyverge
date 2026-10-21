@@ -1,7 +1,11 @@
 """Local executor components."""
 
 from .backend import LocalExecutionBackend
-from .entry import DefaultMigrationEntry
+from .entry import (
+    DefaultEntryPlanner,
+    DefaultMigrationEntry,
+    EntryMigrationTask,
+)
 from .hooks import MigrationHook, invoke_async_hook
 from .step import StepExecutor
 from .strategy import (
@@ -14,7 +18,9 @@ from .strategy import (
 __all__ = [
     "AsyncLevelParallelExecutor",
     "AsyncSequentialExecutor",
+    "DefaultEntryPlanner",
     "DefaultMigrationEntry",
+    "EntryMigrationTask",
     "LevelParallelExecutor",
     "LocalExecutionBackend",
     "MigrationHook",

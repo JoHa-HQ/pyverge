@@ -8,7 +8,7 @@ from pyverge.core.types import (
 )
 from pyverge.executor import (
     AsyncExecutor,
-    DefaultMigrationEntry,
+    DefaultEntryPlanner,
     Executor,
     MigrationEntry,
 )
@@ -117,7 +117,7 @@ class Manager(
                 settings-driven :class:`ExecutionPolicy` selects sequential or
                 level-parallel, sync or async.
             entry_migration: Optional per-entry migration defaults.  Defaults
-                to :class:`~pyverge.migration.DefaultMigrationEntry`.
+                to :class:`~pyverge.migration.DefaultEntryPlanner`.
         """
         if walker is None:
             registry = Registry[VersionValue]()
@@ -137,7 +137,7 @@ class Manager(
                 active_walker,
             ),
             adapter=adapter,
-            entry_migration=entry_migration or DefaultMigrationEntry(),
+            entry_migration=entry_migration or DefaultEntryPlanner(),
         )
         cls._default_engine = engine
         cls._default_adapter = adapter
