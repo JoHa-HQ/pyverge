@@ -26,8 +26,23 @@ class AuditHook(MigrationHook):
 Register a hook on a specific migration edge:
 
 ```python
-manager.add_hook(("User", "1.0.0", "2.0.0"), AuditHook())
+from pyverge.core import ManagerMigrationKey
+
+manager.add_hook(ManagerMigrationKey("User", "1.0.0", "2.0.0"), AuditHook())
 ```
+
+## Async hooks
+
+Async executors use async overrides when present:
+
+```python
+class AsyncAuditHook(MigrationHook):
+    async def abefore_migrate(self, name, from_version, to_version, data):
+        await audit_write(name, from_version, to_version, data)
+```
+
+If only the sync methods exist, the async executor runs them in a worker thread
+via `asyncio.to_thread`; sync hooks do not block the event loop.
 
 ## OpenTelemetry
 
@@ -40,13 +55,14 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, OTLPSpanExporter
 
 from pyverge.adapters.otel import OTELHook
+from pyverge.core import ManagerMigrationKey
 
 provider = TracerProvider()
 provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
 trace.set_tracer_provider(provider)
 
 hook = OTELHook(tracer=trace.get_tracer("converge"), service="converge")
-manager.add_hook(("User", "1.0.0", "2.0.0"), hook)
+manager.add_hook(ManagerMigrationKey("User", "1.0.0", "2.0.0"), hook)
 ```
 
 Each migration step emits a span named `<service>.migrate` with attributes for

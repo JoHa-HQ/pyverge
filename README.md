@@ -86,6 +86,32 @@ migrated = manager.migrate(
 # -> {"kind": "User", "version": "2.0.0", "name": "Alice", "email": "a@b.com", "age": None}
 ```
 
+### Async and prepared runs
+
+```python
+# Async execution
+result = await manager.amigrate(payload)
+
+# Prepare once, execute later with different runtime context
+run = manager.delegate(payload)
+first = run.run(context={"tenant_id": "tenant_a"})
+second = run.run(context={"tenant_id": "tenant_b"})
+```
+
+`manager.migrate` and `manager.amigrate` execute immediately. `delegate`
+returns a reusable `MigrationRun`; `prepare` is the lower-level form.
+Execution mode and parallelism come from settings:
+
+```python
+MigrationSettings(execution_mode="async", parallel_workers=4)
+```
+
+## Migration formats
+
+1. **JSON Patch** - structural, portable, context-free
+2. **JSONata** - declarative expressions with context (planned)
+3. **Python callable** - escape hatch with full context access
+
 ## CLI
 
 ```bash
@@ -107,6 +133,10 @@ pyverge managers myapp.models                     # List managers in a module
 
 Managers are addressed as `module:object_path`. CI-friendly commands
 (`doctor`, `validate`, `migrate --check`, `compat`) return non-zero on failure.
+`init` scaffolds a config file, but config auto-discovery is not wired yet;
+commands still take `module:object_path`.
+
+See [CLI Reference](docs/cli.md) for flags and exit codes.
 
 ## Features
 
@@ -118,7 +148,7 @@ Managers are addressed as `module:object_path`. CI-friendly commands
 - **Runtime context** — pass tenant ids, timestamps, rates via `migrate(context=...)`; runtime callables receive the same read-only view at every step
 - **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
 - **Target policies** — converge to `latest`, `earliest`, a pinned version, or per-kind overrides
-- **Executors** — sync or async, sequential or level-parallel; `prepare` returns a reusable run object with execution deferred
+- **Executors** — sync or async, sequential or level-parallel; `delegate` and `prepare` return reusable run objects with execution deferred
 - **Model diffing** — breaking-change detection with JSON Patch rendering
 - **Migration hooks** — observability via before/after/error callbacks, plus an OpenTelemetry hook
 - **FastMCP adapter** — version FastMCP tools, prompts, and resources: reflect each versioned primitive into the graph and converge every call to the policy target
@@ -129,7 +159,11 @@ Managers are addressed as `module:object_path`. CI-friendly commands
 - [Getting Started](docs/getting-started.md)
 - [Managers](docs/managers.md)
 - [Concepts](docs/concepts.md)
+- [Runtime & Execution](docs/runtime.md)
 - [Execution Flow](docs/execution-flow.md)
+- [CLI Reference](docs/cli.md)
+- [Compatibility](docs/compatibility.md)
+- [Migration Formats](docs/migration-formats.md)
 - [Target Policy](docs/target-policy.md)
 - [Migrations](docs/migration.md)
 - [Telemetry & Hooks](docs/telemetry.md)
@@ -146,11 +180,6 @@ Managers are addressed as `module:object_path`. CI-friendly commands
 Items intentionally out of scope for this documentation pass, tracked here for
 follow-up:
 
-- **CLI/manager facade alignment** — `Manager` now exposes `get`,
-  `get_latest`, and `list_versions`. The CLI still expects `validate_data`,
-  `diff`, `list_models`, `dump_schemas`, and
-  `migrate(data, schema, from_version, to_version)` before those commands
-  work end-to-end.
 - **Additional model providers** — adapters for dataclasses, attrs, marshmallow,
   and MessagePack
 - **Real-source integrations** — `showcases/` projects wiring for document

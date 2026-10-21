@@ -17,11 +17,17 @@ nav:
   - Concepts: concepts.md
   - Managers: managers.md
   - Migrations: migration.md
+  - Migration Formats: migration-formats.md
+  - Runtime & Execution: runtime.md
   - Execution Flow: execution-flow.md
   - Target Policy: target-policy.md
+  - Compatibility: compatibility.md
   - Telemetry & Hooks: telemetry.md
+  - CLI Reference: cli.md
   - FastMCP Integration: fastmcp.md
+  - FastStream Integration: faststream.md
   - Testing: testing.md
+  - Benchmarking: benchmarking.md
   - Common Usage Patterns: usage.md
   - Scenarios: scenarios.md
 
