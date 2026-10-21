@@ -47,9 +47,11 @@ jobs:
             exit 1
           fi
 
-          echo "should_release=true" >> "$GITHUB_OUTPUT"
-          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "ticket=$TICKET_ID" >> "$GITHUB_OUTPUT"
+          {
+            echo "should_release=true"
+            echo "version=$NEXT"
+            echo "ticket=$TICKET_ID"
+          } >> "$GITHUB_OUTPUT"
 
           {
             echo "## Release plan"
