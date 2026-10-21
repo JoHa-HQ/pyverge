@@ -1,3 +1,5 @@
+"""Default per-entry migration policy: direction, steps, finalize."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generic
@@ -11,17 +13,12 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
-
-from .graph import GraphEntry
+from pyverge.migration.graph import GraphEntry
 
 if TYPE_CHECKING:
-    from pyverge.migration.types import (
-        MigrationEntryCallback,
-        RunnableMigration,
-    )
-    from pyverge.providers.types import (
-        ModelAdapter,
-    )
+    from pyverge.providers.types import ModelAdapter
+
+    from .types import MigrationEntryCallback, RunnableMigration
 
 
 class _DefaultMigrationTask(Generic[VersionValue]):

@@ -23,11 +23,13 @@ if TYPE_CHECKING:
     from pyverge.core.types import (
         Attachable,
     )
+    from pyverge.executor import (
+        Executor,
+        MigrationEntry,
+    )
     from pyverge.migration.engine import Engine
     from pyverge.migration.registry import Registry
     from pyverge.migration.types import (
-        Executor,
-        MigrationEntry,
         Walker,
     )
     from pyverge.providers.json_patch import JsonPatchMigration

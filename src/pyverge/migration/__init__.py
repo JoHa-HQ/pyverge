@@ -28,11 +28,17 @@ from pyverge.core import (
     get_at,
     set_at,
 )
-from pyverge.migration.types import (
-    Entry,
+from pyverge.executor import (
+    DefaultMigrationEntry,
     Executor,
+    LevelParallelExecutor,
     MigrationEntry,
     RunnableMigration,
+    SequentialExecutor,
+    StepExecutor,
+)
+from pyverge.migration.types import (
+    Entry,
 )
 from pyverge.providers import (
     JsonPatchMigration,
@@ -49,7 +55,6 @@ from pyverge.reflection import (
 )
 
 from .engine import Engine
-from .executor import LevelParallelExecutor, SequentialExecutor, StepExecutor
 from .graph import GraphBuilder, GraphEntry, MigrationGraph, MigrationPlan
 from .policy import (
     earliest_target_resolver,
@@ -59,7 +64,6 @@ from .policy import (
     skip_target_resolver,
 )
 from .registry import Registry
-from .strategy import DefaultMigrationEntry
 from .walker import CompoundKeyWalker, PydanticWalker, Walker
 
 __all__ = [

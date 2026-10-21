@@ -17,12 +17,12 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
-from pyverge.manager.types import (
-    TargetPolicy,
-)
-from pyverge.migration.types import (
+from pyverge.executor import (
     Executor,
     MigrationEntry,
+)
+from pyverge.manager.types import (
+    TargetPolicy,
 )
 from pyverge.providers.types import (
     TContainer,

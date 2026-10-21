@@ -30,7 +30,8 @@ from pyverge.core.versioning import (
     SentinelEdge,
     VersionEdge,
 )
-from pyverge.migration.types import (
+from pyverge.executor import (
+    DefaultMigrationEntry,
     Executor,
     MigrationEntry,
 )
@@ -50,7 +51,6 @@ from pyverge.reflection.reflection import Reflection
 
 from .graph import GraphBuilder
 from .registry import Registry
-from .strategy import DefaultMigrationEntry
 
 
 class Engine(Generic[VersionValue]):

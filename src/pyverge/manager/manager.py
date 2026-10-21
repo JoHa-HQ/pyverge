@@ -6,14 +6,16 @@ from pyverge.core.settings import MigrationSettings
 from pyverge.core.types import (
     VersionValue,
 )
-from pyverge.migration.engine import Engine
-from pyverge.migration.executor import SequentialExecutor
-from pyverge.migration.graph import GraphBuilder
-from pyverge.migration.registry import Registry
-from pyverge.migration.strategy import DefaultMigrationEntry
-from pyverge.migration.types import (
+from pyverge.executor import (
+    DefaultMigrationEntry,
     Executor,
     MigrationEntry,
+    SequentialExecutor,
+)
+from pyverge.migration.engine import Engine
+from pyverge.migration.graph import GraphBuilder
+from pyverge.migration.registry import Registry
+from pyverge.migration.types import (
     Walker,
 )
 from pyverge.migration.walker import CompoundKeyWalker

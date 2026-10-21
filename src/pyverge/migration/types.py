@@ -6,42 +6,20 @@ migration package rather than the provider-neutral core type module.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any, Protocol
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
-    Attachable,
-    DirectionViolationStrategy,
-    MigrationDirectionStrategy,
-    ModelData,
     Versionable,
-    VersionMissingStrategy,
     VersionValue,
     VersionValue_co,
 )
 
 if TYPE_CHECKING:
-    from pyverge.providers.types import ModelAdapter
-
-    from .graph import GraphEntry, MigrationPlan
     from .registry import Registry
 
 #: A discovered versioned entry: ``(path, depth, source)``.
 Entry = tuple[tuple[str | int, ...], int, "Versionable[VersionValue]"]
-
-MigrationEntryCallback = Callable[
-    [
-        Versionable,
-        Versionable,
-        ModelData,
-        tuple[Attachable, ...],
-        str,
-        MigrationContext | None,
-    ],
-    ModelData,
-]
-
 
 class Walker(Protocol[VersionValue_co]):
     """Protocol for schema-aware payload discovery."""
@@ -57,50 +35,3 @@ class Walker(Protocol[VersionValue_co]):
         target_resolver: Any,
         max_depth: int = -1,
     ) -> Iterator[Entry]: ...
-
-
-class RunnableMigration(Protocol):
-    """Deferred migration of a single graph entry."""
-
-    def run(self) -> ModelData: ...
-
-
-class Executor(Protocol[VersionValue_co]):
-    """Protocol for executing a migration plan.
-
-    The executor owns the pre-execution compatibility gate: it validates the
-    plan's container against the graph's migrated fields before any migration
-    runs.
-    """
-
-    def run(
-        self,
-        plan: MigrationPlan[VersionValue_co],
-        *,
-        registry: Registry[VersionValue_co],
-        entry_migration: MigrationEntry[VersionValue_co],
-        adapter: ModelAdapter,
-        version_property: str,
-        direction: MigrationDirectionStrategy,
-        on_direction_violation: DirectionViolationStrategy,
-        on_missing_path: VersionMissingStrategy,
-        context: MigrationContext | None = None,
-    ) -> ModelData: ...
-
-
-class MigrationEntry(Protocol[VersionValue]):
-    """Per-entry migration policy."""
-
-    def migrate(
-        self,
-        entry: GraphEntry[VersionValue],
-        current: ModelData,
-        *,
-        execute_step: MigrationEntryCallback,
-        adapter: ModelAdapter,
-        version_property: str,
-        direction: MigrationDirectionStrategy,
-        on_direction_violation: DirectionViolationStrategy,
-        on_missing_path: VersionMissingStrategy,
-        context: MigrationContext | None = None,
-    ) -> RunnableMigration: ...

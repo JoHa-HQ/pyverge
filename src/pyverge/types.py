@@ -58,6 +58,11 @@ from pyverge.core.versioning import (
     VersionEdge,
     VersionNode,
 )
+from pyverge.executor import (
+    Executor,
+    MigrationEntry,
+    RunnableMigration,
+)
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
@@ -67,9 +72,6 @@ from pyverge.manager.types import (
 )
 from pyverge.migration.types import (
     Entry,
-    Executor,
-    MigrationEntry,
-    RunnableMigration,
     Walker,
 )
 from pyverge.providers.types import (
