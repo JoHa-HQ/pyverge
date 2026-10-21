@@ -6,11 +6,17 @@ Install the CLI extra:
 pip install "pyverge[cli]"
 ```
 
-Commands address a manager as `module:object_path`:
+Commands address a manager as `module:object_path`. The target may be a
+manager instance, a configured `Manager` subclass, or a zero-arg factory:
 
 ```bash
 pyverge doctor --manager myapp.models:UserManager
+pyverge doctor --manager myapp.models:create_manager
 ```
+
+Runtime schemas work when the module exposes a factory that builds the manager
+from its runtime source (config file, database, feature flags, etc.). `doctor`
+inspects the already-built registry; it does not load schemas itself.
 
 ## Commands
 

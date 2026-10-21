@@ -134,7 +134,9 @@ pyverge managers myapp.models                     # List managers in a module
 Managers are addressed as `module:object_path`. CI-friendly commands
 (`doctor`, `validate`, `migrate --check`, `compat`) return non-zero on failure.
 `init` scaffolds a config file, but config auto-discovery is not wired yet;
-commands still take `module:object_path`.
+commands still take `module:object_path`. A spec may resolve to a manager
+instance, a configured `Manager` subclass, or a zero-arg factory. For runtime
+schemas, expose a factory that builds the manager from your runtime source.
 
 See [CLI Reference](docs/cli.md) for flags and exit codes.
 
