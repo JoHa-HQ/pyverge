@@ -128,4 +128,3 @@ class AbstractModelAdapter:
         if fields is None:
             return frozenset()
         return frozenset(name for name in fields if name not in identity)
-
