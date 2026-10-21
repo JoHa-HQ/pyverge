@@ -266,7 +266,7 @@ class TestDiffCommand:
     ],
     indirect=["model_adapter", "registry"],
 )
-class TestDXCommands:
+class TestCommands:
     def test_doctor_json(
         self,
         runner: CliRunner,
