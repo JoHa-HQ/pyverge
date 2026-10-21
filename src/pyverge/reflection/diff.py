@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Generic
 
-from pyverge.core.render import JsonPatchRender
 from pyverge.core.types import (
     DiffOrigin,
     MigrationKey,
@@ -11,6 +10,8 @@ from pyverge.core.types import (
     Versionable,
     VersionValue,
 )
+
+from .render import JsonPatchRender
 
 __all__ = ["Diff", "DiffOrigin"]
 

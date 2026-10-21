@@ -5,7 +5,6 @@ from pyverge.core import (
     DiscoveryValidationError,
     EngineError,
     ExecutionModeError,
-    JsonPatchRender,
     MaxDepthExceededError,
     MigrationAlreadyRegisteredError,
     MigrationContext,
@@ -62,6 +61,7 @@ from pyverge.reflection import (
     Diff,
     DiffDiscovery,
     JsonPatchDiffDiscovery,
+    JsonPatchRender,
 )
 
 from .engine import Engine

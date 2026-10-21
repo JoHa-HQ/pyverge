@@ -2,44 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 import typer
 
 from pyverge.core.types import ManagerMigrationKey
+from pyverge.reflection import CompatibilityReport
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption, dump_json
-
-
-def _compat_report(manager: Any, key: ManagerMigrationKey) -> dict[str, Any]:
-    edge = manager.get_migration(key)
-    diff = edge.diff
-    identity = {manager.adapter.version_property, manager.adapter.kind_property}
-    added = [field for field in diff.added_fields if field not in identity]
-    removed = [field for field in diff.removed_fields if field not in identity]
-    modified = {
-        field: change
-        for field, change in diff.modified_fields.items()
-        if field not in identity
-    }
-    structural = (
-        bool(removed)
-        or any("type_changed" in change for change in modified.values())
-        or any("required_changed" in change for change in modified.values())
-        or any(diff.is_added_required(field) for field in added)
-    )
-    return {
-        "kind": key.kind,
-        "from": key.source_version,
-        "to": key.target_version,
-        "structural_breaking": structural,
-        "declared_backward_compatible": diff.is_backward_compatible,
-        "breaking": structural and not diff.is_backward_compatible,
-        "added": added,
-        "removed": removed,
-        "modified": sorted(modified),
-    }
 
 
 def compat(
@@ -80,15 +51,43 @@ def compat(
                         )
                     )
 
-        reports = [_compat_report(mgr, key) for key in keys]
-        breaking = any(report["breaking"] for report in reports)
+        identity = frozenset({mgr.adapter.kind_property, mgr.adapter.version_property})
+        reports = [
+            CompatibilityReport.from_diff(
+                mgr.get_migration(key).diff,
+                identity_fields=identity,
+            )
+            for key in keys
+        ]
+        breaking = any(report.breaking for report in reports)
         if format == "json":
-            dump_json({"breaking": breaking, "migrations": reports})
+            dump_json(
+                {
+                    "breaking": breaking,
+                    "migrations": [
+                        {
+                            "kind": report.kind,
+                            "from": report.source_version,
+                            "to": report.target_version,
+                            "structural_breaking": report.structural_breaking,
+                            "declared_backward_compatible": (
+                                report.declared_backward_compatible
+                            ),
+                            "breaking": report.breaking,
+                            "added": list(report.added_fields),
+                            "removed": list(report.removed_fields),
+                            "modified": list(report.modified_fields),
+                        }
+                        for report in reports
+                    ],
+                }
+            )
         else:
             for report in reports:
-                status = "BREAKING" if report["breaking"] else "ok"
+                status = "BREAKING" if report.breaking else "ok"
                 typer.echo(
-                    f"{status} {report['kind']} {report['from']} -> {report['to']}"
+                    f"{status} {report.kind} "
+                    f"{report.source_version} -> {report.target_version}"
                 )
         exit_code = 3 if breaking and fail_on_breaking else 0
         raise typer.Exit(exit_code)

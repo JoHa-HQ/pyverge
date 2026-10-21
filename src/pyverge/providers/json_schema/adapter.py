@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
-from pyverge.core.render import JsonPatchRender
 from pyverge.core.types import (
     Diffable,
     ModelData,
@@ -23,6 +22,7 @@ from pyverge.core.versioning import (
 from pyverge.providers.base import AbstractModelAdapter
 from pyverge.providers.json_patch.migration import JsonPatchMigration
 from pyverge.reflection.diff import Diff
+from pyverge.reflection.render import JsonPatchRender
 
 
 class JsonSchemaModelAdapter(AbstractModelAdapter):

@@ -20,7 +20,6 @@ from .exceptions import (
     VersionedModelError,
 )
 from .path import Path, get_at, set_at
-from .render import JsonPatchRender
 from .settings import DiscoverySettings, MigrationSettings, VersioningSettings
 from .types import (
     MIGRATION_PAIR_LEN,
@@ -69,7 +68,6 @@ __all__ = [
     "DiscoveryValidationError",
     "EngineError",
     "ExecutionModeError",
-    "JsonPatchRender",
     "LookupKey",
     "ManagerKey",
     "ManagerMigrationKey",
