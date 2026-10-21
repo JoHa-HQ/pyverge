@@ -28,7 +28,8 @@ inspects the already-built registry; it does not load schemas itself.
 | `diff` | Render a version diff as RFC 6902 |
 | `compat` | Check structural compatibility of migrations |
 | `doctor` | Validate registry health |
-| `export` | Export the registered graph manifest |
+| `manifest` | Export a JGF v2 graph snapshot |
+| `export` | Legacy flat graph manifest |
 | `info` | Show registered models |
 | `managers` | List managers in a module |
 | `init` | Scaffold models and manager config |
@@ -99,6 +100,26 @@ A migration declared backward compatible overrides the structural result.
 
 Exit `0` when compatible, `1` on error, `3` when `--fail-on-breaking` finds a
 breaking migration.
+
+## `manifest`
+
+```bash
+pyverge manifest --manager myapp.models:UserManager > manifest.json
+```
+
+Emits a JGF v2 envelope:
+
+- top-level `graph`
+- nodes keyed by `kind@version`
+- edges with `source`, `target`, `relation: migration`
+- node metadata: fields, references, `schema_hash`
+- edge metadata: strategy/spec, compatibility, `migration_hash`
+- graph metadata: `manifest_version`, `pyverge_version`, `generated_at`, `content_hash`
+
+This is an explicit CLI contract. The runtime/lifespan does not write it.
+Generate it in CI or from a build job, then compare snapshots across revisions.
+
+`export` remains as the legacy flat manifest.
 
 ## `init`
 

@@ -126,13 +126,14 @@ pyverge migrate data.json --manager myapp.models:UserManager \
 pyverge migrate data.json --manager myapp.models:UserManager --check
 pyverge compat --manager myapp.models:UserManager --fail-on-breaking
 pyverge diff --manager myapp.models:UserManager --from 1.0.0 --to 2.0.0
-pyverge export --manager myapp.models:UserManager # Graph manifest
+pyverge manifest --manager myapp.models:UserManager > manifest.json # JGF snapshot
 pyverge info --manager myapp.models:UserManager
 pyverge managers myapp.models                     # List managers in a module
 ```
 
 Managers are addressed as `module:object_path`. CI-friendly commands
 (`doctor`, `validate`, `migrate --check`, `compat`) return non-zero on failure.
+`manifest` emits a JGF v2 envelope with graph metadata, node schema hashes, migration hashes, and a content hash. It is a CLI contract only: the app lifespan never writes it.
 `init` scaffolds a config file, but config auto-discovery is not wired yet;
 commands still take `module:object_path`. A spec may resolve to a manager
 instance, a configured `Manager` subclass, or a zero-arg factory. For runtime
@@ -152,6 +153,7 @@ See [CLI Reference](docs/cli.md) for flags and exit codes.
 - **Target policies** — converge to `latest`, `earliest`, a pinned version, or per-kind overrides
 - **Executors** — sync or async, sequential or level-parallel; `delegate` and `prepare` return reusable run objects with execution deferred
 - **Model diffing** — breaking-change detection with JSON Patch rendering
+- **Graph manifest** — `pyverge manifest` emits a JGF v2 snapshot with stable node/edge hashes for CI divergence checks
 - **Migration hooks** — observability via before/after/error callbacks, plus an OpenTelemetry hook
 - **FastMCP adapter** — version FastMCP tools, prompts, and resources: reflect each versioned primitive into the graph and converge every call to the policy target
 - **FastStream adapter** — converge versioned message bodies before a subscriber handler runs, through the subscriber `decoder`, with startup reflection of each handler's declared payload model

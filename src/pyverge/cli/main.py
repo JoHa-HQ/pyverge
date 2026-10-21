@@ -13,6 +13,7 @@ from .commands import (
     info,
     init,
     managers,
+    manifest,
     migrate,
     validate,
 )
@@ -22,6 +23,7 @@ app = typer.Typer(help="Schema evolution and migrations for versioned models")
 commands = (
     check,
     managers,
+    manifest,
     info,
     diff,
     doctor,
