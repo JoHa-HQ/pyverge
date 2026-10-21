@@ -2,12 +2,16 @@
 
 from .entry import DefaultMigrationEntry
 from .hooks import MigrationHook
-from .parallel import AsyncLevelParallelExecutor, LevelParallelExecutor
 from .policy import ExecutionPolicy
 from .run import MigrationRun
-from .sequential import AsyncSequentialExecutor, SequentialExecutor
 from .step import StepExecutor
 from .steps import ExplicitStep
+from .strategy import (
+    AsyncLevelParallelExecutor,
+    AsyncSequentialExecutor,
+    LevelParallelExecutor,
+    SequentialExecutor,
+)
 from .types import (
     AsyncExecutor,
     AsyncMigrationEntry,

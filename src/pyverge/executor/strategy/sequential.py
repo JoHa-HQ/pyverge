@@ -19,8 +19,8 @@ from pyverge.migration.graph import MigrationPlan
 from pyverge.migration.registry import Registry
 from pyverge.providers.types import ModelAdapter
 
-from .step import StepExecutor
-from .types import (
+from ..step import StepExecutor
+from ..types import (
     AsyncExecutor,
     AsyncMigrationEntry,
     Executor,

@@ -6,8 +6,12 @@ import os
 
 from pyverge.core.settings import MigrationSettings
 
-from .parallel import AsyncLevelParallelExecutor, LevelParallelExecutor
-from .sequential import AsyncSequentialExecutor, SequentialExecutor
+from .strategy import (
+    AsyncLevelParallelExecutor,
+    AsyncSequentialExecutor,
+    LevelParallelExecutor,
+    SequentialExecutor,
+)
 from .types import AsyncExecutor, Executor
 
 

@@ -102,9 +102,9 @@ max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "src/pyverge/executor/entry.py" = ["PLR0913"]
-"src/pyverge/executor/parallel.py" = ["PLR0913"]
+"src/pyverge/executor/strategy/parallel.py" = ["PLR0913"]
 "src/pyverge/executor/run.py" = ["PLR0913"]
-"src/pyverge/executor/sequential.py" = ["PLR0913"]
+"src/pyverge/executor/strategy/sequential.py" = ["PLR0913"]
 "src/pyverge/executor/step.py" = ["PLR0913"]
 "src/pyverge/executor/types.py" = ["PLR0913"]
 "src/pyverge/migration/engine.py" = ["PLR0913", "C901"]
