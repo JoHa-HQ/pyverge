@@ -53,3 +53,13 @@ jobs:
           files: coverage.xml
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.0.1
+        with:
+          python-version: "3.11"
+      - name: Build docs (strict)
+        run: uvx --from "mkdocs-material>=9.6" mkdocs build --strict
