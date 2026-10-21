@@ -1284,6 +1284,21 @@ class TestPreparedMigration:
         assert second["document"]["name"] == "Bob"
         assert [call["name"] for call in calls] == ["Alice", "Bob"]
 
+    def test_delegate_returns_run_and_materializes_container(
+        self, manager: type[Manager[semver.Version]]
+    ) -> None:
+        instance = manager()
+        instance.store_model(UserV1)
+        instance.store_model(UserV2)
+        instance.store_migration(ModelPair(UserV1, UserV2), migrate_v1_to_v2)
+
+        run = instance.delegate(_payload("1.0.0"), container=UserContainer)
+        result = run.run()
+
+        assert isinstance(run, MigrationRun)
+        assert isinstance(result, UserContainer)
+        assert result.document.version == "2.0.0"
+
     def test_sync_entrypoint_rejects_async_run(
         self, manager: type[Manager[semver.Version]]
     ) -> None:
