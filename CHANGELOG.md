@@ -1,3 +1,9 @@
+## v0.11.0 (2026-10-21)
+
+### Feat
+
+- **#68**: add faststream integration (#69)
+
 ## v0.10.0 (2026-10-18)
 
 ### Feat
