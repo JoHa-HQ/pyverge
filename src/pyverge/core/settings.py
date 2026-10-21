@@ -131,7 +131,14 @@ class MigrationSettings(DiscoverySettings):
         default=0,
         ge=0,
         description=(
-            "Number of worker threads for concurrent execution. "
+            "Number of workers for concurrent execution. "
             "0 = sequential. Capped at ``os.cpu_count()``."
+        ),
+    )
+    execution_mode: Literal["sync", "async"] = Field(
+        default="sync",
+        description=(
+            "Execution driver selected by the default execution policy. "
+            "'sync' uses threads for parallel levels; 'async' uses asyncio."
         ),
     )

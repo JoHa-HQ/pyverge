@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 #: A discovered versioned entry: ``(path, depth, source)``.
 Entry = tuple[tuple[str | int, ...], int, "Versionable[VersionValue]"]
 
+
 class Walker(Protocol[VersionValue_co]):
     """Protocol for schema-aware payload discovery."""
 

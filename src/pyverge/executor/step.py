@@ -52,6 +52,35 @@ class StepExecutor(Generic[VersionValue]):
         result[vp] = str(step_to.version[1])
         return result
 
+    async def aexecute_step(
+        self,
+        step_from: Versionable[VersionValue],
+        step_to: Versionable[VersionValue],
+        data: ModelData,
+        hooks: tuple[Attachable, ...],
+        vp: str,
+        context: MigrationContext | None = None,
+    ) -> ModelData:
+        """Async counterpart of :meth:`execute_step`."""
+        step = self._resolve_step(step_from, step_to)
+        hooks_list = list(hooks)
+        try:
+            result = await step.aexecute(data, hooks_list, context)
+        except MigrationError:
+            raise
+        except Exception as exc:
+            for hook in hooks_list:
+                await hook.aon_error(str(step_from.kind), step_from, step_to, data, exc)
+            raise MigrationError(
+                str(step_from.kind),
+                step_from,
+                step_to,
+                f"Migration failed: {type(exc).__name__}: {exc}",
+            ) from exc
+
+        result[vp] = str(step_to.version[1])
+        return result
+
     def _resolve_step(
         self,
         step_from: Versionable[VersionValue],

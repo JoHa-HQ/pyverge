@@ -1,8 +1,10 @@
 from pyverge.core import (
+    AsyncExecutionRequired,
     DiscoveryError,
     DiscoverySettings,
     DiscoveryValidationError,
     EngineError,
+    ExecutionModeError,
     ExplicitStep,
     JsonPatchRender,
     MaxDepthExceededError,
@@ -21,6 +23,7 @@ from pyverge.core import (
     Path,
     RegistryError,
     SentinelEdge,
+    SyncExecutionRequired,
     VersionEdge,
     VersionedModelError,
     VersioningSettings,
@@ -29,10 +32,14 @@ from pyverge.core import (
     set_at,
 )
 from pyverge.executor import (
+    AsyncLevelParallelExecutor,
+    AsyncSequentialExecutor,
     DefaultMigrationEntry,
+    ExecutionPolicy,
     Executor,
     LevelParallelExecutor,
     MigrationEntry,
+    MigrationRun,
     RunnableMigration,
     SequentialExecutor,
     StepExecutor,
@@ -67,6 +74,9 @@ from .registry import Registry
 from .walker import CompoundKeyWalker, PydanticWalker, Walker
 
 __all__ = [
+    "AsyncExecutionRequired",
+    "AsyncLevelParallelExecutor",
+    "AsyncSequentialExecutor",
     "CallableDiffDiscovery",
     "CompositeDiffDiscovery",
     "CompoundKeyWalker",
@@ -79,6 +89,8 @@ __all__ = [
     "Engine",
     "EngineError",
     "Entry",
+    "ExecutionModeError",
+    "ExecutionPolicy",
     "Executor",
     "ExplicitStep",
     "GraphBuilder",
@@ -99,6 +111,7 @@ __all__ = [
     "MigrationNotFoundError",
     "MigrationPathIntegrityError",
     "MigrationPlan",
+    "MigrationRun",
     "MigrationSettings",
     "MissingReferenceError",
     "ModelAlreadyRegisteredError",
@@ -114,6 +127,7 @@ __all__ = [
     "SentinelEdge",
     "SequentialExecutor",
     "StepExecutor",
+    "SyncExecutionRequired",
     "VersionEdge",
     "VersionNode",
     "VersionedModelError",

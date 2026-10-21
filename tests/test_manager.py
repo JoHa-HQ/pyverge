@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from typing import Literal, cast
 
@@ -10,11 +11,13 @@ from pydantic import BaseModel
 
 from pyverge import Manager
 from pyverge.core import (
+    AsyncExecutionRequired,
     DiscoveryValidationError,
     MigrationHook,
     MigrationSettings,
     ModelNotFoundError,
     RegistryError,
+    SyncExecutionRequired,
     VersioningSettings,
 )
 from pyverge.core.types import (
@@ -30,8 +33,10 @@ from pyverge.manager.types import (
     ManagerInstanceState,
 )
 from pyverge.migration import (
+    AsyncLevelParallelExecutor,
     Engine,
     MigrationContext,
+    MigrationRun,
     PydanticModelAdapter,
     PydanticWalker,
 )
@@ -1247,3 +1252,127 @@ class TestMigrationContext:
 
         with pytest.raises(TypeError):
             context["tenant"] = "tenant_100"
+
+
+class TestPreparedMigration:
+    def test_prepare_defers_execution_until_run(
+        self, manager: type[Manager[semver.Version]]
+    ) -> None:
+        calls: list[MigrationContext] = []
+
+        def _migrate(data: dict, context: MigrationContext | None = None) -> dict:
+            assert context is not None
+            calls.append(context)
+            return migrate_v1_to_v2({**data, "name": context["name"]})
+
+        instance = manager()
+        instance.store_model(UserV1)
+        instance.store_model(UserV2)
+        instance.store_migration(ModelPair(UserV1, UserV2), _migrate)
+
+        run = instance.prepare(_payload("1.0.0"))
+
+        assert isinstance(run, MigrationRun)
+        assert calls == []
+
+        first = run.run(context={"name": "Alice"})
+        second = run.run(context={"name": "Bob"})
+
+        assert first["document"]["name"] == "Alice"
+        assert second["document"]["name"] == "Bob"
+        assert [call["name"] for call in calls] == ["Alice", "Bob"]
+
+    def test_sync_entrypoint_rejects_async_run(
+        self, manager: type[Manager[semver.Version]]
+    ) -> None:
+        instance = manager()
+        instance.store_model(UserV1)
+        instance.store_model(UserV2)
+        instance.store_migration(ModelPair(UserV1, UserV2), migrate_v1_to_v2)
+
+        run = instance.prepare(
+            _payload("1.0.0"), executor=AsyncLevelParallelExecutor(max_workers=2)
+        )
+
+        assert run.is_async
+        with pytest.raises(AsyncExecutionRequired):
+            run.run()
+
+
+class TestAsyncExecution:
+    def _async_manager(self, workers: int = 0) -> type[Manager[semver.Version]]:
+        manager = Manager[semver.Version].configure(
+            MigrationSettings(execution_mode="async", parallel_workers=workers),
+            PydanticModelAdapter(),
+        )
+        manager.model(UserV1)
+        manager.model(UserV2)
+        manager.migration(ModelPair(UserV1, UserV2))(migrate_v1_to_v2)
+        return manager
+
+    def test_amigrate_runs_async_sequential(self) -> None:
+        manager = self._async_manager()
+        result = asyncio.run(manager().amigrate(_payload("1.0.0")))
+
+        assert result["document"]["version"] == "2.0.0"
+
+    def test_amigrate_runs_async_parallel(self) -> None:
+        manager = self._async_manager(workers=2)
+        payload = {
+            "first": {
+                "kind": "User",
+                "version": "1.0.0",
+                "name": "Alice",
+                "email": "alice@example.com",
+                "role": "user",
+            },
+            "second": {
+                "kind": "User",
+                "version": "1.0.0",
+                "name": "Bob",
+                "email": "bob@example.com",
+                "role": "user",
+            },
+        }
+
+        result = asyncio.run(manager().amigrate(payload))
+
+        assert result["first"]["version"] == "2.0.0"
+        assert result["second"]["version"] == "2.0.0"
+
+    def test_async_hooks_are_awaited(self) -> None:
+        manager = self._async_manager()
+        order: list[str] = []
+
+        class _Hook(MigrationHook):
+            async def abefore_migrate(self, name, from_version, to_version, data):
+                order.append("before")
+
+            async def aafter_migrate(
+                self, name, from_version, to_version, original_data, migrated_data
+            ):
+                order.append("after")
+
+        instance = manager()
+        instance.add_hook(ModelPair(UserV1, UserV2), _Hook())
+
+        asyncio.run(instance.amigrate(_payload("1.0.0")))
+
+        assert order == ["before", "after"]
+
+    def test_sync_entrypoint_rejects_async_mode(self) -> None:
+        manager = self._async_manager()
+
+        with pytest.raises(AsyncExecutionRequired):
+            manager().migrate(_payload("1.0.0"))
+
+    def test_async_entrypoint_rejects_sync_mode(
+        self, manager: type[Manager[semver.Version]]
+    ) -> None:
+        instance = manager()
+        instance.store_model(UserV1)
+        instance.store_model(UserV2)
+        instance.store_migration(ModelPair(UserV1, UserV2), migrate_v1_to_v2)
+
+        with pytest.raises(SyncExecutionRequired):
+            asyncio.run(instance.amigrate(_payload("1.0.0")))

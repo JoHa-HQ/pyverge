@@ -1,8 +1,10 @@
 from .context import EMPTY_CONTEXT, MigrationContext
 from .exceptions import (
+    AsyncExecutionRequired,
     DiscoveryError,
     DiscoveryValidationError,
     EngineError,
+    ExecutionModeError,
     MaxDepthExceededError,
     MigrationAlreadyRegisteredError,
     MigrationError,
@@ -14,6 +16,7 @@ from .exceptions import (
     ModelConflictError,
     ModelNotFoundError,
     RegistryError,
+    SyncExecutionRequired,
     VersionedModelError,
 )
 from .hooks import MigrationHook
@@ -58,6 +61,7 @@ from .versioning import SentinelEdge, VersionEdge, VersionNode
 __all__ = [
     "EMPTY_CONTEXT",
     "MIGRATION_PAIR_LEN",
+    "AsyncExecutionRequired",
     "Attachable",
     "Comparable",
     "Diffable",
@@ -66,6 +70,7 @@ __all__ = [
     "DiscoverySettings",
     "DiscoveryValidationError",
     "EngineError",
+    "ExecutionModeError",
     "ExplicitStep",
     "JsonPatchRender",
     "LookupKey",
@@ -100,6 +105,7 @@ __all__ = [
     "RegistryError",
     "Renderable",
     "SentinelEdge",
+    "SyncExecutionRequired",
     "TargetResolver",
     "TargetStrategy",
     "Transitional",

@@ -20,7 +20,12 @@ from pyverge.migration.registry import Registry
 from pyverge.providers.types import ModelAdapter
 
 from .step import StepExecutor
-from .types import Executor, MigrationEntry
+from .types import (
+    AsyncExecutor,
+    AsyncMigrationEntry,
+    Executor,
+    MigrationEntry,
+)
 
 
 class SequentialExecutor(Executor[VersionValue], Generic[VersionValue]):
@@ -57,5 +62,43 @@ class SequentialExecutor(Executor[VersionValue], Generic[VersionValue]):
                 context=context,
             )
             migrated = task.run()
+            _set_at_path(result, entry.path, migrated)
+        return result
+
+
+class AsyncSequentialExecutor(AsyncExecutor[VersionValue], Generic[VersionValue]):
+    """Execute plan entries one at a time with async step/hook handling."""
+
+    async def arun(
+        self,
+        plan: MigrationPlan[VersionValue],
+        *,
+        registry: Registry[VersionValue],
+        entry_migration: AsyncMigrationEntry[VersionValue],
+        adapter: ModelAdapter,
+        version_property: str,
+        direction: MigrationDirectionStrategy,
+        on_direction_violation: DirectionViolationStrategy,
+        on_missing_path: VersionMissingStrategy,
+        context: MigrationContext | None = None,
+    ) -> ModelData:
+        adapter.ensure_compatible(plan.container, fields=plan.target_fields)
+        graph = plan.graph
+        step_executor = StepExecutor(registry)
+        result = copy.deepcopy(plan.data)
+        for entry in graph.topological_order():
+            current = _get_at_path(result, entry.path)
+            task = entry_migration.amigrate(
+                entry,
+                current,
+                aexecute_step=step_executor.aexecute_step,
+                adapter=adapter,
+                version_property=version_property,
+                direction=direction,
+                on_direction_violation=on_direction_violation,
+                on_missing_path=on_missing_path,
+                context=context,
+            )
+            migrated = await task.arun()
             _set_at_path(result, entry.path, migrated)
         return result

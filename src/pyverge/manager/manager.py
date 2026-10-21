@@ -7,10 +7,10 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.executor import (
+    AsyncExecutor,
     DefaultMigrationEntry,
     Executor,
     MigrationEntry,
-    SequentialExecutor,
 )
 from pyverge.migration.engine import Engine
 from pyverge.migration.graph import GraphBuilder
@@ -96,7 +96,7 @@ class Manager(
         *,
         engine: Engine[VersionValue] | None = None,
         walker: Walker | None = None,
-        executor: Executor | None = None,
+        executor: Executor | AsyncExecutor | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> type[Manager[VersionValue]]:
         """Build a configured ``Manager`` subclass.
@@ -113,8 +113,9 @@ class Manager(
                 schema-driven walker (e.g.
                 :class:`~pyverge.migration.PydanticWalker`) to enable
                 container-guided discovery.
-            executor: Optional execution strategy.  Defaults to
-                :class:`~pyverge.migration.SequentialExecutor`.
+            executor: Optional execution strategy override. When omitted, the
+                settings-driven :class:`ExecutionPolicy` selects sequential or
+                level-parallel, sync or async.
             entry_migration: Optional per-entry migration defaults.  Defaults
                 to :class:`~pyverge.migration.DefaultMigrationEntry`.
         """
@@ -129,7 +130,7 @@ class Manager(
         engine = engine or Engine[VersionValue](
             registry=registry,
             settings=settings,
-            default_executor=executor or SequentialExecutor(),
+            default_executor=executor,
             graph_builder=GraphBuilder(
                 registry,
                 settings,

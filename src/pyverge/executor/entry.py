@@ -18,7 +18,12 @@ from pyverge.migration.graph import GraphEntry
 if TYPE_CHECKING:
     from pyverge.providers.types import ModelAdapter
 
-    from .types import MigrationEntryCallback, RunnableMigration
+    from .types import (
+        AsyncMigrationEntryCallback,
+        AsyncRunnableMigration,
+        MigrationEntryCallback,
+        RunnableMigration,
+    )
 
 
 class _DefaultMigrationTask(Generic[VersionValue]):
@@ -29,17 +34,19 @@ class _DefaultMigrationTask(Generic[VersionValue]):
         entry: GraphEntry[VersionValue],
         current: ModelData,
         *,
-        execute_step: MigrationEntryCallback,
+        execute_step: MigrationEntryCallback | None = None,
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
         context: MigrationContext | None = None,
+        aexecute_step: AsyncMigrationEntryCallback | None = None,
     ) -> None:
         self._entry = entry
         self._current = current
         self._execute_step = execute_step
+        self._aexecute_step = aexecute_step
         self._adapter = adapter
         self._version_property = version_property
         self._direction = direction
@@ -64,10 +71,50 @@ class _DefaultMigrationTask(Generic[VersionValue]):
                 )
             return current
 
+        assert self._execute_step is not None
         data = current
         try:
             for (step_from, step_to), hooks in zip(entry.steps, entry.hooks):
                 data = self._execute_step(
+                    step_from,
+                    step_to,
+                    data,
+                    hooks,
+                    self._version_property,
+                    self._context,
+                )
+        except MigrationError:
+            if self._on_missing_path == "raise":
+                raise
+            return current
+
+        if entry.target_model is not None:
+            data = self._adapter.finalize(entry.target_model, data)
+
+        return data
+
+    async def arun(self) -> ModelData:
+        entry = self._entry
+        current = self._current
+
+        if entry.source == entry.target:
+            return current
+
+        if not entry.allows_direction(self._direction):
+            if self._on_direction_violation == "raise":
+                raise MigrationError(
+                    entry.kind,
+                    entry.source,
+                    entry.target,
+                    f"Direction {self._direction} blocked for {entry.kind}",
+                )
+            return current
+
+        assert self._aexecute_step is not None
+        data = current
+        try:
+            for (step_from, step_to), hooks in zip(entry.steps, entry.hooks):
+                data = await self._aexecute_step(
                     step_from,
                     step_to,
                     data,
@@ -106,6 +153,31 @@ class DefaultMigrationEntry(Generic[VersionValue]):
             entry,
             current,
             execute_step=execute_step,
+            adapter=adapter,
+            version_property=version_property,
+            direction=direction,
+            on_direction_violation=on_direction_violation,
+            on_missing_path=on_missing_path,
+            context=context,
+        )
+
+    def amigrate(
+        self,
+        entry: GraphEntry[VersionValue],
+        current: ModelData,
+        *,
+        aexecute_step: AsyncMigrationEntryCallback,
+        adapter: ModelAdapter,
+        version_property: str,
+        direction: MigrationDirectionStrategy,
+        on_direction_violation: DirectionViolationStrategy,
+        on_missing_path: VersionMissingStrategy,
+        context: MigrationContext | None = None,
+    ) -> AsyncRunnableMigration:
+        return _DefaultMigrationTask(
+            entry,
+            current,
+            aexecute_step=aexecute_step,
             adapter=adapter,
             version_property=version_property,
             direction=direction,

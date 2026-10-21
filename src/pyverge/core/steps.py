@@ -22,6 +22,13 @@ class _Step(Protocol):
         context: MigrationContext | None = None,
     ) -> ModelData: ...
 
+    async def aexecute(
+        self,
+        data: ModelData,
+        hooks: list[Attachable],
+        context: MigrationContext | None = None,
+    ) -> ModelData: ...
+
 
 @dataclass(frozen=True, slots=True)
 class ExplicitStep(Generic[VersionValue]):
@@ -47,4 +54,20 @@ class ExplicitStep(Generic[VersionValue]):
         result = self.edge(data, context)
         for hook in hooks:
             hook.after_migrate(str(kind), from_version, to_version, data, result)
+        return result
+
+    async def aexecute(
+        self,
+        data: ModelData,
+        hooks: list[Attachable],
+        context: MigrationContext | None = None,
+    ) -> ModelData:
+        kind = self.edge.kind
+        from_version = self.edge.source
+        to_version = self.edge.target
+        for hook in hooks:
+            await hook.abefore_migrate(str(kind), from_version, to_version, data)
+        result = self.edge(data, context)
+        for hook in hooks:
+            await hook.aafter_migrate(str(kind), from_version, to_version, data, result)
         return result

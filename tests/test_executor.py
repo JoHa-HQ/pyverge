@@ -13,11 +13,15 @@ from pyverge.core import (
     DiscoveryValidationError,
     MigrationError,
     MigrationNotFoundError,
+    MigrationSettings,
     RegistryError,
     VersionNode,
 )
 from pyverge.migration import (
+    AsyncLevelParallelExecutor,
+    AsyncSequentialExecutor,
     Engine,
+    ExecutionPolicy,
     JsonPatchMigration,
     LevelParallelExecutor,
     MigrationContext,
@@ -738,7 +742,7 @@ def test_executor_gate_rejects_field_shallow_container(
     # Force a container that recognizes the type but declares no fields.
     shallow = replace(plan, container=type("Empty", (BaseModel,), {}))
     with pytest.raises(DiscoveryValidationError, match="incompatible"):
-        engine.default_executor.run(
+        SequentialExecutor().run(
             shallow,
             registry=engine.registry,
             entry_migration=engine.entry_migration,
@@ -748,3 +752,31 @@ def test_executor_gate_rejects_field_shallow_container(
             on_direction_violation=engine.settings.on_direction_violation,
             on_missing_path=engine.settings.on_missing_path,
         )
+
+
+class TestExecutionPolicy:
+    @pytest.mark.parametrize(
+        "settings, expected",
+        [
+            pytest.param(MigrationSettings(), SequentialExecutor, id="sync-sequential"),
+            pytest.param(
+                MigrationSettings(parallel_workers=2),
+                LevelParallelExecutor,
+                id="sync-parallel",
+            ),
+            pytest.param(
+                MigrationSettings(execution_mode="async"),
+                AsyncSequentialExecutor,
+                id="async-sequential",
+            ),
+            pytest.param(
+                MigrationSettings(execution_mode="async", parallel_workers=2),
+                AsyncLevelParallelExecutor,
+                id="async-parallel",
+            ),
+        ],
+    )
+    def test_builds_executor_from_settings(
+        self, settings: MigrationSettings, expected: type
+    ) -> None:
+        assert isinstance(ExecutionPolicy(settings).build(), expected)
