@@ -127,7 +127,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 - **Runtime context** — pass tenant ids, timestamps, rates via `migrate(context=...)`; runtime callables receive the same read-only view at every step
 - **Convergent migration engine** — graph-driven, with automatic migration of nested versioned entries
 - **Target policies** — converge to `latest`, `earliest`, a pinned version, or per-kind overrides
-- **Executors** — sequential or level-parallel batch convergence
+- **Executors** — sync or async, sequential or level-parallel; `prepare` returns a reusable run object with execution deferred
 - **Model diffing** — breaking-change detection with JSON Patch rendering
 - **Migration hooks** — observability via before/after/error callbacks, plus an OpenTelemetry hook
 - **FastMCP adapter** — version FastMCP tools, prompts, and resources: reflect each versioned primitive into the graph and converge every call to the policy target
