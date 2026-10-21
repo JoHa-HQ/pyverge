@@ -1,3 +1,3 @@
-from .migration import JsonataMigration
+from .migration import JsonataMigration, JsonataTransform
 
-__all__ = ["JsonataMigration"]
+__all__ = ["JsonataMigration", "JsonataTransform"]

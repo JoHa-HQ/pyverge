@@ -44,6 +44,14 @@ class MigrationStoreMixin(Generic[VersionValue]):
     ) -> MigrationFunc:
         return func.patch
 
+    @_resolve_migration.register(JsonataMigration)
+    @classmethod
+    def _(
+        cls: type[ManagerState[VersionValue]],
+        func: JsonataMigration,
+    ) -> MigrationFunc:
+        return func.migration
+
     @singledispatchmethod
     @classmethod
     def store_migration(

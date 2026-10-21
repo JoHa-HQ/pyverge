@@ -103,7 +103,7 @@ class MigrationKeyDecorator:
                 "strategy='jsonata' expects a class with a string "
                 "'expression' attribute"
             )
-        return JsonataMigration(expression)
+        return JsonataMigration.from_expression(expression)
 
 
 class ModelStoreDecorator:

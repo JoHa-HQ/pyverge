@@ -51,6 +51,7 @@ from pyverge.migration.types import (
 )
 from pyverge.providers import (
     JsonataMigration,
+    JsonataTransform,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
     PydanticDiff,
@@ -106,6 +107,7 @@ __all__ = [
     "JsonPatchRender",
     "JsonSchemaModelAdapter",
     "JsonataMigration",
+    "JsonataTransform",
     "LevelParallelExecutor",
     "LocalExecutionBackend",
     "MaxDepthExceededError",

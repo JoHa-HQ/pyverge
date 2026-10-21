@@ -637,7 +637,7 @@ class TestCompatibilityReport:
 
 class TestJsonataMigration:
     def test_expression_uses_data_and_context(self) -> None:
-        migration = JsonataMigration(
+        migration = JsonataMigration.from_spec(
             {
                 "from": "1.0.0",
                 "to": "2.0.0",
@@ -649,7 +649,7 @@ class TestJsonataMigration:
         )
         context = MigrationContext.create({"tenant": "tenant_99"})
 
-        result = migration(
+        result = migration.migration(
             {"kind": "User", "version": "1.0.0", "email": "A@B.COM"},
             context,
         )
@@ -672,12 +672,12 @@ class TestJsonataMigration:
     )
     def test_rejects_invalid_spec(self, spec: object) -> None:
         with pytest.raises(ValueError):
-            JsonataMigration(spec)  # ty: ignore[invalid-argument-type]
+            JsonataMigration.create(spec)
 
     def test_rejects_non_object_result(self) -> None:
-        migration = JsonataMigration(
+        migration = JsonataMigration.from_spec(
             {"from": "1.0.0", "to": "2.0.0", "expression": "[1]"}
         )
 
         with pytest.raises(TypeError, match="JSON object"):
-            migration({"kind": "User", "version": "1.0.0"})
+            migration.migration({"kind": "User", "version": "1.0.0"})
