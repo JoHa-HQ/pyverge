@@ -593,7 +593,8 @@ class TestMigrationManagement:
             func = func_factory(str(src), str(dst))
             engine.store_migration((src, dst), func)
 
-        result = run_engine(engine, 
+        result = run_engine(
+            engine,
             {
                 "kind": "User",
                 "version": str(real.version[1]),
@@ -656,7 +657,8 @@ class TestMigrationManagement:
             )
 
         with pytest.raises(MigrationNotFoundError):
-            run_engine(engine, 
+            run_engine(
+                engine,
                 {
                     "kind": "User",
                     "version": str(real.version[1]),
@@ -1127,7 +1129,8 @@ class TestMigrationEntryIntegration:
 
         custom_strategy = MagicMock(spec=MigrationEntry)
         custom_strategy.migrate.return_value = _CustomTask()
-        result = run_engine(engine, 
+        result = run_engine(
+            engine,
             {"kind": "User", "version": "1.0.0", "name": "Alice"},
             target=latest_target_resolver(engine.registry),
             entry_migration=custom_strategy,

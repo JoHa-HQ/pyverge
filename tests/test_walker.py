@@ -402,7 +402,8 @@ def test_engine_container_guided_migration(engine: Engine[types.VersionValue]) -
             "role": "user",
         }
     }
-    result = run_engine(engine, 
+    result = run_engine(
+        engine,
         payload,
         target=latest_target_resolver(engine.registry),
         container=UserContainer,
@@ -596,7 +597,8 @@ def test_engine_forward_direction_policy_skip(
         engine.registry,
         envelope_model(model_adapter, discovery_settings, UserV1),
     )
-    result = run_engine(engine, 
+    result = run_engine(
+        engine,
         payload,
         target=target,
         direction="forward",
@@ -646,7 +648,8 @@ def test_engine_any_direction_policy(
         engine.registry,
         envelope_model(model_adapter, discovery_settings, UserV1),
     )
-    result = run_engine(engine, 
+    result = run_engine(
+        engine,
         payload,
         target=target,
     )

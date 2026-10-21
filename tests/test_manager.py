@@ -35,6 +35,7 @@ from pyverge.migration import (
     AsyncLevelParallelExecutor,
     Engine,
     MigrationContext,
+    MigrationError,
     MigrationHook,
     MigrationRun,
     PydanticModelAdapter,
@@ -1359,6 +1360,81 @@ class TestAsyncExecution:
         asyncio.run(instance.amigrate(_payload("1.0.0")))
 
         assert order == ["before", "after"]
+
+    def test_async_hooks_fire_in_registration_order(self) -> None:
+        manager = self._async_manager()
+        order: list[str] = []
+
+        class _Hook(MigrationHook):
+            def __init__(self, label: str) -> None:
+                self._label = label
+
+            async def abefore_migrate(self, name, from_version, to_version, data):
+                order.append(f"{self._label}:before")
+
+            async def aafter_migrate(
+                self, name, from_version, to_version, original_data, migrated_data
+            ):
+                order.append(f"{self._label}:after")
+
+        instance = manager()
+        instance.add_hook(ModelPair(UserV1, UserV2), _Hook("first"))
+        instance.add_hook(ModelPair(UserV1, UserV2), _Hook("second"))
+
+        asyncio.run(instance.amigrate(_payload("1.0.0")))
+
+        assert order == [
+            "first:before",
+            "second:before",
+            "first:after",
+            "second:after",
+        ]
+
+    def test_async_path_delegates_to_sync_hook(self) -> None:
+        manager = self._async_manager()
+        calls: list[str] = []
+
+        class _Hook(MigrationHook):
+            def before_migrate(self, name, from_version, to_version, data):
+                calls.append("before")
+
+            def after_migrate(
+                self, name, from_version, to_version, original_data, migrated_data
+            ):
+                calls.append("after")
+
+        instance = manager()
+        instance.add_hook(ModelPair(UserV1, UserV2), _Hook())
+
+        asyncio.run(instance.amigrate(_payload("1.0.0")))
+
+        assert calls == ["before", "after"]
+
+    def test_async_on_error_is_awaited(self) -> None:
+        manager = self._async_manager()
+        events: list[str] = []
+
+        def _boom(data: dict, context: MigrationContext | None = None) -> dict:
+            raise RuntimeError("boom")
+
+        class _Hook(MigrationHook):
+            async def abefore_migrate(self, name, from_version, to_version, data):
+                events.append("before")
+
+            async def aon_error(self, name, from_version, to_version, data, error):
+                events.append(f"error:{error}")
+
+        instance = manager()
+        instance.remove_migration(ModelPair(UserV1, UserV2))
+        instance.store_migration(ModelPair(UserV1, UserV2), _boom)
+        instance.add_hook(ModelPair(UserV1, UserV2), _Hook())
+
+        with pytest.raises(MigrationError):
+            asyncio.run(instance.amigrate(_payload("1.0.0")))
+
+        assert events[0] == "before"
+        assert events[1].startswith("error:")
+        assert "boom" in events[1]
 
     def test_sync_entrypoint_rejects_async_mode(self) -> None:
         manager = self._async_manager()

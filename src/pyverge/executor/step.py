@@ -37,11 +37,11 @@ class StepExecutor(Generic[VersionValue]):
         hooks_list = list(hooks)
         try:
             result = step.execute(data, hooks_list, context)
-        except MigrationError:
-            raise
         except Exception as exc:
             for hook in hooks_list:
                 hook.on_error(str(step_from.kind), step_from, step_to, data, exc)
+            if isinstance(exc, MigrationError):
+                raise
             raise MigrationError(
                 str(step_from.kind),
                 step_from,
@@ -66,11 +66,11 @@ class StepExecutor(Generic[VersionValue]):
         hooks_list = list(hooks)
         try:
             result = await step.aexecute(data, hooks_list, context)
-        except MigrationError:
-            raise
         except Exception as exc:
             for hook in hooks_list:
                 await hook.aon_error(str(step_from.kind), step_from, step_to, data, exc)
+            if isinstance(exc, MigrationError):
+                raise
             raise MigrationError(
                 str(step_from.kind),
                 step_from,

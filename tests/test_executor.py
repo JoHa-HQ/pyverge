@@ -104,7 +104,8 @@ def test_executor_returns_new_payload(
         }
     }
 
-    result = run_engine(engine, 
+    result = run_engine(
+        engine,
         payload,
         target=latest_target_resolver(engine.registry),
         executor=executor,
@@ -175,7 +176,8 @@ def test_executor_noop_when_source_is_target(
         }
     }
 
-    result = run_engine(engine, 
+    result = run_engine(
+        engine,
         payload,
         target=latest_target_resolver(engine.registry),
         executor=executor,
@@ -455,7 +457,8 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
         }
     }
 
-    result = run_engine(engine, 
+    result = run_engine(
+        engine,
         payload,
         target=latest_target_resolver(engine.registry),
         executor=LevelParallelExecutor(max_workers=2),
