@@ -1,0 +1,41 @@
+name: pyverge
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: showcases/ci
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: pip install "pyverge[cli]"
+
+      - name: Registry health
+        run: pyverge doctor --manager models:manager
+
+      - name: Export graph manifest
+        run: |
+          mkdir -p target
+          pyverge manifest --manager models:manager \
+            --output target/pyverge-manifest.json
+
+      - name: Upload manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyverge-manifest
+          path: showcases/ci/target/pyverge-manifest.json
+
+      - name: Check compatibility
+        run: pyverge compat --manager models:manager --fail-on-breaking
+
+      - name: Check payload convergence
+        run: pyverge migrate payloads/user_v1.json \
+          --manager models:manager --check
