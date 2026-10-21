@@ -167,9 +167,10 @@ Async runs use `await run.arun(context=...)`. `run()` on an async run raises
 
 ### Async hooks
 
-`MigrationHook` exposes async counterparts (`abefore_migrate`,
-`aafter_migrate`, `aon_error`) that default to the sync methods. Async executors
-await them, so tracing and I/O hooks work on the async path without changes.
+Async executors detect the hook shape: an overridden `abefore_migrate`,
+`aafter_migrate`, or `aon_error` is awaited as a coroutine; otherwise the sync
+method runs in a worker thread via `asyncio.to_thread`. Sync hooks therefore
+work on both paths without blocking the event loop.
 
 You can still inject a custom executor per call:
 

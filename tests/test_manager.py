@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import Callable
 from typing import Literal, cast
 
@@ -1390,13 +1391,16 @@ class TestAsyncExecution:
             "second:after",
         ]
 
-    def test_async_path_delegates_to_sync_hook(self) -> None:
+    def test_async_path_runs_sync_hook_in_thread(self) -> None:
         manager = self._async_manager()
+        main_thread = threading.get_ident()
         calls: list[str] = []
+        threads: list[int] = []
 
         class _Hook(MigrationHook):
             def before_migrate(self, name, from_version, to_version, data):
                 calls.append("before")
+                threads.append(threading.get_ident())
 
             def after_migrate(
                 self, name, from_version, to_version, original_data, migrated_data
@@ -1409,6 +1413,7 @@ class TestAsyncExecution:
         asyncio.run(instance.amigrate(_payload("1.0.0")))
 
         assert calls == ["before", "after"]
+        assert threads[0] != main_thread
 
     def test_async_on_error_is_awaited(self) -> None:
         manager = self._async_manager()

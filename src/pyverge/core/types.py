@@ -238,32 +238,6 @@ class Attachable(Protocol):
         error: Exception,
     ) -> None: ...
 
-    async def abefore_migrate(
-        self,
-        name: str,
-        from_version: Comparable,
-        to_version: Comparable,
-        data: dict[str, Any],
-    ) -> None: ...
-
-    async def aafter_migrate(
-        self,
-        name: str,
-        from_version: Comparable,
-        to_version: Comparable,
-        original_data: dict[str, Any],
-        migrated_data: dict[str, Any],
-    ) -> None: ...
-
-    async def aon_error(
-        self,
-        name: str,
-        from_version: Comparable,
-        to_version: Comparable,
-        data: dict[str, Any],
-        error: Exception,
-    ) -> None: ...
-
 
 @runtime_checkable
 class Diffable(Protocol[VersionValue_co]):

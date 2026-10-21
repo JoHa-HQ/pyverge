@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Generic, Protocol
+from typing import Any, Generic, Protocol
 
 from .context import MigrationContext
 from .types import (
@@ -28,6 +31,30 @@ class _Step(Protocol):
         hooks: list[Attachable],
         context: MigrationContext | None = None,
     ) -> ModelData: ...
+
+
+async def invoke_async_hook(
+    hook: Attachable,
+    sync_name: str,
+    async_name: str,
+    *args: Any,
+) -> None:
+    """Invoke a hook on the async path without blocking the event loop.
+
+    An overridden async method runs as a coroutine. Otherwise the sync method
+    runs in a worker thread via ``asyncio.to_thread``.
+    """
+    async_method: Callable[..., Any] | None = getattr(hook, async_name, None)
+    if async_method is not None:
+        await async_method(*args)
+        return
+
+    sync_method: Callable[..., Any] = getattr(hook, sync_name)
+    if inspect.iscoroutinefunction(sync_method):
+        await sync_method(*args)
+        return
+
+    await asyncio.to_thread(sync_method, *args)
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,8 +93,25 @@ class ExplicitStep(Generic[VersionValue]):
         from_version = self.edge.source
         to_version = self.edge.target
         for hook in hooks:
-            await hook.abefore_migrate(str(kind), from_version, to_version, data)
+            await invoke_async_hook(
+                hook,
+                "before_migrate",
+                "abefore_migrate",
+                str(kind),
+                from_version,
+                to_version,
+                data,
+            )
         result = self.edge(data, context)
         for hook in hooks:
-            await hook.aafter_migrate(str(kind), from_version, to_version, data, result)
+            await invoke_async_hook(
+                hook,
+                "after_migrate",
+                "aafter_migrate",
+                str(kind),
+                from_version,
+                to_version,
+                data,
+                result,
+            )
         return result

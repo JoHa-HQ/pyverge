@@ -13,6 +13,9 @@ class MigrationHook:
 
     A provider-specific hook lives with its adapter — e.g.
     :class:`~pyverge.adapters.otel.OTELHook` for OpenTelemetry tracing.
+
+    Async executors use the ``a*`` override when present; otherwise the sync
+    method runs in a worker thread.
     """
 
     def before_migrate(
@@ -40,35 +43,3 @@ class MigrationHook:
         data: Mapping[str, Any],
         error: Exception,
     ) -> None: ...
-
-    async def abefore_migrate(
-        self,
-        name: str,
-        from_version: Comparable,
-        to_version: Comparable,
-        data: Mapping[str, Any],
-    ) -> None:
-        """Async form; defaults to the sync hook."""
-        self.before_migrate(name, from_version, to_version, data)
-
-    async def aafter_migrate(
-        self,
-        name: str,
-        from_version: Comparable,
-        to_version: Comparable,
-        original_data: Mapping[str, Any],
-        migrated_data: Mapping[str, Any],
-    ) -> None:
-        """Async form; defaults to the sync hook."""
-        self.after_migrate(name, from_version, to_version, original_data, migrated_data)
-
-    async def aon_error(
-        self,
-        name: str,
-        from_version: Comparable,
-        to_version: Comparable,
-        data: Mapping[str, Any],
-        error: Exception,
-    ) -> None:
-        """Async form; defaults to the sync hook."""
-        self.on_error(name, from_version, to_version, data, error)

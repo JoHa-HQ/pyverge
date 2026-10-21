@@ -6,7 +6,7 @@ from typing import Generic
 
 from pyverge.core.context import MigrationContext
 from pyverge.core.exceptions import MigrationError, MigrationNotFoundError
-from pyverge.core.steps import ExplicitStep
+from pyverge.core.steps import ExplicitStep, invoke_async_hook
 from pyverge.core.types import (
     Attachable,
     ModelData,
@@ -68,7 +68,16 @@ class StepExecutor(Generic[VersionValue]):
             result = await step.aexecute(data, hooks_list, context)
         except Exception as exc:
             for hook in hooks_list:
-                await hook.aon_error(str(step_from.kind), step_from, step_to, data, exc)
+                await invoke_async_hook(
+                    hook,
+                    "on_error",
+                    "aon_error",
+                    str(step_from.kind),
+                    step_from,
+                    step_to,
+                    data,
+                    exc,
+                )
             if isinstance(exc, MigrationError):
                 raise
             raise MigrationError(
