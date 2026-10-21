@@ -4,6 +4,7 @@ import asyncio
 import functools
 from collections.abc import Callable
 from dataclasses import replace
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -895,57 +896,66 @@ class _RecordingBackend:
         return {"value": 2}
 
 
-def _plan(*paths: tuple[str, ...]) -> MigrationPlan:
+@pytest.fixture
+def execution_plan(request: pytest.FixtureRequest) -> MigrationPlan:
+    """Plan fixture parametrized over discovered paths."""
+    paths: tuple[tuple[str, ...], ...] = request.param
     entries = [
         GraphEntry(path=path, source=MagicMock(), target=MagicMock())
         for path in paths
     ]
     return MigrationPlan(
-        data={p[0]: {"value": 1} for p in paths},
+        data={path[0]: {"value": 1} for path in paths},
         graph=MigrationGraph(entries),
     )
 
 
+@pytest.fixture
+def recording_backend() -> _RecordingBackend:
+    """Backend that records which entry paths the strategies invoke."""
+    return _RecordingBackend()
+
+
 class TestStrategiesUseBackend:
-    def test_sequential_execute_uses_backend(self) -> None:
-        backend = _RecordingBackend()
-        result = SequentialExecutor().execute(
-            _plan(("a",), ("b",)), backend  # ty: ignore[invalid-argument-type]
-        )
-
-        assert result == {"a": {"value": 2}, "b": {"value": 2}}
-        assert backend.calls == [("a",), ("b",)]
-
-    def test_parallel_execute_uses_backend(self) -> None:
-        backend = _RecordingBackend()
-        result = LevelParallelExecutor(max_workers=2).execute(
-            _plan(("a",), ("b",)), backend  # ty: ignore[invalid-argument-type]
-        )
-
-        assert result == {"a": {"value": 2}, "b": {"value": 2}}
-        assert set(backend.calls) == {("a",), ("b",)}
-
-    def test_async_sequential_execute_uses_backend(self) -> None:
-        backend = _RecordingBackend()
-        result = asyncio.run(
-            AsyncSequentialExecutor().aexecute(
-                _plan(("a",), ("b",)), backend  # ty: ignore[invalid-argument-type]
+    @pytest.mark.parametrize(
+        "execution_plan",
+        [pytest.param((("a",), ("b",)), id="two-entries")],
+        indirect=True,
+    )
+    @pytest.mark.parametrize(
+        "executor, run_async",
+        [
+            pytest.param(SequentialExecutor(), False, id="sync-sequential"),
+            pytest.param(
+                LevelParallelExecutor(max_workers=2), False, id="sync-parallel"
+            ),
+            pytest.param(AsyncSequentialExecutor(), True, id="async-sequential"),
+            pytest.param(
+                AsyncLevelParallelExecutor(max_workers=2),
+                True,
+                id="async-parallel",
+            ),
+        ],
+    )
+    def test_strategy_executes_through_backend(
+        self,
+        executor: Any,
+        run_async: bool,
+        execution_plan: MigrationPlan,
+        recording_backend: _RecordingBackend,
+    ) -> None:
+        if run_async:
+            result = asyncio.run(
+                executor.aexecute(
+                    execution_plan,
+                    recording_backend,
+                )
             )
-        )
+        else:
+            result = executor.execute(execution_plan, recording_backend)
 
         assert result == {"a": {"value": 2}, "b": {"value": 2}}
-        assert backend.calls == [("a",), ("b",)]
-
-    def test_async_parallel_execute_uses_backend(self) -> None:
-        backend = _RecordingBackend()
-        result = asyncio.run(
-            AsyncLevelParallelExecutor(max_workers=2).aexecute(
-                _plan(("a",), ("b",)), backend  # ty: ignore[invalid-argument-type]
-            )
-        )
-
-        assert result == {"a": {"value": 2}, "b": {"value": 2}}
-        assert set(backend.calls) == {("a",), ("b",)}
+        assert sorted(recording_backend.calls) == [("a",), ("b",)]
 
 
 class TestRemoteContract:
