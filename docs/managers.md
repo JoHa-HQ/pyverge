@@ -56,7 +56,7 @@ class UserV2(BaseModel):
 
 
 @UserManager.migration("User", "1.0.0", "2.0.0")
-def add_age(data: dict) -> dict:
+def add_age(data: dict, context=None) -> dict:
     return {**data, "age": None}
 ```
 
@@ -82,7 +82,7 @@ class UserV2(BaseModel):
     age: int | None = None
 
 
-def add_age(data: dict) -> dict:
+def add_age(data: dict, context=None) -> dict:
     data["age"] = None
     return data
 
@@ -100,7 +100,7 @@ OtherManager = Manager[semver.Version].configure(
 manager = OtherManager()
 manager.store_model(UserV1)
 manager.store_model(UserV2)
-manager.store_migration((UserV1, UserV2), add_age)
+manager.store_migration(ModelPair(UserV1, UserV2), add_age)
 ```
 
 Class-level and instance-level registration are alternatives — an instance shares
@@ -143,8 +143,12 @@ manager.store_model(search_weather_v1)
 manager.store_model(search_weather_v2)
 manager.store_model(location_v1)   # nested inside search_weather
 manager.store_model(location_v2)
-manager.store_migration(("search_weather", "1.0.0", "2.0.0"), ...)
-manager.store_migration(("location", "1.0.0", "2.0.0"), ...)
+manager.store_migration(
+    ManagerMigrationKey("search_weather", "1.0.0", "2.0.0"), ...
+)
+manager.store_migration(
+    ManagerMigrationKey("location", "1.0.0", "2.0.0"), ...
+)
 ```
 
 The same rule applies to decorator registration: every `@Manager.model()` for a

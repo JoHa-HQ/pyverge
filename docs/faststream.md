@@ -79,11 +79,11 @@ class OrderV2Data(OrderData):
     currency: str
 
 
-def add_currency(data: OrderV1Data) -> OrderV2Data:
+def add_currency(data: OrderV1Data, context=None) -> OrderV2Data:
     return {**data, "currency": "USD"}
 
 
-def drop_currency(data: OrderV2Data) -> OrderV1Data:
+def drop_currency(data: OrderV2Data, context=None) -> OrderV1Data:
     data = dict(data)
     del data["currency"]
     return cast(OrderV1Data, data)

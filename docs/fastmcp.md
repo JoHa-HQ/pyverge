@@ -63,7 +63,7 @@ class WeatherV2(BaseModel):
 
 
 # 2. The migration that reconstructs v1 from v2.
-def add_wind(data: dict) -> dict:
+def add_wind(data: dict, context=None) -> dict:
     return {**data, "wind": 0.0}
 
 

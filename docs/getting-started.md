@@ -57,7 +57,7 @@ class UserV2(BaseModel):
 
 # Register a migration between two versions.
 @UserManager.migration("User", "1.0.0", "2.0.0")
-def add_age(data: dict) -> dict:
+def add_age(data: dict, context=None) -> dict:
     return {**data, "age": None}
 
 
@@ -120,7 +120,9 @@ migration = JsonPatchMigration(
         "ops": [{"op": "add", "path": "/age", "value": None}],
     }
 )
-manager.store_migration(("User", "1.0.0", "2.0.0"), migration)
+manager.store_migration(
+    ManagerMigrationKey("User", "1.0.0", "2.0.0"), migration
+)
 ```
 
 The manager unwraps the compiled patch automatically. Core ops (`add`,
