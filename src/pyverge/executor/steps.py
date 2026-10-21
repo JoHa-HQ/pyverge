@@ -6,8 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Generic, Protocol
 
-from .context import MigrationContext
-from .types import (
+from pyverge.core.context import MigrationContext
+from pyverge.core.types import (
     Attachable,
     Migratable,
     ModelData,

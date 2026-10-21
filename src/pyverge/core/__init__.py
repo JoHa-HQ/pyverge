@@ -22,7 +22,6 @@ from .exceptions import (
 from .path import Path, get_at, set_at
 from .render import JsonPatchRender
 from .settings import DiscoverySettings, MigrationSettings, VersioningSettings
-from .steps import ExplicitStep
 from .types import (
     MIGRATION_PAIR_LEN,
     Attachable,
@@ -70,7 +69,6 @@ __all__ = [
     "DiscoveryValidationError",
     "EngineError",
     "ExecutionModeError",
-    "ExplicitStep",
     "JsonPatchRender",
     "LookupKey",
     "ManagerKey",

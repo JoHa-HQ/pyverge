@@ -7,6 +7,7 @@ from .policy import ExecutionPolicy
 from .run import MigrationRun
 from .sequential import AsyncSequentialExecutor, SequentialExecutor
 from .step import StepExecutor
+from .steps import ExplicitStep
 from .types import (
     AsyncExecutor,
     AsyncMigrationEntry,
@@ -28,6 +29,7 @@ __all__ = [
     "DefaultMigrationEntry",
     "ExecutionPolicy",
     "Executor",
+    "ExplicitStep",
     "LevelParallelExecutor",
     "MigrationEntry",
     "MigrationEntryCallback",

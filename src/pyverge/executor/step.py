@@ -6,7 +6,6 @@ from typing import Generic
 
 from pyverge.core.context import MigrationContext
 from pyverge.core.exceptions import MigrationError, MigrationNotFoundError
-from pyverge.core.steps import ExplicitStep, invoke_async_hook
 from pyverge.core.types import (
     Attachable,
     ModelData,
@@ -15,6 +14,8 @@ from pyverge.core.types import (
 )
 from pyverge.core.versioning import SentinelEdge
 from pyverge.migration.registry import Registry
+
+from .steps import ExplicitStep, invoke_async_hook
 
 
 class StepExecutor(Generic[VersionValue]):
