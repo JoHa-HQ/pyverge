@@ -85,7 +85,7 @@ packages = ["src/pyverge"]
 source = "uv-dynamic-versioning"
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "benchmarks/tests"]
 python_files = ["test_*.py", "bench_*.py"]
 addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80 --doctest-modules"
 

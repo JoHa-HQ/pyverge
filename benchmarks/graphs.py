@@ -36,14 +36,16 @@ def _drop_status(data: dict, context: MigrationContext | None = None) -> dict:
     return data
 
 
-def user_manager() -> Manager[semver.Version]:
+def user_manager(
+    settings: MigrationSettings | None = None,
+) -> Manager[semver.Version]:
     """A linear ``User`` chain, both directions: v1 ↔ v2 ↔ v3.
 
     Reverse edges let a produce seam converge a returned ``latest`` (v3) payload
     down to a pinned older target.
     """
     user_manager_cls = Manager[semver.Version].configure(
-        MigrationSettings(),
+        settings or MigrationSettings(),
         PydanticModelAdapter(),
     )
     manager = user_manager_cls()
