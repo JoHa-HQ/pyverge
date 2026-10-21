@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import functools
 from collections.abc import Callable
 from dataclasses import replace
+from unittest.mock import MagicMock
 
 import pytest
 import semver
@@ -17,14 +19,21 @@ from pyverge.core import (
     RegistryError,
     VersionNode,
 )
+from pyverge.core.types import ModelData
+from pyverge.executor import StepRequest
 from pyverge.migration import (
     AsyncLevelParallelExecutor,
     AsyncSequentialExecutor,
+    DefaultEntryPlanner,
     Engine,
     ExecutionPolicy,
+    GraphEntry,
     JsonPatchMigration,
     LevelParallelExecutor,
+    LocalExecutionBackend,
     MigrationContext,
+    MigrationGraph,
+    MigrationPlan,
     PydanticModelAdapter,
     Registry,
     SequentialExecutor,
@@ -783,3 +792,174 @@ class TestExecutionPolicy:
         self, settings: MigrationSettings, expected: type
     ) -> None:
         assert isinstance(ExecutionPolicy(settings).build(), expected)
+
+
+class TestLocalExecutionBackend:
+    def test_run_entry_delegates_to_entry_planner(self) -> None:
+        task = MagicMock()
+        task.run.return_value = {"name": "Bob"}
+        entry_migration = MagicMock()
+        entry_migration.migrate.return_value = task
+        adapter = MagicMock()
+        entry = MagicMock()
+        context = MigrationContext.empty()
+
+        backend = LocalExecutionBackend(
+            registry=MagicMock(),
+            entry_migration=entry_migration,
+            adapter=adapter,
+            version_property="version",
+            direction="any",
+            on_direction_violation="raise",
+            on_missing_path="raise",
+        )
+
+        result = backend.run_entry(entry, {"name": "Alice"}, context)
+
+        assert result == {"name": "Bob"}
+        entry_migration.migrate.assert_called_once()
+        task.run.assert_called_once_with()
+
+    def test_ensure_compatible_delegates_to_adapter(self) -> None:
+        adapter = MagicMock()
+        backend = LocalExecutionBackend(
+            registry=MagicMock(),
+            entry_migration=DefaultEntryPlanner(),
+            adapter=adapter,
+            version_property="version",
+            direction="any",
+            on_direction_violation="raise",
+            on_missing_path="raise",
+        )
+        plan = MagicMock()
+
+        backend.ensure_compatible(plan)
+
+        adapter.ensure_compatible.assert_called_once_with(
+            plan.container, fields=plan.target_fields
+        )
+
+    def test_arun_entry_delegates_to_async_planner(self) -> None:
+        class _Task:
+            async def arun(self) -> dict:
+                return {"name": "Bob"}
+
+        class _Entry:
+            def __init__(self) -> None:
+                self.calls = 0
+
+            def amigrate(self, *args: object, **kwargs: object) -> _Task:
+                self.calls += 1
+                return _Task()
+
+        entry_migration = _Entry()
+        backend = LocalExecutionBackend(
+            registry=MagicMock(),
+            entry_migration=entry_migration,
+            adapter=MagicMock(),
+            version_property="version",
+            direction="any",
+            on_direction_violation="raise",
+            on_missing_path="raise",
+        )
+
+        result = asyncio.run(backend.arun_entry(MagicMock(), {"name": "Alice"}))
+
+        assert result == {"name": "Bob"}
+        assert entry_migration.calls == 1
+
+
+class _RecordingBackend:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str | int, ...]] = []
+
+    def ensure_compatible(self, plan: object) -> None:
+        pass
+
+    def run_entry(
+        self,
+        entry: GraphEntry,
+        current: ModelData,
+        context: MigrationContext | None,
+    ) -> ModelData:
+        self.calls.append(entry.path)
+        return {"value": 2}
+
+    async def arun_entry(
+        self,
+        entry: GraphEntry,
+        current: ModelData,
+        context: MigrationContext | None,
+    ) -> ModelData:
+        self.calls.append(entry.path)
+        return {"value": 2}
+
+
+def _plan(*paths: tuple[str, ...]) -> MigrationPlan:
+    entries = [
+        GraphEntry(path=path, source=MagicMock(), target=MagicMock())
+        for path in paths
+    ]
+    return MigrationPlan(
+        data={p[0]: {"value": 1} for p in paths},
+        graph=MigrationGraph(entries),
+    )
+
+
+class TestStrategiesUseBackend:
+    def test_sequential_execute_uses_backend(self) -> None:
+        backend = _RecordingBackend()
+        result = SequentialExecutor().execute(
+            _plan(("a",), ("b",)), backend  # ty: ignore[invalid-argument-type]
+        )
+
+        assert result == {"a": {"value": 2}, "b": {"value": 2}}
+        assert backend.calls == [("a",), ("b",)]
+
+    def test_parallel_execute_uses_backend(self) -> None:
+        backend = _RecordingBackend()
+        result = LevelParallelExecutor(max_workers=2).execute(
+            _plan(("a",), ("b",)), backend  # ty: ignore[invalid-argument-type]
+        )
+
+        assert result == {"a": {"value": 2}, "b": {"value": 2}}
+        assert set(backend.calls) == {("a",), ("b",)}
+
+    def test_async_sequential_execute_uses_backend(self) -> None:
+        backend = _RecordingBackend()
+        result = asyncio.run(
+            AsyncSequentialExecutor().aexecute(
+                _plan(("a",), ("b",)), backend  # ty: ignore[invalid-argument-type]
+            )
+        )
+
+        assert result == {"a": {"value": 2}, "b": {"value": 2}}
+        assert backend.calls == [("a",), ("b",)]
+
+    def test_async_parallel_execute_uses_backend(self) -> None:
+        backend = _RecordingBackend()
+        result = asyncio.run(
+            AsyncLevelParallelExecutor(max_workers=2).aexecute(
+                _plan(("a",), ("b",)), backend  # ty: ignore[invalid-argument-type]
+            )
+        )
+
+        assert result == {"a": {"value": 2}, "b": {"value": 2}}
+        assert set(backend.calls) == {("a",), ("b",)}
+
+
+class TestRemoteContract:
+    def test_step_request_is_a_serializable_value(self) -> None:
+        request = StepRequest(
+            kind="User",
+            from_version="1.0.0",
+            to_version="2.0.0",
+            payload={"kind": "User", "version": "1.0.0"},
+            context={"tenant": "t"},
+        )
+
+        assert request.kind == "User"
+        assert request.from_version == "1.0.0"
+        assert request.to_version == "2.0.0"
+        assert request.payload == {"kind": "User", "version": "1.0.0"}
+        assert request.context == {"tenant": "t"}
