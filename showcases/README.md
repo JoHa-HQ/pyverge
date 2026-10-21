@@ -9,8 +9,6 @@ involved, wrap a real driver in a thin adapter.
 - [Event Sourcing](event-sourcing.md) — replaying and upcasting versioned events
 - [ETL Pipelines](etl-pipelines.md) — normalizing records from many sources to a warehouse schema
 - [Document Storage](document-storage.md) — converge-on-read for a document store (projected)
-- [Kafka Consumers](kafka-consumers.md) — converging records in a consumer group (projected)
-- [RabbitMQ / Streams Workers](rabbitmq-streams.md) — ack/reject workers for queues and streams (projected)
 
 ## Configuration & devices
 
@@ -28,6 +26,9 @@ involved, wrap a real driver in a thin adapter.
 - [FastMCP + OpenTelemetry](fastmcp/README.md) — a versioned FastMCP server with
   a self-driving demo and a Jaeger dashboard via `docker compose`. Shipped and
   runnable.
+- [FastStream](faststream/README.md) — the FastStream adapter: converge versioned
+  message bodies before a subscriber handler runs, over Kafka, RabbitMQ, NATS, or
+  Redis (broker chosen by config). Shipped and runnable.
 
 ## What's glue vs. engine
 

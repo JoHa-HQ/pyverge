@@ -200,6 +200,29 @@ class TargetResolutionMixin(Generic[VersionValue]):
             return cast(TargetResolver, target)
         return cls.compile_target_spec(cast(TargetSpec, target), engine=engine)
 
+    @classmethod
+    def resolve_target_model(
+        cls: type[ManagerState[VersionValue]],
+        declared: ModelHandle,
+        target: TargetPolicy,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> ModelHandle | None:
+        """Resolve a declared model class to the model served at *target*.
+
+        The declared class names the kind (any registered version). The target
+        policy is compiled and applied to that kind's anchor, yielding the
+        versionable served — a reconstructed class when the target is not the
+        anchor. Returns its model handle, or ``None`` when the target skips the
+        kind. This is the façade the FastStream adapter uses to bind a handler's
+        payload type to the version actually served.
+        """
+        engine = engine or cls._default_engine
+        anchor = engine.get_model_by_class(declared)
+        resolver = cls._resolve_target_policy(target, engine=engine)
+        resolved = resolver(anchor)
+        return resolved.model if resolved is not None else None
+
     @_resolve_target_policy.register(type)
     @classmethod
     def _policy_for_type(

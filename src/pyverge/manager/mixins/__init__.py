@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from pyverge.core.types import (
         Diffable,
         ManagerMigrationKey,
+        ModelData,
         ModelHandle,
         ModelKind,
         ModelPair,
@@ -73,7 +74,29 @@ if TYPE_CHECKING:
             version: Versionable[VersionValue] | None = None,
         ) -> None: ...
 
-        def attach_hooks(self, hooks: Iterable) -> None: ...
+        @classmethod
+        def identifies(
+            cls,
+            key: ModelHandle,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> bool: ...
+
+        @classmethod
+        def dump(
+            cls,
+            value: object,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> ModelData: ...
+
+        @classmethod
+        def attach_hooks(
+            cls,
+            hooks: Iterable,
+            *,
+            engine: Engine[VersionValue] | None = None,
+        ) -> None: ...
 
         @classmethod
         def compile_target_spec(

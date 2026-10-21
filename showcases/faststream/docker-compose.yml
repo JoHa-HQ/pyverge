@@ -1,0 +1,149 @@
+name: pyverge-faststream-showcase
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - jaeger
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # Jaeger UI — http://localhost:16686
+
+  kafka:
+    image: confluentinc/cp-kafka:8.0.0
+    profiles: [kafka]
+    ports:
+      - "9092:9092" # host clients (EXTERNAL)
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      # INTERNAL for other containers (Microcks), EXTERNAL for the host.
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://127.0.0.1:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    profiles: [rabbitmq]
+    ports:
+      - "5672:5672" # AMQP
+      - "15672:15672" # management UI — http://localhost:15672
+
+  nats:
+    image: nats:2.10
+    profiles: [nats]
+    command: ["-js"]
+    ports:
+      - "4222:4222" # client
+      - "8222:8222" # monitoring — http://localhost:8222
+
+  redis:
+    image: redis:7
+    profiles: [redis]
+    ports:
+      - "6379:6379"
+
+  # --- Microcks: AsyncAPI mocking/testing -----------------------------------
+  # Global service: starts alongside Jaeger/OTel in every run.
+  # UI: http://localhost:8080  (specs auto-imported from ./asyncapi)
+
+  microcks-mongo:
+    image: mongo:4.4.29
+    volumes:
+      - microcks-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 1s
+      retries: 3
+
+  microcks-postman:
+    image: quay.io/microcks/microcks-postman-runtime:0.8.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      start_period: 5s
+      interval: 20s
+      timeout: 3s
+      retries: 3
+
+  microcks-import:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      - microcks
+    volumes:
+      - ./asyncapi:/specs:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for attempt in $(seq 1 120); do
+          if curl --fail --silent --show-error \
+            -F "file=@/specs/orders.yaml" \
+            -F "mainArtifact=true" \
+            http://microcks:8080/api/artifact/upload; then
+            echo "Imported orders.yaml";
+            exit 0;
+          fi;
+          sleep 2;
+        done;
+        echo "Microcks import failed" >&2;
+        exit 1
+
+  microcks:
+    image: quay.io/microcks/microcks:nightly
+    depends_on:
+      - microcks-mongo
+      - microcks-postman
+    ports:
+      - "8080:8080" # UI / API — http://localhost:8080
+      - "9090:9090"
+    volumes:
+      - ./asyncapi:/deployments/config
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_MONGODB_URI=mongodb://microcks-mongo:27017
+      - SPRING_MONGODB_DATABASE=microcks
+      - POSTMAN_RUNNER_URL=http://microcks-postman:3000
+      - TEST_CALLBACK_URL=http://microcks:8080
+      - SERVICES_UPDATE_INTERVAL=0 0 0/2 * * *
+      - KEYCLOAK_ENABLED=false
+      - ASYNC_MINION_URL=http://microcks-async-minion:8081
+      # AsyncAPI binding is explicit; no KAFKA default.
+      - ASYNC_API_DEFAULT_BINDING=${MICROCKS_BROKER_BINDING:?set MICROCKS_BROKER_BINDING}
+      # Internal Microcks event bus (service updates + async triggers).
+      - KAFKA_BOOTSTRAP_SERVER=${MICROCKS_KAFKA_BOOTSTRAP_SERVER:?set MICROCKS_KAFKA_BOOTSTRAP_SERVER}
+
+  microcks-async-minion:
+    image: quay.io/microcks/microcks-async-minion:nightly
+    depends_on:
+      - microcks
+    volumes:
+      - ./microcks/async-minion.properties:/deployments/config/application.properties:ro
+    environment:
+      - QUARKUS_PROFILE=docker-compose
+      - MICROCKS_KAFKA_BOOTSTRAP_SERVER=${MICROCKS_KAFKA_BOOTSTRAP_SERVER:?set MICROCKS_KAFKA_BOOTSTRAP_SERVER}
+      - MICROCKS_BROKER_BINDING=${MICROCKS_BROKER_BINDING:?set MICROCKS_BROKER_BINDING}
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/q/health/ready"]
+      start_period: 10s
+      interval: 10s
+      timeout: 2s
+      retries: 3
+
+volumes:
+  microcks-mongo-data:

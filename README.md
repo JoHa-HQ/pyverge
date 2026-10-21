@@ -24,6 +24,9 @@ pip install "pyverge[cli]"
 
 # With MCP tool server
 pip install "pyverge[fastmcp]"
+
+# With FastStream messaging adapter
+pip install "pyverge[faststream]"
 ```
 
 Development dependencies are managed as a dependency group; install them with
@@ -127,6 +130,7 @@ pyverge export --manager user --version 2.0.0 > schema.json
 - **Model diffing** — breaking-change detection with JSON Patch rendering
 - **Migration hooks** — observability via before/after/error callbacks, plus an OpenTelemetry hook
 - **FastMCP adapter** — version FastMCP tools, prompts, and resources: reflect each versioned primitive into the graph and converge every call to the policy target
+- **FastStream adapter** — converge versioned message bodies before a subscriber handler runs, through the subscriber `decoder`, with startup reflection of each handler's declared payload model
 
 ## Documentation
 
@@ -138,7 +142,9 @@ pyverge export --manager user --version 2.0.0 > schema.json
 - [Migrations](docs/migration.md)
 - [Telemetry & Hooks](docs/telemetry.md)
 - [FastMCP Integration](docs/fastmcp.md)
+- [FastStream Integration](docs/faststream.md)
 - [Testing](docs/testing.md)
+- [Benchmarking](docs/benchmarking.md)
 - [Common Usage Patterns](docs/usage.md)
 - [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)

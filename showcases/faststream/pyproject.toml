@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24"
+]
+
+[project]
+name = "faststream-demo"
+version = "0.0.0"
+description = "FastStream showcase for pyverge"
+requires-python = ">=3.11"
+dependencies = [
+  "pyverge",
+  "faststream[kafka,rabbit,nats,redis]>=0.7",
+  "typer>=0.12",
+  "dependency-injector>=4.49.1"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/faststream_demo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-p no:cacheprovider"
+
+[tool.uv.sources]
+pyverge = {path = "../../", editable = true}

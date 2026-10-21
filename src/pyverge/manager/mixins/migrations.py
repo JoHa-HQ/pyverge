@@ -217,16 +217,21 @@ class MigrationStoreMixin(Generic[VersionValue]):
         )
         engine.add_hook(SentinelEdge.from_pair(*pair), hook)
 
+    @classmethod
     def attach_hooks(
-        self: ManagerState[VersionValue],
+        cls: type[ManagerState[VersionValue]],
         hooks: Iterable[Attachable],
+        *,
+        engine: Engine[VersionValue] | None = None,
     ) -> None:
         """Attach *hooks* to every registered migration edge.
 
-        The instance-level bulk form of :meth:`add_hook`, for observers that
-        watch the whole graph (e.g. tracing every step).
+        The bulk form of :meth:`add_hook`, for observers that watch the whole
+        graph (e.g. tracing every step). Callable from the class or an instance;
+        pass *engine* to target a specific engine explicitly.
         """
-        registry = self.engine.registry
+        engine = engine or cls._default_engine
+        registry = engine.registry
         for kind in registry.kinds:
             for edge in registry.migrations(kind):
                 for hook in hooks:
