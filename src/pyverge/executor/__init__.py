@@ -1,17 +1,18 @@
-"""Migration execution: step resolution, sequential/parallel runners, policy."""
+"""Migration execution: local strategies, prepared runs, remote contracts."""
 
-from .entry import DefaultMigrationEntry
-from .hooks import MigrationHook
-from .policy import ExecutionPolicy
-from .run import MigrationRun
-from .step import StepExecutor
-from .steps import ExplicitStep
-from .strategy import (
+from .local import (
     AsyncLevelParallelExecutor,
     AsyncSequentialExecutor,
+    DefaultMigrationEntry,
     LevelParallelExecutor,
+    LocalExecutionBackend,
+    MigrationHook,
     SequentialExecutor,
+    StepExecutor,
 )
+from .policy import ExecutionPolicy
+from .remote import ExecutionTransport, StepRequest
+from .run import MigrationRun
 from .types import (
     AsyncExecutor,
     AsyncMigrationEntry,
@@ -32,9 +33,10 @@ __all__ = [
     "AsyncSequentialExecutor",
     "DefaultMigrationEntry",
     "ExecutionPolicy",
+    "ExecutionTransport",
     "Executor",
-    "ExplicitStep",
     "LevelParallelExecutor",
+    "LocalExecutionBackend",
     "MigrationEntry",
     "MigrationEntryCallback",
     "MigrationHook",
@@ -42,4 +44,5 @@ __all__ = [
     "RunnableMigration",
     "SequentialExecutor",
     "StepExecutor",
+    "StepRequest",
 ]

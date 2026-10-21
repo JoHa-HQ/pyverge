@@ -1,4 +1,4 @@
-"""Prepared migration: plan + executor, run on demand."""
+"""Prepared migration: plan + executor + backend, run on demand."""
 
 from __future__ import annotations
 
@@ -18,11 +18,17 @@ from pyverge.migration.graph import MigrationPlan
 from pyverge.migration.registry import Registry
 from pyverge.providers.types import ModelAdapter
 
+from .local.backend import LocalExecutionBackend
+from .ports import (
+    AsyncExecutionStrategy,
+    ExecutionBackend,
+    SyncExecutionStrategy,
+)
 from .types import AsyncExecutor, AsyncMigrationEntry, Executor, MigrationEntry
 
 
 class MigrationRun(Generic[VersionValue]):
-    """A built migration plan bound to an executor.
+    """A built migration plan bound to an executor and backend.
 
     Construction does not execute the migration. ``run``/``arun`` accept the
     context at execution time, so the same prepared run can be executed with
@@ -42,16 +48,21 @@ class MigrationRun(Generic[VersionValue]):
         direction: MigrationDirectionStrategy,
         on_direction_violation: DirectionViolationStrategy,
         on_missing_path: VersionMissingStrategy,
+        backend: ExecutionBackend[VersionValue] | None = None,
     ) -> None:
         self.plan = plan
         self.executor = executor
-        self._registry = registry
-        self._entry_migration = entry_migration
-        self._adapter = adapter
-        self._version_property = version_property
-        self._direction = direction
-        self._on_direction_violation = on_direction_violation
-        self._on_missing_path = on_missing_path
+        self._backend: ExecutionBackend[VersionValue] = backend or (
+            LocalExecutionBackend(
+                registry=registry,
+                entry_migration=entry_migration,
+                adapter=adapter,
+                version_property=version_property,
+                direction=direction,
+                on_direction_violation=on_direction_violation,
+                on_missing_path=on_missing_path,
+            )
+        )
 
     @property
     def is_async(self) -> bool:
@@ -68,15 +79,9 @@ class MigrationRun(Generic[VersionValue]):
             raise AsyncExecutionRequired(
                 "This migration was prepared for async execution; use arun()"
             )
-        return cast("Executor[VersionValue]", self.executor).run(
+        return cast("SyncExecutionStrategy[VersionValue]", self.executor).execute(
             self.plan,
-            registry=self._registry,
-            entry_migration=cast("MigrationEntry[VersionValue]", self._entry_migration),
-            adapter=self._adapter,
-            version_property=self._version_property,
-            direction=self._direction,
-            on_direction_violation=self._on_direction_violation,
-            on_missing_path=self._on_missing_path,
+            self._backend,
             context=_as_context(context),
         )
 
@@ -90,17 +95,11 @@ class MigrationRun(Generic[VersionValue]):
             raise SyncExecutionRequired(
                 "This migration was prepared for sync execution; use run()"
             )
-        return await cast("AsyncExecutor[VersionValue]", self.executor).arun(
+        return await cast(
+            "AsyncExecutionStrategy[VersionValue]", self.executor
+        ).aexecute(
             self.plan,
-            registry=self._registry,
-            entry_migration=cast(
-                "AsyncMigrationEntry[VersionValue]", self._entry_migration
-            ),
-            adapter=self._adapter,
-            version_property=self._version_property,
-            direction=self._direction,
-            on_direction_violation=self._on_direction_violation,
-            on_missing_path=self._on_missing_path,
+            self._backend,
             context=_as_context(context),
         )
 

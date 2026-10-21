@@ -18,7 +18,7 @@ from pyverge.migration.graph import GraphEntry
 if TYPE_CHECKING:
     from pyverge.providers.types import ModelAdapter
 
-    from .types import (
+    from ..types import (
         AsyncMigrationEntryCallback,
         AsyncRunnableMigration,
         MigrationEntryCallback,

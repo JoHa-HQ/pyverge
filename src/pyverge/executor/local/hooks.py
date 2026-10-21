@@ -1,7 +1,9 @@
-from collections.abc import Mapping
+import asyncio
+import inspect
+from collections.abc import Callable, Mapping
 from typing import Any
 
-from pyverge.core.types import Comparable
+from pyverge.core.types import Attachable, Comparable
 
 
 class MigrationHook:
@@ -43,3 +45,23 @@ class MigrationHook:
         data: Mapping[str, Any],
         error: Exception,
     ) -> None: ...
+
+
+async def invoke_async_hook(
+    hook: Attachable,
+    sync_name: str,
+    async_name: str,
+    *args: Any,
+) -> None:
+    """Invoke a hook on the async path without blocking the event loop."""
+    async_method: Callable[..., Any] | None = getattr(hook, async_name, None)
+    if async_method is not None:
+        await async_method(*args)
+        return
+
+    sync_method: Callable[..., Any] = getattr(hook, sync_name)
+    if inspect.iscoroutinefunction(sync_method):
+        await sync_method(*args)
+        return
+
+    await asyncio.to_thread(sync_method, *args)

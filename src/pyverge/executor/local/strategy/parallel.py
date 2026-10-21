@@ -1,4 +1,4 @@
-"""Level-parallel plan execution (thread pool)."""
+"""Level-parallel plan execution (thread pool / asyncio gather)."""
 
 from __future__ import annotations
 
@@ -23,16 +23,21 @@ from pyverge.migration.graph import GraphEntry, MigrationPlan
 from pyverge.migration.registry import Registry
 from pyverge.providers.types import ModelAdapter
 
-from ..step import StepExecutor
-from ..types import (
+from ...ports import AsyncExecutionStrategy, ExecutionBackend, SyncExecutionStrategy
+from ...types import (
     AsyncExecutor,
     AsyncMigrationEntry,
     Executor,
     MigrationEntry,
 )
+from .sequential import _backend
 
 
-class LevelParallelExecutor(Executor[VersionValue], Generic[VersionValue]):
+class LevelParallelExecutor(
+    Executor[VersionValue],
+    SyncExecutionStrategy[VersionValue],
+    Generic[VersionValue],
+):
     """Execute independent plan entries within each topological level in parallel.
 
     Args:
@@ -55,44 +60,45 @@ class LevelParallelExecutor(Executor[VersionValue], Generic[VersionValue]):
         on_missing_path: VersionMissingStrategy,
         context: MigrationContext | None = None,
     ) -> ModelData:
-        adapter.ensure_compatible(plan.container, fields=plan.target_fields)
-        graph = plan.graph
-        step_executor = StepExecutor(registry)
+        return self.execute(
+            plan,
+            _backend(
+                registry,
+                entry_migration,
+                adapter,
+                version_property,
+                direction,
+                on_direction_violation,
+                on_missing_path,
+            ),
+            context=context,
+        )
+
+    def execute(
+        self,
+        plan: MigrationPlan[VersionValue],
+        backend: ExecutionBackend[VersionValue],
+        *,
+        context: MigrationContext | None = None,
+    ) -> ModelData:
+        backend.ensure_compatible(plan)
         result = copy.deepcopy(plan.data)
-        levels = graph.execution_levels()
-        for level in levels:
+        for level in plan.graph.execution_levels():
             if len(level) == 1:
                 entry = level[0]
                 current = _get_at_path(result, entry.path)
-                task = entry_migration.migrate(
-                    entry,
-                    current,
-                    execute_step=step_executor.execute_step,
-                    adapter=adapter,
-                    version_property=version_property,
-                    direction=direction,
-                    on_direction_violation=on_direction_violation,
-                    on_missing_path=on_missing_path,
-                    context=context,
-                )
-                migrated = task.run()
+                migrated = backend.run_entry(entry, current, context)
                 _set_at_path(result, entry.path, migrated)
                 continue
 
             with _ThreadPoolExecutor(max_workers=self._max_workers) as pool:
                 futures = {
                     pool.submit(
-                        _run_task,
-                        entry_migration,
-                        step_executor,
-                        adapter,
-                        version_property,
-                        direction,
-                        on_direction_violation,
-                        on_missing_path,
-                        context,
+                        _run_entry,
+                        backend,
                         entry,
                         _get_at_path(result, entry.path),
+                        context,
                     ): entry
                     for entry in level
                 }
@@ -110,33 +116,11 @@ class LevelParallelExecutor(Executor[VersionValue], Generic[VersionValue]):
         return result
 
 
-def _run_task(
-    entry_migration: MigrationEntry[VersionValue],
-    step_executor: StepExecutor,
-    adapter: ModelAdapter,
-    version_property: str,
-    direction: MigrationDirectionStrategy,
-    on_direction_violation: DirectionViolationStrategy,
-    on_missing_path: VersionMissingStrategy,
-    context: MigrationContext | None,
-    entry: GraphEntry[VersionValue],
-    current: ModelData,
-) -> ModelData:
-    """Helper for running a task inside a thread pool."""
-    return entry_migration.migrate(
-        entry,
-        current,
-        execute_step=step_executor.execute_step,
-        adapter=adapter,
-        version_property=version_property,
-        direction=direction,
-        on_direction_violation=on_direction_violation,
-        on_missing_path=on_missing_path,
-        context=context,
-    ).run()
-
-
-class AsyncLevelParallelExecutor(AsyncExecutor[VersionValue], Generic[VersionValue]):
+class AsyncLevelParallelExecutor(
+    AsyncExecutor[VersionValue],
+    AsyncExecutionStrategy[VersionValue],
+    Generic[VersionValue],
+):
     """Execute independent entries per level with ``asyncio.gather``."""
 
     def __init__(self, max_workers: int | None = None) -> None:
@@ -155,27 +139,35 @@ class AsyncLevelParallelExecutor(AsyncExecutor[VersionValue], Generic[VersionVal
         on_missing_path: VersionMissingStrategy,
         context: MigrationContext | None = None,
     ) -> ModelData:
-        adapter.ensure_compatible(plan.container, fields=plan.target_fields)
-        graph = plan.graph
-        step_executor = StepExecutor(registry)
+        return await self.aexecute(
+            plan,
+            _backend(
+                registry,
+                entry_migration,
+                adapter,
+                version_property,
+                direction,
+                on_direction_violation,
+                on_missing_path,
+            ),
+            context=context,
+        )
+
+    async def aexecute(
+        self,
+        plan: MigrationPlan[VersionValue],
+        backend: ExecutionBackend[VersionValue],
+        *,
+        context: MigrationContext | None = None,
+    ) -> ModelData:
+        backend.ensure_compatible(plan)
         result = copy.deepcopy(plan.data)
         semaphore = asyncio.Semaphore(self._max_workers) if self._max_workers else None
-        for level in graph.execution_levels():
+        for level in plan.graph.execution_levels():
             if len(level) == 1:
                 entry = level[0]
                 current = _get_at_path(result, entry.path)
-                task = entry_migration.amigrate(
-                    entry,
-                    current,
-                    aexecute_step=step_executor.aexecute_step,
-                    adapter=adapter,
-                    version_property=version_property,
-                    direction=direction,
-                    on_direction_violation=on_direction_violation,
-                    on_missing_path=on_missing_path,
-                    context=context,
-                )
-                migrated = await task.arun()
+                migrated = await backend.arun_entry(entry, current, context)
                 _set_at_path(result, entry.path, migrated)
                 continue
 
@@ -183,17 +175,11 @@ class AsyncLevelParallelExecutor(AsyncExecutor[VersionValue], Generic[VersionVal
                 *(
                     _limited_await(
                         semaphore,
-                        _run_task_async(
-                            entry_migration,
-                            step_executor,
-                            adapter,
-                            version_property,
-                            direction,
-                            on_direction_violation,
-                            on_missing_path,
-                            context,
+                        _run_entry_async(
+                            backend,
                             entry,
                             _get_at_path(result, entry.path),
+                            context,
                         ),
                     )
                     for entry in level
@@ -212,30 +198,22 @@ class AsyncLevelParallelExecutor(AsyncExecutor[VersionValue], Generic[VersionVal
         return result
 
 
-async def _run_task_async(
-    entry_migration: AsyncMigrationEntry[VersionValue],
-    step_executor: StepExecutor,
-    adapter: ModelAdapter,
-    version_property: str,
-    direction: MigrationDirectionStrategy,
-    on_direction_violation: DirectionViolationStrategy,
-    on_missing_path: VersionMissingStrategy,
-    context: MigrationContext | None,
+def _run_entry(
+    backend: ExecutionBackend[VersionValue],
     entry: GraphEntry[VersionValue],
     current: ModelData,
+    context: MigrationContext | None,
 ) -> ModelData:
-    """Helper for running an async task inside a gather wave."""
-    return await entry_migration.amigrate(
-        entry,
-        current,
-        aexecute_step=step_executor.aexecute_step,
-        adapter=adapter,
-        version_property=version_property,
-        direction=direction,
-        on_direction_violation=on_direction_violation,
-        on_missing_path=on_missing_path,
-        context=context,
-    ).arun()
+    return backend.run_entry(entry, current, context)
+
+
+async def _run_entry_async(
+    backend: ExecutionBackend[VersionValue],
+    entry: GraphEntry[VersionValue],
+    current: ModelData,
+    context: MigrationContext | None,
+) -> ModelData:
+    return await backend.arun_entry(entry, current, context)
 
 
 async def _limited_await(

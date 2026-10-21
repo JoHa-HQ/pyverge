@@ -6,7 +6,7 @@ import os
 
 from pyverge.core.settings import MigrationSettings
 
-from .strategy import (
+from .local.strategy import (
     AsyncLevelParallelExecutor,
     AsyncSequentialExecutor,
     LevelParallelExecutor,
