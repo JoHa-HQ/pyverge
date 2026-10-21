@@ -19,13 +19,16 @@ jobs:
       - run: pip install "pyverge[cli]"
 
       - name: Registry health
-        run: pyverge doctor --manager models:manager
+        run: pyverge doctor --manager manager:manager
 
       - name: Export graph manifest
         run: |
           mkdir -p target
-          pyverge manifest --manager models:manager \
+          pyverge manifest --manager manager:manager \
             --output target/pyverge-manifest.json
+
+      - name: Compare manifest snapshot
+        run: python compare_manifest.py
 
       - name: Upload manifest
         uses: actions/upload-artifact@v4
@@ -34,8 +37,8 @@ jobs:
           path: showcases/ci/target/pyverge-manifest.json
 
       - name: Check compatibility
-        run: pyverge compat --manager models:manager --fail-on-breaking
+        run: pyverge compat --manager manager:manager --fail-on-breaking
 
-      - name: Check payload convergence
-        run: pyverge migrate payloads/user_v1.json \
-          --manager models:manager --check
+      - name: Check nested payload convergence
+        run: pyverge migrate payloads/person_v1.json \
+          --manager manager:manager --check

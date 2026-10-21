@@ -1,42 +1,40 @@
-"""Minimal manager for the CI gate showcase."""
+"""Nested versioned models for the CI gate showcase."""
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-import semver
-from pydantic import BaseModel
-
-from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
-
-UserManager = Manager[semver.Version].configure(
-    MigrationSettings(),
-    PydanticModelAdapter(),
-)
+from pydantic import BaseModel, Field
 
 
-@UserManager.model()
-class UserV1(BaseModel):
-    kind: Literal["User"] = "User"
+class AddressV1(BaseModel):
+    kind: Literal["Address"] = "Address"
+    version: Literal["1.0.0"] = "1.0.0"
+    street: str
+    city: str
+
+
+class AddressV2(BaseModel):
+    kind: Literal["Address"] = "Address"
+    version: Literal["2.0.0"] = "2.0.0"
+    street: str
+    city: str
+    country: str | None = None
+
+
+Address = Annotated[AddressV1 | AddressV2, Field(discriminator="version")]
+
+
+class PersonV1(BaseModel):
+    kind: Literal["Person"] = "Person"
     version: Literal["1.0.0"] = "1.0.0"
     name: str
-    email: str
+    address: Address
 
 
-@UserManager.model()
-class UserV2(BaseModel):
-    kind: Literal["User"] = "User"
+class PersonV2(BaseModel):
+    kind: Literal["Person"] = "Person"
     version: Literal["2.0.0"] = "2.0.0"
     name: str
-    email: str
-    age: int | None = None
-
-
-@UserManager.migration("User", "1.0.0", "2.0.0")
-def add_age(data: dict, context=None) -> dict:
-    """v1 -> v2: add the optional age field."""
-    return {**data, "age": None}
-
-
-manager = UserManager()
+    address: Address
+    email: str | None = None

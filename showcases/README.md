@@ -23,8 +23,9 @@ involved, wrap a real driver in a thin adapter.
 
 ## Runnable examples
 
-- [CI Gate](ci/README.md) — doctor, manifest artifact, compatibility gate, and
-  payload convergence check in GitHub Actions. Shipped and runnable.
+- [CI Gate](ci/README.md) — nested Person/Address graph, manifest snapshot
+  comparison, compatibility gate, and payload convergence check in GitHub
+  Actions. Shipped and runnable.
 - [FastMCP + OpenTelemetry](fastmcp/README.md) — a versioned FastMCP server with
   a self-driving demo and a Jaeger dashboard via `docker compose`. Shipped and
   runnable.
