@@ -91,31 +91,22 @@ migrated = manager.migrate(
 ```bash
 # Requires: pip install "pyverge[cli]"
 
-pyverge init          # Bootstrap a new project
-pyverge validate      # Validate data against a schema version
-pyverge migrate       # Migrate data between versions
-pyverge diff          # Show differences between versions
-pyverge export        # Export JSON Schema definitions
-pyverge info          # List registered models and versions
-pyverge managers      # List available managers from configuration
+pyverge init                                      # Scaffold models + config
+pyverge doctor --manager myapp.models:UserManager # Registry health gate
+pyverge validate data.json --manager myapp.models:UserManager \
+  --schema User --version 1.0.0                   # Batch/stdin validation
+pyverge migrate data.json --manager myapp.models:UserManager \
+  --target latest                                 # Emit migrated payload
+pyverge migrate data.json --manager myapp.models:UserManager --check
+pyverge compat --manager myapp.models:UserManager --fail-on-breaking
+pyverge diff --manager myapp.models:UserManager --from 1.0.0 --to 2.0.0
+pyverge export --manager myapp.models:UserManager # Graph manifest
+pyverge info --manager myapp.models:UserManager
+pyverge managers myapp.models                     # List managers in a module
 ```
 
-Configuration lives in a `pyverge.toml` (or `[tool.pyverge]` in
-`pyproject.toml`), pointing at the module that defines your manager.
-
-```toml
-# pyverge.toml
-[managers]
-user = "myapp.models:UserManager"
-```
-
-```bash
-pyverge info          # List registered models and versions
-pyverge validate data.json --manager user --version 1.0.0
-pyverge migrate data.json --manager user --to latest
-pyverge diff --manager user --from 1.0.0 --to 2.0.0
-pyverge export --manager user --version 2.0.0 > schema.json
-```
+Managers are addressed as `module:object_path`. CI-friendly commands
+(`doctor`, `validate`, `migrate --check`, `compat`) return non-zero on failure.
 
 ## Features
 
