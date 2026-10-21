@@ -105,6 +105,10 @@ breaking migration.
 
 ```bash
 pyverge manifest --manager myapp.models:UserManager > manifest.json
+
+# CI: compare graph content against a baseline snapshot
+pyverge manifest --manager myapp.models:UserManager \
+  --output target/manifest.json --baseline manifest.json
 ```
 
 Emits a JGF v2 envelope:
@@ -115,6 +119,9 @@ Emits a JGF v2 envelope:
 - node metadata: fields, references, `schema_hash`
 - edge metadata: strategy/spec, compatibility, `migration_hash`
 - graph metadata: `manifest_version`, `pyverge_version`, `generated_at`, `content_hash`
+
+Comparison ignores volatile graph metadata (`generated_at`, tool version) and
+checks node/edge content. It exits `1` on divergence.
 
 This is an explicit CLI contract. The runtime/lifespan does not write it.
 Generate it in CI or from a build job, then compare snapshots across revisions.

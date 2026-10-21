@@ -9,7 +9,6 @@ A nested version graph checked by pyverge in CI.
 - `manager.py` — configured manager exposed as `manager:manager`
 - `payloads/person_v1.json` — nested payload at the oldest versions
 - `manifest.json` — checked-in JGF v2 graph snapshot
-- `compare_manifest.py` — semantic snapshot comparison
 - `.github/workflows/pyverge.yml` — CI gate
 
 ## Run locally
@@ -21,8 +20,8 @@ pip install "pyverge[cli]"
 pyverge doctor --manager manager:manager
 pyverge migrate payloads/person_v1.json --manager manager:manager
 pyverge compat --manager manager:manager --fail-on-breaking
-pyverge manifest --manager manager:manager --output target/pyverge-manifest.json
-python compare_manifest.py
+pyverge manifest --manager manager:manager \
+  --output target/pyverge-manifest.json --baseline manifest.json
 ```
 
 The payload converges both entries:
@@ -34,8 +33,8 @@ The payload converges both entries:
 
 - `doctor` fails on missing model references or migration gaps
 - `manifest` emits a JGF v2 graph snapshot
-- `compare_manifest.py` compares the generated graph against `manifest.json`,
-  ignoring only `generated_at`, and fails on divergence
+- `manifest --baseline manifest.json` compares graph nodes/edges against the
+  checked-in snapshot and fails on divergence
 - `compat --fail-on-breaking` exits `3` on breaking schema changes
 - `migrate --check` fails when the nested payload cannot converge
 

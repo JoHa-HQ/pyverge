@@ -21,14 +21,12 @@ jobs:
       - name: Registry health
         run: pyverge doctor --manager manager:manager
 
-      - name: Export graph manifest
+      - name: Export graph manifest and compare snapshot
         run: |
           mkdir -p target
           pyverge manifest --manager manager:manager \
-            --output target/pyverge-manifest.json
-
-      - name: Compare manifest snapshot
-        run: python compare_manifest.py
+            --output target/pyverge-manifest.json \
+            --baseline manifest.json
 
       - name: Upload manifest
         uses: actions/upload-artifact@v4

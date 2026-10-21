@@ -37,6 +37,36 @@ def _migration_identity(func: MigrationFunc) -> dict[str, Any]:
     }
 
 
+def _semantic_manifest(envelope: dict[str, Any]) -> dict[str, Any]:
+    """Return only graph content, excluding volatile metadata."""
+    graph = envelope["graph"]
+    return {
+        "manifest_version": graph["metadata"].get("manifest_version"),
+        "nodes": graph["nodes"],
+        "edges": graph["edges"],
+    }
+
+
+def _diff_summary(
+    current: dict[str, Any],
+    baseline: dict[str, Any],
+) -> list[str]:
+    current_nodes = set(current["nodes"])
+    baseline_nodes = set(baseline["nodes"])
+    current_edges = {edge["id"] for edge in current["edges"]}
+    baseline_edges = {edge["id"] for edge in baseline["edges"]}
+    issues: list[str] = []
+    for label, changed in (
+        ("node added", current_nodes - baseline_nodes),
+        ("node removed", baseline_nodes - current_nodes),
+        ("edge added", current_edges - baseline_edges),
+        ("edge removed", baseline_edges - current_edges),
+    ):
+        if changed:
+            issues.append(f"{label}: {', '.join(sorted(changed))}")
+    return issues
+
+
 def build_manifest(manager: Any, *, manager_spec: str) -> dict[str, Any]:
     """Build a JGF v2 envelope for the manager's registry graph."""
     registry = manager.registry
@@ -112,6 +142,10 @@ def manifest(
     output: Annotated[
         Path | None, typer.Option("--output", "-o", help="Write manifest file")
     ] = None,
+    baseline: Annotated[
+        Path | None,
+        typer.Option("--baseline", help="Compare against a manifest snapshot"),
+    ] = None,
 ) -> None:
     """Export the graph as a JGF v2 manifest snapshot."""
     try:
@@ -121,6 +155,17 @@ def manifest(
             write_json_file(output, envelope)
         else:
             dump_json(envelope)
+
+        if baseline is not None:
+            base_envelope = json.loads(baseline.read_text())
+            current = _semantic_manifest(envelope)
+            expected = _semantic_manifest(base_envelope)
+            if current != expected:
+                typer.secho("Manifest divergence detected", fg=typer.colors.RED)
+                for issue in _diff_summary(current, expected):
+                    typer.echo(f"  - {issue}")
+                raise typer.Exit(1)
+            typer.secho("Manifest snapshot matches", fg=typer.colors.GREEN)
     except ConfigError as exc:
         typer.secho(str(exc), fg=typer.colors.RED)
         raise typer.Exit(1) from exc
