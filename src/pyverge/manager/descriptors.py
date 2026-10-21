@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Protocol, overload
+from typing import TYPE_CHECKING, Any, Literal, Protocol, overload
 
 from pyverge.core.types import (
     Attachable,
@@ -14,7 +14,7 @@ from pyverge.core.types import (
 from pyverge.manager.types import (
     ManagerClassState,
 )
-from pyverge.providers import JsonPatchMigration
+from pyverge.providers import JsonataMigration, JsonPatchMigration
 from pyverge.providers.types import (
     ModelHandle,
 )
@@ -23,11 +23,16 @@ if TYPE_CHECKING:
     from pyverge.manager.manager import Manager
 
 
+MigrationStrategy = Literal["jsonata"]
+
+
 class MigrationDecorator(Protocol):
     @overload
     def __call__(self, func: MigrationFunc) -> MigrationFunc: ...
     @overload
     def __call__(self, func: JsonPatchMigration) -> JsonPatchMigration: ...
+    @overload
+    def __call__(self, func: JsonataMigration) -> JsonataMigration: ...
 
 
 class ModelDecorator(Protocol):
@@ -51,24 +56,54 @@ class MigrationKeyDecorator:
         key: MigrationKeyInput,
         *,
         backward_compatible: bool = False,
+        strategy: MigrationStrategy | None = None,
     ) -> None:
         self._owner = owner
         self._key = key
         self._backward_compatible = backward_compatible
+        self._strategy = strategy
 
     @overload
     def __call__(self, func: MigrationFunc) -> MigrationFunc: ...
     @overload
     def __call__(self, func: JsonPatchMigration) -> JsonPatchMigration: ...
+    @overload
+    def __call__(self, func: JsonataMigration) -> JsonataMigration: ...
+    @overload
+    def __call__(self, func: type[Any]) -> type[Any]: ...
     def __call__(
-        self, func: MigrationFunc | JsonPatchMigration
-    ) -> MigrationFunc | JsonPatchMigration:
+        self,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration | type[Any],
+    ) -> MigrationFunc | JsonPatchMigration | JsonataMigration | type[Any]:
+        body = self._coerce(func)
         self._owner.store_migration(
             self._key,
-            func,
+            body,
             backward_compatible=self._backward_compatible,
         )
         return func
+
+    def _coerce(
+        self,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration | type[Any],
+    ) -> MigrationFunc | JsonPatchMigration | JsonataMigration:
+        if self._strategy is None:
+            if isinstance(func, type):
+                raise TypeError(
+                    "A bare class is not executable; use strategy='jsonata'"
+                )
+            return func
+        if self._strategy != "jsonata":
+            raise ValueError(f"Unknown migration strategy: {self._strategy!r}")
+        if isinstance(func, (JsonPatchMigration, JsonataMigration)):
+            return func
+        expression = getattr(func, "expression", None)
+        if not isinstance(expression, str):
+            raise TypeError(
+                "strategy='jsonata' expects a class with a string "
+                "'expression' attribute"
+            )
+        return JsonataMigration(expression)
 
 
 class ModelStoreDecorator:
@@ -163,12 +198,14 @@ class _MigrationDescriptor:
         def decorator(
             *args: Any,
             backward_compatible: bool = False,
+            strategy: MigrationStrategy | None = None,
         ) -> MigrationKeyDecorator:
             key = self._migration_key(args)
             return MigrationKeyDecorator(
                 owner,
                 key,
                 backward_compatible=backward_compatible,
+                strategy=strategy,
             )
 
         return decorator

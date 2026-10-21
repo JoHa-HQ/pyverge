@@ -15,7 +15,7 @@ from pyverge.core.types import (
 from pyverge.core.versioning import (
     SentinelEdge,
 )
-from pyverge.providers import JsonPatchMigration
+from pyverge.providers import JsonataMigration, JsonPatchMigration
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -32,7 +32,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @classmethod
     def _resolve_migration(
         cls: type[ManagerState[VersionValue]],
-        func: MigrationFunc | JsonPatchMigration,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
     ) -> MigrationFunc:
         return cast(MigrationFunc, func)
 
@@ -49,7 +49,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     def store_migration(
         cls: type[ManagerState[VersionValue]],
         key: MigrationKeyInput,
-        func: MigrationFunc | JsonPatchMigration,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
@@ -61,7 +61,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     def _(
         cls: type[ManagerState[VersionValue]],
         key: ModelPair,
-        func: MigrationFunc | JsonPatchMigration,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
@@ -80,7 +80,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     def _(
         cls: type[ManagerState[VersionValue]],
         key: ManagerMigrationKey,
-        func: MigrationFunc | JsonPatchMigration,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,

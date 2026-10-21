@@ -8,6 +8,7 @@ from .json_patch import (
     SplitOperation,
 )
 from .json_schema import JsonSchemaModelAdapter
+from .jsonata import JsonataMigration
 from .pydantic import PydanticDiff, PydanticModelAdapter
 
 __all__ = [
@@ -15,6 +16,7 @@ __all__ = [
     "JsonPatch",
     "JsonPatchMigration",
     "JsonSchemaModelAdapter",
+    "JsonataMigration",
     "MapOperation",
     "Pointer",
     "PydanticDiff",

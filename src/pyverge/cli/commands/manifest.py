@@ -12,6 +12,7 @@ import typer
 
 from pyverge import __version__
 from pyverge.core.types import MigrationFunc
+from pyverge.providers import JsonataMigration
 
 from .._helpers import write_json_file
 from ..config import ConfigError, resolve_manager
@@ -27,6 +28,8 @@ def _hash(value: Any) -> str:
 
 def _migration_identity(func: MigrationFunc) -> dict[str, Any]:
     """Serialize a migration by identity, never by callable body."""
+    if isinstance(func, JsonataMigration):
+        return {"strategy": "jsonata", "expression": func.expression}
     ops = getattr(func, "patch", None)
     if isinstance(ops, list):
         return {"strategy": "jsonpatch", "ops": ops}

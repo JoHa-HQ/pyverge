@@ -87,7 +87,7 @@ MigrationSettings(execution_mode="async", parallel_workers=4)
 | Format | Use when | Context |
 | --- | --- | --- |
 | JSON Patch | structural changes | no |
-| JSONata | declarative expressions | planned |
+| JSONata | declarative expressions | yes |
 | Python callable | imperative logic | yes |
 
 ## CLI
@@ -121,7 +121,7 @@ See [CLI Reference](docs/cli.md).
 
 - **Versioned registry** — semver or ISO date versions, decorator registration
 - **Convergent engine** — graph-driven migration of nested versioned entries
-- **Declarative migrations** — JSON Patch or Python callables; JSONata planned
+- **Declarative migrations** — JSON Patch, JSONata expressions, or Python callables
 - **Runtime context** — shared read-only bindings across every step
 - **Sync/async executors** — sequential or level-parallel; prepared runs
 - **Reflection** — reconstruct missing models or propose migrations from diffs
