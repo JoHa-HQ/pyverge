@@ -71,12 +71,12 @@ class FeatureFlagsV2(BaseModel):
 
 
 @FeatureFlagsManager.migration("FeatureFlags", "1.0.0", "2.0.0")
-def add_notifications(data: dict) -> dict:
+def add_notifications(data: dict, context=None) -> dict:
     return {**data, "notifications": True}
 
 
 @FeatureFlagsManager.migration("FeatureFlags", "2.0.0", "1.0.0")
-def drop_notifications(data: dict) -> dict:
+def drop_notifications(data: dict, context=None) -> dict:
     return {k: v for k, v in data.items() if k in {"kind", "version", "dark_mode"}}
 
 

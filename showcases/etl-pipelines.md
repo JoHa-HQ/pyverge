@@ -88,12 +88,12 @@ class CustomerV3(BaseModel):
 
 
 @CustomerManager.migration("Customer", "1.0.0", "2.0.0")
-def add_email(data: dict) -> dict:
+def add_email(data: dict, context=None) -> dict:
     return {**data, "email": None}
 
 
 @CustomerManager.migration("Customer", "2.0.0", "3.0.0")
-def add_segment(data: dict) -> dict:
+def add_segment(data: dict, context=None) -> dict:
     return {**data, "segment": None}
 
 

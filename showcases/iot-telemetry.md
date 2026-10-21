@@ -81,7 +81,7 @@ class TempSensorV2(BaseModel):
 
 
 @TempSensorManager.migration("TempSensor", "1.0.0", "2.0.0")
-def rename_temp(data: dict) -> dict:
+def rename_temp(data: dict, context=None) -> dict:
     return {
         "device_id": data["device_id"],
         "temperature_c": data["temp"],

@@ -1,6 +1,6 @@
 """Migration callables for the weather version graphs.
 
-Each function is a plain ``(dict) -> dict`` transformation, the same shape
+Each function is a plain ``(dict, context=None) -> dict`` transformation, the same shape
 pyverge executes and whose AST the engine parses to reconstruct missing model
 versions. They are grouped as documented tables so each graph reads as the
 API's schema history::
@@ -15,63 +15,65 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-Migration = Callable[[dict], dict]
+from pyverge.core.context import MigrationContext
+
+Migration = Callable[[dict, MigrationContext | None], dict]
 
 
-def add_humidity(data: dict) -> dict:
+def add_humidity(data: dict, context: MigrationContext | None = None) -> dict:
     """v1 -> v2: the API began reporting relative humidity."""
     return {**data, "humidity": 0}
 
 
-def add_wind(data: dict) -> dict:
+def add_wind(data: dict, context: MigrationContext | None = None) -> dict:
     """v2 -> v3: the API began reporting wind speed."""
     return {**data, "wind": 0.0}
 
 
-def drop_wind(data: dict) -> dict:
+def drop_wind(data: dict, context: MigrationContext | None = None) -> dict:
     """v3 -> v2: discard wind for a caller on the older schema."""
     data = dict(data)
     del data["wind"]
     return data
 
 
-def drop_humidity(data: dict) -> dict:
+def drop_humidity(data: dict, context: MigrationContext | None = None) -> dict:
     """v2 -> v1: discard humidity for a caller on the oldest schema."""
     data = dict(data)
     del data["humidity"]
     return data
 
 
-def add_coordinates(data: dict) -> dict:
+def add_coordinates(data: dict, context: MigrationContext | None = None) -> dict:
     """v3 -> v4: the record gained resolved coordinates (city lookup)."""
     return {**data, "coordinates": None}
 
 
-def drop_coordinates(data: dict) -> dict:
+def drop_coordinates(data: dict, context: MigrationContext | None = None) -> dict:
     """v4 -> v3: discard coordinates for a caller on the older schema."""
     data = dict(data)
     del data["coordinates"]
     return data
 
 
-def add_style(data: dict) -> dict:
+def add_style(data: dict, context: MigrationContext | None = None) -> dict:
     """v1 -> v2: the prompt gained a wording style."""
     return {**data, "style": "short"}
 
 
-def drop_style(data: dict) -> dict:
+def drop_style(data: dict, context: MigrationContext | None = None) -> dict:
     """v2 -> v1: discard style for a caller on the older schema."""
     data = dict(data)
     del data["style"]
     return data
 
 
-def add_units(data: dict) -> dict:
+def add_units(data: dict, context: MigrationContext | None = None) -> dict:
     """v1 -> v2: the resource gained a units parameter."""
     return {**data, "units": "celsius"}
 
 
-def drop_units(data: dict) -> dict:
+def drop_units(data: dict, context: MigrationContext | None = None) -> dict:
     """v2 -> v1: discard units for a caller on the older schema."""
     data = dict(data)
     del data["units"]

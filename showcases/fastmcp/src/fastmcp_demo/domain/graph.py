@@ -42,7 +42,7 @@ ANCHOR_MODELS = (SearchWeather, Coordinates, WeatherBriefing, WeatherReading)
 
 #: Migration edges, newest first: forward edges so the engine reconstructs each
 #: older endpoint from the already-materialized newer one, then the reverse
-#: edges. Each is a plain ``(dict) -> dict`` callable.
+#: edges. Each is a plain ``(dict, context=None) -> dict`` callable.
 EDGES: tuple[tuple[str, str, str, migrations.Migration], ...] = (
     ("search_weather", V3, V4, migrations.add_coordinates),
     ("search_weather", V2, V3, migrations.add_wind),

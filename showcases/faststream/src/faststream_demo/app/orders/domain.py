@@ -6,6 +6,7 @@ import semver
 from pydantic import BaseModel, Field
 
 from pyverge import Manager
+from pyverge.core.context import MigrationContext
 from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 
@@ -40,14 +41,18 @@ class Order(BaseModel):
     currency: str = "USD"
 
 
-def add_currency(data: OrderV1Data) -> OrderV2Data:
+def add_currency(
+    data: OrderV1Data, context: MigrationContext | None = None
+) -> OrderV2Data:
     """v1 -> v2: the event began carrying a currency."""
     data = dict(data)  # ty: ignore[invalid-assignment]
     data["currency"] = "USD"  # ty: ignore[invalid-key]
     return cast(OrderV2Data, data)
 
 
-def drop_currency(data: OrderV2Data) -> OrderV1Data:
+def drop_currency(
+    data: OrderV2Data, context: MigrationContext | None = None
+) -> OrderV1Data:
     """v2 -> v1: discard currency for a consumer pinned to the older schema."""
     data = dict(data)  # ty: ignore[invalid-assignment]
     del data["currency"]  # ty: ignore[invalid-argument-type]
