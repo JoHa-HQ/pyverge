@@ -1,7 +1,5 @@
-from collections.abc import Mapping
 from typing import Any, Generic, Self, overload
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.exceptions import (
     MigrationNotFoundError,
     MissingReferenceError,
@@ -531,61 +529,3 @@ class Engine(Generic[VersionValue]):
             on_direction_violation=effective_on_direction_violation,
             on_missing_path=effective_on_missing,
         )
-
-    def migrate(
-        self: Self,
-        data: ModelData,
-        target: TargetResolver,
-        *,
-        container: ModelHandle | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor[VersionValue] | AsyncExecutor[VersionValue] | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-        context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> ModelData:
-        """Converge every versioned entry in *data* synchronously."""
-        return self.prepare(
-            data,
-            target,
-            container=container,
-            version_property=version_property,
-            depth_limit=depth_limit,
-            direction=direction,
-            on_direction_violation=on_direction_violation,
-            on_version_not_found=on_version_not_found,
-            executor=executor,
-            entry_migration=entry_migration,
-        ).run(context=context)
-
-    async def amigrate(
-        self: Self,
-        data: ModelData,
-        target: TargetResolver,
-        *,
-        container: ModelHandle | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor[VersionValue] | AsyncExecutor[VersionValue] | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-        context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> ModelData:
-        """Converge every versioned entry in *data* asynchronously."""
-        return await self.prepare(
-            data,
-            target,
-            container=container,
-            version_property=version_property,
-            depth_limit=depth_limit,
-            direction=direction,
-            on_direction_violation=on_direction_violation,
-            on_version_not_found=on_version_not_found,
-            executor=executor,
-            entry_migration=entry_migration,
-        ).arun(context=context)

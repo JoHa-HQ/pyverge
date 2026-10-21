@@ -64,7 +64,7 @@ from tests.examples.pydantic.semver_nested import (
     AddressV3,
     PersonV1,
 )
-from tests.utils import envelope_model, meta_versionable
+from tests.utils import envelope_model, meta_versionable, run_engine
 
 
 class TestModelManagement:
@@ -593,7 +593,7 @@ class TestMigrationManagement:
             func = func_factory(str(src), str(dst))
             engine.store_migration((src, dst), func)
 
-        result = engine.migrate(
+        result = run_engine(engine, 
             {
                 "kind": "User",
                 "version": str(real.version[1]),
@@ -656,7 +656,7 @@ class TestMigrationManagement:
             )
 
         with pytest.raises(MigrationNotFoundError):
-            engine.migrate(
+            run_engine(engine, 
                 {
                     "kind": "User",
                     "version": str(real.version[1]),
@@ -1127,7 +1127,7 @@ class TestMigrationEntryIntegration:
 
         custom_strategy = MagicMock(spec=MigrationEntry)
         custom_strategy.migrate.return_value = _CustomTask()
-        result = engine.migrate(
+        result = run_engine(engine, 
             {"kind": "User", "version": "1.0.0", "name": "Alice"},
             target=latest_target_resolver(engine.registry),
             entry_migration=custom_strategy,

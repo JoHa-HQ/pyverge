@@ -52,7 +52,7 @@ from tests.examples.pydantic.semver_nested import (
     preserve_children_person,
     promote_address,
 )
-from tests.utils import edge_from_models, envelope_model
+from tests.utils import edge_from_models, envelope_model, run_engine
 
 
 @pytest.mark.parametrize(
@@ -104,7 +104,7 @@ def test_executor_returns_new_payload(
         }
     }
 
-    result = engine.migrate(
+    result = run_engine(engine, 
         payload,
         target=latest_target_resolver(engine.registry),
         executor=executor,
@@ -175,7 +175,7 @@ def test_executor_noop_when_source_is_target(
         }
     }
 
-    result = engine.migrate(
+    result = run_engine(engine, 
         payload,
         target=latest_target_resolver(engine.registry),
         executor=executor,
@@ -354,7 +354,7 @@ def test_sequential_executor_runs_in_topological_order(
         }
     }
 
-    engine.migrate(payload, target=latest_target_resolver(engine.registry))
+    run_engine(engine, payload, target=latest_target_resolver(engine.registry))
 
     # Address is nested inside Person, so it must run before Person.
     assert order == ["address", "person"]
@@ -413,7 +413,7 @@ def test_executor_propagates_migration_error(
     }
 
     with pytest.raises(MigrationError, match="Migration failed"):
-        engine.migrate(payload, target=latest_target_resolver(engine.registry))
+        run_engine(engine, payload, target=latest_target_resolver(engine.registry))
 
 
 @pytest.mark.parametrize(
@@ -455,7 +455,7 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
         }
     }
 
-    result = engine.migrate(
+    result = run_engine(engine, 
         payload,
         target=latest_target_resolver(engine.registry),
         executor=LevelParallelExecutor(max_workers=2),
@@ -696,13 +696,13 @@ def test_target_resolver_converges_end_to_end(
     expected_error: type[Exception] | None,
     snapshot,
 ) -> None:
-    """Every resolver policy drives ``engine.migrate`` to its target version."""
+    """Every resolver policy drives ``engine.prepare`` to its target version."""
     if expected_error is not None:
         with pytest.raises(expected_error):
-            engine.migrate(payload, target=resolver_factory(engine.registry))
+            run_engine(engine, payload, target=resolver_factory(engine.registry))
         return
 
-    result = engine.migrate(payload, target=resolver_factory(engine.registry))
+    result = run_engine(engine, payload, target=resolver_factory(engine.registry))
 
     assert result == snapshot
 

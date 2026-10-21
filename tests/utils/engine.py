@@ -1,5 +1,6 @@
 """Utility functions for engine and model management in tests."""
 
+from collections.abc import Mapping
 from typing import Any, cast
 
 from pyverge.core import (
@@ -7,6 +8,7 @@ from pyverge.core import (
     VersioningSettings,
     VersionNode,
 )
+from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     MigrationFunc,
     VersionValue,
@@ -131,3 +133,15 @@ def register_migrations(
             is_backward_compatible=backward_compatible,
         )
         registry.store_migration(VersionEdge(versions[0], versions[1], diff, func))
+
+
+def run_engine(
+    engine: Any,
+    data: dict[str, Any],
+    target: Any,
+    *,
+    context: Mapping[str, Any] | MigrationContext | None = None,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Prepare and immediately run a migration through an engine."""
+    return engine.prepare(data, target, **kwargs).run(context=context)
