@@ -7,10 +7,10 @@ from typing import Any
 
 from opentelemetry.trace import Span, SpanKind, StatusCode, Tracer
 
-from pyverge.core.hooks import MigrationHook
 from pyverge.core.types import (
     Comparable,
 )
+from pyverge.executor import MigrationHook
 
 
 class OTELHook(MigrationHook):

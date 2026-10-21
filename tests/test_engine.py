@@ -13,7 +13,6 @@ import semver
 from pyverge import types
 from pyverge.core import (
     MigrationAlreadyRegisteredError,
-    MigrationHook,
     MigrationNotFoundError,
     MigrationSettings,
     MissingReferenceError,
@@ -29,6 +28,7 @@ from pyverge.migration import (
     JsonSchemaModelAdapter,
     MigrationContext,
     MigrationEntry,
+    MigrationHook,
     PydanticModelAdapter,
     earliest_target_resolver,
     fixed_target_resolver,

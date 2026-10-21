@@ -1,6 +1,7 @@
 """Migration execution: step resolution, sequential/parallel runners, policy."""
 
 from .entry import DefaultMigrationEntry
+from .hooks import MigrationHook
 from .parallel import AsyncLevelParallelExecutor, LevelParallelExecutor
 from .policy import ExecutionPolicy
 from .run import MigrationRun
@@ -30,6 +31,7 @@ __all__ = [
     "LevelParallelExecutor",
     "MigrationEntry",
     "MigrationEntryCallback",
+    "MigrationHook",
     "MigrationRun",
     "RunnableMigration",
     "SequentialExecutor",

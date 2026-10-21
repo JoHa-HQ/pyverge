@@ -13,7 +13,6 @@ from pyverge import Manager
 from pyverge.core import (
     AsyncExecutionRequired,
     DiscoveryValidationError,
-    MigrationHook,
     MigrationSettings,
     ModelNotFoundError,
     RegistryError,
@@ -36,6 +35,7 @@ from pyverge.migration import (
     AsyncLevelParallelExecutor,
     Engine,
     MigrationContext,
+    MigrationHook,
     MigrationRun,
     PydanticModelAdapter,
     PydanticWalker,
