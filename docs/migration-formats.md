@@ -5,7 +5,7 @@ Choose the simplest format that expresses the edge.
 | Format | Use when | Context |
 | --- | --- | --- |
 | RFC 6902 JSON Patch | structural add/remove/replace | no |
-| JSONata | declarative expressions and runtime values | yes (planned) |
+| JSONata | declarative expressions and runtime values | yes |
 | Python callable | imperative logic or context access | yes |
 
 ## JSON Patch
@@ -26,8 +26,52 @@ context-free by design.
 ## JSONata
 
 Declarative expressions for formatting, arithmetic, filtering, and context
-variables such as `$tenant_id`. Planned follow-up; until it lands, use a
-callable for these cases.
+variables such as `$tenant_id`.
+
+```python
+@manager.migration("User", "1.0.0", "2.0.0", strategy="jsonata")
+class UserV1ToV2:
+    expression = """
+    {
+      "kind": kind,
+      "version": "2.0.0",
+      "full_name": first_name & " " & last_name,
+      "email": $lowercase(email),
+      "tenant_id": $tenant_id
+    }
+    """
+```
+
+```python
+result = manager.migrate(payload, context={"tenant_id": "tenant_99"})
+```
+
+`JsonataMigration` is a declarative spec; it produces a callable
+`JsonataTransform`, mirroring `JsonPatchMigration` → `JsonPatch`:
+
+```python
+from pyverge.migration import JsonataMigration
+
+migration = JsonataMigration.from_spec(
+    {
+        "from": "1.0.0",
+        "to": "2.0.0",
+        "expression": '{"kind": kind, "version": "2.0.0", "name": $lowercase(name)}',
+    }
+)
+
+result = migration.migration(payload, context={...})
+```
+
+Factories:
+
+- `JsonataMigration.from_expression("...")`
+- `JsonataMigration.from_spec({...})`
+- `JsonataMigration.create("...")` or `.create({...})`
+
+A JSONata expression replaces the payload rather than patching it. Emit every
+target field, including `kind`; the engine stamps the target `version`.
+Expressions compile at registration and invalid syntax raises `ValueError`.
 
 ## Python callable
 

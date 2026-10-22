@@ -165,8 +165,7 @@ Choose the simplest format that expresses the migration:
    to serialize, diff, and move between runtimes. Patch ops cannot read runtime
    context; use it for structural changes.
 2. **JSONata** — declarative expressions for string formatting, arithmetic,
-   filtering, and context-dependent values (`$tenant_id`). Planned follow-up;
-   until it lands, use a runtime callable for these cases.
+   filtering, and context-dependent values (`$tenant_id`).
 3. **Python callable** — the escape hatch. Full language and full context
    access, but no longer portable configuration.
 
@@ -209,7 +208,7 @@ source mapping while a migration is running.
 
 **JSON Patch does not read context.** RFC 6902 has no variables, and keeping it
 free of them is what makes it portable. If an op needs a runtime value, promote
-that migration to JSONata (declarative + context, planned) or a callable.
+that migration to JSONata (declarative + context) or a callable.
 
 Every runtime callable uses the same contract:
 

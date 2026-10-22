@@ -1389,6 +1389,15 @@ wheels = [
 ]
 
 [[package]]
+name = "jsonata-python"
+version = "0.7.1"
+source = {registry = "https://pypi.org/simple"}
+sdist = {url = "https://files.pythonhosted.org/packages/5b/e1/a1247412b909987479acc5e376c65f975a7daf25ec37e91cc0c8ec5fa74e/jsonata_python-0.7.1.tar.gz", hash = "sha256:c3c4dd3e68d913cf079ed5374cfcc6b249fb33fedaef55b23b14c7168b797e4e", size = 87663, upload-time = "2026-10-10T03:48:51.755388Z"}
+wheels = [
+  {url = "https://files.pythonhosted.org/packages/46/85/1abd3677ad6c3a6ae249ed1234c0ab8dabbbca7b13d5bfd58c65acacb64f/jsonata_python-0.7.1-py3-none-any.whl", hash = "sha256:d34603578dd20add2aa0ac4562ca080d9c662f6b161298bd6254fe28247804ae", size = 87560, upload-time = "2026-10-10T03:48:49.643185Z"}
+]
+
+[[package]]
 name = "jsonpatch"
 version = "1.33"
 source = {registry = "https://pypi.org/simple"}
@@ -2347,6 +2356,7 @@ name = "pyverge"
 source = {editable = "."}
 dependencies = [
   {name = "datamodel-code-generator"},
+  {name = "jsonata-python"},
   {name = "jsonpatch"},
   {name = "jsonschema"},
   {name = "opentelemetry-distro"},
@@ -2382,6 +2392,7 @@ requires-dist = [
   {name = "dependency-injector", marker = "extra == 'fastmcp'", specifier = ">=4.49.1"},
   {name = "fastmcp", marker = "extra == 'fastmcp'", specifier = ">=4"},
   {name = "faststream", marker = "extra == 'faststream'", specifier = ">=0.7"},
+  {name = "jsonata-python", specifier = ">=0.7.1"},
   {name = "jsonpatch", specifier = ">=1.33"},
   {name = "jsonschema", specifier = ">=4.26.0"},
   {name = "opentelemetry-distro", extras = ["telemetry"], specifier = ">=0.65b0"},

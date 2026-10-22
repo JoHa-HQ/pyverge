@@ -232,6 +232,36 @@ class TestClassLevelRegistration:
         manager().migrate(_payload(anchor))
         assert hook.calls == 1
 
+    def test_jsonata_strategy_registers_class_expression(
+        self, manager: type[Manager[semver.Version]]
+    ) -> None:
+        instance = manager()
+        instance.store_model(UserV1)
+        instance.store_model(UserV2)
+
+        @manager.migration("User", "1.0.0", "2.0.0", strategy="jsonata")
+        class _Migration:
+            expression = (
+                '{"kind": kind, "version": "2.0.0", '
+                '"name": $uppercase(name), "email": email, "role": role, '
+                '"age": $age}'
+            )
+
+        expected_age = 42
+        result = instance.migrate(_payload("1.0.0"), context={"age": expected_age})
+
+        assert result["document"]["name"] == "ALICE"
+        assert result["document"]["age"] == expected_age
+
+    def test_jsonata_strategy_requires_expression(
+        self, manager: type[Manager[semver.Version]]
+    ) -> None:
+        with pytest.raises(TypeError, match="expression"):
+
+            @manager.migration("User", "1.0.0", "2.0.0", strategy="jsonata")
+            class _Migration:
+                pass
+
     def test_unscoped_registration_raises(self) -> None:
         with pytest.raises(AttributeError):
             Manager.model(UserV1)

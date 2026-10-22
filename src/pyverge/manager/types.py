@@ -40,6 +40,7 @@ if TYPE_CHECKING:
         Walker,
     )
     from pyverge.providers.json_patch import JsonPatchMigration
+    from pyverge.providers.jsonata import JsonataMigration
 
 TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]
 
@@ -95,7 +96,7 @@ class ManagerClassState(Protocol[VersionValue]):
     def store_migration(
         cls,
         key: ModelPair | ManagerMigrationKey,
-        func: MigrationFunc | JsonPatchMigration,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,

@@ -64,7 +64,8 @@ def migrate(data, context=None):
     return data
 ```
 
-JSON Patch intentionally does not read context; use a callable.
+JSON Patch intentionally does not read context. JSONata reads context as
+JSONata variables; callables receive the `MigrationContext` directly.
 
 ## Hooks
 

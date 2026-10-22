@@ -1,7 +1,7 @@
 name: Feature request
 description: Propose a new feature or enhancement for pyverge
 title: "[Feature]: <short description>"
-labels: ["enhancement", "triage"]
+labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
@@ -11,25 +11,30 @@ body:
         [documentation](https://github.com/JoHa-HQ/pyverge/tree/main/docs) first.
 
   - type: textarea
-    id: context
+    id: problem
     attributes:
-      label: context
+      label: Problem / motivation
       description: |
-        What happened? A clear, concise description of the defect.
-        Why does it matter? The impact, and the expected vs. actual behavior.
-        Where does it occur? The component/adapter and the environment in which
-        you hit it.
+        What problem are you trying to solve? Why does it matter?
+        What are you doing today instead?
     validations:
       required: true
-
 
   - type: textarea
     id: proposal
     attributes:
-      label: Solution
+      label: Proposed solution
       description: What would you like pyverge to do? Sketch the API or behavior.
     validations:
       required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches, workarounds, or existing tools you considered.
+    validations:
+      required: false
 
   - type: dropdown
     id: area

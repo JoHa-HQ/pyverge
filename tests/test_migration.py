@@ -16,6 +16,7 @@ from pyverge.core import (
 )
 from pyverge.migration import (
     Diff,
+    JsonataMigration,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
     MigrationContext,
@@ -632,3 +633,51 @@ class TestCompatibilityReport:
         assert report.structural_breaking is True
         assert report.declared_backward_compatible is True
         assert report.breaking is False
+
+
+class TestJsonataMigration:
+    def test_expression_uses_data_and_context(self) -> None:
+        migration = JsonataMigration.from_spec(
+            {
+                "from": "1.0.0",
+                "to": "2.0.0",
+                "expression": (
+                    '{"kind": kind, "version": "2.0.0", '
+                    '"email": $lowercase(email), "tenant": $tenant}'
+                ),
+            }
+        )
+        context = MigrationContext.create({"tenant": "tenant_99"})
+
+        result = migration.migration(
+            {"kind": "User", "version": "1.0.0", "email": "A@B.COM"},
+            context,
+        )
+
+        assert result == {
+            "kind": "User",
+            "version": "2.0.0",
+            "email": "a@b.com",
+            "tenant": "tenant_99",
+        }
+
+    @pytest.mark.parametrize(
+        "spec",
+        [
+            pytest.param("", id="empty"),
+            pytest.param("bad(", id="syntax"),
+            pytest.param({"from": "", "to": "2.0.0", "expression": "{}"}, id="from"),
+            pytest.param({"from": "1.0.0", "to": "2.0.0"}, id="expression"),
+        ],
+    )
+    def test_rejects_invalid_spec(self, spec: object) -> None:
+        with pytest.raises(ValueError):
+            JsonataMigration.create(spec)
+
+    def test_rejects_non_object_result(self) -> None:
+        migration = JsonataMigration.from_spec(
+            {"from": "1.0.0", "to": "2.0.0", "expression": "[1]"}
+        )
+
+        with pytest.raises(TypeError, match="JSON object"):
+            migration.migration({"kind": "User", "version": "1.0.0"})
