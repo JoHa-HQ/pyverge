@@ -1,14 +1,8 @@
-## Unreleased
+## v0.13.0 (2026-10-22)
 
 ### Feat
 
-- **#70**: add JSONata migration strategy
-- **#70**: expose JSONata specs as callable transforms
-
-### Breaking
-
-- **#70**: `JsonataMigration` is no longer directly callable; use
-  `from_spec(...).migration` or register through the manager.
+- **#70**: introduce jsonata support. unify migration protocols. improve type hints for providers. (#75)
 
 ## v0.12.0 (2026-10-21)
 
