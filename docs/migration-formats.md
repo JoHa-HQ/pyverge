@@ -46,6 +46,29 @@ class UserV1ToV2:
 result = manager.migrate(payload, context={"tenant_id": "tenant_99"})
 ```
 
+`JsonataMigration` is a declarative spec; it produces a callable
+`JsonataTransform`, mirroring `JsonPatchMigration` → `JsonPatch`:
+
+```python
+from pyverge.migration import JsonataMigration
+
+migration = JsonataMigration.from_spec(
+    {
+        "from": "1.0.0",
+        "to": "2.0.0",
+        "expression": '{"kind": kind, "version": "2.0.0", "name": $lowercase(name)}',
+    }
+)
+
+result = migration.migration(payload, context={...})
+```
+
+Factories:
+
+- `JsonataMigration.from_expression("...")`
+- `JsonataMigration.from_spec({...})`
+- `JsonataMigration.create("...")` or `.create({...})`
+
 A JSONata expression replaces the payload rather than patching it. Emit every
 target field, including `kind`; the engine stamps the target `version`.
 Expressions compile at registration and invalid syntax raises `ValueError`.
