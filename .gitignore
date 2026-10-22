@@ -237,6 +237,3 @@ site/
 
 # CI showcase build output
 showcases/ci/target/
-
-# Local OpenSpec workspace
-openspec/

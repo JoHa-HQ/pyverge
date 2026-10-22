@@ -142,9 +142,3 @@ See [CLI Reference](docs/cli.md).
 - [Testing](docs/testing.md) · [Benchmarking](docs/benchmarking.md)
 - [Usage Patterns](docs/usage.md) · [Scenarios](docs/scenarios.md)
 - [Showcases](showcases/README.md)
-
-## Plan
-
-- Additional model adapters: dataclasses, attrs, marshmallow, MessagePack
-- Real-source showcase drivers: MongoDB, Kafka, RabbitMQ, MQTT
-- Generated API reference once the SDK surface stabilizes
