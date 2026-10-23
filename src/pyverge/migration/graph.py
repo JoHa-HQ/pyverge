@@ -12,11 +12,11 @@ from pyverge.core.types import (
     ModelHandle,
     ModelKind,
     TargetResolver,
-    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
     EdgeKey,
+    VersionNode,
 )
 from pyverge.migration.types import (
     Walker,
@@ -34,17 +34,14 @@ class GraphEntry(Generic[VersionValue]):
     """
 
     path: tuple[str | int, ...]
-    source: Versionable[VersionValue]
-    target: Versionable[VersionValue]
+    source: VersionNode[VersionValue]
+    target: VersionNode[VersionValue]
+    target_model: ModelHandle | None = None
     steps: tuple[
-        tuple[
-            Versionable[VersionValue],
-            Versionable[VersionValue],
-        ],
+        tuple[VersionNode[VersionValue], VersionNode[VersionValue]],
         ...,
     ] = ()
     hooks: tuple[tuple[Attachable, ...], ...] = ()
-    target_model: Any | None = None
 
     def allows_direction(self, direction: MigrationDirectionStrategy) -> bool:
         """Return whether this entry may migrate under *direction*.
@@ -293,9 +290,9 @@ class GraphBuilder(Generic[VersionValue]):
 
     def _resolve_migration_path(
         self,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
-    ) -> list[tuple[Versionable[VersionValue], Versionable[VersionValue]]]:
+        source: VersionNode[VersionValue],
+        target: VersionNode[VersionValue],
+    ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
         """Adjacent migration steps between *source* and *target*, for hooks.
 
         Uses the registry's sorted version list; an edge without an explicit
@@ -318,9 +315,9 @@ class GraphBuilder(Generic[VersionValue]):
                 self._registry.name,
                 f"Target version {target} is not registered for kind {target.kind}",
             )
-        path: list[tuple[Versionable[VersionValue], Versionable[VersionValue]]] = []
+        path: list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]] = []
         step = lo
-        current = source
+        current = kind_versions[lo]
         while step < hi:
             nxt = kind_versions[step + 1]
             path.append((current, nxt))

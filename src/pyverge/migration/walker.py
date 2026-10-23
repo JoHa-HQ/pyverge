@@ -8,11 +8,11 @@ from pyverge.core.settings import DiscoverySettings
 from pyverge.core.types import (
     MigrationDirectionStrategy,
     TargetResolver,
-    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
     VersionKey,
+    VersionNode,
 )
 from pyverge.migration.types import (
     Entry,
@@ -105,8 +105,8 @@ class Walker(Generic[VersionValue]):
         kp: str,
         vp: str,
         target_resolver: TargetResolver,
-    ) -> Versionable[VersionValue] | None:
-        """Return the registered versionable for a versioned dict, or ``None``."""
+    ) -> VersionNode[VersionValue] | None:
+        """Return the registered node for a versioned dict, or ``None``."""
         if not isinstance(value, dict):
             return None
         kind = value.get(kp)
@@ -128,8 +128,8 @@ class Walker(Generic[VersionValue]):
 
     def _forward_ok(
         self,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        source: VersionNode[VersionValue],
+        target: VersionNode[VersionValue],
     ) -> bool:
         if self._direction == "any":
             return True

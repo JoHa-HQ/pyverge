@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import (
+    TYPE_CHECKING,
     Any,
     Generic,
     Literal,
@@ -23,6 +24,9 @@ from pendulum import Date
 from semver import Version as SemVer
 
 from .context import MigrationContext
+
+if TYPE_CHECKING:
+    from .versioning import VersionNode
 
 # ---------------------------------------------------------------------------
 # Version axis
@@ -321,7 +325,10 @@ VersionPair = tuple[Comparable[VersionValue_co], Comparable[VersionValue_co]]
 
 LookupKey = Versionable[VersionValue_co] | Migratable[VersionValue_co]
 
-TargetResolver = Callable[
-    [Versionable[VersionValue_co]],
-    Versionable[VersionValue_co] | None,
-]
+
+class TargetResolver(Protocol[VersionValue_co]):
+    """Resolve a discovered version to its target node, or skip it."""
+
+    def __call__(
+        self, current: VersionNode[VersionValue_co]
+    ) -> VersionNode[VersionValue_co] | None: ...

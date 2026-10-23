@@ -56,7 +56,12 @@ class TestGraphEntry:
         source = envelope_model(model_adapter, discovery_settings, PersonV1)
         target = envelope_model(model_adapter, discovery_settings, PersonV2)
 
-        entry = GraphEntry(path=("document",), source=source, target=target)
+        entry = GraphEntry(
+            path=("document",),
+            source=source,
+            target=target,
+            target_model=target.model,
+        )
 
         assert entry.path == ("document",)
         assert entry.source is source
@@ -69,7 +74,12 @@ class TestGraphEntry:
         source = envelope_model(model_adapter, discovery_settings, PersonV1)
         target = envelope_model(model_adapter, discovery_settings, PersonV2)
 
-        entry = GraphEntry(path=("document",), source=source, target=target)
+        entry = GraphEntry(
+            path=("document",),
+            source=source,
+            target=target,
+            target_model=target.model,
+        )
 
         assert "GraphEntry" in repr(entry)
         assert "document" in repr(entry)
@@ -87,6 +97,7 @@ class TestGraphEntry:
             path=("document",),
             source=source,
             target=target,
+            target_model=target.model,
             steps=steps,
         )
 

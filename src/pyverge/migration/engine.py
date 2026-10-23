@@ -279,10 +279,20 @@ class Engine(Generic[VersionValue]):
                 registry.name,
                 endpoint.version,
             )
-        outcome = self.reflect(anchor, endpoint, migration=func)
-        if outcome.model is not None:
-            registry.store_model(outcome.model)
-        return registry.get_model(endpoint)
+        return self._materialize_missing(anchor, endpoint, func)
+
+    def _materialize_missing(
+        self: Self,
+        anchor: VersionNode[VersionValue],
+        target: Comparable[VersionValue],
+        func: MigrationFunc,
+    ) -> VersionNode[VersionValue]:
+        """Reflect *target* from *anchor* and store the materialized node."""
+        outcome = self.reflect(anchor, target, migration=func)
+        if outcome.model is None:
+            raise ModelNotFoundError(self.registry.name, target.version)
+        self.registry.store_model(outcome.model)
+        return outcome.model
 
     def reflect(
         self: Self,
@@ -316,8 +326,8 @@ class Engine(Generic[VersionValue]):
 
     def reconstruct(
         self: Self,
-        anchor: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        anchor: VersionNode[VersionValue],
+        target: Comparable[VersionValue],
         migration: JsonPatch | MigrationFunc,
     ) -> None:
         """Reconstruct and store a missing model for *target*.
@@ -325,14 +335,12 @@ class Engine(Generic[VersionValue]):
         Applies the migration diff to the *anchor* model and stores the result at
         *target*'s version (inverted when the anchor is the newer endpoint).
         """
-        outcome = self.reflect(anchor, target, migration=migration)
-        if outcome.model is not None:
-            self.registry.store_model(outcome.model)
+        self._materialize_missing(anchor, target, migration)
 
     def propose_migration(
         self: Self,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        source: VersionNode[VersionValue],
+        target: VersionNode[VersionValue],
         *,
         is_backward_compatible: bool = False,
     ) -> JsonPatchMigration:
@@ -355,8 +363,6 @@ class Engine(Generic[VersionValue]):
                 f"Cannot propose migration across strategies: "
                 f"{source.strategy.__name__} != {target.strategy.__name__}",
             )
-        if source.model is None or target.model is None:
-            raise ModelNotFoundError(self.registry.name, source.version)
         outcome = self.reflect(
             source,
             target,
