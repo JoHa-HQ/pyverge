@@ -3,6 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/pyverge.svg)](https://pypi.org/project/pyverge/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/pyverge.svg)](https://pypi.org/project/pyverge/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyverge.svg)](https://pypi.org/project/pyverge/)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/JoHa-HQ/pyverge/badge)](https://scorecard.dev/viewer/?uri=github.com/JoHa-HQ/pyverge)
 
 Schema evolution and migrations for versioned data. Register model versions,
 define migrations between them, and converge payloads to a target schema at
