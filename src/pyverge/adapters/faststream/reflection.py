@@ -23,6 +23,12 @@ if TYPE_CHECKING:
     from faststream import FastStream
 
 
+def _topic_name(topic: object) -> str:
+    """Return the topic name from a plain string or a FastStream topic value."""
+    name = getattr(topic, "name", None)
+    return name if isinstance(name, str) else str(topic)
+
+
 @dataclass(frozen=True)
 class SubscriberModel:
     """A subscriber's handler plus the payload model it declares."""
@@ -90,7 +96,9 @@ class SubscriberWalker:
             yield SubscriberModel(
                 handler=handler,
                 model=model,
-                topics=tuple(getattr(subscriber, "topics", ())),
+                topics=tuple(
+                    _topic_name(topic) for topic in getattr(subscriber, "topics", ())
+                ),
             )
 
 
