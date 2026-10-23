@@ -43,7 +43,7 @@ ModelHandle: TypeAlias = type[Any]
 # JSON aliases
 # ---------------------------------------------------------------------------
 
-JsonPrimities: TypeAlias = int | float | str | bool | None | dict[str, Any] | list[Any]
+JsonPrimities: TypeAlias = int | float | str | bool | dict[str, Any] | list[Any] | None
 JsonValue: TypeAlias = JsonPrimities | dict[str, JsonPrimities] | list[JsonPrimities]
 JsonSchema: TypeAlias = dict[str, JsonValue]
 JsonSchemaMode = Literal["validation", "serialization"]

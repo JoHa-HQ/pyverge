@@ -29,7 +29,7 @@ RESOURCE_VERSION = "2.0.0"
 
 @tool(name="search_weather", version=ANCHOR_VERSION)
 @inject
-def search_weather(  # noqa: PLR0913
+def search_weather(  # noqa: PLR0913, PLR0917
     city: str,
     units: str = "celsius",
     temperature: float = 0.0,

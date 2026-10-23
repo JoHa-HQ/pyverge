@@ -32,4 +32,4 @@ asyncio_mode = "auto"
 addopts = "-p no:cacheprovider"
 
 [tool.uv.sources]
-pyverge = {path = "../../", editable = true}
+pyverge = { path = "../../", editable = true }

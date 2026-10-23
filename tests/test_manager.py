@@ -1141,7 +1141,7 @@ class TestCompileTargetSpec:
         ],
         indirect=["model_adapter", "registry"],
     )
-    def test_compile_target_spec(  # noqa: PLR0913
+    def test_compile_target_spec(  # noqa: PLR0913, PLR0917
         self,
         manager: type[Manager[semver.Version]],
         model_adapter: PydanticModelAdapter,
