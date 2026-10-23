@@ -20,6 +20,8 @@ process for contributing code, documentation, and ideas.
 ### Reporting issues
 
 - Use the issue tracker to report bugs, request features, or ask questions.
+- Do **not** report security vulnerabilities publicly. See
+  [SECURITY.md](SECURITY.md).
 - For bugs, include:
   - A minimal reproducible example
   - Expected vs. actual behavior
@@ -109,6 +111,12 @@ Releases are automated via [commitizen](https://commitizen-tools.github.io/commi
 
 5. Pre-release tags (`vX.Y.Z-rcN`) or a manual `Publish Dev (TestPyPI)` run
    publish to TestPyPI.
+
+## Community
+
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Governance](GOVERNANCE.md)
+- [Security Policy](SECURITY.md)
 
 ## Questions?
 

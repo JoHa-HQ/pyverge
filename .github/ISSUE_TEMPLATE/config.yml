@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/JoHa-HQ/pyverge/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue.
   - name: Documentation
     url: https://github.com/JoHa-HQ/pyverge/tree/main/docs
     about: Usage guides, concepts, and API docs.

@@ -28,8 +28,7 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge import Manager, MigrationSettings, PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
     MigrationSettings(),
@@ -129,6 +128,13 @@ See [CLI Reference](docs/cli.md).
 - **Graph manifest** — JGF v2 snapshot with stable hashes for CI divergence checks
 - **Adapters** — FastMCP tools/prompts/resources and FastStream messages
 - **Hooks** — before/after/error callbacks, async-aware, OpenTelemetry hook
+
+## Security
+
+Do not report security vulnerabilities through public issues. Use
+[GitHub private vulnerability reporting](https://github.com/JoHa-HQ/pyverge/security/advisories/new).
+See [SECURITY.md](SECURITY.md) for scope, response targets, and disclosure
+timeline.
 
 ## Documentation
 
