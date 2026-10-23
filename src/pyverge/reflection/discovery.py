@@ -8,6 +8,7 @@ from typing import Any, Generic
 from pyverge.core.types import (
     Comparable,
     MigrationFunc,
+    Versionable,
     VersionValue,
 )
 from pyverge.providers.json_patch import JsonPatch
@@ -32,7 +33,7 @@ class JsonPatchDiffDiscovery(Generic[VersionValue]):
     def discover(
         self,
         migration: JsonPatch,
-        source: Comparable[VersionValue],
+        source: Versionable[VersionValue],
         target: Comparable[VersionValue],
     ) -> Diff[VersionValue]:
         added: list[str] = []
@@ -91,7 +92,7 @@ class CallableDiffDiscovery(Generic[VersionValue]):
     def discover(
         self,
         migration: MigrationFunc,
-        source: Comparable[VersionValue],
+        source: Versionable[VersionValue],
         target: Comparable[VersionValue],
     ) -> Diff[VersionValue]:
         try:
@@ -169,7 +170,7 @@ class CompositeDiffDiscovery(Generic[VersionValue]):
     def discover(
         self,
         migration: JsonPatch | MigrationFunc,
-        source: Comparable[VersionValue],
+        source: Versionable[VersionValue],
         target: Comparable[VersionValue],
     ) -> Diff[VersionValue]:
         if isinstance(migration, JsonPatch):

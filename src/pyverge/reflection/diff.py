@@ -8,6 +8,7 @@ from pyverge.core.types import (
     DiffOrigin,
     MigrationKey,
     Renderable,
+    Versionable,
     VersionValue,
 )
 
@@ -30,7 +31,7 @@ class Diff(Generic[VersionValue]):
     concrete schemas.
     """
 
-    source: Comparable[VersionValue]
+    source: Versionable[VersionValue]
     target: Comparable[VersionValue]
     added_fields: list[str] = field(default_factory=list)
     removed_fields: list[str] = field(default_factory=list)

@@ -296,7 +296,7 @@ class Engine(Generic[VersionValue]):
 
     def reflect(
         self: Self,
-        source: Comparable[VersionValue],
+        source: Versionable[VersionValue],
         target: Comparable[VersionValue],
         *,
         migration: JsonPatch | MigrationFunc | None = None,

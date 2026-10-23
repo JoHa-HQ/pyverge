@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from pydantic import BaseModel, create_model
 from pydantic.fields import FieldInfo
@@ -14,6 +14,7 @@ from pyverge.core.types import (
     ModelData,
     ModelHandle,
     ModelVersionKey,
+    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
@@ -254,7 +255,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
 
     def diff(
         self,
-        source: Comparable[VersionValue],
+        source: Versionable[VersionValue],
         target: Comparable[VersionValue],
         *,
         is_backward_compatible: bool = False,
@@ -264,10 +265,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
         A meta endpoint (``model is None``) yields a plain ``Diff`` with empty
         predicates — there is no schema to compare.
         """
-        if (
-            getattr(source, "model", None) is None
-            or getattr(target, "model", None) is None
-        ):
+        if getattr(target, "model", None) is None:
             return Diff(
                 source=source,
                 target=target,
@@ -275,7 +273,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
             )
         return PydanticDiff.from_pair(
             source,
-            target,
+            cast("Versionable[VersionValue]", target),
             is_backward_compatible=is_backward_compatible,
         )
 
@@ -300,9 +298,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
         and fields added by the diff are appended with their recorded type and
         default.  The ``version`` field is pinned to the reconstructed version.
         """
-        anchor = getattr(diff.source, "model", None)
-        if anchor is None:
-            raise ValueError("Cannot materialize a model without an anchor model")
+        anchor = diff.source.model
         version = diff.target.version[1]
         fields: dict[str, Any] = {}
         fields[self._version_property] = (str, str(version))
@@ -383,8 +379,8 @@ class PydanticDiff(Diff[VersionValue]):
     @classmethod
     def from_pair(
         cls: type[Self],
-        source: Comparable[VersionValue],
-        target: Comparable[VersionValue],
+        source: Versionable[VersionValue],
+        target: Versionable[VersionValue],
         *,
         is_backward_compatible: bool = False,
     ) -> Self:
@@ -400,13 +396,8 @@ class PydanticDiff(Diff[VersionValue]):
                 f"Cannot create diff across kinds: {source.kind} != {target.kind}"
             )
 
-        source_model = getattr(source, "model", None)
-        target_model = getattr(target, "model", None)
-        if source_model is None or target_model is None:
-            raise ValueError("Cannot diff versions without models")
-
-        source_fields = source_model.model_fields
-        target_fields = target_model.model_fields
+        source_fields = source.model.model_fields
+        target_fields = target.model.model_fields
 
         source_keys = set(source_fields.keys())
         target_keys = set(target_fields.keys())

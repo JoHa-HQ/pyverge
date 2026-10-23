@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from datamodel_code_generator import InputFileType, generate
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from pyverge.core.types import (
     ModelData,
     ModelHandle,
     ModelVersionKey,
+    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
@@ -243,7 +244,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
 
     def diff(
         self,
-        source: Comparable[VersionValue],
+        source: Versionable[VersionValue],
         target: Comparable[VersionValue],
         *,
         is_backward_compatible: bool = False,
@@ -253,10 +254,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         A meta endpoint (``model is None``) yields a plain ``Diff`` with empty
         predicates — there is no schema to compare.
         """
-        if (
-            getattr(source, "model", None) is None
-            or getattr(target, "model", None) is None
-        ):
+        if getattr(target, "model", None) is None:
             return Diff(
                 source=source,
                 target=target,
@@ -264,7 +262,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
             )
         return _pydantic_diff_pair(
             source,
-            target,
+            cast("Versionable[VersionValue]", target),
             is_backward_compatible=is_backward_compatible,
         )
 
@@ -280,10 +278,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         pinned to the reconstructed version.  The document is then
         re-materialized into a Pydantic model.
         """
-        anchor = _require_model(
-            getattr(diff.source, "model", None),
-            "Cannot materialize a model without an anchor model",
-        )
+        anchor = diff.source.model
         version = diff.target.version[1]
         document = anchor.model_json_schema()
         properties = document.setdefault("properties", {})
@@ -348,16 +343,9 @@ def _json_type(annotation: Any) -> str:
     return "string"
 
 
-def _require_model(model: ModelHandle | None, message: str) -> ModelHandle:
-    """Return a bound model or fail when the version is a meta node."""
-    if model is None:
-        raise ValueError(message)
-    return model
-
-
 def _pydantic_diff_pair(
-    source: Comparable[VersionValue],
-    target: Comparable[VersionValue],
+    source: Versionable[VersionValue],
+    target: Versionable[VersionValue],
     *,
     is_backward_compatible: bool = False,
 ) -> Diff[VersionValue]:
@@ -372,12 +360,8 @@ def _pydantic_diff_pair(
             f"Cannot create diff across kinds: {source.kind} != {target.kind}"
         )
 
-    source_model = _require_model(
-        getattr(source, "model", None), "Cannot diff versions without models"
-    )
-    target_model = _require_model(
-        getattr(target, "model", None), "Cannot diff versions without models"
-    )
+    source_model = source.model
+    target_model = target.model
 
     source_fields = source_model.model_fields
     target_fields = target_model.model_fields

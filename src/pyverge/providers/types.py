@@ -8,6 +8,7 @@ from pyverge.core.types import (
     ModelData,
     ModelHandle,
     ModelVersionKey,
+    Versionable,
     VersionValue,
     VersionValue_co,
 )
@@ -156,7 +157,7 @@ class ModelAdapter(Protocol):
 
     def diff(
         self,
-        source: Comparable[VersionValue_co],
+        source: Versionable[VersionValue_co],
         target: Comparable[VersionValue_co],
         *,
         is_backward_compatible: bool = False,

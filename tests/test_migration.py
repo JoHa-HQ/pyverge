@@ -13,6 +13,7 @@ from pyverge import types
 from pyverge.core import (
     VersioningSettings,
     VersionKey,
+    VersionNode,
 )
 from pyverge.migration import (
     Diff,
@@ -395,7 +396,7 @@ class TestPydanticDiff:
         meta = meta_versionable(model_adapter, "User", version)
         real = envelope_model(model_adapter, versioning_settings, UserV1)
 
-        diff = model_adapter.diff(meta, real)
+        diff = model_adapter.diff(real, meta)
         assert isinstance(diff, Diff)
         assert not diff.has_additions
         assert not diff.has_removals
@@ -489,7 +490,7 @@ class TestJsonSchemaModelAdapter:
         real = adapter.versionable(
             adapter.to_pydantic(_schema("1.0.0", {"name": {"type": "string"}}))
         )
-        diff = adapter.diff(meta_node, real)
+        diff = adapter.diff(real, meta_node)
         assert isinstance(diff, Diff)
         assert not diff.has_additions
         assert not diff.has_removals
@@ -560,7 +561,8 @@ class TestCompatibilityReport:
         added_info: dict[str, dict[str, Any]] | None = None,
         backward_compatible: bool = False,
     ) -> CompatibilityReport:
-        source = VersionKey(
+        source = VersionNode(
+            _model=type("Model", (), {}),
             _value=semver.Version.parse("1.0.0"),
             _kind="User",
         )
