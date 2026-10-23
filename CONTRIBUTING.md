@@ -20,6 +20,8 @@ process for contributing code, documentation, and ideas.
 ### Reporting issues
 
 - Use the issue tracker to report bugs, request features, or ask questions.
+- Do **not** report security vulnerabilities publicly. See
+  [SECURITY.md](SECURITY.md).
 - For bugs, include:
   - A minimal reproducible example
   - Expected vs. actual behavior
@@ -28,16 +30,20 @@ process for contributing code, documentation, and ideas.
 
 ### Submitting code
 
-1. **Create a branch** from `main`:
+1. **Open an issue first** using the bug or feature template. Every non-trivial
+   change needs a ticket so it can be triaged, scoped, and linked from commits.
+   Small fixes such as typos may proceed without one.
+
+2. **Create a branch** from `main`:
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
-2. **Make your changes** following the existing code style.
+3. **Make your changes** following the existing code style.
 
-3. **Write tests** for new functionality. Aim for high coverage.
+4. **Write tests** for new functionality. Aim for high coverage.
 
-4. **Run checks** before committing:
+5. **Run checks** before committing:
    ```bash
    uv run ruff check .
    uv run ruff format .
@@ -45,7 +51,7 @@ process for contributing code, documentation, and ideas.
    uv run ty check src/pyverge
    ```
 
-5. **Commit** with a clear message following [Conventional Commits](https://www.conventionalcommits.org/),
+6. **Commit** with a clear message following [Conventional Commits](https://www.conventionalcommits.org/),
    scoped by issue number:
    ```bash
    git commit -m "feat(#56): add new migration hook type"
@@ -53,7 +59,7 @@ process for contributing code, documentation, and ideas.
    The scope is the issue the work addresses, so the history links commits to
    their issue (e.g. `fix(#62): ...`).
 
-6. **Push** and open a pull request.
+7. **Push** and open a pull request. Link the issue with `Closes #...`.
 
 ### Documentation
 
@@ -87,7 +93,11 @@ Releases are automated via [commitizen](https://commitizen-tools.github.io/commi
 1. Commit messages determine the next version:
    - `feat:` → minor version bump
    - `fix:` → patch version bump
-   - `BREAKING CHANGE:` → major version bump
+   - `feat!:` or `fix!:` → major version bump
+   - a `BREAKING CHANGE:` footer also marks the change as breaking
+
+   With the issue scope, the form is `type(#issue)!: description`, for example
+   `feat(#56)!: replace the manager registration API`.
 
 2. Merging to `main` runs the `Release` workflow plan job. It computes the
    next version from commits and writes the proposed SHA, version, ticket, and
@@ -101,6 +111,12 @@ Releases are automated via [commitizen](https://commitizen-tools.github.io/commi
 
 5. Pre-release tags (`vX.Y.Z-rcN`) or a manual `Publish Dev (TestPyPI)` run
    publish to TestPyPI.
+
+## Community
+
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Governance](GOVERNANCE.md)
+- [Security Policy](SECURITY.md)
 
 ## Questions?
 

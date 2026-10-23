@@ -103,7 +103,8 @@ to?"*
 
 **Provider-agnostic core.** Discovery, planning, and execution operate on plain
 dicts. The only place a model library (Pydantic, dataclasses, etc.) is touched
-is at the adapter seam. You can swap adapters without changing the engine.
+is at the adapter seam. You can swap adapters without changing the engine. See
+[providers](providers.md).
 
 **Bounded context per manager.** A `Manager` owns one complete version graph —
 one registry, one adapter. A kind and every kind it contains must be registered

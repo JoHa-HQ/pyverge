@@ -3,6 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/pyverge.svg)](https://pypi.org/project/pyverge/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/pyverge.svg)](https://pypi.org/project/pyverge/)
 [![Python versions](https://img.shields.io/pypi/pyversions/pyverge.svg)](https://pypi.org/project/pyverge/)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/JoHa-HQ/pyverge/badge)](https://scorecard.dev/viewer/?uri=github.com/JoHa-HQ/pyverge)
 
 Schema evolution and migrations for versioned data. Register model versions,
 define migrations between them, and converge payloads to a target schema at
@@ -28,8 +29,7 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge import Manager, MigrationSettings, PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
     MigrationSettings(),
@@ -130,10 +130,18 @@ See [CLI Reference](docs/cli.md).
 - **Adapters** — FastMCP tools/prompts/resources and FastStream messages
 - **Hooks** — before/after/error callbacks, async-aware, OpenTelemetry hook
 
+## Security
+
+Do not report security vulnerabilities through public issues. Use
+[GitHub private vulnerability reporting](https://github.com/JoHa-HQ/pyverge/security/advisories/new).
+See [SECURITY.md](SECURITY.md) for scope, response targets, and disclosure
+timeline.
+
 ## Documentation
 
 - [Getting Started](docs/getting-started.md)
 - [Managers](docs/managers.md) · [Concepts](docs/concepts.md)
+- [Providers](docs/providers.md)
 - [Migrations](docs/migration.md) · [Migration Formats](docs/migration-formats.md)
 - [Runtime & Execution](docs/runtime.md) · [Execution Flow](docs/execution-flow.md)
 - [Target Policy](docs/target-policy.md) · [Compatibility](docs/compatibility.md)
