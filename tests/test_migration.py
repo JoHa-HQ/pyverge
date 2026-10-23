@@ -12,7 +12,7 @@ import semver
 from pyverge import types
 from pyverge.core import (
     VersioningSettings,
-    VersionNode,
+    VersionKey,
 )
 from pyverge.migration import (
     Diff,
@@ -485,9 +485,7 @@ class TestJsonSchemaModelAdapter:
 
     def test_meta_endpoint_empty_diff(self) -> None:
         adapter = JsonSchemaModelAdapter()
-        meta_node = VersionNode[semver.Version](
-            _model=None, _value=semver.Version(0, 1, 0), _kind="User"
-        )
+        meta_node = VersionKey(_value=semver.Version(0, 1, 0), _kind="User")
         real = adapter.versionable(
             adapter.to_pydantic(_schema("1.0.0", {"name": {"type": "string"}}))
         )
@@ -562,13 +560,11 @@ class TestCompatibilityReport:
         added_info: dict[str, dict[str, Any]] | None = None,
         backward_compatible: bool = False,
     ) -> CompatibilityReport:
-        source = VersionNode(
-            _model=None,
+        source = VersionKey(
             _value=semver.Version.parse("1.0.0"),
             _kind="User",
         )
-        target = VersionNode(
-            _model=None,
+        target = VersionKey(
             _value=semver.Version.parse("2.0.0"),
             _kind="User",
         )

@@ -39,12 +39,10 @@ class TopicTargets(Mapping[str, TargetPolicy]):
     def __len__(self) -> int:
         return len(self._targets)
 
-    def get(
-        self,
-        topic: str,
-        default: TargetPolicy | None = None,
-    ) -> TargetPolicy | None:
-        return self._targets.get(topic, default)
+    def get(self, key: object, default: Any = None) -> Any:
+        if not isinstance(key, str):
+            return default
+        return self._targets.get(key, default)
 
     @classmethod
     def coerce(
@@ -95,8 +93,10 @@ class MessageHeaders(Mapping[str, Any]):
     def __len__(self) -> int:
         return len(self._headers)
 
-    def get(self, name: str, default: Any = None) -> Any:
-        return self._headers.get(name.lower(), default)
+    def get(self, key: object, default: Any = None) -> Any:
+        if not isinstance(key, str):
+            return default
+        return self._headers.get(key.lower(), default)
 
 
 class HeaderParser:

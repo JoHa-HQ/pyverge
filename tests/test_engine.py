@@ -20,7 +20,7 @@ from pyverge.core import (
     ModelConflictError,
     ModelNotFoundError,
     RegistryError,
-    VersionNode,
+    VersionKey,
 )
 from pyverge.migration import (
     Engine,
@@ -97,9 +97,7 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [semver.Version, "test", [], []],
                 lambda engine: engine.get_model(
-                    VersionNode(
-                        _model=None, _value=semver.Version(9, 9, 9), _kind="User"
-                    )
+                    VersionKey(_value=semver.Version(9, 9, 9), _kind="User")
                 ),
                 ModelNotFoundError,
                 id="get_missing_pydantic_semver",
@@ -108,9 +106,7 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [pendulum.Date, "test", [], []],
                 lambda engine: engine.get_model(
-                    VersionNode(
-                        _model=None, _value=pendulum.Date(2099, 1, 1), _kind="User"
-                    )
+                    VersionKey(_value=pendulum.Date(2099, 1, 1), _kind="User")
                 ),
                 ModelNotFoundError,
                 id="get_missing_pydantic_pendulum",
@@ -838,9 +834,7 @@ class TestReflection:
             ).patch,
         )
 
-        reconstructed = engine.get_model(
-            VersionNode(_model=None, _value=semver.Version(2, 0, 0), _kind="User")
-        )
+        reconstructed = engine.get_model(meta)
         assert reconstructed.model is not None
         assert all(
             field in reconstructed.model.model_fields

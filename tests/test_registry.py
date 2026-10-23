@@ -21,7 +21,7 @@ from pyverge.core import (
     ModelNotFoundError,
     RegistryError,
     VersioningSettings,
-    VersionNode,
+    VersionKey,
 )
 from pyverge.migration import (
     MigrationContext,
@@ -241,7 +241,7 @@ class TestModel:
         key: types.ModelVersionKey,
     ) -> None:
         with pytest.raises(ModelNotFoundError, match="not found"):
-            registry.get_model(VersionNode(_model=None, _value=key[1], _kind=key[0]))
+            registry.get_model(VersionKey(_value=key[1], _kind=key[0]))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, target",
@@ -279,8 +279,7 @@ class TestModel:
             pytest.param(
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV1], []],
-                VersionNode(
-                    _model=None,
+                VersionKey(
                     _value=semver.Version.parse("1.0.0"),
                     _kind="User",
                 ),
@@ -289,8 +288,7 @@ class TestModel:
             pytest.param(
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV011Dev7], []],
-                VersionNode(
-                    _model=None,
+                VersionKey(
                     _value=semver.Version.parse("0.1.1+dev.7"),
                     _kind="User",
                 ),
@@ -299,8 +297,7 @@ class TestModel:
             pytest.param(
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
-                VersionNode(
-                    _model=None,
+                VersionKey(
                     _value=pendulum.Date(2025, 3, 10),
                     _kind="User",
                 ),
