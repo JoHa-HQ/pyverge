@@ -18,9 +18,9 @@ from pyverge import Manager
 from pyverge.manager.types import TargetPolicy
 
 from .binding import SignatureBinder
-from .reflection import SubscriberWalker
 from .targets import DEFAULT_TARGET, FirstMatch
 from .types import HandlerBinder, TargetContext, TopicTargets
+from .views import HandlerView
 
 Fn = TypeVar("Fn", bound=Callable[..., Any])
 
@@ -89,7 +89,7 @@ def subscriber(
         return converge_message
 
     def decorate(fn: Fn) -> Fn:
-        declared = SubscriberWalker.declared_model(fn)
+        declared = HandlerView(fn).input_model
         if declared is not None and manager.identifies(declared):
             models = _candidate_models(manager, declared, targets, topics, header)
             annotation = _model_union(models)
