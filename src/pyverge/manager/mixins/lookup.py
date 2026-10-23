@@ -13,7 +13,6 @@ from pyverge.core.types import (
     Comparable,
     Migratable,
     Transitional,
-    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
@@ -23,7 +22,7 @@ from pyverge.core.versioning import (
 )
 
 if TYPE_CHECKING:
-    from . import ManagerState
+    from pyverge.manager.manager import Manager
 
 
 class LookupMixin(Generic[VersionValue]):
@@ -38,7 +37,7 @@ class LookupMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def _resolve_model_key(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: Any,
     ) -> VersionKey[VersionValue]:
         """Normalize a model key to a search key.
@@ -51,7 +50,7 @@ class LookupMixin(Generic[VersionValue]):
     @_resolve_model_key.register(tuple)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: tuple,
     ) -> VersionKey[VersionValue]:
         kind, value = key
@@ -60,7 +59,7 @@ class LookupMixin(Generic[VersionValue]):
     @_resolve_model_key.register(VersionNode)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: VersionNode[VersionValue],
     ) -> VersionKey[VersionValue]:
         return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
@@ -68,7 +67,7 @@ class LookupMixin(Generic[VersionValue]):
     @_resolve_model_key.register(type)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: type,
     ) -> VersionKey[VersionValue]:
         """Resolve a bare model class through the adapter and a neutral lookup."""
@@ -84,7 +83,7 @@ class LookupMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def _normalize_index(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         index: Any,
     ) -> Any:
         """Map a fluent lookup key to a typed registry key."""
@@ -98,9 +97,9 @@ class LookupMixin(Generic[VersionValue]):
     @_normalize_index.register(tuple)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         index: tuple,
-    ) -> VersionNode[VersionValue] | EdgeKey:
+    ) -> VersionKey[VersionValue] | EdgeKey:
         if len(index) == MIGRATION_PAIR_LEN and isinstance(index[0], str):
             return cls._resolve_model_key(index)
         return EdgeKey.from_pair(*index)
@@ -108,12 +107,12 @@ class LookupMixin(Generic[VersionValue]):
     @_normalize_index.register(type)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         index: type,
-    ) -> VersionNode[VersionValue]:
+    ) -> VersionKey[VersionValue]:
         return cls._resolve_model_key(index)
 
-    def __contains__(self: ManagerState[VersionValue], index: Any) -> bool:
+    def __contains__(self: Manager[VersionValue], index: Any) -> bool:
         """Fluent membership: version key, edge pair, model class, or slice."""
         engine = self.engine
         if isinstance(index, slice):
@@ -131,8 +130,8 @@ class LookupMixin(Generic[VersionValue]):
             return False
 
     def __getitem__(
-        self: ManagerState[VersionValue], index: Any
-    ) -> Versionable[VersionValue] | Migratable | list[Migratable]:
+        self: Manager[VersionValue], index: Any
+    ) -> VersionNode[VersionValue] | Migratable | list[Migratable]:
         """Fluent selection: a version, an edge, or a migration path (slice)."""
         engine = self.engine
         if isinstance(index, slice):
@@ -146,7 +145,7 @@ class LookupMixin(Generic[VersionValue]):
         return engine.registry[type(self)._normalize_index(index)]
 
     def migration_path(
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         from_version: Any,
         to_version: Any,
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:

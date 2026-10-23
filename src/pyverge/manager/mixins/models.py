@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING, Generic, cast, overload
+from typing import TYPE_CHECKING, Generic, cast
 
 from pyverge.core.types import (
     Comparable,
@@ -20,9 +20,8 @@ from pyverge.providers.types import (
 )
 
 if TYPE_CHECKING:
+    from pyverge.manager.manager import Manager
     from pyverge.migration.engine import Engine
-
-    from . import ManagerState
 
 
 class ModelStoreMixin(Generic[VersionValue]):
@@ -31,7 +30,7 @@ class ModelStoreMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def store_model(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -43,7 +42,7 @@ class ModelStoreMixin(Generic[VersionValue]):
     @store_model.register(VersionNode)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         version: VersionNode[VersionValue],
         *,
         engine: Engine[VersionValue] | None = None,
@@ -55,7 +54,7 @@ class ModelStoreMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def reconcile_model(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -71,7 +70,7 @@ class ModelStoreMixin(Generic[VersionValue]):
     @reconcile_model.register(VersionNode)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         version: VersionNode[VersionValue],
         *,
         engine: Engine[VersionValue] | None = None,
@@ -80,7 +79,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         return engine.reconcile_model(version)
 
     def missing_references(
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         version: Versionable[VersionValue],
     ) -> frozenset[ModelVersionKey]:
         """Return the versioned ``(kind, version)`` pairs *version* declares
@@ -88,7 +87,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         return self.engine.registry.missing_references(version)
 
     def validate_graph(
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         version: Versionable[VersionValue] | None = None,
     ) -> None:
         """Validate registered models' declared references are registered.
@@ -100,7 +99,7 @@ class ModelStoreMixin(Generic[VersionValue]):
 
     @classmethod
     def list_versions(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         kind: ModelKind | None = None,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -113,7 +112,7 @@ class ModelStoreMixin(Generic[VersionValue]):
 
     @classmethod
     def get_entities(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> list[ModelKind]:
@@ -123,7 +122,7 @@ class ModelStoreMixin(Generic[VersionValue]):
 
     @classmethod
     def identifies(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -134,7 +133,7 @@ class ModelStoreMixin(Generic[VersionValue]):
 
     @classmethod
     def dump(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         value: object,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -150,123 +149,55 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         return engine.adapter.dump(value)
 
-    @overload
     @classmethod
     def get_model(
-        cls, key: ModelHandle, *, engine: Engine[VersionValue] | None = None
-    ) -> Versionable[VersionValue]: ...
-    @overload
-    @classmethod
-    def get_model(
-        cls, key: ModelKey, *, engine: Engine[VersionValue] | None = None
-    ) -> Versionable[VersionValue]: ...
-
-    @singledispatchmethod
-    @classmethod
-    def get_model(
-        cls: type[ManagerState[VersionValue]],
-        key: ModelHandle,
+        cls: type[Manager[VersionValue]],
+        key: ModelHandle | ModelKey,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]:
-        """Return a registered model version; a bare class is looked up by class."""
+    ) -> VersionNode[VersionValue]:
+        """Return a registered model version by class or by key."""
         engine = engine or cls._default_engine
+        if isinstance(key, ModelKey):
+            return engine.get_model(
+                engine.adapter.version_key(kind=key.kind, version=key.version)
+            )
         return engine.get_model_by_class(key)
 
-    @get_model.register(ModelKey)
     @classmethod
-    def _(
-        cls: type[ManagerState[VersionValue]],
-        key: ModelKey,
+    def get_latest_model(
+        cls: type[Manager[VersionValue]],
+        key: Comparable[VersionValue] | ModelKind,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
+        """Return the latest version for a kind or the given version identity."""
         engine = engine or cls._default_engine
-        return engine.get_model(
-            engine.adapter.version_key(kind=key.kind, version=key.version)
-        )
-
-    @overload
-    @classmethod
-    def get_latest_model(
-        cls,
-        key: Comparable[VersionValue],
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]: ...
-
-    @overload
-    @classmethod
-    def get_latest_model(
-        cls, key: ModelKind, *, engine: Engine[VersionValue] | None = None
-    ) -> Versionable[VersionValue]: ...
-
-    @singledispatchmethod
-    @classmethod
-    def get_latest_model(
-        cls: type[ManagerState[VersionValue]],
-        key: Comparable[VersionValue],
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]:
-        engine = engine or cls._default_engine
+        if isinstance(key, str):
+            return engine.get_latest_model(key)
         return engine.get_model(key)
 
-    @get_latest_model.register(ModelKind)
     @classmethod
-    def _(
-        cls: type[ManagerState[VersionValue]],
-        key: ModelKind,
+    def get_earliest_model(
+        cls: type[Manager[VersionValue]],
+        key: Comparable[VersionValue] | ModelKind,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
+        """Return the earliest version for a kind or the given version identity."""
         engine = engine or cls._default_engine
-        return engine.get_latest_model(key)
-
-    @overload
-    @classmethod
-    def get_earliest_model(
-        cls,
-        key: Comparable[VersionValue],
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]: ...
-    @overload
-    @classmethod
-    def get_earliest_model(
-        cls, key: ModelKind, *, engine: Engine[VersionValue] | None = None
-    ) -> Versionable[VersionValue]: ...
-
-    @singledispatchmethod
-    @classmethod
-    def get_earliest_model(
-        cls: type[ManagerState[VersionValue]],
-        key: Comparable[VersionValue],
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]:
-        engine = engine or cls._default_engine
+        if isinstance(key, str):
+            return engine.get_earliest_model(key)
         return engine.get_model(key)
-
-    @get_earliest_model.register(ModelKind)
-    @classmethod
-    def _(
-        cls: type[ManagerState[VersionValue]],
-        key: ModelKind,
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]:
-        engine = engine or cls._default_engine
-        return engine.get_earliest_model(key)
 
     @classmethod
     def get(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         kind: ModelKind,
         version: str,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         """Return the registered versionable for ``kind``@``version``."""
         engine = engine or cls._default_engine
         key = ModelKey(kind, cast(VersionValue, engine.adapter.of(version)))

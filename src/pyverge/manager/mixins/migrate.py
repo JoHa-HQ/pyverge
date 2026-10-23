@@ -31,9 +31,8 @@ from pyverge.providers.types import (
 )
 
 if TYPE_CHECKING:
+    from pyverge.manager.manager import Manager
     from pyverge.migration.engine import Engine
-
-    from . import ManagerState
 
 
 class MigrateMixin(Generic[VersionValue]):
@@ -41,7 +40,7 @@ class MigrateMixin(Generic[VersionValue]):
 
     @overload
     def migrate(
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         data: ModelData,
         target: TargetPolicy = "latest",
         *,
@@ -58,7 +57,7 @@ class MigrateMixin(Generic[VersionValue]):
 
     @overload
     def migrate(
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         data: ModelData,
         target: TargetPolicy = "latest",
         *,
@@ -74,7 +73,7 @@ class MigrateMixin(Generic[VersionValue]):
     ) -> ModelData: ...
 
     def prepare(  # noqa: PLR0913
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         data: ModelData,
         target: TargetPolicy = "latest",
         *,
@@ -108,7 +107,7 @@ class MigrateMixin(Generic[VersionValue]):
         )
 
     def delegate(  # noqa: PLR0913
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         data: ModelData,
         target: TargetPolicy = "latest",
         *,
@@ -136,7 +135,7 @@ class MigrateMixin(Generic[VersionValue]):
         )
 
     def migrate(  # noqa: PLR0913
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         data: ModelData,
         target: TargetPolicy = "latest",
         *,
@@ -177,7 +176,7 @@ class MigrateMixin(Generic[VersionValue]):
         return run.run(context=_as_context(context))
 
     async def amigrate(  # noqa: PLR0913
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         data: ModelData,
         target: TargetPolicy = "latest",
         *,
@@ -207,7 +206,7 @@ class MigrateMixin(Generic[VersionValue]):
         return await run.arun(context=_as_context(context))
 
     def info(
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
     ) -> dict[str, str | int | dict[str, str | int]]:
         """Return manager metadata."""
         engine = self.engine
@@ -221,7 +220,7 @@ class MigrateMixin(Generic[VersionValue]):
         }
 
     def validate(
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         data: ModelData,
         kind: ModelKind,
         version: str,
@@ -236,7 +235,7 @@ class MigrateMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def diff(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelPair | ManagerMigrationKey,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -247,7 +246,7 @@ class MigrateMixin(Generic[VersionValue]):
     @diff.register(ModelPair)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelPair,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -260,7 +259,7 @@ class MigrateMixin(Generic[VersionValue]):
     @diff.register(ManagerMigrationKey)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ManagerMigrationKey,
         *,
         engine: Engine[VersionValue] | None = None,
