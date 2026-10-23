@@ -17,7 +17,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
     VersionKey,
     VersionNode,
 )
@@ -88,7 +88,7 @@ class LookupMixin(Generic[VersionValue]):
         index: Any,
     ) -> Any:
         """Map a fluent lookup key to a typed registry key."""
-        if isinstance(index, (Comparable, Transitional, SentinelEdge)):
+        if isinstance(index, (Comparable, Transitional, EdgeKey)):
             return index
         raise RegistryError(
             cls._default_engine.registry.name,
@@ -100,10 +100,10 @@ class LookupMixin(Generic[VersionValue]):
     def _(
         cls: type[ManagerState[VersionValue]],
         index: tuple,
-    ) -> VersionNode[VersionValue] | SentinelEdge:
+    ) -> VersionNode[VersionValue] | EdgeKey:
         if len(index) == MIGRATION_PAIR_LEN and isinstance(index[0], str):
             return cls._resolve_model_key(index)
-        return SentinelEdge.from_pair(*index)
+        return EdgeKey.from_pair(*index)
 
     @_normalize_index.register(type)
     @classmethod
@@ -140,7 +140,7 @@ class LookupMixin(Generic[VersionValue]):
             to_v = engine.get_model(type(self)._resolve_model_key(index.stop))
             path = engine.find_migration_path(from_v, to_v)
             return [
-                engine.registry.get_migration_by_edge(SentinelEdge.from_pair(src, dst))
+                engine.registry.get_migration_by_edge(EdgeKey.from_pair(src, dst))
                 for src, dst in path
             ]
         return engine.registry[type(self)._normalize_index(index)]

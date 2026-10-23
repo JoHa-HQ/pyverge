@@ -114,15 +114,15 @@ class Walker(Generic[VersionValue]):
         if not (isinstance(kind, str) and isinstance(version_str, str)):
             return None
         try:
-            sentinel = VersionKey[VersionValue](
+            key = VersionKey[VersionValue](
                 _value=self._adapter.of(version_str), _kind=kind
             )
         except Exception:
             return None
-        if not self._registry.has_model(sentinel):
+        if not self._registry.has_model(key):
             return None
         try:
-            return self._registry.get_model(sentinel)
+            return self._registry.get_model(key)
         except Exception:
             return None
 

@@ -12,6 +12,7 @@ import semver
 
 from pyverge import types
 from pyverge.core import (
+    EdgeKey,
     MigrationAlreadyRegisteredError,
     MigrationNotFoundError,
     MigrationSettings,
@@ -19,7 +20,6 @@ from pyverge.core import (
     ModelConflictError,
     ModelNotFoundError,
     RegistryError,
-    SentinelEdge,
     VersionNode,
 )
 from pyverge.migration import (
@@ -461,7 +461,7 @@ class TestMigrationManagement:
             return data
 
         engine.store_migration((versions[0], versions[1]), _migrate)
-        edge = SentinelEdge.from_pair(versions[0], versions[1])
+        edge = EdgeKey.from_pair(versions[0], versions[1])
         assert engine.get_migration(edge).func is _migrate
 
     @pytest.mark.parametrize(
@@ -550,7 +550,7 @@ class TestMigrationManagement:
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         with pytest.raises(MigrationNotFoundError):
-            engine.get_migration(SentinelEdge.from_pair(versions[0], versions[1]))
+            engine.get_migration(EdgeKey.from_pair(versions[0], versions[1]))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -574,7 +574,7 @@ class TestMigrationManagement:
         for pair in pairwise(versions):
             engine.store_migration(pair, lambda d, _: d, backward_compatible=True)
 
-        engine.remove_migration(SentinelEdge.from_pair(versions[0], versions[1]))
+        engine.remove_migration(EdgeKey.from_pair(versions[0], versions[1]))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -604,7 +604,7 @@ class TestMigrationManagement:
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
         with pytest.raises(RegistryError, match="critical"):
-            engine.remove_migration(SentinelEdge.from_pair(versions[1], versions[2]))
+            engine.remove_migration(EdgeKey.from_pair(versions[1], versions[2]))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -628,7 +628,7 @@ class TestMigrationManagement:
             engine.store_model(v)
         engine.store_migration((versions[0], versions[1]), lambda d, _: d)
 
-        edge = SentinelEdge.from_pair(versions[0], versions[1])
+        edge = EdgeKey.from_pair(versions[0], versions[1])
         engine.remove_migration(edge, force=True)
         with pytest.raises(MigrationNotFoundError):
             engine.get_migration(edge)
@@ -655,7 +655,7 @@ class TestMigrationManagement:
             engine.store_model(v)
 
         with pytest.raises(MigrationNotFoundError):
-            engine.remove_migration(SentinelEdge.from_pair(versions[0], versions[1]))
+            engine.remove_migration(EdgeKey.from_pair(versions[0], versions[1]))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -735,9 +735,7 @@ class TestMigrationManagement:
         for v in versions:
             assert v not in engine.registry
         assert (
-            engine.registry.has_migration(
-                SentinelEdge.from_pair(versions[0], versions[1])
-            )
+            engine.registry.has_migration(EdgeKey.from_pair(versions[0], versions[1]))
             is False
         )
 
@@ -786,21 +784,19 @@ class TestMigrationManagement:
             engine.store_model(v)
         engine.store_migration((versions[0], versions[1]), lambda d, _: d)
 
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         if scenario == "add_remove":
             hook = MigrationHook()
-            engine.add_hook(SentinelEdge.from_pair(versions[0], versions[1]), hook)
+            engine.add_hook(EdgeKey.from_pair(versions[0], versions[1]), hook)
             assert engine.registry.has_hooks(engine.registry.get_migration_by_edge(key))
 
-            engine.remove_hook(SentinelEdge.from_pair(versions[0], versions[1]), hook)
+            engine.remove_hook(EdgeKey.from_pair(versions[0], versions[1]), hook)
             assert not engine.registry.has_hooks(
                 engine.registry.get_migration_by_edge(key)
             )
             return
 
-        engine.add_hook(
-            SentinelEdge.from_pair(versions[0], versions[1]), MigrationHook()
-        )
+        engine.add_hook(EdgeKey.from_pair(versions[0], versions[1]), MigrationHook())
         engine.clear_hooks()
         assert not engine.registry._hooks
 
@@ -917,13 +913,13 @@ class TestLookupTyped:
         ],
         indirect=["model_adapter", "registry"],
     )
-    def test_getitem_typed_sentinel_edge(
+    def test_getitem_typed_edge_key(
         self,
         engine: Engine[types.VersionValue],
         models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         assert engine[key].func is not None
 
 

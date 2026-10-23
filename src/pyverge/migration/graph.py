@@ -16,7 +16,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
 )
 from pyverge.migration.types import (
     Walker,
@@ -270,7 +270,7 @@ class GraphBuilder(Generic[VersionValue]):
             path_steps = self._resolve_migration_path(source, target)
             hook_sets: list[tuple[Attachable, ...]] = []
             for src, dst in path_steps:
-                edge = SentinelEdge.from_pair(src, dst)
+                edge = EdgeKey.from_pair(src, dst)
                 hooks = self._registry.get_hooks(edge)
                 hook_sets.append(tuple(hooks))
             target_model = target.model

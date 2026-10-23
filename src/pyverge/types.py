@@ -54,7 +54,7 @@ from pyverge.core.types import (
     VersionValue_co,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
     VersionEdge,
     VersionKey,
     VersionNode,
@@ -85,6 +85,7 @@ __all__ = [
     "Comparable",
     "Diffable",
     "DirectionViolationStrategy",
+    "EdgeKey",
     "Entry",
     "Executor",
     "ExtraFieldStrategy",
@@ -120,7 +121,6 @@ __all__ = [
     "ResolverFactory",
     "RunnableMigration",
     "SchemaTransformer",
-    "SentinelEdge",
     "TargetPolicy",
     "TargetResolver",
     "TargetSpec",

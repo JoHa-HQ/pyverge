@@ -25,7 +25,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
     VersionEdge,
     VersionNode,
 )
@@ -107,9 +107,7 @@ class Engine(Generic[VersionValue]):
     ) -> Migratable[VersionValue]: ...
 
     @overload
-    def __getitem__(
-        self, index: SentinelEdge[VersionValue]
-    ) -> Migratable[VersionValue]: ...
+    def __getitem__(self, index: EdgeKey[VersionValue]) -> Migratable[VersionValue]: ...
 
     def __getitem__(
         self, index: Any
@@ -232,7 +230,7 @@ class Engine(Generic[VersionValue]):
         resolved_from = self._resolve(v_from, other=v_to, func=func)
         resolved_to = self._resolve(v_to, other=v_from, func=func)
 
-        if not registry.is_adjacent(SentinelEdge.from_pair(resolved_from, resolved_to)):
+        if not registry.is_adjacent(EdgeKey.from_pair(resolved_from, resolved_to)):
             raise RegistryError(
                 registry.name,
                 f"Cannot register migration with skip versions: {v_from}→{v_to}",
@@ -258,7 +256,7 @@ class Engine(Generic[VersionValue]):
         *,
         other: Comparable[VersionValue],
         func: MigrationFunc,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         """Return *endpoint*, reconstructing it when it is not registered.
 
         A registered endpoint is returned as-is; an unregistered one is
@@ -398,7 +396,7 @@ class Engine(Generic[VersionValue]):
                     "It is on the critical path. Use force=True to override.",
                 )
 
-        self.registry.remove_migration(SentinelEdge.from_version_edge(edge))
+        self.registry.remove_migration(EdgeKey.from_version_edge(edge))
 
     def remove_migration_range(
         self: Self,
@@ -432,7 +430,7 @@ class Engine(Generic[VersionValue]):
                 if edge.source in version_set and edge.target in version_set:
                     if registry.has_hooks(edge):
                         registry.clear_hooks(edge)
-                    registry.remove_migration(SentinelEdge.from_version_edge(edge))
+                    registry.remove_migration(EdgeKey.from_version_edge(edge))
 
         for v in reversed(kind_versions):
             try:

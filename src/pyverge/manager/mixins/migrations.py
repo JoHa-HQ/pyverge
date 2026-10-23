@@ -13,7 +13,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
 )
 from pyverge.providers import JsonataMigration, JsonPatchMigration
 
@@ -126,7 +126,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
-        engine.remove_migration(SentinelEdge.from_pair(*pair))
+        engine.remove_migration(EdgeKey.from_pair(*pair))
 
     @remove_migration.register(ManagerMigrationKey)
     @classmethod
@@ -142,7 +142,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.version_key(kind=key.kind, version=key.source_version),
             adapter.version_key(kind=key.kind, version=key.target_version),
         )
-        engine.remove_migration(SentinelEdge.from_pair(*pair))
+        engine.remove_migration(EdgeKey.from_pair(*pair))
 
     @singledispatchmethod
     @classmethod
@@ -165,7 +165,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
-        return engine.get_migration(SentinelEdge.from_pair(*pair))
+        return engine.get_migration(EdgeKey.from_pair(*pair))
 
     @get_migration.register(ManagerMigrationKey)
     @classmethod
@@ -181,7 +181,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.version_key(kind=key.kind, version=key.source_version),
             adapter.version_key(kind=key.kind, version=key.target_version),
         )
-        return engine.get_migration(SentinelEdge.from_pair(*pair))
+        return engine.get_migration(EdgeKey.from_pair(*pair))
 
     @singledispatchmethod
     @classmethod
@@ -206,7 +206,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
-        engine.add_hook(SentinelEdge.from_pair(*pair), hook)
+        engine.add_hook(EdgeKey.from_pair(*pair), hook)
 
     @add_hook.register(ManagerMigrationKey)
     @classmethod
@@ -223,7 +223,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.version_key(kind=key.kind, version=key.source_version),
             adapter.version_key(kind=key.kind, version=key.target_version),
         )
-        engine.add_hook(SentinelEdge.from_pair(*pair), hook)
+        engine.add_hook(EdgeKey.from_pair(*pair), hook)
 
     @classmethod
     def attach_hooks(

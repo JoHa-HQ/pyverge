@@ -1,6 +1,6 @@
 """Core type surface: keys, aliases, and provider-neutral protocols.
 
-Behavior classes (``VersionNode``/``VersionEdge``/``SentinelEdge``) live in
+Behavior classes (``VersionNode``/``VersionEdge``/``EdgeKey``) live in
 :mod:`pyverge.core.versioning`; this module owns only passive type surface so
 the core can be imported by every layer without pulling behavior.
 """
@@ -61,7 +61,7 @@ ModelKind: TypeAlias = str
 ModelData: TypeAlias = dict[str, Any]
 ModelVersionKey: TypeAlias = tuple[ModelKind, VersionValue]
 
-MigrationKey: TypeAlias = tuple[VersionValue, VersionValue]
+MigrationKey: TypeAlias = tuple["Comparable", "Comparable"]
 #: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
 MIGRATION_PAIR_LEN: int = 2
 MigrationFunc: TypeAlias = Callable[[ModelData, MigrationContext | None], ModelData]
@@ -175,9 +175,9 @@ class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co]):
 class Transitional(Orderable, Protocol[VersionValue_co]):
     """Edge identity aspect: a directed ``source`` → ``target`` transition.
 
-    Implemented by ``VersionEdge`` and ``SentinelEdge``.  Carries ``source``,
+    Implemented by ``VersionEdge`` and ``EdgeKey``.  Carries ``source``,
     ``target``, ``edge`` and ordering semantics, but no execution.  Endpoints
-    are :class:`Comparable` so edges may reference sentinel keys.
+    are :class:`Comparable` so edges may reference search keys.
     """
 
     @property
@@ -193,12 +193,15 @@ class Migratable(Transitional[VersionValue_co], Protocol[VersionValue_co]):
     """Executable aspect: a transition that can run a migration.
 
     Adds a required ``func`` and ``diff`` on top of :class:`Transitional`.
-    Implemented by ``VersionEdge``; sentinels are key-only and satisfy
+    Implemented by ``VersionEdge``; ``EdgeKey`` is key-only and satisfies
     :class:`Transitional` only.
     """
 
-    func: MigrationFunc
-    diff: Diffable[VersionValue_co]
+    @property
+    def func(self) -> MigrationFunc: ...
+
+    @property
+    def diff(self) -> Diffable[VersionValue_co]: ...
 
     def __call__(
         self,

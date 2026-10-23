@@ -157,8 +157,8 @@ class TargetResolutionMixin(Generic[VersionValue]):
         def resolve(
             current: Versionable[VersionValue],
         ) -> Versionable[VersionValue] | None:
-            sentinel = VersionKey[VersionValue](_value=parsed, _kind=current.kind)
-            return engine.get_model(sentinel)
+            key = VersionKey[VersionValue](_value=parsed, _kind=current.kind)
+            return engine.get_model(key)
 
         return resolve
 

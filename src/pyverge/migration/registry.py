@@ -25,7 +25,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
     VersionKey,
     VersionNode,
 )
@@ -170,8 +170,8 @@ class Registry(Generic[VersionValue]):
         registered = self.get_model(node)
         missing = []
         for kind, version in registered.references:
-            sentinel = VersionKey[VersionValue](_value=version, _kind=kind)
-            if not self.has_model(sentinel):
+            key = VersionKey[VersionValue](_value=version, _kind=kind)
+            if not self.has_model(key):
                 missing.append((kind, version))
         return frozenset(missing)
 
@@ -181,8 +181,8 @@ class Registry(Generic[VersionValue]):
         pair: tuple[Comparable[VersionValue], Comparable[VersionValue]],
     ) -> Migratable[VersionValue]:
         edges = self._migrations.get(kind, [])
-        sentinel = SentinelEdge.from_pair(*pair)
-        idx = bisect.bisect_left(edges, sentinel)
+        key = EdgeKey.from_pair(*pair)
+        idx = bisect.bisect_left(edges, key)
         if idx < len(edges) and edges[idx].edge == pair:
             return edges[idx]
         raise MigrationNotFoundError(self._name, pair)
@@ -190,7 +190,7 @@ class Registry(Generic[VersionValue]):
     def has_migration(self: Self, key: Transitional[VersionValue]) -> bool:
         """Whether a migration edge is registered.
 
-        Accepts any transitional edge (``VersionEdge``/``SentinelEdge`` or any
+        Accepts any transitional edge (``VersionEdge``/``EdgeKey`` or any
         object exposing ``kind`` and ``edge``).
         """
         try:
@@ -463,7 +463,7 @@ class Registry(Generic[VersionValue]):
         current = kind_versions[lo]
         while lo != hi:
             nxt = kind_versions[lo + step]
-            edge_key = SentinelEdge.from_pair(current, nxt)
+            edge_key = EdgeKey.from_pair(current, nxt)
             if self.has_migration(edge_key):
                 path.append((current, nxt))
                 current = nxt
@@ -497,9 +497,9 @@ class Registry(Generic[VersionValue]):
         lo = bisect.bisect_left(kind_versions, from_version)
         hi = bisect.bisect_left(kind_versions, to_version)
 
-        keys_to_remove: list[SentinelEdge[VersionValue]] = []
+        keys_to_remove: list[EdgeKey[VersionValue]] = []
         for i in range(lo, hi):
-            edge_key = SentinelEdge.from_pair(kind_versions[i], kind_versions[i + 1])
+            edge_key = EdgeKey.from_pair(kind_versions[i], kind_versions[i + 1])
             if not self.has_migration(edge_key):
                 continue
             if self.is_adjacent(edge_key):

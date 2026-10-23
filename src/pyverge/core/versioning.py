@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Any, Generic, Self, cast
+from typing import Generic, Self
 
 from .context import MigrationContext
 from .exceptions import MigrationError
@@ -89,9 +89,8 @@ class VersionKey(Generic[VersionValue]):
         return f"VersionKey[{self.strategy.__name__}]({self._value}, {self._kind})"
 
 
-@total_ordering
-@dataclass(frozen=True, slots=True)
-class VersionNode(Generic[VersionValue]):
+@dataclass(frozen=True, slots=True, eq=False)
+class VersionNode(VersionKey[VersionValue]):
     """A materialized model version that always binds a model handle.
 
     ``references`` is the set of versioned kinds the model's fields *declare*
@@ -108,69 +107,12 @@ class VersionNode(Generic[VersionValue]):
     """
 
     _model: ModelHandle
-    _value: VersionValue
-    _kind: ModelKind
     references: frozenset[ModelVersionKey] = frozenset()
     fields: frozenset[str] = frozenset()
 
     @property
-    def strategy(self) -> type[VersionValue]:
-        return type(self._value)
-
-    @property
     def model(self) -> ModelHandle:
         return self._model
-
-    @property
-    def version(self) -> tuple[ModelKind, VersionValue]:
-        return self._kind, self._value
-
-    @property
-    def kind(self) -> ModelKind:
-        return self._kind
-
-    def __lt__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, VersionKey)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        other_c = cast(Comparable[VersionValue], other)
-        return self.version < other_c.version
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, VersionKey)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        other_c = cast(Comparable[VersionValue], other)
-        return self.version == other_c.version
-
-    def __gt__(self, other: object) -> bool:
-        if not isinstance(other, (VersionNode, VersionKey)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        other_c = cast(Comparable[VersionValue], other)
-        return self.version > other_c.version
-
-    def __hash__(self) -> int:
-        return hash((self._kind, self._value))
-
-    def __str__(self) -> str:
-        return f"{self._kind}:{self._value}"
 
     def __repr__(self) -> str:
         model = getattr(self.model, "__name__", "model")
@@ -179,17 +121,28 @@ class VersionNode(Generic[VersionValue]):
 
 @total_ordering
 @dataclass(frozen=True, slots=True)
-class VersionEdge(Generic[VersionValue]):
-    """A directed migration edge connecting two versions of the same kind.
+class EdgeKey(Generic[VersionValue]):
+    """A temporary directed ``(source, target)`` edge search key.
 
-    Holds its ``source``/``target`` endpoints and the ``diff`` computed for
-    the transition between them.
+    Keys are not stored.  Equality and ordering compare only the endpoint
+    identities, so an edge key and a :class:`VersionEdge` with the same
+    endpoints are interchangeable inside sorted collections.
     """
 
-    source: Any
-    target: Any
-    diff: Diffable[VersionValue]
-    func: MigrationFunc
+    source: Comparable[VersionValue]
+    target: Comparable[VersionValue]
+
+    @classmethod
+    def from_pair(
+        cls,
+        source: Comparable[VersionValue],
+        target: Comparable[VersionValue],
+    ) -> Self:
+        return cls(source, target)
+
+    @classmethod
+    def from_version_edge(cls, edge: Migratable[VersionValue]) -> Self:
+        return cls(edge.source, edge.target)
 
     @property
     def kind(self) -> ModelKind:
@@ -202,6 +155,36 @@ class VersionEdge(Generic[VersionValue]):
     @property
     def edge(self) -> MigrationKey:
         return (self.source, self.target)
+
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, EdgeKey):
+            return self.edge < other.edge
+        return NotImplemented
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, EdgeKey):
+            return self.edge == other.edge
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.edge)
+
+    def __str__(self) -> str:
+        return f"EdgeKey({self.source}→{self.target})"
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class VersionEdge(EdgeKey[VersionValue]):
+    """A directed migration edge connecting two materialized versions.
+
+    Holds its ``source``/``target`` nodes and the ``diff`` computed for the
+    transition between them.
+    """
+
+    source: VersionNode[VersionValue]
+    target: VersionNode[VersionValue]
+    diff: Diffable[VersionValue]
+    func: MigrationFunc
 
     def __call__(
         self,
@@ -218,81 +201,5 @@ class VersionEdge(Generic[VersionValue]):
                 f"Failed to apply migration {self}: {e}",
             ) from e
 
-    def __lt__(self, other: object) -> bool:
-        if isinstance(other, (VersionEdge, SentinelEdge)):
-            return self.edge < other.edge
-        return NotImplemented
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, (VersionEdge, SentinelEdge)):
-            return self.edge == other.edge
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self.edge)
-
     def __str__(self) -> str:
         return f"VersionEdge({self.source}→{self.target})"
-
-
-@total_ordering
-class SentinelEdge(Generic[VersionValue]):
-    """Lightweight value-only sentinel for searching across edges."""
-
-    __slots__ = ("_source", "_target")
-
-    def __init__(
-        self,
-        source: Comparable,
-        target: Comparable,
-    ) -> None:
-        self._source = source
-        self._target = target
-
-    @classmethod
-    def from_version_edge(cls, edge: Migratable[VersionValue]) -> Self:
-        return cls(edge.source, edge.target)
-
-    @classmethod
-    def from_pair(
-        cls,
-        source: Comparable,
-        target: Comparable,
-    ) -> Self:
-        return cls(source, target)
-
-    @property
-    def kind(self) -> ModelKind:
-        return self._source.kind
-
-    @property
-    def key(self) -> MigrationKey:
-        return (self._source, self._target)
-
-    @property
-    def edge(self) -> MigrationKey:
-        return (self._source, self._target)
-
-    @property
-    def source(self) -> Comparable:
-        return self._source
-
-    @property
-    def target(self) -> Comparable:
-        return self._target
-
-    def __lt__(self, other: object) -> bool:
-        if isinstance(other, (VersionEdge, SentinelEdge)):
-            return self.edge < other.edge
-        return NotImplemented
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, (VersionEdge, SentinelEdge)):
-            return self.edge == other.edge
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self.edge)
-
-    def __str__(self) -> str:
-        return f"SentinelEdge({self._source}→{self._target})"

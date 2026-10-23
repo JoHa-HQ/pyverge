@@ -12,6 +12,7 @@ import semver
 
 from pyverge import types
 from pyverge.core import (
+    EdgeKey,
     MigrationAlreadyRegisteredError,
     MigrationError,
     MigrationNotFoundError,
@@ -19,7 +20,6 @@ from pyverge.core import (
     ModelConflictError,
     ModelNotFoundError,
     RegistryError,
-    SentinelEdge,
     VersioningSettings,
     VersionNode,
 )
@@ -610,10 +610,7 @@ class TestMigration:
             model_adapter, versioning_settings, models[0], models[1], func=_migrate
         )
         registry.store_migration(edge)
-        assert (
-            registry.get_migration(SentinelEdge.from_version_edge(edge)).func
-            is edge.func
-        )
+        assert registry.get_migration(EdgeKey.from_version_edge(edge)).func is edge.func
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -732,7 +729,7 @@ class TestMigration:
                 models[1],
                 func=lambda data, _: data,
             )
-            registry.get_migration(SentinelEdge.from_version_edge(fake_key))
+            registry.get_migration(EdgeKey.from_version_edge(fake_key))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -776,10 +773,10 @@ class TestMigration:
             models[1],
             func=lambda data, _: data,
         )
-        registry.remove_migration(SentinelEdge.from_version_edge(key))
+        registry.remove_migration(EdgeKey.from_version_edge(key))
 
         with pytest.raises(MigrationNotFoundError):
-            registry.get_migration(SentinelEdge.from_version_edge(key))
+            registry.get_migration(EdgeKey.from_version_edge(key))
 
 
 class TestHooks:
@@ -825,7 +822,7 @@ class TestHooks:
             models[1],
             func=lambda d, _: d,
         )
-        key = SentinelEdge.from_version_edge(edge)
+        key = EdgeKey.from_version_edge(edge)
         hook = MigrationHook()
         registry.add_hook(key, hook)
         assert registry.get_hooks(key) == [hook]
@@ -918,7 +915,7 @@ class TestHooks:
             models[1],
             func=lambda d, _: d,
         )
-        key = SentinelEdge.from_version_edge(edge)
+        key = EdgeKey.from_version_edge(edge)
         for h in [hook1, hook2]:
             registry.add_hook(edge, h)
         registry.remove_hook(key, hook1)
@@ -1014,7 +1011,7 @@ class TestHooks:
             models[1],
             func=lambda d, _: d,
         )
-        key = SentinelEdge.from_version_edge(edge)
+        key = EdgeKey.from_version_edge(edge)
         with pytest.raises(RegistryError):
             registry.remove_hook(key, MigrationHook())
 
@@ -1063,7 +1060,7 @@ class TestHooks:
             models[1],
             func=lambda d, _: d,
         )
-        key = SentinelEdge.from_version_edge(edge)
+        key = EdgeKey.from_version_edge(edge)
         registry.add_hook(edge, MigrationHook())
         registry.add_hook(edge, MigrationHook())
         assert len(registry.get_hooks(key)) == expected_amount
@@ -1112,7 +1109,7 @@ class TestHooks:
             models[1],
             func=lambda d, _: d,
         )
-        key = SentinelEdge.from_version_edge(edge)
+        key = EdgeKey.from_version_edge(edge)
         registry.add_hook(key, MigrationHook())
         registry.clear_hooks(key)
         assert registry.get_hooks(key) == []
@@ -1322,7 +1319,7 @@ class TestVersionEdgeIndex:
             func=lambda d, _: d,
         )
 
-        registry.remove_migration(SentinelEdge.from_version_edge(e1))
+        registry.remove_migration(EdgeKey.from_version_edge(e1))
 
         assert registry.migrations_of(versions[0]) == (frozenset())
         assert registry.migrations_of(versions[1]) == {e2}
@@ -1420,7 +1417,7 @@ class TestVersionEdgeIndex:
         key = versions[0]
         assert clone.migrations_of(key) == registry.migrations_of(key)
 
-        clone.remove_migration(SentinelEdge.from_version_edge(edge))
+        clone.remove_migration(EdgeKey.from_version_edge(edge))
         assert clone.migrations_of(key) == frozenset()
         assert registry.migrations_of(key) == {edge}
 
@@ -1512,7 +1509,7 @@ class TestVersionEdgeIndex:
             models[1],
             func=lambda d, _: d,
         )
-        registry.remove_migration(SentinelEdge.from_version_edge(edge))
+        registry.remove_migration(EdgeKey.from_version_edge(edge))
 
         registry.remove_model(versions[0])
         with pytest.raises(ModelNotFoundError):
@@ -1618,14 +1615,14 @@ class TestEdgePairLookup:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
 
-        key12 = SentinelEdge.from_pair(versions[0], versions[1])
-        key13 = SentinelEdge.from_pair(versions[0], versions[2])
+        key12 = EdgeKey.from_pair(versions[0], versions[1])
+        key13 = EdgeKey.from_pair(versions[0], versions[2])
         assert registry.has_migration(key12) is True
         assert registry.has_migration(key13) is False
         # VersionNode endpoints hit the same index entry
         assert (
             registry.has_migration(
-                SentinelEdge.from_pair(
+                EdgeKey.from_pair(
                     versions[0],
                     versions[1],
                 )
@@ -1675,7 +1672,7 @@ class TestEdgePairLookup:
         )
         registry.store_migration(edge)
 
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         found = registry.get_migration_by_edge(key)
         assert found.func is edge.func
 
@@ -1713,7 +1710,7 @@ class TestEdgePairLookup:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
 
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         with pytest.raises(MigrationNotFoundError):
             registry.get_migration_by_edge(key)
 
@@ -1756,7 +1753,7 @@ class TestEdgePairLookup:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
 
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         assert registry.get_migration_by_edge(key).diff.is_backward_compatible is False
 
     @pytest.mark.parametrize(
@@ -1802,7 +1799,7 @@ class TestEdgePairLookup:
         )
         registry.store_migration(edge)
 
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         assert registry.get_migration_by_edge(key).diff.is_backward_compatible is True
 
     @pytest.mark.parametrize(
@@ -1835,7 +1832,7 @@ class TestEdgePairLookup:
             for model in models
         ]
         with pytest.raises(MigrationNotFoundError):
-            registry.get_migration_by_edge(SentinelEdge.from_pair(*pair))
+            registry.get_migration_by_edge(EdgeKey.from_pair(*pair))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -1882,9 +1879,9 @@ class TestEdgePairLookup:
             models[1],
             func=lambda d, _: d,
         )
-        registry.remove_migration(SentinelEdge.from_version_edge(edge))
+        registry.remove_migration(EdgeKey.from_version_edge(edge))
 
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         assert registry.has_migration(key) is False
 
     @pytest.mark.parametrize(
@@ -1928,7 +1925,7 @@ class TestEdgePairLookup:
 
         registry.clear_migrations()
 
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         assert registry.has_migration(key) is False
 
     @pytest.mark.parametrize(
@@ -1978,10 +1975,10 @@ class TestEdgePairLookup:
         )
 
         clone = registry.copy()
-        key = SentinelEdge.from_pair(versions[0], versions[1])
+        key = EdgeKey.from_pair(versions[0], versions[1])
         assert clone.has_migration(key) is True
 
-        clone.remove_migration(SentinelEdge.from_version_edge(edge))
+        clone.remove_migration(EdgeKey.from_version_edge(edge))
         assert clone.has_migration(key) is False
         assert registry.has_migration(key) is True
 
@@ -2029,7 +2026,7 @@ class TestMigrationHookGuard:
         registry.store_migration(edge)
         registry.add_hook(edge, MigrationHook())
 
-        key = SentinelEdge.from_version_edge(edge)
+        key = EdgeKey.from_version_edge(edge)
         with pytest.raises(RegistryError, match="hooks"):
             registry.remove_migration(key)
 
@@ -2078,13 +2075,13 @@ class TestMigrationHookGuard:
             models[1],
             func=lambda d, _: d,
         )
-        key = SentinelEdge.from_version_edge(edge)
+        key = EdgeKey.from_version_edge(edge)
         registry.add_hook(key, MigrationHook())
         registry.clear_hooks(key)
 
         registry.remove_migration(key)
         with pytest.raises(MigrationNotFoundError):
-            registry.get_migration(SentinelEdge.from_version_edge(edge))
+            registry.get_migration(EdgeKey.from_version_edge(edge))
 
 
 class TestReferences:

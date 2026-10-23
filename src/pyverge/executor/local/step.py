@@ -12,7 +12,7 @@ from pyverge.core.types import (
     Versionable,
     VersionValue,
 )
-from pyverge.core.versioning import SentinelEdge
+from pyverge.core.versioning import EdgeKey
 from pyverge.migration.registry import Registry
 
 from .hooks import invoke_async_hook
@@ -124,7 +124,7 @@ class StepExecutor(Generic[VersionValue]):
         step_to: Versionable[VersionValue],
     ):
         """Resolve a pair of endpoints to a registered migration edge."""
-        key = SentinelEdge.from_pair(step_from, step_to)
+        key = EdgeKey.from_pair(step_from, step_to)
         if self._registry.has_migration(key):
             return self._registry.get_migration(key)
         raise MigrationNotFoundError(
