@@ -12,7 +12,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
-    VersionNode,
+    VersionKey,
 )
 from pyverge.migration.types import (
     Entry,
@@ -114,8 +114,8 @@ class Walker(Generic[VersionValue]):
         if not (isinstance(kind, str) and isinstance(version_str, str)):
             return None
         try:
-            sentinel = VersionNode[VersionValue](
-                _model=None, _value=self._adapter.of(version_str), _kind=kind
+            sentinel = VersionKey[VersionValue](
+                _value=self._adapter.of(version_str), _kind=kind
             )
         except Exception:
             return None

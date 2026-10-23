@@ -3,16 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from pyverge.core.types import (
+    Comparable,
     Diffable,
     ModelData,
     ModelHandle,
     ModelVersionKey,
-    Versionable,
     VersionValue,
     VersionValue_co,
 )
 
 if TYPE_CHECKING:
+    from pyverge.core.versioning import VersionNode
     from pyverge.providers.json_patch.migration import JsonPatchMigration
     from pyverge.reflection.diff import Diff
 
@@ -133,23 +134,30 @@ class ModelAdapter(Protocol):
 
     def versionable(
         self,
-        model_cls: ModelHandle | None,
+        model_cls: ModelHandle,
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> Versionable[VersionValue]:
-        """Wrap a model class into a versionable, or build a meta versionable.
+    ) -> VersionNode[VersionValue]:
+        """Wrap a model class into a materialized version node.
 
-        With a model class, the node carries it and ``version``/``kind`` are
-        read from the class.  With ``None``, a meta node (no concrete model)
-        is built from *kind* and *version* strings.
+        ``kind`` and ``version`` are read from the class when omitted.
         """
+        ...
+
+    def version_key(
+        self,
+        *,
+        kind: str,
+        version: str,
+    ) -> Comparable[VersionValue]:
+        """Build a temporary search key from *kind* and *version* strings."""
         ...
 
     def diff(
         self,
-        source: Versionable[VersionValue_co],
-        target: Versionable[VersionValue_co],
+        source: Comparable[VersionValue_co],
+        target: Comparable[VersionValue_co],
         *,
         is_backward_compatible: bool = False,
     ) -> Diff[VersionValue_co]: ...

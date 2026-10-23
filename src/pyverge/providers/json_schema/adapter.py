@@ -9,14 +9,15 @@ from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from pyverge.core.types import (
+    Comparable,
     Diffable,
     ModelData,
     ModelHandle,
     ModelVersionKey,
-    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
+    VersionKey,
     VersionNode,
 )
 from pyverge.providers.base import AbstractModelAdapter
@@ -208,26 +209,16 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
 
     def versionable(
         self,
-        model_cls: ModelHandle | dict[str, Any] | None,
+        model_cls: ModelHandle | dict[str, Any],
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         """Build a ``VersionNode`` wrapping the schema's Pydantic model.
 
         A JSON schema document is materialized into a Pydantic model first;
-        an already-materialized model is used as-is.  With ``None`` as the
-        model, a meta node (no concrete model) is built from *kind* and
-        *version* strings.
+        an already-materialized model is used as-is.
         """
-        if model_cls is None:
-            if kind is None or version is None:
-                raise ValueError("kind and version are required for a meta versionable")
-            return VersionNode[VersionValue](
-                _model=None,
-                _value=self.of(version),
-                _kind=kind,
-            )
         model: ModelHandle
         if isinstance(model_cls, dict):
             model = self.to_pydantic(model_cls)
@@ -241,10 +232,19 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
             fields=self.fields(model),
         )
 
+    def version_key(
+        self,
+        *,
+        kind: str,
+        version: str,
+    ) -> Comparable[VersionValue]:
+        """Build a temporary search key for *kind* and *version*."""
+        return VersionKey[VersionValue](_value=self.of(version), _kind=kind)
+
     def diff(
         self,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        source: Comparable[VersionValue],
+        target: Comparable[VersionValue],
         *,
         is_backward_compatible: bool = False,
     ) -> Diff[VersionValue]:
@@ -253,7 +253,10 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         A meta endpoint (``model is None``) yields a plain ``Diff`` with empty
         predicates — there is no schema to compare.
         """
-        if source.model is None or target.model is None:
+        if (
+            getattr(source, "model", None) is None
+            or getattr(target, "model", None) is None
+        ):
             return Diff(
                 source=source,
                 target=target,
@@ -278,7 +281,8 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         re-materialized into a Pydantic model.
         """
         anchor = _require_model(
-            diff.source.model, "Cannot materialize a model without an anchor model"
+            getattr(diff.source, "model", None),
+            "Cannot materialize a model without an anchor model",
         )
         version = diff.target.version[1]
         document = anchor.model_json_schema()
@@ -352,8 +356,8 @@ def _require_model(model: ModelHandle | None, message: str) -> ModelHandle:
 
 
 def _pydantic_diff_pair(
-    source: Versionable[VersionValue],
-    target: Versionable[VersionValue],
+    source: Comparable[VersionValue],
+    target: Comparable[VersionValue],
     *,
     is_backward_compatible: bool = False,
 ) -> Diff[VersionValue]:
@@ -368,8 +372,12 @@ def _pydantic_diff_pair(
             f"Cannot create diff across kinds: {source.kind} != {target.kind}"
         )
 
-    source_model = _require_model(source.model, "Cannot diff versions without models")
-    target_model = _require_model(target.model, "Cannot diff versions without models")
+    source_model = _require_model(
+        getattr(source, "model", None), "Cannot diff versions without models"
+    )
+    target_model = _require_model(
+        getattr(target, "model", None), "Cannot diff versions without models"
+    )
 
     source_fields = source_model.model_fields
     target_fields = target_model.model_fields

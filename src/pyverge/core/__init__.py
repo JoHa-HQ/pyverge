@@ -53,7 +53,7 @@ from .types import (
     VersionValue,
     VersionValue_co,
 )
-from .versioning import SentinelEdge, VersionEdge, VersionNode
+from .versioning import SentinelEdge, VersionEdge, VersionKey, VersionNode
 
 __all__ = [
     "EMPTY_CONTEXT",
@@ -105,6 +105,7 @@ __all__ = [
     "Transitional",
     "ValidationMode",
     "VersionEdge",
+    "VersionKey",
     "VersionMissingStrategy",
     "VersionNode",
     "VersionPair",

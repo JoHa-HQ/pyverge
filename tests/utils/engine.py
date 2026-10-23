@@ -6,6 +6,7 @@ from typing import Any, cast
 from pyverge.core import (
     VersionEdge,
     VersioningSettings,
+    VersionKey,
     VersionNode,
 )
 from pyverge.core.context import MigrationContext
@@ -43,10 +44,9 @@ def meta_versionable(
     adapter: ModelAdapter,
     kind: str,
     version: str,
-) -> VersionNode[VersionValue]:
-    """Build a meta version: a ``(kind, version)`` pair with no concrete model."""
-    return VersionNode[VersionValue](
-        _model=None,
+) -> VersionKey[VersionValue]:
+    """Build a temporary search key for a ``(kind, version)`` pair."""
+    return VersionKey[VersionValue](
         _value=cast(VersionValue, adapter.of(version)),
         _kind=kind,
     )

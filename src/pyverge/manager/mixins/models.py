@@ -104,7 +104,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         kind: ModelKind | None = None,
         *,
         engine: Engine[VersionValue] | None = None,
-    ) -> list[Versionable[VersionValue]]:
+    ) -> list[VersionNode[VersionValue]]:
         """Return registered versions, optionally filtered by *kind*."""
         engine = engine or cls._default_engine
         if kind is None:
@@ -183,7 +183,7 @@ class ModelStoreMixin(Generic[VersionValue]):
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
         return engine.get_model(
-            engine.adapter.versionable(None, kind=key.kind, version=key.version)
+            engine.adapter.version_key(kind=key.kind, version=key.version)
         )
 
     @overload

@@ -56,6 +56,7 @@ from pyverge.core.types import (
 from pyverge.core.versioning import (
     SentinelEdge,
     VersionEdge,
+    VersionKey,
     VersionNode,
 )
 from pyverge.executor import (
@@ -127,6 +128,7 @@ __all__ = [
     "Transitional",
     "ValidationMode",
     "VersionEdge",
+    "VersionKey",
     "VersionMissingStrategy",
     "VersionNode",
     "VersionPair",

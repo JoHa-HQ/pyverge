@@ -11,7 +11,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
-    VersionNode,
+    VersionKey,
 )
 from pyverge.manager.types import (
     TargetPolicy,
@@ -157,12 +157,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
         def resolve(
             current: Versionable[VersionValue],
         ) -> Versionable[VersionValue] | None:
-            sentinel: Versionable[VersionValue] = cast(
-                Versionable[VersionValue],
-                VersionNode[VersionValue](
-                    _model=None, _value=parsed, _kind=current.kind
-                ),
-            )
+            sentinel = VersionKey[VersionValue](_value=parsed, _kind=current.kind)
             return engine.get_model(sentinel)
 
         return resolve

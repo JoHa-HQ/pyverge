@@ -503,17 +503,17 @@ class TestModel:
         ],
         indirect=["model_adapter", "registry"],
     )
-    def test_meta_version_registers(
+    def test_meta_key_is_lookup_only(
         self,
         model_adapter: types.ModelAdapter,
         registry: Registry[types.VersionValue],
         version: str,
     ) -> None:
-        """A meta version registers by (kind, version) with no concrete model."""
-        meta = meta_versionable(model_adapter, "User", version)
-        registry.store_model(meta)
+        """A meta key is a search value; it is never stored as a node."""
+        key = meta_versionable(model_adapter, "User", version)
 
-        assert registry.get_model(meta).model is None
+        assert registry.find_model(key) is None
+        assert key not in registry
         assert registry.models("User") == frozenset()
 
     @pytest.mark.parametrize(
@@ -543,11 +543,11 @@ class TestModel:
         meta_versions: list[str],
         expected: list[str],
     ) -> None:
-        """Meta and real versions order together by version value within a kind."""
-        for v in meta_versions:
-            registry.store_model(meta_versionable(model_adapter, "User", v))
-
-        versions = [str(v.version[1]) for v in registry.kind_versions("User")]
+        """Keys and real nodes order together by version value within a kind."""
+        keys = [meta_versionable(model_adapter, "User", v) for v in meta_versions]
+        versions = [
+            str(v.version[1]) for v in sorted([*registry.kind_versions("User"), *keys])
+        ]
         assert versions == expected
 
     @pytest.mark.parametrize(
@@ -2200,15 +2200,6 @@ class TestReferences:
         node = envelope_model(model_adapter, versioning_settings, model)
         assert {kind for kind, _ in node.references} == {"Address"}
         assert len(node.references) == 3  # noqa: PLR2004
-
-    def test_meta_node_references_nothing(
-        self,
-        model_adapter: types.ModelAdapter,
-        registry: Registry[types.VersionValue],
-    ) -> None:
-        """A meta version carries no concrete model, so it references nothing."""
-        meta = meta_versionable(model_adapter, "User", "1.0.0")
-        assert meta.references == frozenset()
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model",

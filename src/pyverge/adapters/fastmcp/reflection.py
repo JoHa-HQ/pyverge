@@ -11,10 +11,8 @@ from fastmcp.prompts.function_prompt import FunctionPrompt
 from fastmcp.resources.template import FunctionResourceTemplate
 from fastmcp.tools.function_tool import FunctionTool
 
-from pyverge.core import VersionNode
-from pyverge.core.types import (
-    Versionable,
-)
+from pyverge.core.versioning import VersionNode
+from pyverge.providers.json_schema.adapter import JsonSchemaModelAdapter
 from pyverge.providers.types import (
     ModelAdapter,
 )
@@ -71,26 +69,32 @@ class ReflectedNode:
         identity = set(self._identity())
         return frozenset(set(self.compliant().get("properties", {})) - identity)
 
-    def versionable(self) -> Versionable:
-        """Wrap the compliant schema into a versionable via the provider's adapter.
+    def versionable(self) -> VersionNode:
+        """Wrap the compliant schema into a materialized version node.
 
-        A typed adapter that refuses a raw schema yields a meta node carrying the
-        schema-derived ``fields`` instead, so the engine can still reconcile it.
+        The adapter must produce a model.  A key-only node is not valid here.
         """
         adapter = self.provider.adapter
+        document = self.compliant()
         try:
             return adapter.versionable(
-                self.compliant(),  # ty: ignore[invalid-argument-type]
+                document,  # ty: ignore[invalid-argument-type]
                 kind=self.kind,
                 version=self.version,
             )
         except (AttributeError, TypeError, ValueError):
-            return VersionNode[Any](
-                _model=None,
-                _value=adapter.of(self.version),
-                _kind=self.kind,
-                fields=self.fields(),
-            )
+            pass
+
+        model = JsonSchemaModelAdapter().to_pydantic(
+            document, class_name="ReflectedModel"
+        )
+        try:
+            return adapter.versionable(model)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Cannot materialize {self.kind}@{self.version} "
+                "from the reflected schema"
+            ) from exc
 
 
 class ComponentReflection(ABC):

@@ -30,8 +30,6 @@ from pyverge.migration import (
     MigrationEntry,
     MigrationHook,
     PydanticModelAdapter,
-    earliest_target_resolver,
-    fixed_target_resolver,
     latest_target_resolver,
 )
 from pyverge.providers.types import (
@@ -508,169 +506,6 @@ class TestMigrationManagement:
             engine.store_migration(versions, lambda d, _: d)  # ty: ignore[invalid-argument-type]
 
     @pytest.mark.parametrize(
-        "model_adapter, registry, meta_models, "
-        "expected_version, func_factory, migration_direction",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV011Dev7], []],
-                [("User", "0.2.1"), ("User", "1.0.0")],
-                "1.0.0",
-                lambda from_v, to_v: lambda d, to=to_v: {**d, "version": to},
-                "forward",
-                id="pydantic_semver_user_v1_meta_010_020_forward",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [pendulum.Date, "test", [UserV20250310], []],
-                [("User", "2025-03-11"), ("User", "2025-04-01")],
-                "2025-04-01",
-                lambda from_v, to_v: lambda d, to=to_v: {**d, "version": to},
-                "forward",
-                id="pydantic_pendulum_user_v20250310_meta_20250311_20250401_forward",
-            ),
-            pytest.param(
-                JsonSchemaModelAdapter,
-                [semver.Version, "test", [USER_V1_0_0], []],
-                [("User", "1.1.0"), ("User", "2.0.0")],
-                "2.0.0",
-                lambda from_v, to_v: (
-                    JsonPatchMigration(
-                        {
-                            "from": from_v,
-                            "to": to_v,
-                            "ops": [
-                                {
-                                    "op": "replace",
-                                    "path": "/version",
-                                    "value": to_v,
-                                }
-                            ],
-                        }
-                    ).patch
-                ),
-                "forward",
-                id="pydantic_semver_user_v1_meta_010_020_jsonpatch_forward",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [pendulum.Date, "test", [UserV20251231], []],
-                [("User", "2025-04-11"), ("User", "2025-03-01")],
-                "2025-03-01",
-                lambda from_v, to_v: lambda d, to=to_v: {**d, "version": to},
-                "backward",
-                id="pydantic_pendulum_user_v20250310_meta_20250411_20250301_backward",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_meta_chain_forward_migrates_to_latest(
-        self,
-        engine: Engine[types.VersionValue],
-        meta_models: list[types.ModelVersionKey],
-        expected_version: str,
-        func_factory: Callable,
-        migration_direction: types.MigrationDirectionStrategy,
-    ) -> None:
-        """A meta chain hooks stored (kind, version) pairs and converges forward.
-
-        The migration func is built either as a Python callable or as a
-        declarative :class:`JsonPatchMigration` spec.
-        """
-        if migration_direction == "forward":
-            real = engine.get_latest_model(kind=meta_models[0][0])
-            target = latest_target_resolver(engine.registry)
-        else:
-            real = engine.get_earliest_model(kind=meta_models[0][0])
-            target = earliest_target_resolver(engine.registry)
-        versionables = [
-            engine.store_model(
-                engine.adapter.versionable(None, kind=m[0], version=m[1])
-            )
-            for m in meta_models
-        ]
-        for src, dst in pairwise([real, *versionables]):
-            func = func_factory(str(src), str(dst))
-            engine.store_migration((src, dst), func)
-
-        result = run_engine(
-            engine,
-            {
-                "kind": "User",
-                "version": str(real.version[1]),
-                "name": "Alice",
-                "email": "a@b.c",
-                "role": "user",
-            },
-            target=target,
-            direction=migration_direction,
-        )
-        assert result["version"] == expected_version
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, meta_versions, direction",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV011Dev7], []],
-                [("User", "0.2.0"), ("User", "0.3.0")],
-                "forward",
-                id="pydantic_semver_user_v1_meta_010_020_forward",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1], []],
-                [("User", "0.2.0"), ("User", "0.1.0")],
-                "backward",
-                id="pydantic_semver_user_v1_meta_020_010_backward",
-            ),
-            pytest.param(
-                JsonSchemaModelAdapter,
-                [semver.VersionInfo, "test", [USER_V1_0_0], []],
-                [("User", "0.2.0"), ("User", "0.1.0")],
-                "backward",
-                id="json_schema_semver_user_v1_0_0_020_backward",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_meta_chain_missing_edge_raises(
-        self,
-        engine: Engine[types.VersionValue],
-        meta_versions: list[tuple[str, str]],
-        direction: types.MigrationDirectionStrategy,
-    ) -> None:
-        """Backward migration raises when a reverse edge is missing."""
-        versionables = [
-            engine.store_model(
-                engine.adapter.versionable(None, kind=v[0], version=v[1])
-            )
-            for v in meta_versions
-        ]
-        if direction == "backward":
-            real = engine.get_latest_model(versionables[0].kind)
-        else:
-            real = engine.get_earliest_model(versionables[0].kind)
-        for src, dst in pairwise([real, versionables[0]]):
-            engine.store_migration(
-                (src, dst), lambda d, _: {**d, "version": str(dst.version[1])}
-            )
-
-        with pytest.raises(MigrationNotFoundError):
-            run_engine(
-                engine,
-                {
-                    "kind": "User",
-                    "version": str(real.version[1]),
-                    "name": "Alice",
-                    "email": "a@b.c",
-                    "role": "user",
-                },
-                target=fixed_target_resolver(engine.registry, versionables[1]),
-                direction=direction,
-            )
-
-    @pytest.mark.parametrize(
         "model_adapter, registry, models",
         [
             pytest.param(
@@ -1036,15 +871,10 @@ class TestReflection:
         models: list[ModelHandle],
     ) -> None:
         real = envelope_model(engine.adapter, engine.settings, models[0])
-        meta = engine.adapter.versionable(None, kind="User", version="1.0.0")
-        engine.store_model(meta)
+        key = engine.adapter.version_key(kind="User", version="1.0.0")
 
-        engine.store_migration((meta, real), lambda d, _: {**d, "age": None})
-
-        stored = engine.get_model(
-            VersionNode(_model=None, _value=semver.Version(1, 0, 0), _kind="User")
-        )
-        assert stored.model is None
+        with pytest.raises(ModelNotFoundError):
+            engine.store_migration((key, real), lambda d, _: {**d, "age": None})
 
 
 class TestLookupTyped:

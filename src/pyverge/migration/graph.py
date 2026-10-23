@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 from dataclasses import dataclass
 from typing import Any, Generic
 
@@ -305,20 +306,18 @@ class GraphBuilder(Generic[VersionValue]):
         if source.kind != target.kind:
             return []
         kind_versions = self._registry.kind_versions(source.kind)
-        try:
-            lo = kind_versions.index(source)
-        except ValueError as exc:
+        lo = bisect.bisect_left(kind_versions, source)
+        if lo >= len(kind_versions) or kind_versions[lo] != source:
             raise RegistryError(
                 self._registry.name,
                 f"Source version {source} is not registered for kind {source.kind}",
-            ) from exc
-        try:
-            hi = kind_versions.index(target)
-        except ValueError as exc:
+            )
+        hi = bisect.bisect_left(kind_versions, target)
+        if hi >= len(kind_versions) or kind_versions[hi] != target:
             raise RegistryError(
                 self._registry.name,
                 f"Target version {target} is not registered for kind {target.kind}",
-            ) from exc
+            )
         path: list[tuple[Versionable[VersionValue], Versionable[VersionValue]]] = []
         step = lo
         current = source

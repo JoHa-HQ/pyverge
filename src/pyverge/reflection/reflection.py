@@ -21,7 +21,7 @@ from .reconstruction import (
 )
 
 if TYPE_CHECKING:
-    from pyverge.core.types import MigrationFunc, Versionable
+    from pyverge.core.types import Comparable, MigrationFunc
     from pyverge.providers.json_patch import JsonPatch
     from pyverge.providers.types import ModelAdapter
     from pyverge.reflection.diff import Diff
@@ -48,8 +48,8 @@ class Reflection(Generic[VersionValue]):
 
     def diff(
         self,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        source: Comparable[VersionValue],
+        target: Comparable[VersionValue],
         *,
         migration: JsonPatch | MigrationFunc | None = None,
         is_backward_compatible: bool = False,
@@ -75,8 +75,8 @@ class Reflection(Generic[VersionValue]):
 
     def reflect(
         self,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        source: Comparable[VersionValue],
+        target: Comparable[VersionValue],
         *,
         migration: JsonPatch | MigrationFunc | None = None,
         is_backward_compatible: bool = False,

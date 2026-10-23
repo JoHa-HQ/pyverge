@@ -27,6 +27,7 @@ from pyverge.core.types import (
 from pyverge.core.versioning import (
     SentinelEdge,
     VersionEdge,
+    VersionNode,
 )
 from pyverge.executor import (
     AsyncExecutor,
@@ -118,8 +119,8 @@ class Engine(Generic[VersionValue]):
 
     def store_model(
         self: Self,
-        version: Versionable[VersionValue],
-    ) -> Versionable[VersionValue]:
+        version: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue]:
         """Register a model version via the strict store.
 
         A duplicate ``(kind, version)`` fails loudly — re-registration is a
@@ -129,8 +130,8 @@ class Engine(Generic[VersionValue]):
 
     def reconcile_model(
         self: Self,
-        version: Versionable[VersionValue],
-    ) -> Versionable[VersionValue]:
+        version: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue]:
         """Register a model version, treating an identical re-registration as a
         no-op and raising :class:`ModelConflictError` on a differing surface.
         """
@@ -138,7 +139,7 @@ class Engine(Generic[VersionValue]):
 
     def validate(
         self: Self,
-        version: Versionable[VersionValue] | None = None,
+        key: Comparable[VersionValue] | None = None,
     ) -> None:
         """Validate that registered models' declared references are registered.
 
@@ -146,8 +147,8 @@ class Engine(Generic[VersionValue]):
         Raises :class:`MissingReferenceError` naming the absent references.
         """
         nodes = (
-            [self.registry.get_model(version)]
-            if version is not None
+            [self.registry.get_model(key)]
+            if key is not None
             else list(self.registry.versions)
         )
         for node in nodes:
@@ -162,14 +163,14 @@ class Engine(Generic[VersionValue]):
     def get_model(
         self: Self,
         key: Comparable[VersionValue],
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         """Return the model matching *key*."""
         return self.registry.get_model(key)
 
     def get_model_by_class(
         self: Self,
         cls: ModelHandle,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         """Return the model matching *cls*, resolving through the adapter."""
         if not self.adapter.identify(cls):
             raise ModelNotFoundError(self.registry.name, cls)
@@ -191,14 +192,14 @@ class Engine(Generic[VersionValue]):
     def get_latest_model(
         self: Self,
         kind: ModelKind,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         """Most recent version for *kind*."""
         return self.registry.latest(kind)
 
     def get_earliest_model(
         self: Self,
         kind: ModelKind,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         """Earliest version for *kind*."""
         return self.registry.earliest(kind)
 
@@ -253,9 +254,9 @@ class Engine(Generic[VersionValue]):
 
     def _resolve(
         self: Self,
-        endpoint: Versionable[VersionValue],
+        endpoint: Comparable[VersionValue],
         *,
-        other: Versionable[VersionValue],
+        other: Comparable[VersionValue],
         func: MigrationFunc,
     ) -> Versionable[VersionValue]:
         """Return *endpoint*, reconstructing it when it is not registered.
@@ -280,12 +281,6 @@ class Engine(Generic[VersionValue]):
                 registry.name,
                 endpoint.version,
             )
-        if anchor.model is None:
-            raise ModelNotFoundError(
-                registry.name,
-                endpoint.version,
-            )
-
         outcome = self.reflect(anchor, endpoint, migration=func)
         if outcome.model is not None:
             registry.store_model(outcome.model)
@@ -293,8 +288,8 @@ class Engine(Generic[VersionValue]):
 
     def reflect(
         self: Self,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        source: Comparable[VersionValue],
+        target: Comparable[VersionValue],
         *,
         migration: JsonPatch | MigrationFunc | None = None,
         is_backward_compatible: bool = False,
@@ -449,7 +444,7 @@ class Engine(Generic[VersionValue]):
         self: Self,
         from_version: Versionable,
         to_version: Versionable,
-    ) -> list[tuple[Versionable, Versionable]]:
+    ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
         """Return a complete migration chain between two versions."""
         return self.registry.migration_path(from_version, to_version)
 

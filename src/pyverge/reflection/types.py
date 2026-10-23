@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Protocol, TypeVar, runtime_checkable
 
 from pyverge.core.types import (
+    Comparable,
     MigrationFunc,
-    Versionable,
     VersionValue,
 )
 from pyverge.reflection.diff import Diff
@@ -25,6 +25,6 @@ class DiffDiscovery(Protocol[VersionValue, MigrationFunc_co]):
     def discover(
         self,
         migration: MigrationFunc_co,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        source: Comparable[VersionValue],
+        target: Comparable[VersionValue],
     ) -> Diff[VersionValue]: ...

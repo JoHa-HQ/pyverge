@@ -146,16 +146,15 @@ class Comparable(Orderable, Protocol[VersionValue_co]):
 
 @runtime_checkable
 class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co]):
-    """Protocol for a model version that may bind an opaque model handle.
+    """Protocol for a materialized model version.
 
-    Adds a ``model`` binding on top of :class:`Comparable`.  The model is an
-    opaque, provider-owned :data:`ModelHandle`; core never names a provider
-    model base.  Shared by ``VersionNode``.  A model-less node
-    (``_model=None``) is a meta version: orderable and still versionable.
+    Adds a required ``model`` binding on top of :class:`Comparable`.  The model
+    is an opaque, provider-owned :data:`ModelHandle`; core never names a
+    provider model base.  Search-only identities use ``VersionKey`` instead.
     """
 
     @property
-    def model(self) -> ModelHandle | None: ...
+    def model(self) -> ModelHandle: ...
 
     @property
     def references(self) -> frozenset[ModelVersionKey]:
@@ -249,9 +248,9 @@ class Diffable(Protocol[VersionValue_co]):
     """
 
     @property
-    def source(self) -> Versionable: ...
+    def source(self) -> Comparable: ...
     @property
-    def target(self) -> Versionable: ...
+    def target(self) -> Comparable: ...
     @property
     def origin(self) -> DiffOrigin: ...
     def inverted(self) -> Diffable: ...
@@ -315,7 +314,7 @@ class Renderable(Protocol[VersionValue_co, Renderable_co]):
     def __call__(self) -> Renderable_co: ...
 
 
-VersionPair = tuple[Versionable[VersionValue_co], Versionable[VersionValue_co]]
+VersionPair = tuple[Comparable[VersionValue_co], Comparable[VersionValue_co]]
 
 LookupKey = Versionable[VersionValue_co] | Migratable[VersionValue_co]
 

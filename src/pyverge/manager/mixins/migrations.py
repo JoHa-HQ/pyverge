@@ -96,8 +96,8 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (
-            adapter.versionable(None, kind=key.kind, version=key.source_version),
-            adapter.versionable(None, kind=key.kind, version=key.target_version),
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
         )
         return engine.store_migration(
             pair,
@@ -139,8 +139,8 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (
-            adapter.versionable(None, kind=key.kind, version=key.source_version),
-            adapter.versionable(None, kind=key.kind, version=key.target_version),
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
         )
         engine.remove_migration(SentinelEdge.from_pair(*pair))
 
@@ -178,8 +178,8 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (
-            adapter.versionable(None, kind=key.kind, version=key.source_version),
-            adapter.versionable(None, kind=key.kind, version=key.target_version),
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
         )
         return engine.get_migration(SentinelEdge.from_pair(*pair))
 
@@ -220,8 +220,8 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (
-            adapter.versionable(None, kind=key.kind, version=key.source_version),
-            adapter.versionable(None, kind=key.kind, version=key.target_version),
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
         )
         engine.add_hook(SentinelEdge.from_pair(*pair), hook)
 
