@@ -34,10 +34,7 @@ def envelope_model(
     A JSON schema document is materialized into a Pydantic model first; a
     model class is wrapped directly.
     """
-    return cast(
-        VersionNode[VersionValue],
-        adapter.versionable(cast("ModelHandle", model_cls)),
-    )
+    return adapter.versionable(cast("ModelHandle", model_cls))
 
 
 def meta_versionable(

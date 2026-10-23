@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
+from typing import Any
 
 from datamodel_code_generator import InputFileType, generate
 from pydantic import BaseModel
@@ -124,7 +124,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
             raise TypeError(
                 f"Cannot serialize {type(model).__name__}: expected a Pydantic model"
             )
-        return cast("ModelData", model.model_dump(by_alias=True))
+        return model.model_dump(by_alias=True)
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
