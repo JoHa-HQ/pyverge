@@ -277,7 +277,9 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         pinned to the reconstructed version.  The document is then
         re-materialized into a Pydantic model.
         """
-        anchor = diff.source.model
+        anchor = _require_model(
+            diff.source.model, "Cannot materialize a model without an anchor model"
+        )
         version = diff.target.version[1]
         document = anchor.model_json_schema()
         properties = document.setdefault("properties", {})
@@ -342,6 +344,13 @@ def _json_type(annotation: Any) -> str:
     return "string"
 
 
+def _require_model(model: ModelHandle | None, message: str) -> ModelHandle:
+    """Return a bound model or fail when the version is a meta node."""
+    if model is None:
+        raise ValueError(message)
+    return model
+
+
 def _pydantic_diff_pair(
     source: Versionable[VersionValue],
     target: Versionable[VersionValue],
@@ -359,8 +368,11 @@ def _pydantic_diff_pair(
             f"Cannot create diff across kinds: {source.kind} != {target.kind}"
         )
 
-    source_fields = source.model.model_fields
-    target_fields = target.model.model_fields
+    source_model = _require_model(source.model, "Cannot diff versions without models")
+    target_model = _require_model(target.model, "Cannot diff versions without models")
+
+    source_fields = source_model.model_fields
+    target_fields = target_model.model_fields
 
     source_keys = set(source_fields.keys())
     target_keys = set(target_fields.keys())

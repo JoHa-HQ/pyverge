@@ -300,6 +300,8 @@ class PydanticModelAdapter(AbstractModelAdapter):
         default.  The ``version`` field is pinned to the reconstructed version.
         """
         anchor = diff.source.model
+        if anchor is None:
+            raise ValueError("Cannot materialize a model without an anchor model")
         version = diff.target.version[1]
         fields: dict[str, Any] = {}
         fields[self._version_property] = (str, str(version))
@@ -397,8 +399,13 @@ class PydanticDiff(Diff[VersionValue]):
                 f"Cannot create diff across kinds: {source.kind} != {target.kind}"
             )
 
-        source_fields = source.model.model_fields
-        target_fields = target.model.model_fields
+        source_model = source.model
+        target_model = target.model
+        if source_model is None or target_model is None:
+            raise ValueError("Cannot diff versions without models")
+
+        source_fields = source_model.model_fields
+        target_fields = target_model.model_fields
 
         source_keys = set(source_fields.keys())
         target_keys = set(target_fields.keys())

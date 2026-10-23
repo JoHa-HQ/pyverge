@@ -146,16 +146,16 @@ class Comparable(Orderable, Protocol[VersionValue_co]):
 
 @runtime_checkable
 class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co]):
-    """Protocol for a model version that always binds an opaque model handle.
+    """Protocol for a model version that may bind an opaque model handle.
 
-    Adds a required ``model`` binding on top of :class:`Comparable`.  The model
-    is an opaque, provider-owned :data:`ModelHandle`; core never names a
-    provider model base.  Shared by ``VersionNode``.  A model-less node
-    (``_model=None``) is orderable and satisfies :class:`Comparable`.
+    Adds a ``model`` binding on top of :class:`Comparable`.  The model is an
+    opaque, provider-owned :data:`ModelHandle`; core never names a provider
+    model base.  Shared by ``VersionNode``.  A model-less node
+    (``_model=None``) is a meta version: orderable and still versionable.
     """
 
     @property
-    def model(self) -> ModelHandle: ...
+    def model(self) -> ModelHandle | None: ...
 
     @property
     def references(self) -> frozenset[ModelVersionKey]:
