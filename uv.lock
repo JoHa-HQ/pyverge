@@ -1,11 +1,11 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
   "python_full_version >= '3.14'",
   "python_full_version == '3.13.*'",
   "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
-  "(python_full_version < '3.13' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')"
+  "python_full_version < '3.12' or (python_full_version == '3.12.*' and sys_platform != 'emscripten')"
 ]
 
 [[package]]
@@ -221,12 +221,12 @@ name = "black"
 version = "26.5.1"
 source = {registry = "https://pypi.org/simple"}
 dependencies = [
-  {name = "click", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"},
-  {name = "mypy-extensions", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"},
-  {name = "packaging", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"},
-  {name = "pathspec", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"},
-  {name = "platformdirs", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"},
-  {name = "pytokens", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"}
+  {name = "click"},
+  {name = "mypy-extensions"},
+  {name = "packaging"},
+  {name = "pathspec"},
+  {name = "platformdirs"},
+  {name = "pytokens"}
 ]
 sdist = {url = "https://files.pythonhosted.org/packages/c0/37/5628dd55bf2b34257fc7603f0fe97c40e3aaf24265f416a9c85c95ca1436/black-26.5.1.tar.gz", hash = "sha256:dd321f668053961824bcc1be1cc1df748b2d7e4fa28086b08331e577b0100a73", size = 679439, upload-time = "2026-05-18T16:53:36.107Z"}
 wheels = [
@@ -1109,8 +1109,8 @@ name = "httpcore2"
 version = "2.13.1"
 source = {registry = "https://pypi.org/simple"}
 dependencies = [
-  {name = "h11", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"},
-  {name = "truststore", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"}
+  {name = "h11"},
+  {name = "truststore"}
 ]
 sdist = {url = "https://files.pythonhosted.org/packages/cb/f3/1db7aa2bc2524062192bb0e0323969492d1883152a232fe36eea65f4e35c/httpcore2-2.13.1.tar.gz", hash = "sha256:e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103", size = 68071, upload-time = "2026-09-23T07:47:22.372Z"}
 wheels = [
@@ -1281,7 +1281,7 @@ name = "importlib-metadata"
 version = "9.0.0"
 source = {registry = "https://pypi.org/simple"}
 dependencies = [
-  {name = "zipp", marker = "(python_full_version < '3.13' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')"}
+  {name = "zipp"}
 ]
 sdist = {url = "https://files.pythonhosted.org/packages/a9/01/15bb152d77b21318514a96f43af312635eb2500c96b55398d020c93d86ea/importlib_metadata-9.0.0.tar.gz", hash = "sha256:a4f57ab599e6a2e3016d7595cfd72eb4661a5106e787a95bcc90c7105b831efc", size = 56405, upload-time = "2026-03-20T06:42:56.999Z"}
 wheels = [
@@ -1392,9 +1392,9 @@ wheels = [
 name = "jsonata-python"
 version = "0.7.1"
 source = {registry = "https://pypi.org/simple"}
-sdist = {url = "https://files.pythonhosted.org/packages/5b/e1/a1247412b909987479acc5e376c65f975a7daf25ec37e91cc0c8ec5fa74e/jsonata_python-0.7.1.tar.gz", hash = "sha256:c3c4dd3e68d913cf079ed5374cfcc6b249fb33fedaef55b23b14c7168b797e4e", size = 87663, upload-time = "2026-10-10T03:48:51.755388Z"}
+sdist = {url = "https://files.pythonhosted.org/packages/5b/e1/a1247412b909987479acc5e376c65f975a7daf25ec37e91cc0c8ec5fa74e/jsonata_python-0.7.1.tar.gz", hash = "sha256:c3c4dd3e68d913cf079ed5374cfcc6b249fb33fedaef55b23b14c7168b797e4e", size = 87663, upload-time = "2026-10-10T03:48:51.755Z"}
 wheels = [
-  {url = "https://files.pythonhosted.org/packages/46/85/1abd3677ad6c3a6ae249ed1234c0ab8dabbbca7b13d5bfd58c65acacb64f/jsonata_python-0.7.1-py3-none-any.whl", hash = "sha256:d34603578dd20add2aa0ac4562ca080d9c662f6b161298bd6254fe28247804ae", size = 87560, upload-time = "2026-10-10T03:48:49.643185Z"}
+  {url = "https://files.pythonhosted.org/packages/46/85/1abd3677ad6c3a6ae249ed1234c0ab8dabbbca7b13d5bfd58c65acacb64f/jsonata_python-0.7.1-py3-none-any.whl", hash = "sha256:d34603578dd20add2aa0ac4562ca080d9c662f6b161298bd6254fe28247804ae", size = 87560, upload-time = "2026-10-10T03:48:49.643Z"}
 ]
 
 [[package]]
@@ -2744,8 +2744,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = {registry = "https://pypi.org/simple"}
 dependencies = [
-  {name = "cryptography", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"},
-  {name = "jeepney", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'"}
+  {name = "cryptography"},
+  {name = "jeepney"}
 ]
 sdist = {url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z"}
 wheels = [
@@ -2816,14 +2816,14 @@ wheels = [
 
 [[package]]
 name = "syrupy"
-version = "5.2.0"
+version = "6.1.1"
 source = {registry = "https://pypi.org/simple"}
 dependencies = [
   {name = "pytest"}
 ]
-sdist = {url = "https://files.pythonhosted.org/packages/33/7e/a4793801683d32132d9683be8364e93f6bca2f277bfbe81647eba46b8cfd/syrupy-5.2.0.tar.gz", hash = "sha256:0e6b7abf1e04f060f6c797bed8bca96f2468954168328041e02634a68fc11ff0", size = 50223, upload-time = "2026-05-16T21:11:37.367Z"}
+sdist = {url = "https://files.pythonhosted.org/packages/74/2c/8ffc1414d1951895d0d5b7dc83c0b079ebc48c3bf27ffbb0064646367500/syrupy-6.1.1.tar.gz", hash = "sha256:7e584a8df4ede6dd3c1c44a77f9edc46186b6767a73dea6f0083044946839a59", size = 109705, upload-time = "2026-09-13T20:25:21.599Z"}
 wheels = [
-  {url = "https://files.pythonhosted.org/packages/4e/18/dc99a152bea18a898a8ac387bfeb9ec0829e0f5bed11cfec2e2ca189c5a2/syrupy-5.2.0-py3-none-any.whl", hash = "sha256:798cb493a6e20f4839e58ea8f10eb1b0d85684c676442f79786e219bf32618e6", size = 51828, upload-time = "2026-05-16T21:11:34.984Z"}
+  {url = "https://files.pythonhosted.org/packages/2c/b5/bf2a8a335a6a813869dd482cedbcde252f582b5afbfe50eb78ec09962800/syrupy-6.1.1-py3-none-any.whl", hash = "sha256:6ac9ac6a42d70ae44156f5f157a9563b9bb8cc96dcf9364327f330463bff889a", size = 63436, upload-time = "2026-09-13T20:25:20.294Z"}
 ]
 
 [[package]]
