@@ -65,7 +65,6 @@ ModelKind: TypeAlias = str
 ModelData: TypeAlias = dict[str, Any]
 ModelVersionKey: TypeAlias = tuple[ModelKind, VersionValue]
 
-MigrationKey: TypeAlias = tuple["Comparable", "Comparable"]
 #: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
 MIGRATION_PAIR_LEN: int = 2
 MigrationFunc: TypeAlias = Callable[[ModelData, MigrationContext | None], ModelData]
@@ -146,6 +145,9 @@ class Comparable(Orderable, Protocol[VersionValue_co]):
     def strategy(self) -> type[VersionValue_co]: ...
     @property
     def version(self) -> tuple[ModelKind, VersionValue_co]: ...
+
+
+MigrationKey: TypeAlias = tuple[Comparable, Comparable]
 
 
 @runtime_checkable

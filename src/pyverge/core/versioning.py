@@ -39,7 +39,7 @@ class VersionKey(Generic[VersionValue]):
         return type(self._value)
 
     @property
-    def version(self) -> tuple[ModelKind, VersionValue]:
+    def version(self) -> ModelVersionKey:
         return self._kind, self._value
 
     @property
