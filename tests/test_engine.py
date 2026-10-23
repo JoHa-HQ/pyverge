@@ -30,6 +30,7 @@ from pyverge.migration import (
     MigrationEntry,
     MigrationHook,
     PydanticModelAdapter,
+    fixed_target_resolver,
     latest_target_resolver,
 )
 from pyverge.providers.types import (
@@ -500,6 +501,97 @@ class TestMigrationManagement:
         ]
         with pytest.raises(RegistryError, match="across kinds"):
             engine.store_migration(versions, lambda d, _: d)  # ty: ignore[invalid-argument-type]
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, migration_settings, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV011Dev7], []],
+                {"on_missing": "reconstruct_model"},
+                [UserV011Dev7],
+                id="pydantic_semver_unregistered_chain",
+            ),
+        ],
+        indirect=["model_adapter", "registry", "migration_settings"],
+    )
+    def test_unregistered_chain_reconstructs_to_latest(
+        self,
+        engine: Engine[types.VersionValue],
+        models: list[ModelHandle],
+    ) -> None:
+        """Unregistered endpoints are reconstructed before the chain is stored."""
+        real = engine.get_latest_model("User")
+        keys = [
+            engine.adapter.version_key(kind="User", version=version)
+            for version in ("0.2.1", "1.0.0")
+        ]
+
+        for src, dst in pairwise([real, *keys]):
+            target = str(dst.version[1])
+            engine.store_migration(
+                (src, dst), lambda d, to=target: {**d, "version": to}
+            )
+
+        result = run_engine(
+            engine,
+            {
+                "kind": "User",
+                "version": str(real.version[1]),
+                "name": "Alice",
+                "email": "a@b.c",
+                "role": "user",
+            },
+            target=latest_target_resolver(engine.registry),
+        )
+        assert result["version"] == "1.0.0"
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, migration_settings, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV011Dev7], []],
+                {"on_missing": "reconstruct_model"},
+                [UserV011Dev7],
+                id="pydantic_semver_unregistered_chain",
+            ),
+        ],
+        indirect=["model_adapter", "registry", "migration_settings"],
+    )
+    def test_unregistered_chain_missing_edge_raises(
+        self,
+        engine: Engine[types.VersionValue],
+        models: list[ModelHandle],
+    ) -> None:
+        """A removed edge still breaks an otherwise materialized chain."""
+        real = engine.get_latest_model("User")
+        keys = [
+            engine.adapter.version_key(kind="User", version=version)
+            for version in ("0.2.0", "0.3.0")
+        ]
+        for src, dst in pairwise([real, *keys]):
+            target = str(dst.version[1])
+            engine.store_migration(
+                (src, dst), lambda d, to=target: {**d, "version": to}
+            )
+
+        first = engine.get_model(keys[0])
+        second = engine.get_model(keys[1])
+        engine.remove_migration(EdgeKey.from_pair(first, second), force=True)
+
+        with pytest.raises(MigrationNotFoundError):
+            run_engine(
+                engine,
+                {
+                    "kind": "User",
+                    "version": str(real.version[1]),
+                    "name": "Alice",
+                    "email": "a@b.c",
+                    "role": "user",
+                },
+                target=fixed_target_resolver(engine.registry, second),
+            )
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
