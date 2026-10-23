@@ -6,6 +6,7 @@ import textwrap
 from typing import Any, Generic
 
 from pyverge.core.types import (
+    Comparable,
     MigrationFunc,
     Versionable,
     VersionValue,
@@ -33,7 +34,7 @@ class JsonPatchDiffDiscovery(Generic[VersionValue]):
         self,
         migration: JsonPatch,
         source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        target: Comparable[VersionValue],
     ) -> Diff[VersionValue]:
         added: list[str] = []
         removed: list[str] = []
@@ -92,7 +93,7 @@ class CallableDiffDiscovery(Generic[VersionValue]):
         self,
         migration: MigrationFunc,
         source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        target: Comparable[VersionValue],
     ) -> Diff[VersionValue]:
         try:
             src = inspect.getsource(migration)
@@ -170,7 +171,7 @@ class CompositeDiffDiscovery(Generic[VersionValue]):
         self,
         migration: JsonPatch | MigrationFunc,
         source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        target: Comparable[VersionValue],
     ) -> Diff[VersionValue]:
         if isinstance(migration, JsonPatch):
             return self._json_patch.discover(migration, source, target)

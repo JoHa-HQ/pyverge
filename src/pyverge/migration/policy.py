@@ -6,9 +6,9 @@ from pyverge.core.exceptions import RegistryError
 from pyverge.core.types import (
     ModelKind,
     TargetResolver,
-    Versionable,
     VersionValue,
 )
+from pyverge.core.versioning import VersionNode
 
 from .registry import Registry
 
@@ -19,8 +19,8 @@ def skip_target_resolver(
     """A resolver that always skips (returns ``None``)."""
 
     def resolve(
-        current: Versionable[VersionValue],
-    ) -> Versionable[VersionValue] | None:
+        current: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue] | None:
         return None
 
     return resolve
@@ -32,8 +32,8 @@ def latest_target_resolver(
     """A resolver that converges to the latest registered version per kind."""
 
     def resolve(
-        current: Versionable[VersionValue],
-    ) -> Versionable[VersionValue] | None:
+        current: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue] | None:
         return registry.latest(current.kind)
 
     return resolve
@@ -45,8 +45,8 @@ def earliest_target_resolver(
     """A resolver that converges to the earliest registered version per kind."""
 
     def resolve(
-        current: Versionable[VersionValue],
-    ) -> Versionable[VersionValue] | None:
+        current: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue] | None:
         return registry.earliest(current.kind)
 
     return resolve
@@ -54,7 +54,7 @@ def earliest_target_resolver(
 
 def fixed_target_resolver(
     registry: Registry[VersionValue],
-    target: Versionable[VersionValue],
+    target: VersionNode[VersionValue],
 ) -> TargetResolver:
     """A resolver that always returns *target* for its kind.
 
@@ -67,8 +67,8 @@ def fixed_target_resolver(
         )
 
     def resolve(
-        current: Versionable[VersionValue],
-    ) -> Versionable[VersionValue] | None:
+        current: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue] | None:
         if current.kind != target.kind:
             raise RegistryError(
                 registry.name,
@@ -93,8 +93,8 @@ def multi_target_resolver(
     }
 
     def resolve(
-        current: Versionable[VersionValue],
-    ) -> Versionable[VersionValue] | None:
+        current: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue] | None:
         resolver = by_kind.get(current.kind, fallback)
         if resolver is None:
             return None

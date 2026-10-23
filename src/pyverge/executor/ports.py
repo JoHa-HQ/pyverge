@@ -9,6 +9,7 @@ from pyverge.core.types import (
     Attachable,
     ModelData,
     Versionable,
+    VersionValue,
     VersionValue_co,
 )
 
@@ -40,49 +41,49 @@ class StepInvoker(Protocol[VersionValue_co]):
     ) -> ModelData: ...
 
 
-class ExecutionBackend(Protocol[VersionValue_co]):
+class ExecutionBackend(Protocol[VersionValue]):
     """Runs entries and steps for a prepared plan.
 
     Local and remote backends implement this port. Strategies never touch the
     registry, adapter, or migration catalog directly.
     """
 
-    def ensure_compatible(self, plan: MigrationPlan[VersionValue_co]) -> None: ...
+    def ensure_compatible(self, plan: MigrationPlan[VersionValue]) -> None: ...
 
     def run_entry(
         self,
-        entry: GraphEntry[VersionValue_co],
+        entry: GraphEntry[VersionValue],
         current: ModelData,
         context: MigrationContext | None = None,
     ) -> ModelData: ...
 
     async def arun_entry(
         self,
-        entry: GraphEntry[VersionValue_co],
+        entry: GraphEntry[VersionValue],
         current: ModelData,
         context: MigrationContext | None = None,
     ) -> ModelData: ...
 
 
-class SyncExecutionStrategy(Protocol[VersionValue_co]):
+class SyncExecutionStrategy(Protocol[VersionValue]):
     """A sync plan executor selected by :class:`ExecutionPolicy`."""
 
     def execute(
         self,
-        plan: MigrationPlan[VersionValue_co],
-        backend: ExecutionBackend[VersionValue_co],
+        plan: MigrationPlan[VersionValue],
+        backend: ExecutionBackend[VersionValue],
         *,
         context: MigrationContext | None = None,
     ) -> ModelData: ...
 
 
-class AsyncExecutionStrategy(Protocol[VersionValue_co]):
+class AsyncExecutionStrategy(Protocol[VersionValue]):
     """An async plan executor selected by :class:`ExecutionPolicy`."""
 
     async def aexecute(
         self,
-        plan: MigrationPlan[VersionValue_co],
-        backend: ExecutionBackend[VersionValue_co],
+        plan: MigrationPlan[VersionValue],
+        backend: ExecutionBackend[VersionValue],
         *,
         context: MigrationContext | None = None,
     ) -> ModelData: ...

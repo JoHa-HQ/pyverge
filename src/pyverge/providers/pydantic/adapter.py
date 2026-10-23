@@ -9,6 +9,7 @@ from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from pyverge.core.types import (
+    Comparable,
     Diffable,
     ModelData,
     ModelHandle,
@@ -17,6 +18,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
+    VersionKey,
     VersionNode,
 )
 from pyverge.providers.base import AbstractModelAdapter
@@ -105,7 +107,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
             raise TypeError(
                 f"Cannot serialize {type(model).__name__}: expected a Pydantic model"
             )
-        return cast("ModelData", model.model_dump(by_alias=True))
+        return model.model_dump(by_alias=True)
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
@@ -228,36 +230,33 @@ class PydanticModelAdapter(AbstractModelAdapter):
 
     def versionable(
         self,
-        model_cls: ModelHandle | None,
+        model_cls: ModelHandle,
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> Versionable[VersionValue]:
-        """Build a ``VersionNode`` wrapping *model_cls* using its encoded metadata.
-
-        With ``None`` as the model, a meta node (no concrete model) is built
-        from *kind* and *version* strings.
-        """
-        if model_cls is not None:
-            return VersionNode[VersionValue](
-                _model=model_cls,
-                _value=self.of(self.version(model_cls)),
-                _kind=self.kind(model_cls),
-                references=self.references(model_cls),
-                fields=self.fields(model_cls),
-            )
-        if kind is None or version is None:
-            raise ValueError("kind and version are required for a meta versionable")
+    ) -> VersionNode[VersionValue]:
+        """Build a ``VersionNode`` wrapping *model_cls* using its encoded metadata."""
         return VersionNode[VersionValue](
-            _model=None,
-            _value=self.of(version),
-            _kind=kind,
+            _model=model_cls,
+            _value=self.of(self.version(model_cls)),
+            _kind=self.kind(model_cls),
+            references=self.references(model_cls),
+            fields=self.fields(model_cls),
         )
+
+    def version_key(
+        self,
+        *,
+        kind: str,
+        version: str,
+    ) -> Comparable[VersionValue]:
+        """Build a temporary search key for *kind* and *version*."""
+        return VersionKey[VersionValue](_value=self.of(version), _kind=kind)
 
     def diff(
         self,
         source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        target: Comparable[VersionValue],
         *,
         is_backward_compatible: bool = False,
     ) -> Diff[VersionValue]:
@@ -266,7 +265,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
         A meta endpoint (``model is None``) yields a plain ``Diff`` with empty
         predicates — there is no schema to compare.
         """
-        if source.model is None or target.model is None:
+        if getattr(target, "model", None) is None:
             return Diff(
                 source=source,
                 target=target,
@@ -274,7 +273,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
             )
         return PydanticDiff.from_pair(
             source,
-            target,
+            cast("Versionable[VersionValue]", target),
             is_backward_compatible=is_backward_compatible,
         )
 

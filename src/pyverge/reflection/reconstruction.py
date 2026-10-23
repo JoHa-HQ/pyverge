@@ -12,7 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generic, Protocol, runtime_checkable
 
-from pyverge.core.types import Versionable, VersionValue
+from pyverge.core.types import VersionValue
+from pyverge.core.versioning import VersionNode
 
 if TYPE_CHECKING:
     from pyverge.core.types import Diffable
@@ -29,7 +30,7 @@ class Reconstruction(Generic[VersionValue]):
     it.
     """
 
-    model: Versionable[VersionValue] | None = None
+    model: VersionNode[VersionValue] | None = None
     migration: JsonPatchMigration | None = None
 
 

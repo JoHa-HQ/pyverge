@@ -133,6 +133,8 @@ class ToolDiscovery:
                 if (kind, version) in self._nodes:
                     continue
                 model = self._manager.get(kind, version).model
+                if model is None:
+                    continue
                 schema = model.model_json_schema()
                 schema["properties"] = {
                     k: v

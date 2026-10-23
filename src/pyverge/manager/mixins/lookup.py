@@ -10,18 +10,19 @@ from pyverge.core.exceptions import (
 )
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
+    Comparable,
     Migratable,
     Transitional,
-    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
+    VersionKey,
     VersionNode,
 )
 
 if TYPE_CHECKING:
-    from . import ManagerState
+    from pyverge.manager.manager import Manager
 
 
 class LookupMixin(Generic[VersionValue]):
@@ -36,48 +37,45 @@ class LookupMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def _resolve_model_key(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: Any,
-    ) -> VersionNode[VersionValue]:
-        """Normalize a model key to a version node.
+    ) -> VersionKey[VersionValue]:
+        """Normalize a model key to a search key.
 
         Fallback: any comparable exposing ``kind`` and ``version`` is reduced
         to its ``(kind, version)`` key.
         """
-        return VersionNode[VersionValue](
-            _model=None, _value=key.version[1], _kind=key.kind
-        )
+        return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
 
     @_resolve_model_key.register(tuple)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: tuple,
-    ) -> VersionNode[VersionValue]:
+    ) -> VersionKey[VersionValue]:
         kind, value = key
-        return VersionNode[VersionValue](_model=None, _value=value, _kind=kind)
+        return VersionKey[VersionValue](_value=value, _kind=kind)
 
     @_resolve_model_key.register(VersionNode)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: VersionNode[VersionValue],
-    ) -> VersionNode[VersionValue]:
-        return key
+    ) -> VersionKey[VersionValue]:
+        return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
 
     @_resolve_model_key.register(type)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: type,
-    ) -> VersionNode[VersionValue]:
+    ) -> VersionKey[VersionValue]:
         """Resolve a bare model class through the adapter and a neutral lookup."""
         engine = cls._default_engine
         if not engine.adapter.identify(key):
             raise ModelNotFoundError(engine.registry.name, key)
         versionable = engine.registry.get_model_by_handle(key)
-        return VersionNode[VersionValue](
-            _model=None,
+        return VersionKey[VersionValue](
             _value=versionable.version[1],
             _kind=versionable.kind,
         )
@@ -85,11 +83,11 @@ class LookupMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def _normalize_index(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         index: Any,
     ) -> Any:
         """Map a fluent lookup key to a typed registry key."""
-        if isinstance(index, (Versionable, Transitional, SentinelEdge)):
+        if isinstance(index, (Comparable, Transitional, EdgeKey)):
             return index
         raise RegistryError(
             cls._default_engine.registry.name,
@@ -99,22 +97,22 @@ class LookupMixin(Generic[VersionValue]):
     @_normalize_index.register(tuple)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         index: tuple,
-    ) -> VersionNode[VersionValue] | SentinelEdge:
+    ) -> VersionKey[VersionValue] | EdgeKey:
         if len(index) == MIGRATION_PAIR_LEN and isinstance(index[0], str):
             return cls._resolve_model_key(index)
-        return SentinelEdge.from_pair(*index)
+        return EdgeKey.from_pair(*index)
 
     @_normalize_index.register(type)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         index: type,
-    ) -> VersionNode[VersionValue]:
+    ) -> VersionKey[VersionValue]:
         return cls._resolve_model_key(index)
 
-    def __contains__(self: ManagerState[VersionValue], index: Any) -> bool:
+    def __contains__(self: Manager[VersionValue], index: Any) -> bool:
         """Fluent membership: version key, edge pair, model class, or slice."""
         engine = self.engine
         if isinstance(index, slice):
@@ -132,8 +130,8 @@ class LookupMixin(Generic[VersionValue]):
             return False
 
     def __getitem__(
-        self: ManagerState[VersionValue], index: Any
-    ) -> Versionable[VersionValue] | Migratable | list[Migratable]:
+        self: Manager[VersionValue], index: Any
+    ) -> VersionNode[VersionValue] | Migratable | list[Migratable]:
         """Fluent selection: a version, an edge, or a migration path (slice)."""
         engine = self.engine
         if isinstance(index, slice):
@@ -141,16 +139,16 @@ class LookupMixin(Generic[VersionValue]):
             to_v = engine.get_model(type(self)._resolve_model_key(index.stop))
             path = engine.find_migration_path(from_v, to_v)
             return [
-                engine.registry.get_migration_by_edge(SentinelEdge.from_pair(src, dst))
+                engine.registry.get_migration_by_edge(EdgeKey.from_pair(src, dst))
                 for src, dst in path
             ]
         return engine.registry[type(self)._normalize_index(index)]
 
     def migration_path(
-        self: ManagerState[VersionValue],
+        self: Manager[VersionValue],
         from_version: Any,
         to_version: Any,
-    ) -> list[tuple[Versionable, Versionable]]:
+    ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
         """Return the migration chain between two fluent keys."""
         engine = self.engine
         return engine.find_migration_path(

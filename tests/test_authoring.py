@@ -17,9 +17,7 @@ from pydantic import ValidationError
 from pyverge import Manager
 from pyverge.core import (
     MigrationSettings,
-    ModelNotFoundError,
     VersioningSettings,
-    VersionNode,
 )
 from pyverge.migration import (
     JsonPatchMigration,
@@ -115,13 +113,3 @@ class TestProposeMigration:
         eng.propose_migration(anchor, target)
         # Nothing was auto-registered with the registry.
         assert eng.registry.migrations_of(anchor.kind) == frozenset()
-
-    def test_proposal_rejects_missing_model(self, engine) -> None:
-        eng, anchor, _target = engine
-        virtual = VersionNode(
-            _model=None,
-            _value=anchor.version[1],
-            _kind=anchor.kind,
-        )
-        with pytest.raises(ModelNotFoundError):
-            eng.propose_migration(anchor, virtual)

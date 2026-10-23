@@ -8,7 +8,6 @@ so a handler can bridge schema versions across a topic boundary.
 from __future__ import annotations
 
 import inspect
-import typing
 from collections.abc import Callable, Mapping
 from functools import wraps
 from typing import Any, cast
@@ -18,18 +17,12 @@ from pyverge.manager.types import TargetPolicy
 from pyverge.providers.types import ModelHandle
 
 from .types import Fn, PayloadDumper, ResultConverger
+from .views import HandlerView, PublisherView
 
 
 def return_model(handler: Any) -> ModelHandle | None:
     """Return the handler's return annotation when it is a class."""
-    try:
-        hints = typing.get_type_hints(handler)
-    except Exception:
-        hints = {}
-    annotation = hints.get("return")
-    if annotation is None:
-        annotation = inspect.signature(handler).return_annotation
-    return annotation if isinstance(annotation, type) else None
+    return HandlerView(handler).return_model
 
 
 class ReturnConverger:
@@ -91,7 +84,8 @@ def publisher(
     """
 
     def decorate(fn: Fn) -> Any:
-        declared = return_model(fn)
+        published = PublisherView(fn, topics)
+        declared = published.return_model
         out_model = (
             manager.resolve_target_model(declared, target)
             if declared is not None and manager.identifies(declared)

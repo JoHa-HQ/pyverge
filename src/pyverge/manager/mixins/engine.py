@@ -9,7 +9,6 @@ from pyverge.core.types import (
 if TYPE_CHECKING:
     from pyverge.manager.types import (
         ManagerClassState,
-        ManagerInstanceState,
     )
     from pyverge.migration.engine import Engine
 
@@ -35,7 +34,7 @@ class EngineLifecycleMixin(Generic[VersionValue]):
         return instance
 
     def __init__(
-        self: ManagerInstanceState[VersionValue],
+        self,
         engine: Engine[VersionValue] | None = None,
     ) -> None:
         """Apply an explicit engine override; ``__new__`` resolves the default."""

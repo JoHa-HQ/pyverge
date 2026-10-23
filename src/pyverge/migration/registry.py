@@ -22,11 +22,11 @@ from pyverge.core.types import (
     ModelKind,
     ModelVersionKey,
     Transitional,
-    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
+    VersionKey,
     VersionNode,
 )
 
@@ -65,11 +65,11 @@ class Registry(Generic[VersionValue]):
 
     def __init__(self: Self, *, name: str | None = None) -> None:
         self._name = name or "registry"
-        self._by_versions: list[Versionable[VersionValue]] = []
-        self._by_kinds: dict[ModelKind, list[Versionable[VersionValue]]] = defaultdict(
+        self._by_versions: list[VersionNode[VersionValue]] = []
+        self._by_kinds: dict[ModelKind, list[VersionNode[VersionValue]]] = defaultdict(
             list
         )
-        self._by_models: dict[ModelHandle, Versionable[VersionValue]] = {}
+        self._by_models: dict[ModelHandle, VersionNode[VersionValue]] = {}
         self._migrations: dict[ModelKind, list[Migratable[VersionValue]]] = defaultdict(
             list
         )
@@ -86,7 +86,7 @@ class Registry(Generic[VersionValue]):
         Typed only: raw tuples are fluent sugar owned by the manager.
         """
         try:
-            if isinstance(index, Versionable):
+            if isinstance(index, Comparable):
                 return self.has_model(index)
             if isinstance(index, Transitional):
                 return self.has_migration(index)
@@ -96,16 +96,16 @@ class Registry(Generic[VersionValue]):
 
     def __getitem__(
         self, index: object
-    ) -> Versionable[VersionValue] | Migratable[VersionValue]:
+    ) -> VersionNode[VersionValue] | Migratable[VersionValue]:
         """Lookup by version node or migration edge (typed only)."""
-        if isinstance(index, Versionable):
+        if isinstance(index, Comparable):
             return self.get_model(index)
         if isinstance(index, Transitional):
             return self.get_migration(index)
         raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
 
     @property
-    def versions(self: Self) -> list[Versionable[VersionValue]]:
+    def versions(self: Self) -> list[VersionNode[VersionValue]]:
         """Registered versions in ascending order."""
         return self._by_versions
 
@@ -125,7 +125,7 @@ class Registry(Generic[VersionValue]):
         return sorted(kind for kind, versions in self._by_kinds.items() if versions)
 
     @property
-    def latest_version(self) -> Versionable[VersionValue]:
+    def latest_version(self) -> VersionNode[VersionValue]:
         """The most recently registered version overall."""
         if not self._by_versions:
             raise RegistryError(self._name, "No versions registered")
@@ -140,12 +140,8 @@ class Registry(Generic[VersionValue]):
 
     def models(self: Self, kind: ModelKind | None) -> frozenset[ModelHandle]:
         if kind is None:
-            return frozenset(
-                v.model for v in self._by_models.values() if v.model is not None
-            )
-        return frozenset(
-            v.model for v in self._by_kinds.get(kind, []) if v.model is not None
-        )
+            return frozenset(v.model for v in self._by_models.values())
+        return frozenset(v.model for v in self._by_kinds.get(kind, []))
 
     def migrations(self: Self, kind: ModelKind) -> list[Migratable[VersionValue]]:
         """Registered migrations for *kind*."""
@@ -157,7 +153,7 @@ class Registry(Generic[VersionValue]):
         """Migration edges referencing *key* as source or target."""
         return frozenset(self._edges_by_version.get(key, ()))
 
-    def kind_versions(self: Self, kind: ModelKind) -> list[Versionable[VersionValue]]:
+    def kind_versions(self: Self, kind: ModelKind) -> list[VersionNode[VersionValue]]:
         return list(self._by_kinds.get(kind, []))
 
     def has_model(self: Self, key: Comparable) -> bool:
@@ -165,7 +161,7 @@ class Registry(Generic[VersionValue]):
         return idx < len(self._by_versions) and self._by_versions[idx] == key
 
     def missing_references(
-        self: Self, node: Versionable[VersionValue]
+        self: Self, node: Comparable[VersionValue]
     ) -> frozenset[ModelVersionKey]:
         """The ``(kind, version)`` pairs *node* declares but that are absent.
 
@@ -174,10 +170,8 @@ class Registry(Generic[VersionValue]):
         registered = self.get_model(node)
         missing = []
         for kind, version in registered.references:
-            sentinel = VersionNode[VersionValue](
-                _model=None, _value=version, _kind=kind
-            )
-            if not self.has_model(sentinel):
+            key = VersionKey[VersionValue](_value=version, _kind=kind)
+            if not self.has_model(key):
                 missing.append((kind, version))
         return frozenset(missing)
 
@@ -187,8 +181,8 @@ class Registry(Generic[VersionValue]):
         pair: tuple[Comparable[VersionValue], Comparable[VersionValue]],
     ) -> Migratable[VersionValue]:
         edges = self._migrations.get(kind, [])
-        sentinel = SentinelEdge.from_pair(*pair)
-        idx = bisect.bisect_left(edges, sentinel)
+        key = EdgeKey.from_pair(*pair)
+        idx = bisect.bisect_left(edges, key)
         if idx < len(edges) and edges[idx].edge == pair:
             return edges[idx]
         raise MigrationNotFoundError(self._name, pair)
@@ -196,7 +190,7 @@ class Registry(Generic[VersionValue]):
     def has_migration(self: Self, key: Transitional[VersionValue]) -> bool:
         """Whether a migration edge is registered.
 
-        Accepts any transitional edge (``VersionEdge``/``SentinelEdge`` or any
+        Accepts any transitional edge (``VersionEdge``/``EdgeKey`` or any
         object exposing ``kind`` and ``edge``).
         """
         try:
@@ -221,12 +215,12 @@ class Registry(Generic[VersionValue]):
     def has_hooks(self: Self, key: Transitional[VersionValue]) -> bool:
         return key in self._hooks
 
-    def latest(self: Self, kind: ModelKind) -> Versionable[VersionValue]:
+    def latest(self: Self, kind: ModelKind) -> VersionNode[VersionValue]:
         if kind not in self._by_kinds:
             raise RegistryError(self._name, "No versions registered")
         return self._by_kinds[kind][-1]
 
-    def earliest(self: Self, kind: ModelKind) -> Versionable[VersionValue]:
+    def earliest(self: Self, kind: ModelKind) -> VersionNode[VersionValue]:
         if kind not in self._by_kinds:
             raise RegistryError(self._name, "No versions registered")
         return self._by_kinds[kind][0]
@@ -254,8 +248,8 @@ class Registry(Generic[VersionValue]):
 
     def store_model(
         self: Self,
-        version: Versionable[VersionValue],
-    ) -> Versionable[VersionValue]:
+        version: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue]:
         """Register a model at *version*.
 
         Strict: a duplicate ``(kind, version)`` raises
@@ -267,16 +261,15 @@ class Registry(Generic[VersionValue]):
                 registry_name=self._name,
                 version=version.version,
             )
-        if version.model is not None:
-            self._by_models[version.model] = version
+        self._by_models[version.model] = version
         bisect.insort_left(self._by_versions, version)
         bisect.insort_left(self._by_kinds[version.version[0]], version)
         return version
 
     def reconcile_model(
         self: Self,
-        version: Versionable[VersionValue],
-    ) -> Versionable[VersionValue]:
+        version: VersionNode[VersionValue],
+    ) -> VersionNode[VersionValue]:
         """Register *version*, reconciling against an existing registration.
 
         The fallback store: an unregistered version is stored; an identical
@@ -300,16 +293,23 @@ class Registry(Generic[VersionValue]):
     def get_model(
         self: Self,
         key: Comparable,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         idx = bisect.bisect_left(self._by_versions, key)
         if idx < len(self._by_versions) and (model := self._by_versions[idx]) == key:
             return model
         raise ModelNotFoundError(self._name, key.version)
 
+    def find_model(self: Self, key: Comparable) -> VersionNode[VersionValue] | None:
+        """Return the node for *key*, or ``None`` when it is not registered."""
+        idx = bisect.bisect_left(self._by_versions, key)
+        if idx < len(self._by_versions) and (model := self._by_versions[idx]) == key:
+            return model
+        return None
+
     def get_model_by_handle(
         self: Self, handle: ModelHandle
-    ) -> Versionable[VersionValue]:
-        """Return the registered versionable for the opaque *handle*."""
+    ) -> VersionNode[VersionValue]:
+        """Return the registered node for the opaque *handle*."""
         if target := self._by_models.get(handle):
             return target
         raise ModelNotFoundError(self._name, handle)
@@ -336,8 +336,7 @@ class Registry(Generic[VersionValue]):
         version = self._by_versions[version_idx]
 
         del self._by_kinds[key.kind][kind_idx]
-        if version.model is not None:
-            del self._by_models[version.model]
+        del self._by_models[version.model]
         del self._by_versions[version_idx]
 
     def remove_model_by_handle(self: Self, handle: ModelHandle) -> None:
@@ -424,9 +423,9 @@ class Registry(Generic[VersionValue]):
 
     def migration_path(
         self: Self,
-        from_version: Versionable[VersionValue],
-        to_version: Versionable[VersionValue],
-    ) -> list[tuple[Versionable[VersionValue], Versionable[VersionValue]]]:
+        from_version: Comparable[VersionValue],
+        to_version: Comparable[VersionValue],
+    ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
         """Return a complete migration chain between two versions.
 
         Both endpoints must be registered versions of the same kind and a
@@ -454,17 +453,17 @@ class Registry(Generic[VersionValue]):
                 (from_version, to_version),
             )
 
-        lo = kind_versions.index(from_version)
-        hi = kind_versions.index(to_version)
+        lo = bisect.bisect_left(kind_versions, from_version)
+        hi = bisect.bisect_left(kind_versions, to_version)
         if lo == hi:
             return []
 
         step = 1 if lo < hi else -1
-        path: list[tuple[Versionable[VersionValue], Versionable[VersionValue]]] = []
-        current = from_version
+        path: list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]] = []
+        current = kind_versions[lo]
         while lo != hi:
             nxt = kind_versions[lo + step]
-            edge_key = SentinelEdge.from_pair(current, nxt)
+            edge_key = EdgeKey.from_pair(current, nxt)
             if self.has_migration(edge_key):
                 path.append((current, nxt))
                 current = nxt
@@ -480,8 +479,8 @@ class Registry(Generic[VersionValue]):
 
     def remove_migration_range(
         self: Self,
-        from_version: Versionable[VersionValue],
-        to_version: Versionable[VersionValue],
+        from_version: Comparable[VersionValue],
+        to_version: Comparable[VersionValue],
     ) -> None:
         """Remove every migration on edges between two versions of one kind.
 
@@ -498,9 +497,9 @@ class Registry(Generic[VersionValue]):
         lo = bisect.bisect_left(kind_versions, from_version)
         hi = bisect.bisect_left(kind_versions, to_version)
 
-        keys_to_remove: list[SentinelEdge[VersionValue]] = []
+        keys_to_remove: list[EdgeKey[VersionValue]] = []
         for i in range(lo, hi):
-            edge_key = SentinelEdge.from_pair(kind_versions[i], kind_versions[i + 1])
+            edge_key = EdgeKey.from_pair(kind_versions[i], kind_versions[i + 1])
             if not self.has_migration(edge_key):
                 continue
             if self.is_adjacent(edge_key):

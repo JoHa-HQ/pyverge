@@ -160,22 +160,19 @@ def engine(
     migration_settings: MigrationSettings,
     model_adapter: ModelAdapter,
 ) -> Engine[VersionValue]:
-    return cast(
-        "Engine[VersionValue]",
-        Engine(
+    return Engine(
+        registry,
+        migration_settings,
+        SequentialExecutor(),
+        GraphBuilder(
             registry,
             migration_settings,
-            SequentialExecutor(),
-            GraphBuilder(
-                registry,
-                migration_settings,
-                CompoundKeyWalker(
-                    registry, settings=migration_settings, adapter=model_adapter
-                ),
+            CompoundKeyWalker(
+                registry, settings=migration_settings, adapter=model_adapter
             ),
-            model_adapter,
-            entry_migration=DefaultMigrationEntry(),
         ),
+        model_adapter,
+        entry_migration=DefaultMigrationEntry(),
     )
 
 

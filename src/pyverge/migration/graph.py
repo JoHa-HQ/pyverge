@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 from dataclasses import dataclass
 from typing import Any, Generic
 
@@ -11,11 +12,11 @@ from pyverge.core.types import (
     ModelHandle,
     ModelKind,
     TargetResolver,
-    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
+    VersionNode,
 )
 from pyverge.migration.types import (
     Walker,
@@ -33,17 +34,14 @@ class GraphEntry(Generic[VersionValue]):
     """
 
     path: tuple[str | int, ...]
-    source: Versionable[VersionValue]
-    target: Versionable[VersionValue]
+    source: VersionNode[VersionValue]
+    target: VersionNode[VersionValue]
+    target_model: ModelHandle | None = None
     steps: tuple[
-        tuple[
-            Versionable[VersionValue],
-            Versionable[VersionValue],
-        ],
+        tuple[VersionNode[VersionValue], VersionNode[VersionValue]],
         ...,
     ] = ()
     hooks: tuple[tuple[Attachable, ...], ...] = ()
-    target_model: Any | None = None
 
     def allows_direction(self, direction: MigrationDirectionStrategy) -> bool:
         """Return whether this entry may migrate under *direction*.
@@ -269,7 +267,7 @@ class GraphBuilder(Generic[VersionValue]):
             path_steps = self._resolve_migration_path(source, target)
             hook_sets: list[tuple[Attachable, ...]] = []
             for src, dst in path_steps:
-                edge = SentinelEdge.from_pair(src, dst)
+                edge = EdgeKey.from_pair(src, dst)
                 hooks = self._registry.get_hooks(edge)
                 hook_sets.append(tuple(hooks))
             target_model = target.model
@@ -292,9 +290,9 @@ class GraphBuilder(Generic[VersionValue]):
 
     def _resolve_migration_path(
         self,
-        source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
-    ) -> list[tuple[Versionable[VersionValue], Versionable[VersionValue]]]:
+        source: VersionNode[VersionValue],
+        target: VersionNode[VersionValue],
+    ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
         """Adjacent migration steps between *source* and *target*, for hooks.
 
         Uses the registry's sorted version list; an edge without an explicit
@@ -305,23 +303,21 @@ class GraphBuilder(Generic[VersionValue]):
         if source.kind != target.kind:
             return []
         kind_versions = self._registry.kind_versions(source.kind)
-        try:
-            lo = kind_versions.index(source)
-        except ValueError as exc:
+        lo = bisect.bisect_left(kind_versions, source)
+        if lo >= len(kind_versions) or kind_versions[lo] != source:
             raise RegistryError(
                 self._registry.name,
                 f"Source version {source} is not registered for kind {source.kind}",
-            ) from exc
-        try:
-            hi = kind_versions.index(target)
-        except ValueError as exc:
+            )
+        hi = bisect.bisect_left(kind_versions, target)
+        if hi >= len(kind_versions) or kind_versions[hi] != target:
             raise RegistryError(
                 self._registry.name,
                 f"Target version {target} is not registered for kind {target.kind}",
-            ) from exc
-        path: list[tuple[Versionable[VersionValue], Versionable[VersionValue]]] = []
+            )
+        path: list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]] = []
         step = lo
-        current = source
+        current = kind_versions[lo]
         while step < hi:
             nxt = kind_versions[step + 1]
             path.append((current, nxt))

@@ -13,16 +13,15 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
-    SentinelEdge,
+    EdgeKey,
 )
 from pyverge.providers import JsonataMigration, JsonPatchMigration
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from pyverge.manager.manager import Manager
     from pyverge.migration.engine import Engine
-
-    from . import ManagerState
 
 
 class MigrationStoreMixin(Generic[VersionValue]):
@@ -31,7 +30,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def _resolve_migration(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
     ) -> MigrationFunc:
         return cast(MigrationFunc, func)
@@ -39,7 +38,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @_resolve_migration.register(JsonPatchMigration)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         func: JsonPatchMigration,
     ) -> MigrationFunc:
         return func.patch
@@ -47,7 +46,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @_resolve_migration.register(JsonataMigration)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         func: JsonataMigration,
     ) -> MigrationFunc:
         return func.migration
@@ -55,7 +54,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def store_migration(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: MigrationKeyInput,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
@@ -67,7 +66,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @store_migration.register(ModelPair)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelPair,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
@@ -86,7 +85,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @store_migration.register(ManagerMigrationKey)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ManagerMigrationKey,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
@@ -96,8 +95,8 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (
-            adapter.versionable(None, kind=key.kind, version=key.source_version),
-            adapter.versionable(None, kind=key.kind, version=key.target_version),
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
         )
         return engine.store_migration(
             pair,
@@ -108,7 +107,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def remove_migration(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: MigrationKeyInput,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -118,7 +117,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @remove_migration.register(ModelPair)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelPair,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -126,12 +125,12 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
-        engine.remove_migration(SentinelEdge.from_pair(*pair))
+        engine.remove_migration(EdgeKey.from_pair(*pair))
 
     @remove_migration.register(ManagerMigrationKey)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ManagerMigrationKey,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -139,15 +138,15 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (
-            adapter.versionable(None, kind=key.kind, version=key.source_version),
-            adapter.versionable(None, kind=key.kind, version=key.target_version),
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
         )
-        engine.remove_migration(SentinelEdge.from_pair(*pair))
+        engine.remove_migration(EdgeKey.from_pair(*pair))
 
     @singledispatchmethod
     @classmethod
     def get_migration(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: MigrationKeyInput,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -157,7 +156,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @get_migration.register(ModelPair)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelPair,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -165,12 +164,12 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
-        return engine.get_migration(SentinelEdge.from_pair(*pair))
+        return engine.get_migration(EdgeKey.from_pair(*pair))
 
     @get_migration.register(ManagerMigrationKey)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ManagerMigrationKey,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -178,15 +177,15 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (
-            adapter.versionable(None, kind=key.kind, version=key.source_version),
-            adapter.versionable(None, kind=key.kind, version=key.target_version),
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
         )
-        return engine.get_migration(SentinelEdge.from_pair(*pair))
+        return engine.get_migration(EdgeKey.from_pair(*pair))
 
     @singledispatchmethod
     @classmethod
     def add_hook(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: MigrationKeyInput,
         hook: Attachable,
         *,
@@ -197,7 +196,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @add_hook.register(ModelPair)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ModelPair,
         hook: Attachable,
         *,
@@ -206,12 +205,12 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
-        engine.add_hook(SentinelEdge.from_pair(*pair), hook)
+        engine.add_hook(EdgeKey.from_pair(*pair), hook)
 
     @add_hook.register(ManagerMigrationKey)
     @classmethod
     def _(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         key: ManagerMigrationKey,
         hook: Attachable,
         *,
@@ -220,14 +219,14 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (
-            adapter.versionable(None, kind=key.kind, version=key.source_version),
-            adapter.versionable(None, kind=key.kind, version=key.target_version),
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
         )
-        engine.add_hook(SentinelEdge.from_pair(*pair), hook)
+        engine.add_hook(EdgeKey.from_pair(*pair), hook)
 
     @classmethod
     def attach_hooks(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         hooks: Iterable[Attachable],
         *,
         engine: Engine[VersionValue] | None = None,

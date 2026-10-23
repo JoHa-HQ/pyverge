@@ -3,17 +3,20 @@ from __future__ import annotations
 from typing import Protocol, TypeVar, runtime_checkable
 
 from pyverge.core.types import (
+    Comparable,
     MigrationFunc,
     Versionable,
     VersionValue,
 )
 from pyverge.reflection.diff import Diff
 
-MigrationFunc_co = TypeVar("MigrationFunc_co", bound=MigrationFunc, covariant=True)
+MigrationFunc_contra = TypeVar(
+    "MigrationFunc_contra", bound=MigrationFunc, contravariant=True
+)
 
 
 @runtime_checkable
-class DiffDiscovery(Protocol[VersionValue, MigrationFunc_co]):
+class DiffDiscovery(Protocol[VersionValue, MigrationFunc_contra]):
     """Discover the structural change a migration encodes as a :class:`Diff`.
 
     Implementations are format-specific: one reads a JSON Patch, another
@@ -24,7 +27,7 @@ class DiffDiscovery(Protocol[VersionValue, MigrationFunc_co]):
 
     def discover(
         self,
-        migration: MigrationFunc_co,
+        migration: MigrationFunc_contra,
         source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        target: Comparable[VersionValue],
     ) -> Diff[VersionValue]: ...

@@ -901,7 +901,13 @@ def execution_plan(request: pytest.FixtureRequest) -> MigrationPlan:
     """Plan fixture parametrized over discovered paths."""
     paths: tuple[tuple[str, ...], ...] = request.param
     entries = [
-        GraphEntry(path=path, source=MagicMock(), target=MagicMock()) for path in paths
+        GraphEntry(
+            path=path,
+            source=MagicMock(),
+            target=MagicMock(),
+            target_model=MagicMock(),
+        )
+        for path in paths
     ]
     return MigrationPlan(
         data={path[0]: {"value": 1} for path in paths},

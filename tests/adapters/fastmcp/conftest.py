@@ -10,7 +10,7 @@ tests.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Any
@@ -60,7 +60,7 @@ def app(request: pytest.FixtureRequest, manager: type, case: Case) -> FastMCP:
     )
 
     @asynccontextmanager
-    async def app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
+    async def app_lifespan(server: FastMCP) -> AsyncGenerator[dict[str, Any], None]:
         await discovery.search(server)
         discovery.register()
         await discovery.enrich(server)

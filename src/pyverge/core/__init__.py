@@ -53,7 +53,7 @@ from .types import (
     VersionValue,
     VersionValue_co,
 )
-from .versioning import SentinelEdge, VersionEdge, VersionNode
+from .versioning import EdgeKey, VersionEdge, VersionKey, VersionNode
 
 __all__ = [
     "EMPTY_CONTEXT",
@@ -66,6 +66,7 @@ __all__ = [
     "DiscoveryError",
     "DiscoverySettings",
     "DiscoveryValidationError",
+    "EdgeKey",
     "EngineError",
     "ExecutionModeError",
     "LookupKey",
@@ -98,13 +99,13 @@ __all__ = [
     "Path",
     "RegistryError",
     "Renderable",
-    "SentinelEdge",
     "SyncExecutionRequired",
     "TargetResolver",
     "TargetStrategy",
     "Transitional",
     "ValidationMode",
     "VersionEdge",
+    "VersionKey",
     "VersionMissingStrategy",
     "VersionNode",
     "VersionPair",

@@ -16,6 +16,7 @@ repos:
         entry: uv run toml-sort --in-place
         language: system
         types: [toml]
+        exclude: (^|/)uv\.lock$
       - id: ty
         name: ty check
         entry: uv run ty check --exclude showcases/

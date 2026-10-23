@@ -96,7 +96,7 @@ def _load_payload(
 
 
 @app.callback()
-def configure(  # noqa: PLR0913
+def configure(  # noqa: PLR0913, PLR0917
     ctx: typer.Context,
     broker: Annotated[Broker, typer.Argument(...)],
     dsn: Annotated[str, typer.Argument(callback=resolve_dsn)],
@@ -135,7 +135,7 @@ def configure(  # noqa: PLR0913
 
 @app.command()
 @lambda f: wraps(f)(lambda *a, **kw: asyncio.run(f(*a, **kw)))
-async def send(  # noqa: PLR0913
+async def send(  # noqa: PLR0913, PLR0917
     ctx: typer.Context,
     topic: Annotated[str, typer.Argument(help="Destination topic.")],
     payload: Annotated[

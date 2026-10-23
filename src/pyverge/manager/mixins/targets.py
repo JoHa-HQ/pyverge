@@ -7,10 +7,10 @@ from pyverge.core.exceptions import ModelNotFoundError, RegistryError
 from pyverge.core.types import (
     ModelKind,
     TargetResolver,
-    Versionable,
     VersionValue,
 )
 from pyverge.core.versioning import (
+    VersionKey,
     VersionNode,
 )
 from pyverge.manager.types import (
@@ -30,7 +30,7 @@ from pyverge.providers.types import (
 )
 
 if TYPE_CHECKING:
-    from . import ManagerState
+    from pyverge.manager.manager import Manager
 
 
 class TargetResolutionMixin(Generic[VersionValue]):
@@ -44,7 +44,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def compile_target_spec(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         spec: TargetSpec,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -58,12 +58,12 @@ class TargetResolutionMixin(Generic[VersionValue]):
         :class:`VersionNode`.
         """
         engine = engine or cls._default_engine
-        return fixed_target_resolver(engine.registry, cast(Versionable, spec))
+        return fixed_target_resolver(engine.registry, cast(VersionNode, spec))
 
     @compile_target_spec.register(type(None))
     @classmethod
     def _compile_skip(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         spec: None,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -75,7 +75,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @compile_target_spec.register(str)
     @classmethod
     def _compile_string(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         spec: str,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -93,7 +93,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @compile_target_spec.register(type)
     @classmethod
     def _compile_model(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         spec: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -104,7 +104,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
 
     @classmethod
     def _model_resolver(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         model_cls: ModelHandle,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -122,8 +122,8 @@ class TargetResolutionMixin(Generic[VersionValue]):
             ) from exc
 
         def resolve(
-            current: Versionable[VersionValue],
-        ) -> Versionable[VersionValue] | None:
+            current: VersionNode[VersionValue],
+        ) -> VersionNode[VersionValue] | None:
             if current.kind != target.kind:
                 raise RegistryError(
                     registry.name,
@@ -136,7 +136,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
 
     @classmethod
     def _string_resolver(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         value: str,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -155,21 +155,16 @@ class TargetResolutionMixin(Generic[VersionValue]):
             ) from None
 
         def resolve(
-            current: Versionable[VersionValue],
-        ) -> Versionable[VersionValue] | None:
-            sentinel: Versionable[VersionValue] = cast(
-                Versionable[VersionValue],
-                VersionNode[VersionValue](
-                    _model=None, _value=parsed, _kind=current.kind
-                ),
-            )
-            return engine.get_model(sentinel)
+            current: VersionNode[VersionValue],
+        ) -> VersionNode[VersionValue] | None:
+            key = VersionKey[VersionValue](_value=parsed, _kind=current.kind)
+            return engine.get_model(key)
 
         return resolve
 
     @classmethod
     def _resolve_kind_mapping(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         mapping: dict[ModelKind | Literal["*"], TargetSpec],
         *,
         engine: Engine[VersionValue] | None = None,
@@ -189,7 +184,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @singledispatchmethod
     @classmethod
     def _resolve_target_policy(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         target: TargetPolicy,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -202,7 +197,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
 
     @classmethod
     def resolve_target_model(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         declared: ModelHandle,
         target: TargetPolicy,
         *,
@@ -226,7 +221,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @_resolve_target_policy.register(type)
     @classmethod
     def _policy_for_type(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         target: type,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -241,7 +236,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @_resolve_target_policy.register(dict)
     @classmethod
     def _policy_for_mapping(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         target: dict,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -255,7 +250,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     @_resolve_target_policy.register(str)
     @classmethod
     def _policy_for_string(
-        cls: type[ManagerState[VersionValue]],
+        cls: type[Manager[VersionValue]],
         target: str,
         *,
         engine: Engine[VersionValue] | None = None,

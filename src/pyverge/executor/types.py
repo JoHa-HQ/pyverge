@@ -13,7 +13,7 @@ from pyverge.core.types import (
     ModelData,
     Versionable,
     VersionMissingStrategy,
-    VersionValue_co,
+    VersionValue,
 )
 
 if TYPE_CHECKING:
@@ -59,7 +59,7 @@ AsyncMigrationEntryCallback = Callable[
 ]
 
 
-class Executor(Protocol[VersionValue_co]):
+class Executor(Protocol[VersionValue]):
     """Protocol for executing a migration plan.
 
     The executor owns the pre-execution compatibility gate: it validates the
@@ -69,10 +69,10 @@ class Executor(Protocol[VersionValue_co]):
 
     def run(
         self,
-        plan: MigrationPlan[VersionValue_co],
+        plan: MigrationPlan[VersionValue],
         *,
-        registry: Registry[VersionValue_co],
-        entry_migration: MigrationEntry[VersionValue_co],
+        registry: Registry[VersionValue],
+        entry_migration: MigrationEntry[VersionValue],
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
@@ -83,15 +83,15 @@ class Executor(Protocol[VersionValue_co]):
 
 
 @runtime_checkable
-class AsyncExecutor(Protocol[VersionValue_co]):
+class AsyncExecutor(Protocol[VersionValue]):
     """Protocol for asynchronously executing a migration plan."""
 
     async def arun(
         self,
-        plan: MigrationPlan[VersionValue_co],
+        plan: MigrationPlan[VersionValue],
         *,
-        registry: Registry[VersionValue_co],
-        entry_migration: AsyncMigrationEntry[VersionValue_co],
+        registry: Registry[VersionValue],
+        entry_migration: AsyncMigrationEntry[VersionValue],
         adapter: ModelAdapter,
         version_property: str,
         direction: MigrationDirectionStrategy,
@@ -101,12 +101,12 @@ class AsyncExecutor(Protocol[VersionValue_co]):
     ) -> ModelData: ...
 
 
-class MigrationEntry(Protocol[VersionValue_co]):
+class MigrationEntry(Protocol[VersionValue]):
     """Per-entry migration policy."""
 
     def migrate(
         self,
-        entry: GraphEntry[VersionValue_co],
+        entry: GraphEntry[VersionValue],
         current: ModelData,
         *,
         execute_step: MigrationEntryCallback,
@@ -119,12 +119,12 @@ class MigrationEntry(Protocol[VersionValue_co]):
     ) -> RunnableMigration: ...
 
 
-class AsyncMigrationEntry(Protocol[VersionValue_co]):
+class AsyncMigrationEntry(Protocol[VersionValue]):
     """Async per-entry migration policy."""
 
     def amigrate(
         self,
-        entry: GraphEntry[VersionValue_co],
+        entry: GraphEntry[VersionValue],
         current: ModelData,
         *,
         aexecute_step: AsyncMigrationEntryCallback,

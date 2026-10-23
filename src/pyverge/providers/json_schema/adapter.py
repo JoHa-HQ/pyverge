@@ -9,6 +9,7 @@ from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from pyverge.core.types import (
+    Comparable,
     Diffable,
     ModelData,
     ModelHandle,
@@ -17,6 +18,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
+    VersionKey,
     VersionNode,
 )
 from pyverge.providers.base import AbstractModelAdapter
@@ -123,7 +125,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
             raise TypeError(
                 f"Cannot serialize {type(model).__name__}: expected a Pydantic model"
             )
-        return cast("ModelData", model.model_dump(by_alias=True))
+        return model.model_dump(by_alias=True)
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
@@ -208,26 +210,16 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
 
     def versionable(
         self,
-        model_cls: ModelHandle | dict[str, Any] | None,
+        model_cls: ModelHandle | dict[str, Any],
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> Versionable[VersionValue]:
+    ) -> VersionNode[VersionValue]:
         """Build a ``VersionNode`` wrapping the schema's Pydantic model.
 
         A JSON schema document is materialized into a Pydantic model first;
-        an already-materialized model is used as-is.  With ``None`` as the
-        model, a meta node (no concrete model) is built from *kind* and
-        *version* strings.
+        an already-materialized model is used as-is.
         """
-        if model_cls is None:
-            if kind is None or version is None:
-                raise ValueError("kind and version are required for a meta versionable")
-            return VersionNode[VersionValue](
-                _model=None,
-                _value=self.of(version),
-                _kind=kind,
-            )
         model: ModelHandle
         if isinstance(model_cls, dict):
             model = self.to_pydantic(model_cls)
@@ -241,10 +233,19 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
             fields=self.fields(model),
         )
 
+    def version_key(
+        self,
+        *,
+        kind: str,
+        version: str,
+    ) -> Comparable[VersionValue]:
+        """Build a temporary search key for *kind* and *version*."""
+        return VersionKey[VersionValue](_value=self.of(version), _kind=kind)
+
     def diff(
         self,
         source: Versionable[VersionValue],
-        target: Versionable[VersionValue],
+        target: Comparable[VersionValue],
         *,
         is_backward_compatible: bool = False,
     ) -> Diff[VersionValue]:
@@ -253,7 +254,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         A meta endpoint (``model is None``) yields a plain ``Diff`` with empty
         predicates — there is no schema to compare.
         """
-        if source.model is None or target.model is None:
+        if getattr(target, "model", None) is None:
             return Diff(
                 source=source,
                 target=target,
@@ -261,7 +262,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
             )
         return _pydantic_diff_pair(
             source,
-            target,
+            cast("Versionable[VersionValue]", target),
             is_backward_compatible=is_backward_compatible,
         )
 
@@ -359,8 +360,11 @@ def _pydantic_diff_pair(
             f"Cannot create diff across kinds: {source.kind} != {target.kind}"
         )
 
-    source_fields = source.model.model_fields
-    target_fields = target.model.model_fields
+    source_model = source.model
+    target_model = target.model
+
+    source_fields = source_model.model_fields
+    target_fields = target_model.model_fields
 
     source_keys = set(source_fields.keys())
     target_keys = set(target_fields.keys())

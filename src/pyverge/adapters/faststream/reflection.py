@@ -9,15 +9,14 @@ validates it, failing fast on a broken graph.
 
 from __future__ import annotations
 
-import inspect
-import types
-import typing
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pyverge import Manager
 from pyverge.providers.types import ModelHandle
+
+from .views import FastStreamSubscriber, HandlerView
 
 if TYPE_CHECKING:
     from faststream import FastStream
@@ -31,6 +30,11 @@ class SubscriberModel:
     model: ModelHandle
     topics: tuple[str, ...]
 
+    @property
+    def input_model(self) -> ModelHandle:
+        """The declared payload model, matching :class:`SubscriberPort`."""
+        return self.model
+
 
 class SubscriberWalker:
     """Walk a broker's subscribers, yielding those with a versioned payload model."""
@@ -39,58 +43,23 @@ class SubscriberWalker:
         self._manager = manager
 
     @staticmethod
-    def _original_call(subscriber: Any) -> Any:
-        """Return the undecorated handler for *subscriber*, or ``None``."""
-        for item in subscriber.calls:
-            wrapper = getattr(item, "handler", None)
-            original = getattr(wrapper, "_original_call", None)
-            if original is not None:
-                return original
-        return None
-
-    @classmethod
-    def _first_model(cls, annotation: Any) -> ModelHandle | None:
-        """Return the first concrete model, unwrapping unions."""
-        if isinstance(annotation, type):
-            return annotation
-        if typing.get_origin(annotation) in (typing.Union, types.UnionType):
-            for member in typing.get_args(annotation):
-                model = cls._first_model(member)
-                if model is not None:
-                    return model
-        return None
-
-    @classmethod
-    def declared_model(cls, handler: Any) -> ModelHandle | None:
-        """Return the handler's first class-typed parameter annotation.
-
-        Resolves string annotations, unwraps ``Union`` annotations, then returns
-        the first parameter annotated with a concrete class.
-        """
-        if handler is None:
-            return None
-        original = getattr(handler, "_original_call", handler)
-        try:
-            hints = typing.get_type_hints(original)
-        except Exception:
-            hints = {}
-        for name, param in inspect.signature(original).parameters.items():
-            annotation = hints.get(name, param.annotation)
-            model = cls._first_model(annotation)
-            if model is not None:
-                return model
-        return None
+    def declared_model(handler: Any) -> ModelHandle | None:
+        """Return the handler's first class-typed parameter annotation."""
+        return HandlerView(handler).input_model
 
     def walk(self, broker: Any) -> Iterator[SubscriberModel]:
-        for subscriber in broker.subscribers:
-            handler = self._original_call(subscriber)
-            model = self.declared_model(handler)
-            if model is None or not self._manager.identifies(model):
+        for raw in broker.subscribers:
+            subscriber = FastStreamSubscriber(raw)
+            model = subscriber.input_model
+            handler = subscriber.handler
+            if handler is None or model is None:
+                continue
+            if not self._manager.identifies(model):
                 continue
             yield SubscriberModel(
                 handler=handler,
                 model=model,
-                topics=tuple(getattr(subscriber, "topics", ())),
+                topics=subscriber.topics,
             )
 
 

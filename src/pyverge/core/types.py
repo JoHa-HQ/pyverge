@@ -1,6 +1,6 @@
 """Core type surface: keys, aliases, and provider-neutral protocols.
 
-Behavior classes (``VersionNode``/``VersionEdge``/``SentinelEdge``) live in
+Behavior classes (``VersionNode``/``VersionEdge``/``EdgeKey``) live in
 :mod:`pyverge.core.versioning`; this module owns only passive type surface so
 the core can be imported by every layer without pulling behavior.
 """
@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import (
+    TYPE_CHECKING,
     Any,
     Generic,
     Literal,
@@ -23,6 +24,9 @@ from pendulum import Date
 from semver import Version as SemVer
 
 from .context import MigrationContext
+
+if TYPE_CHECKING:
+    from .versioning import VersionNode
 
 # ---------------------------------------------------------------------------
 # Version axis
@@ -43,7 +47,7 @@ ModelHandle: TypeAlias = type[Any]
 # JSON aliases
 # ---------------------------------------------------------------------------
 
-JsonPrimities: TypeAlias = int | float | str | bool | None | dict[str, Any] | list[Any]
+JsonPrimities: TypeAlias = int | float | str | bool | dict[str, Any] | list[Any] | None
 JsonValue: TypeAlias = JsonPrimities | dict[str, JsonPrimities] | list[JsonPrimities]
 JsonSchema: TypeAlias = dict[str, JsonValue]
 JsonSchemaMode = Literal["validation", "serialization"]
@@ -61,7 +65,6 @@ ModelKind: TypeAlias = str
 ModelData: TypeAlias = dict[str, Any]
 ModelVersionKey: TypeAlias = tuple[ModelKind, VersionValue]
 
-MigrationKey: TypeAlias = tuple[VersionValue, VersionValue]
 #: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
 MIGRATION_PAIR_LEN: int = 2
 MigrationFunc: TypeAlias = Callable[[ModelData, MigrationContext | None], ModelData]
@@ -144,14 +147,16 @@ class Comparable(Orderable, Protocol[VersionValue_co]):
     def version(self) -> tuple[ModelKind, VersionValue_co]: ...
 
 
+MigrationKey: TypeAlias = tuple[Comparable, Comparable]
+
+
 @runtime_checkable
 class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co]):
-    """Protocol for a model version that always binds an opaque model handle.
+    """Protocol for a materialized model version.
 
     Adds a required ``model`` binding on top of :class:`Comparable`.  The model
     is an opaque, provider-owned :data:`ModelHandle`; core never names a
-    provider model base.  Shared by ``VersionNode``.  A model-less node
-    (``_model=None``) is orderable and satisfies :class:`Comparable`.
+    provider model base.  Search-only identities use ``VersionKey`` instead.
     """
 
     @property
@@ -176,9 +181,9 @@ class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co]):
 class Transitional(Orderable, Protocol[VersionValue_co]):
     """Edge identity aspect: a directed ``source`` → ``target`` transition.
 
-    Implemented by ``VersionEdge`` and ``SentinelEdge``.  Carries ``source``,
+    Implemented by ``VersionEdge`` and ``EdgeKey``.  Carries ``source``,
     ``target``, ``edge`` and ordering semantics, but no execution.  Endpoints
-    are :class:`Comparable` so edges may reference sentinel keys.
+    are :class:`Comparable` so edges may reference search keys.
     """
 
     @property
@@ -194,12 +199,15 @@ class Migratable(Transitional[VersionValue_co], Protocol[VersionValue_co]):
     """Executable aspect: a transition that can run a migration.
 
     Adds a required ``func`` and ``diff`` on top of :class:`Transitional`.
-    Implemented by ``VersionEdge``; sentinels are key-only and satisfy
+    Implemented by ``VersionEdge``; ``EdgeKey`` is key-only and satisfies
     :class:`Transitional` only.
     """
 
-    func: MigrationFunc
-    diff: Diffable[VersionValue_co]
+    @property
+    def func(self) -> MigrationFunc: ...
+
+    @property
+    def diff(self) -> Diffable[VersionValue_co]: ...
 
     def __call__(
         self,
@@ -251,7 +259,7 @@ class Diffable(Protocol[VersionValue_co]):
     @property
     def source(self) -> Versionable: ...
     @property
-    def target(self) -> Versionable: ...
+    def target(self) -> Comparable: ...
     @property
     def origin(self) -> DiffOrigin: ...
     def inverted(self) -> Diffable: ...
@@ -315,11 +323,14 @@ class Renderable(Protocol[VersionValue_co, Renderable_co]):
     def __call__(self) -> Renderable_co: ...
 
 
-VersionPair = tuple[Versionable[VersionValue_co], Versionable[VersionValue_co]]
+VersionPair = tuple[Comparable[VersionValue_co], Comparable[VersionValue_co]]
 
 LookupKey = Versionable[VersionValue_co] | Migratable[VersionValue_co]
 
-TargetResolver = Callable[
-    [Versionable[VersionValue_co]],
-    Versionable[VersionValue_co] | None,
-]
+
+class TargetResolver(Protocol[VersionValue]):
+    """Resolve a discovered version to its target node, or skip it."""
+
+    def __call__(
+        self, current: VersionNode[VersionValue]
+    ) -> VersionNode[VersionValue] | None: ...

@@ -6,6 +6,7 @@ from typing import Any, cast
 from pyverge.core import (
     VersionEdge,
     VersioningSettings,
+    VersionKey,
     VersionNode,
 )
 from pyverge.core.context import MigrationContext
@@ -33,20 +34,16 @@ def envelope_model(
     A JSON schema document is materialized into a Pydantic model first; a
     model class is wrapped directly.
     """
-    return cast(
-        VersionNode[VersionValue],
-        adapter.versionable(cast("ModelHandle", model_cls)),
-    )
+    return adapter.versionable(cast("ModelHandle", model_cls))
 
 
 def meta_versionable(
     adapter: ModelAdapter,
     kind: str,
     version: str,
-) -> VersionNode[VersionValue]:
-    """Build a meta version: a ``(kind, version)`` pair with no concrete model."""
-    return VersionNode[VersionValue](
-        _model=None,
+) -> VersionKey[VersionValue]:
+    """Build a temporary search key for a ``(kind, version)`` pair."""
+    return VersionKey[VersionValue](
         _value=cast(VersionValue, adapter.of(version)),
         _kind=kind,
     )

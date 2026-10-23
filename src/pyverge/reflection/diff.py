@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Generic
 
 from pyverge.core.types import (
+    Comparable,
     DiffOrigin,
     MigrationKey,
     Renderable,
@@ -31,7 +32,7 @@ class Diff(Generic[VersionValue]):
     """
 
     source: Versionable[VersionValue]
-    target: Versionable[VersionValue]
+    target: Comparable[VersionValue]
     added_fields: list[str] = field(default_factory=list)
     removed_fields: list[str] = field(default_factory=list)
     modified_fields: dict[str, dict[str, Any]] = field(default_factory=dict)

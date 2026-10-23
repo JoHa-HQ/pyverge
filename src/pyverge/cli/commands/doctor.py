@@ -7,7 +7,7 @@ from typing import Annotated
 
 import typer
 
-from pyverge.core import MissingReferenceError, SentinelEdge
+from pyverge.core import EdgeKey, MissingReferenceError
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption, dump_json
@@ -33,7 +33,7 @@ def doctor(
         for kind in registry.entities:
             versions = registry.kind_versions(kind)
             for source, target in pairwise(versions):
-                if not registry.has_migration(SentinelEdge.from_pair(source, target)):
+                if not registry.has_migration(EdgeKey.from_pair(source, target)):
                     issues.append(
                         f"{kind}: missing migration "
                         f"{source.version[1]} -> {target.version[1]}"
