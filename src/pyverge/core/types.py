@@ -326,9 +326,9 @@ VersionPair = tuple[Comparable[VersionValue_co], Comparable[VersionValue_co]]
 LookupKey = Versionable[VersionValue_co] | Migratable[VersionValue_co]
 
 
-class TargetResolver(Protocol[VersionValue_co]):
+class TargetResolver(Protocol[VersionValue]):
     """Resolve a discovered version to its target node, or skip it."""
 
     def __call__(
-        self, current: VersionNode[VersionValue_co]
-    ) -> VersionNode[VersionValue_co] | None: ...
+        self, current: VersionNode[VersionValue]
+    ) -> VersionNode[VersionValue] | None: ...

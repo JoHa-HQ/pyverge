@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from pyverge.core.types import (
     VersionValue,
-    VersionValue_co,
 )
 
 if TYPE_CHECKING:
@@ -23,11 +22,11 @@ if TYPE_CHECKING:
 Entry = tuple[tuple[str | int, ...], int, "VersionNode[VersionValue]"]
 
 
-class Walker(Protocol[VersionValue_co]):
+class Walker(Protocol[VersionValue]):
     """Protocol for schema-aware payload discovery."""
 
     @property
-    def registry(self) -> Registry[VersionValue_co]: ...
+    def registry(self) -> Registry[VersionValue]: ...
 
     def discover(
         self,
