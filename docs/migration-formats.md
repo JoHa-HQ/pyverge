@@ -8,9 +8,34 @@ Choose the simplest format that expresses the edge.
 | JSONata | declarative expressions and runtime values | yes |
 | Python callable | imperative logic or context access | yes |
 
+## Specs and functions
+
+A migration is either:
+
+- `MigrationFunc` — callable `(payload, context) -> payload`
+- `MigrationSpec` — declarative spec exposing `.transform -> MigrationFunc`
+
+The manager accepts both. Registration resolves a spec to its executable
+transform; callables are stored as-is.
+
+```python
+from pyverge import JsonPatchMigration
+
+spec = JsonPatchMigration(
+    {
+        "from": "1.0.0",
+        "to": "2.0.0",
+        "ops": [{"op": "add", "path": "/age", "value": None}],
+    }
+)
+func = spec.transform
+```
+
 ## JSON Patch
 
 ```python
+from pyverge import JsonPatchMigration
+
 JsonPatchMigration(
     {
         "from": "1.0.0",

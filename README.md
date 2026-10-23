@@ -134,6 +134,7 @@ See [CLI Reference](docs/cli.md).
 
 - [Getting Started](docs/getting-started.md)
 - [Managers](docs/managers.md) · [Concepts](docs/concepts.md)
+- [Providers](docs/providers.md)
 - [Migrations](docs/migration.md) · [Migration Formats](docs/migration-formats.md)
 - [Runtime & Execution](docs/runtime.md) · [Execution Flow](docs/execution-flow.md)
 - [Target Policy](docs/target-policy.md) · [Compatibility](docs/compatibility.md)
