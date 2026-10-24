@@ -30,6 +30,7 @@ class EngineLifecycleMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ):
         instance = super().__new__(cls)
+        cls._reflection_locked = True
         instance.engine = (engine or cls._default_engine).copy()
         return instance
 

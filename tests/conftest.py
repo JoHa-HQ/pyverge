@@ -42,6 +42,7 @@ from tests.utils.settings import (
     overrides,
     without_identity,
 )
+from tests.utils.source import StaticSource
 
 # Example model modules are imported by tests, not collected as tests.  With
 # ``--doctest-modules`` their basenames (e.g. ``semver.py``) collide with
@@ -182,6 +183,20 @@ def engine(
         Reflection(model_adapter, CompositeDiffDiscovery()),
         on_missing=migration_settings.on_missing,
     )
+
+
+@pytest.fixture
+def source_factory():
+    """Build a static source from descriptors."""
+
+    def make(
+        descriptors: list,
+        *,
+        source_id: str,
+    ) -> StaticSource:
+        return StaticSource(tuple(descriptors), source_id)
+
+    return make
 
 
 @pytest.fixture

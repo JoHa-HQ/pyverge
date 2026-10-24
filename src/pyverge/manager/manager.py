@@ -27,6 +27,7 @@ from .mixins import (
     MigrateMixin,
     MigrationStoreMixin,
     ModelStoreMixin,
+    ReflectionMixin,
     TargetResolutionMixin,
 )
 
@@ -38,6 +39,7 @@ class Manager(
     MigrationStoreMixin[VersionValue],
     LookupMixin[VersionValue],
     MigrateMixin[VersionValue],
+    ReflectionMixin[VersionValue],
     metaclass=ManagerMeta,
 ):
     """Class factory scoping a migration ``Engine`` to a version strategy.
@@ -50,6 +52,7 @@ class Manager(
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+    _reflection_locked: ClassVar[bool] = False
 
     def __class_getitem__(
         cls, strategy: type[VersionValue]
@@ -61,6 +64,7 @@ class Manager(
                 "_strategy": strategy,
                 "_default_adapter": None,
                 "_default_engine": None,
+                "_reflection_locked": False,
                 "__module__": cls.__module__,
                 "__qualname__": cls.__name__,
             },

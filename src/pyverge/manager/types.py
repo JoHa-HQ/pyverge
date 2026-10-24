@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, ClassVar, Literal, Protocol, Self, TypeAlias
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Literal,
+    Protocol,
+    Self,
+    TypeAlias,
+    runtime_checkable,
+)
 
 from pyverge.core.types import (
     ManagerMigrationKey,
@@ -22,6 +30,11 @@ if TYPE_CHECKING:
     from pyverge.core.types import (
         Attachable,
     )
+    from pyverge.discovery.types import (
+        ReflectionReport,
+        ReflectionStrategy,
+        RegistrationContext,
+    )
     from pyverge.migration.engine import Engine
     from pyverge.migration.types import (
         Walker,
@@ -31,6 +44,7 @@ if TYPE_CHECKING:
     from pyverge.migrations.jsonata import JsonataMigration
     from pyverge.reflection import DiffProvider
     from pyverge.registry import Registry
+    from pyverge.sources import SourcePort
     from pyverge.versioning import ContentHasher, DiffMaterializer
 
 TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]
@@ -61,6 +75,7 @@ class ManagerClassState(Protocol[VersionValue]):
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+    _reflection_locked: ClassVar[bool]
 
     @classmethod
     def configure(
@@ -114,3 +129,17 @@ class ManagerInstanceState(Protocol[VersionValue]):
 
     @property
     def adapter(self) -> ModelAdapter: ...
+
+
+@runtime_checkable
+class Reflectable(Protocol):
+    """Build-time source reflection surface."""
+
+    @classmethod
+    def reflect(
+        cls,
+        source: SourcePort,
+        *,
+        strategies: dict[str, ReflectionStrategy] | None = None,
+        context: RegistrationContext | None = None,
+    ) -> ReflectionReport: ...
