@@ -3,7 +3,15 @@ from collections import defaultdict
 from itertools import chain
 from typing import Generic, Self, cast
 
-from pyverge.convergence.errors import (
+from pyverge.core.types import (
+    Attachable,
+    MigrationFunc,
+    ModelHandle,
+    ModelKind,
+    ModelVersionKey,
+    VersionValue,
+)
+from pyverge.registry.errors import (
     CatalogError,
     GraphLockedError,
     MigrationConflictError,
@@ -12,14 +20,6 @@ from pyverge.convergence.errors import (
     ModelAlreadyRegisteredError,
     ModelConflictError,
     ModelNotFoundError,
-)
-from pyverge.core.types import (
-    Attachable,
-    MigrationFunc,
-    ModelHandle,
-    ModelKind,
-    ModelVersionKey,
-    VersionValue,
 )
 from pyverge.versioning import (
     Comparable,
@@ -33,16 +33,16 @@ from pyverge.versioning import (
 
 
 class InMemoryCatalog(Generic[VersionValue]):
-    """In-memory catalog for versioned models, migrations, and hooks.
+    """In-memory registry for versioned models, migrations, and hooks.
 
     Provider-neutral: models are stored against an opaque :data:`ModelHandle`
-    and lookups are keyed by version.  Class identification is the engine's
-    concern, through the adapter.
+    and lookups are keyed by version.  Class identification is a provider
+    concern; the registry never imports an adapter.
 
     >>> from typing import Literal
     >>> import semver
     >>> from pydantic import BaseModel
-    >>> from pyverge.convergence.catalog import Registry
+    >>> from pyverge.registry import Registry
     >>> from pyverge.providers import PydanticModelAdapter
     >>> from pyverge.versioning import default_content_hasher
     >>> adapter = PydanticModelAdapter()

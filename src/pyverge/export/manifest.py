@@ -11,10 +11,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pyverge.convergence.catalog.ports import GraphCatalog
+from pyverge.jgf import JgfExporter
+from pyverge.registry.types import GraphCatalog
 from pyverge.versioning import ChangeSet
-
-from .jgf import JgfExporter
 
 
 class ManifestVersion(StrEnum):

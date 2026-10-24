@@ -8,7 +8,7 @@ from typing import Literal
 
 from pyverge.versioning import EdgeKey
 
-from .catalog.ports import GraphCatalog
+from .types import GraphCatalog
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,9 +49,8 @@ class CatalogHealth:
                 rendered = ", ".join(
                     f"{kind}@{version}" for kind, version in sorted(absent)
                 )
-                issues.append(
-                    f"{node.jgf_id} references unregistered versions: {rendered}"
-                )
+                subject = f"{node.version[0]}@{node.version[1]}"
+                issues.append(f"{subject} references unregistered versions: {rendered}")
 
         for kind in catalog.entities:
             versions = catalog.kind_versions(kind)

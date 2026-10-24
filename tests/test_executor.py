@@ -13,10 +13,6 @@ from pydantic import BaseModel
 from pyverge.executor import StepRequest
 
 from pyverge import types
-from pyverge.convergence.errors import (
-    CatalogError,
-    MigrationNotFoundError,
-)
 from pyverge.core.types import ModelData
 from pyverge.migration import (
     AsyncLevelParallelExecutor,
@@ -44,6 +40,10 @@ from pyverge.migration import (
 from pyverge.providers.errors import ProviderCapabilityError
 from pyverge.providers.types import (
     ModelHandle,
+)
+from pyverge.registry.errors import (
+    CatalogError,
+    MigrationNotFoundError,
 )
 from pyverge.versioning import VersionNode
 from pyverge.versioning.errors import MigrationApplicationError

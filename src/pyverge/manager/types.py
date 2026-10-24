@@ -24,7 +24,6 @@ from pyverge.schemas.types import (
 from pyverge.versioning import Versionable
 
 if TYPE_CHECKING:
-    from pyverge.convergence.catalog import Registry
     from pyverge.core.types import (
         Attachable,
     )
@@ -42,6 +41,7 @@ if TYPE_CHECKING:
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
     from pyverge.reflection import DiffProvider
+    from pyverge.registry import Registry
     from pyverge.versioning import ContentHasher, DiffMaterializer
 
 TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]

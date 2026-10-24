@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Generic
 
 from pyverge.core.types import VersionValue
 
-from .ports import DiffProvider
+from .types import DiffProvider
 
 if TYPE_CHECKING:
     from pyverge.core.types import MigrationFunc

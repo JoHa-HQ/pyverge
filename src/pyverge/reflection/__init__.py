@@ -4,9 +4,10 @@ from .discovery import (
     DiffDiscovery,
     JsonPatchDiffDiscovery,
 )
-from .ports import DiffProvider
 from .reflection import Reflection
+from .reflector import Reflector
 from .render import JsonPatchRenderer
+from .types import DiffProvider
 
 __all__ = [
     "CallableDiffDiscovery",
@@ -16,4 +17,5 @@ __all__ = [
     "JsonPatchDiffDiscovery",
     "JsonPatchRenderer",
     "Reflection",
+    "Reflector",
 ]

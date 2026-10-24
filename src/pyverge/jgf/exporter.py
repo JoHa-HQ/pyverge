@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from pyverge.convergence.catalog.ports import GraphCatalog, ModelCatalog
+from pyverge.registry.types import GraphCatalog, ModelCatalog
 from pyverge.versioning import JgfGraph, JgfNode
 from pyverge.versioning.canonical import ContentHasher
 

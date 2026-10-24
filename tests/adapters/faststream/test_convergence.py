@@ -22,8 +22,8 @@ from pyverge.adapters.faststream import (
     publisher,
     subscriber,
 )
-from pyverge.convergence.errors import CatalogError
 from pyverge.migration import MigrationContext, PydanticModelAdapter
+from pyverge.registry.errors import CatalogError
 from tests.examples.pydantic.semver import (
     UserV1,
     UserV2,

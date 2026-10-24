@@ -1,17 +1,3 @@
-from pyverge.convergence.catalog import (
-    Registry,
-)
-from pyverge.convergence.errors import (
-    CatalogError,
-    MigrationAlreadyRegisteredError,
-    MigrationNotFoundError,
-    MigrationPathError,
-    MigrationPathIntegrityError,
-    MissingReferenceError,
-    ModelAlreadyRegisteredError,
-    ModelConflictError,
-    ModelNotFoundError,
-)
 from pyverge.core import (
     MaxDepthExceededError,
     MigrationContext,
@@ -63,10 +49,25 @@ from pyverge.reflection import (
     JsonPatchDiffDiscovery,
     JsonPatchRenderer,
 )
+from pyverge.registry import (
+    Registry,
+)
+from pyverge.registry.errors import (
+    CatalogError,
+    MigrationAlreadyRegisteredError,
+    MigrationNotFoundError,
+    MigrationPathError,
+    MigrationPathIntegrityError,
+    MissingReferenceError,
+    ModelAlreadyRegisteredError,
+    ModelConflictError,
+    ModelNotFoundError,
+)
 from pyverge.versioning import Diff, EdgeKey, VersionEdge, VersionKey, VersionNode
 from pyverge.versioning.errors import MigrationApplicationError
 
 from .engine import Engine
+from .errors import BackwardCompatibilityError
 from .graph import GraphBuilder, GraphEntry, MigrationGraph, MigrationPlan
 from .policy import (
     earliest_target_resolver,
@@ -75,12 +76,14 @@ from .policy import (
     multi_target_resolver,
     skip_target_resolver,
 )
+from .registration import MigrationRegistrationService
 from .walker import CompoundKeyWalker, PydanticWalker, Walker
 
 __all__ = [
     "AsyncExecutionRequired",
     "AsyncLevelParallelExecutor",
     "AsyncSequentialExecutor",
+    "BackwardCompatibilityError",
     "CallableDiffDiscovery",
     "CatalogError",
     "CompositeDiffDiscovery",
@@ -119,6 +122,7 @@ __all__ = [
     "MigrationPathError",
     "MigrationPathIntegrityError",
     "MigrationPlan",
+    "MigrationRegistrationService",
     "MigrationRun",
     "MissingReferenceError",
     "ModelAlreadyRegisteredError",

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from functools import singledispatch, singledispatchmethod
 from typing import Any, Protocol, TypeVar, cast
 
-from pyverge.core.types import ModelData
+from pyverge.core.types import ModelData, ModelHandle
 from pyverge.manager.types import TargetPolicy
 
 Fn = TypeVar("Fn", bound=Callable[..., Any])
@@ -182,14 +182,56 @@ class PayloadDumper(Protocol):
         ...
 
 
+class HandlerPort(Protocol):
+    """One callable with its declared payload and return models."""
+
+    @property
+    def handler(self) -> Callable[..., Any]: ...
+
+    @property
+    def input_model(self) -> ModelHandle | None: ...
+
+    @property
+    def return_model(self) -> ModelHandle | None: ...
+
+
+class SubscriberPort(Protocol):
+    """One FastStream subscriber exposed as reflected properties."""
+
+    @property
+    def topics(self) -> tuple[str, ...]: ...
+
+    @property
+    def handler(self) -> Callable[..., Any] | None: ...
+
+    @property
+    def input_model(self) -> ModelHandle | None: ...
+
+
+class PublisherPort(Protocol):
+    """One FastStream publisher exposed as reflected properties."""
+
+    @property
+    def topics(self) -> tuple[str, ...]: ...
+
+    @property
+    def handler(self) -> Callable[..., Any] | None: ...
+
+    @property
+    def return_model(self) -> ModelHandle | None: ...
+
+
 __all__ = [
     "Fn",
     "HandlerBinder",
+    "HandlerPort",
     "HeaderParser",
     "MessageHeaders",
     "NegotiationError",
     "PayloadDumper",
+    "PublisherPort",
     "ResultConverger",
+    "SubscriberPort",
     "TargetContext",
     "TargetSelector",
     "TopicTargets",

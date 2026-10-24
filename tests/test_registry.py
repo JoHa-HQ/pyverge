@@ -14,11 +14,22 @@ import pytest
 import semver
 
 from pyverge import types
-from pyverge.convergence import JgfImporter
-from pyverge.convergence.catalog import InMemoryCatalog
-from pyverge.convergence.catalog.ports import PathCatalog
-from pyverge.convergence.errors import (
-    BackwardCompatibilityError,
+from pyverge.export import ManifestDiff
+from pyverge.jgf import JgfExporter, JgfImporter
+from pyverge.migration import (
+    Engine,
+    MigrationContext,
+    MigrationHook,
+    PydanticModelAdapter,
+    Registry,
+)
+from pyverge.migration.errors import BackwardCompatibilityError
+from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.providers.types import (
+    ModelHandle,
+)
+from pyverge.registry import InMemoryCatalog
+from pyverge.registry.errors import (
     CatalogError,
     GraphLockedError,
     MigrationConflictError,
@@ -28,18 +39,7 @@ from pyverge.convergence.errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
-from pyverge.export import JgfExporter, ManifestDiff
-from pyverge.migration import (
-    Engine,
-    MigrationContext,
-    MigrationHook,
-    PydanticModelAdapter,
-    Registry,
-)
-from pyverge.providers import JsonSchemaModelAdapter
-from pyverge.providers.types import (
-    ModelHandle,
-)
+from pyverge.registry.types import PathCatalog
 from pyverge.versioning import (
     EdgeKey,
     JgfNode,

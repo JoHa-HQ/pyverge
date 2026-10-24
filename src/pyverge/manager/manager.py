@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from pyverge.convergence.catalog import Registry
 from pyverge.core.types import VersionValue
 from pyverge.migration.engine import Engine
 from pyverge.migration.types import (
@@ -14,6 +13,7 @@ from pyverge.migrations.identity import (
 )
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.reflection import CompositeDiffDiscovery, DiffProvider, Reflection
+from pyverge.registry import Registry
 from pyverge.schemas.backend import ModelMaterializer
 from pyverge.schemas.types import (
     ModelAdapter,

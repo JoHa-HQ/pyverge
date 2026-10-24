@@ -1,6 +1,5 @@
-"""Export domain: JGF projection, manifest assembly, and manifest diff."""
+"""Export domain: manifest assembly and manifest diff."""
 
-from .jgf import JgfExporter
 from .manifest import (
     ManifestDiff,
     ManifestExporter,
@@ -9,7 +8,6 @@ from .manifest import (
 )
 
 __all__ = [
-    "JgfExporter",
     "ManifestDiff",
     "ManifestExporter",
     "ManifestSpec",

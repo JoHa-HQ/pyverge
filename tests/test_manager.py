@@ -11,10 +11,6 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.convergence.errors import (
-    CatalogError,
-    ModelNotFoundError,
-)
 from pyverge.core import (
     ManagerMigrationKey,
     MigrationKeyInput,
@@ -43,6 +39,10 @@ from pyverge.providers import JsonSchemaModelAdapter
 from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,
+)
+from pyverge.registry.errors import (
+    CatalogError,
+    ModelNotFoundError,
 )
 from pyverge.versioning import Migratable, Versionable
 from pyverge.versioning.errors import MigrationApplicationError

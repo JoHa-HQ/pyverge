@@ -7,9 +7,8 @@ and can converge the handler's return to an outgoing target on publish.
 
 The adapter is split by responsibility (ports & adapters):
 
-* :mod:`.ports` — host-neutral handler, subscriber, and publisher ports.
+* :mod:`.types` — host-neutral ports plus transport values and decorator ports.
 * :mod:`.views` — FastStream wrappers implementing those ports.
-* :mod:`.types` — transport values and decorator ports.
 * :mod:`.binding` — the default ``HandlerBinder``.
 * :mod:`.subscriber` — the consume decorator (converges in FastStream's decoder).
 * :mod:`.publisher` — the produce decorator (in/out).
@@ -21,7 +20,6 @@ FastStream is imported only here; pyverge core and providers never import it.
 from __future__ import annotations
 
 from .binding import SignatureBinder
-from .ports import HandlerPort, PublisherPort, SubscriberPort
 from .publisher import ReturnConverger, publish_to, publisher
 from .reflection import Reflector, SubscriberModel, SubscriberWalker
 from .subscriber import subscriber
@@ -36,11 +34,14 @@ from .targets import (
 from .types import (
     Fn,
     HandlerBinder,
+    HandlerPort,
     HeaderParser,
     MessageHeaders,
     NegotiationError,
     PayloadDumper,
+    PublisherPort,
     ResultConverger,
+    SubscriberPort,
     TargetContext,
     TargetSelector,
     TopicTargets,

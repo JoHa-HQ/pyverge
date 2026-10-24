@@ -3,14 +3,14 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Any, Generic
 
-from pyverge.convergence.errors import (
-    CatalogError,
-    MigrationPathError,
-    ModelNotFoundError,
-)
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
     VersionValue,
+)
+from pyverge.registry.errors import (
+    CatalogError,
+    MigrationPathError,
+    ModelNotFoundError,
 )
 from pyverge.versioning import (
     Comparable,

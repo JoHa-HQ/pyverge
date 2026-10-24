@@ -10,12 +10,12 @@ import semver
 
 from pyverge import types
 from pyverge.export import (
-    JgfExporter,
     ManifestDiff,
     ManifestExporter,
     ManifestSpec,
     ManifestVersion,
 )
+from pyverge.jgf import JgfExporter
 from pyverge.migration import JsonSchemaModelAdapter, PydanticModelAdapter, Registry
 from pyverge.providers.types import ModelHandle
 from pyverge.versioning import (

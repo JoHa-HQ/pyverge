@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pyverge.convergence.catalog import (
-    Registry,
-)
-from pyverge.convergence.errors import CatalogError
 from pyverge.core.types import (
     ModelKind,
     TargetResolver,
     VersionValue,
 )
+from pyverge.registry import (
+    Registry,
+)
+from pyverge.registry.errors import CatalogError
 from pyverge.versioning import VersionNode
 
 

@@ -1,4 +1,4 @@
-"""Catalog ports: read models, write registrars, and the aggregate."""
+"""Registry ports: read models, write capabilities, and the aggregate."""
 
 from __future__ import annotations
 
@@ -39,6 +39,7 @@ class ModelCatalog(Protocol):
     def get_model_by_handle(self, handle: ModelHandle) -> VersionNode: ...
     def latest(self, kind: ModelKind) -> VersionNode: ...
     def earliest(self, kind: ModelKind) -> VersionNode: ...
+    @property
     def latest_version(self) -> VersionNode: ...
     def missing_references(self, node: Versionable) -> frozenset[ModelVersionKey]: ...
 
@@ -58,10 +59,10 @@ class ContentHashLookup(Protocol):
 
 
 class GraphCatalog(PathCatalog, ModelCatalog, Protocol):
-    """Read-only migration graph and JGF surface used by runtime planning."""
+    """Read-only migration graph surface used by runtime planning."""
 
     def migrations(self, kind: ModelKind) -> list[Migratable]: ...
-    def migrations_of(self, version: Any) -> frozenset[Migratable]: ...
+    def migrations_of(self, key: Any) -> frozenset[Migratable]: ...
     def has_migration(self, key: Transitional) -> bool: ...
     def get_migration(self, key: Transitional) -> Migratable: ...
     def get_migration_by_edge(self, key: Transitional) -> Migratable: ...
@@ -73,8 +74,8 @@ class GraphCatalog(PathCatalog, ModelCatalog, Protocol):
     def snapshot(self) -> GraphCatalog: ...
 
 
-class ModelRegistrar(Protocol):
-    """Write-side model registration."""
+class ModelWrite(Protocol):
+    """Write-side model capability."""
 
     def store_model(self, version: VersionNode) -> VersionNode: ...
     def reconcile_model(self, version: VersionNode) -> VersionNode: ...
@@ -83,11 +84,11 @@ class ModelRegistrar(Protocol):
     def clear_models(self) -> None: ...
 
 
-class MigrationRegistrar(Protocol):
-    """Write-side migration registration."""
+class MigrationWrite(Protocol):
+    """Write-side migration capability."""
 
-    def store_migration(self, edge: VersionEdge) -> Any: ...
-    def remove_migration(self, key: Transitional, *, force: bool = False) -> None: ...
+    def store_migration(self, key: VersionEdge) -> Any: ...
+    def remove_migration(self, key: Transitional) -> None: ...
     def remove_migration_range(
         self, from_version: Versionable, to_version: Versionable
     ) -> None: ...
@@ -99,16 +100,16 @@ class MigrationRegistrar(Protocol):
     def clear_hooks(self, key: Transitional | None = None) -> None: ...
 
 
-class RegistryPort(GraphCatalog, ModelRegistrar, MigrationRegistrar, Protocol):
+class RegistryPort(GraphCatalog, ModelWrite, MigrationWrite, Protocol):
     """Full catalog contract for an in-memory or remote adapter."""
 
 
 __all__ = [
     "ContentHashLookup",
     "GraphCatalog",
-    "MigrationRegistrar",
+    "MigrationWrite",
     "ModelCatalog",
-    "ModelRegistrar",
+    "ModelWrite",
     "PathCatalog",
     "RegistryPort",
 ]

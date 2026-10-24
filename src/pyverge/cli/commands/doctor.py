@@ -6,8 +6,8 @@ from typing import Annotated, cast
 
 import typer
 
-from pyverge.convergence import CatalogHealth
-from pyverge.convergence.catalog.ports import GraphCatalog
+from pyverge.registry import CatalogHealth
+from pyverge.registry.types import GraphCatalog
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption, dump_json

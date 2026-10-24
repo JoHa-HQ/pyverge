@@ -3,9 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any, Generic, Literal
 
-from pyverge.convergence.catalog import (
-    Registry,
-)
 from pyverge.core.errors import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.types import (
     MigrationDirectionStrategy,
@@ -14,6 +11,9 @@ from pyverge.core.types import (
 )
 from pyverge.migration.types import (
     Entry,
+)
+from pyverge.registry import (
+    Registry,
 )
 from pyverge.schemas.types import (
     ModelAdapter,

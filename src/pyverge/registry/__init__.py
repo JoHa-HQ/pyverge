@@ -1,8 +1,6 @@
-"""Convergence package (catalog, registrars, reflection)."""
+"""Registry generic subdomain: types, in-memory store, explorer, and health."""
 
-from .context import RegistrationContext
 from .errors import (
-    BackwardCompatibilityError,
     CatalogError,
     GraphLockedError,
     MigrationAlreadyRegisteredError,
@@ -15,26 +13,41 @@ from .errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
+from .explorer import GraphExplorer
 from .health import CatalogHealth, HealthReport
-from .jgf import EdgeResolver, JgfImporter, NodeResolver
+from .memory import InMemoryCatalog, Registry
+from .types import (
+    ContentHashLookup,
+    GraphCatalog,
+    MigrationWrite,
+    ModelCatalog,
+    ModelWrite,
+    PathCatalog,
+    RegistryPort,
+)
 
 __all__ = [
-    "BackwardCompatibilityError",
     "CatalogError",
     "CatalogHealth",
-    "EdgeResolver",
+    "ContentHashLookup",
+    "GraphCatalog",
+    "GraphExplorer",
     "GraphLockedError",
     "HealthReport",
-    "JgfImporter",
+    "InMemoryCatalog",
     "MigrationAlreadyRegisteredError",
     "MigrationConflictError",
     "MigrationNotFoundError",
     "MigrationPathError",
     "MigrationPathIntegrityError",
+    "MigrationWrite",
     "MissingReferenceError",
     "ModelAlreadyRegisteredError",
+    "ModelCatalog",
     "ModelConflictError",
     "ModelNotFoundError",
-    "NodeResolver",
-    "RegistrationContext",
+    "ModelWrite",
+    "PathCatalog",
+    "Registry",
+    "RegistryPort",
 ]

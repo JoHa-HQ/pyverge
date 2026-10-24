@@ -14,7 +14,7 @@ from pyverge.core.types import (
 )
 
 if TYPE_CHECKING:
-    from pyverge.convergence.catalog import (
+    from pyverge.registry import (
         Registry,
     )
     from pyverge.versioning import VersionNode

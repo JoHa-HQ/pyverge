@@ -4,10 +4,6 @@ import bisect
 from dataclasses import dataclass
 from typing import Any, Generic
 
-from pyverge.convergence.catalog import (
-    Registry,
-)
-from pyverge.convergence.errors import CatalogError
 from pyverge.core.errors import MaxDepthExceededError
 from pyverge.core.types import (
     Attachable,
@@ -20,6 +16,10 @@ from pyverge.core.types import (
 from pyverge.migration.types import (
     Walker,
 )
+from pyverge.registry import (
+    Registry,
+)
+from pyverge.registry.errors import CatalogError
 from pyverge.versioning import (
     EdgeKey,
     VersionNode,

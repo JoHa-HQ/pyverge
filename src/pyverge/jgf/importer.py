@@ -1,32 +1,18 @@
-"""JGF import service: parse a document and register through catalog ports."""
+"""JGF import service: parse a document and register through registry write ports."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Protocol
+from typing import Any
 
-from pyverge.versioning import JgfEdge, JgfGraph, JgfNode, VersionEdge, VersionNode
+from pyverge.registry.types import MigrationWrite, ModelWrite
+from pyverge.versioning import JgfGraph
 
-from .catalog.ports import (
-    MigrationRegistrar,
-    ModelRegistrar,
-)
-
-
-class NodeResolver(Protocol):
-    """Map a JGF node back to a concrete version model."""
-
-    def resolve(self, node: JgfNode) -> VersionNode: ...
-
-
-class EdgeResolver(Protocol):
-    """Map a JGF edge back to a concrete migration edge."""
-
-    def resolve(self, edge: JgfEdge) -> VersionEdge: ...
+from .types import EdgeResolver, NodeResolver
 
 
 class JgfImporter:
-    """Import a JGF document into a catalog using explicit resolvers."""
+    """Import a JGF document into a registry using explicit resolvers."""
 
     def __init__(self, node_resolver: NodeResolver) -> None:
         self._node_resolver = node_resolver
@@ -35,8 +21,8 @@ class JgfImporter:
         self,
         document: Mapping[str, Any],
         *,
-        models: ModelRegistrar,
-        migrations: MigrationRegistrar | None = None,
+        models: ModelWrite,
+        migrations: MigrationWrite | None = None,
         edge_resolver: EdgeResolver | None = None,
     ) -> JgfGraph:
         """Register nodes (and edges when a resolver is supplied)."""
@@ -46,7 +32,7 @@ class JgfImporter:
         if graph.edges:
             if migrations is None or edge_resolver is None:
                 raise ValueError(
-                    "Importing JGF edges requires both a migration registrar "
+                    "Importing JGF edges requires both a migration write port "
                     "and an EdgeResolver"
                 )
             for edge in graph.edges:
@@ -54,4 +40,4 @@ class JgfImporter:
         return graph
 
 
-__all__ = ["EdgeResolver", "JgfImporter", "NodeResolver"]
+__all__ = ["JgfImporter"]

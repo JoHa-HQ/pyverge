@@ -3,7 +3,6 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
-from pyverge.convergence.errors import CatalogError, ModelNotFoundError
 from pyverge.core.types import (
     ModelKind,
     TargetResolver,
@@ -21,6 +20,7 @@ from pyverge.migration.policy import (
     multi_target_resolver,
     skip_target_resolver,
 )
+from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import (
     ModelHandle,
 )

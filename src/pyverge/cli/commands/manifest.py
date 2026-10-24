@@ -9,14 +9,14 @@ from typing import Annotated, cast
 import typer
 
 from pyverge import __version__
-from pyverge.convergence.catalog.ports import GraphCatalog
 from pyverge.export import (
-    JgfExporter,
     ManifestDiff,
     ManifestExporter,
     ManifestSpec,
     ManifestVersion,
 )
+from pyverge.jgf import JgfExporter
+from pyverge.registry.types import GraphCatalog
 from pyverge.versioning import default_content_hasher
 
 from .._helpers import write_json_file
