@@ -1503,6 +1503,15 @@ wheels = [
 ]
 
 [[package]]
+name = "json-graph-lite"
+version = "0.8a0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5e/7a/2e9fb3fff57ec56b42c88bef46ba035fea993e3ead4f7753ee03b4ca2215/json-graph-lite-0.8a0.tar.gz", hash = "sha256:c3b2dd6ac51a02e33e50d6716a39144a7c7ba7050c1ce8920fb283abd8ccf523", size = 6414, upload-time = "2020-12-10T18:50:30.26Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/90/f6/c2a0158bd8d25f5a5e843e7152b3c5f39e60f5d164a18f1796248a2f0557/json_graph_lite-0.8a0-py2.py3-none-any.whl", hash = "sha256:d1bb44dc0e2de9ab99b79c8cb68b2ab382a5304eb2e1a5140d9571589c88d5cc", size = 10144, upload-time = "2020-12-10T18:50:29.058Z" },
+]
+
+[[package]]
 name = "jsonata-python"
 version = "0.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2644,6 +2653,7 @@ dev = [
     { name = "faststream", extra = ["kafka"] },
     { name = "hatch" },
     { name = "hypothesis" },
+    { name = "json-graph-lite" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
@@ -2683,6 +2693,7 @@ dev = [
     { name = "faststream", extras = ["kafka"], specifier = ">=0.7.7" },
     { name = "hatch", specifier = ">=1.16.5" },
     { name = "hypothesis", specifier = ">=6.130" },
+    { name = "json-graph-lite", specifier = ">=0.8a0" },
     { name = "pre-commit", specifier = ">=4.0" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-benchmark", specifier = ">=4.0" },
