@@ -14,7 +14,7 @@ from typing import Any, cast
 
 from pyverge import Manager
 from pyverge.manager.types import TargetPolicy
-from pyverge.providers.types import ModelHandle
+from pyverge.schemas.types import ModelHandle
 
 from .types import Fn, PayloadDumper, ResultConverger
 from .views import HandlerView, PublisherView

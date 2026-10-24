@@ -13,7 +13,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from pyverge.providers.types import ModelHandle
+from pyverge.schemas.types import ModelHandle
 
 
 def _original_call(handler: Any) -> Any:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import inspect
 from typing import Any
 
-from pyverge.providers.types import ModelHandle
+from pyverge.schemas.types import ModelHandle
 
 
 def first_param_name(handler: Any) -> str | None:

@@ -11,11 +11,11 @@ from fastmcp.prompts.function_prompt import FunctionPrompt
 from fastmcp.resources.template import FunctionResourceTemplate
 from fastmcp.tools.function_tool import FunctionTool
 
-from pyverge.core.versioning import VersionNode
-from pyverge.providers.json_schema.adapter import JsonSchemaModelAdapter
-from pyverge.providers.types import (
+from pyverge.schemas.json_schema.adapter import JsonSchemaModelAdapter
+from pyverge.schemas.types import (
     ModelAdapter,
 )
+from pyverge.versioning import VersionNode
 
 from .injection import InjectionDetector, injected_names
 

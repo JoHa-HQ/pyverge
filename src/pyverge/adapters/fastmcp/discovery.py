@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
-from pyverge.core import MissingReferenceError, ModelConflictError
+from pyverge.convergence.errors import MissingReferenceError, ModelConflictError
 from pyverge.core.types import (
     Attachable,
 )

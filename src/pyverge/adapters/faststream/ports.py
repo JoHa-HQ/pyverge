@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol
 
-from pyverge.providers.types import ModelHandle
+from pyverge.schemas.types import ModelHandle
 
 
 class HandlerPort(Protocol):

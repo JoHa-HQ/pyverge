@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pyverge import Manager
-from pyverge.providers.types import ModelHandle
+from pyverge.schemas.types import ModelHandle
 
 from .views import FastStreamSubscriber, HandlerView
 
