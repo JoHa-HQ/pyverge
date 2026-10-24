@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from pyverge.versioning import (
+    MigrationIdentity,
+    default_canonicalizer,
+)
+
 from .patch import JsonPatch
 
 
@@ -46,3 +51,11 @@ class JsonPatchMigration:
     def patch(self) -> JsonPatch:
         """The compiled executable JSON Patch."""
         return self._patch
+
+    @property
+    def migration_identity(self) -> MigrationIdentity:
+        """Stable identity of the declarative spec."""
+        return MigrationIdentity(
+            "jsonpatch",
+            default_canonicalizer().dumps(self.spec),
+        )

@@ -8,6 +8,10 @@ from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     ModelData,
 )
+from pyverge.versioning import (
+    MigrationIdentity,
+    default_canonicalizer,
+)
 
 
 class SetDefaultOperation(jsonpatch.PatchOperation):
@@ -151,6 +155,14 @@ class JsonPatch(jsonpatch.JsonPatch):
             "split": SplitOperation,
         }
     )
+
+    @property
+    def migration_identity(self) -> MigrationIdentity:
+        """Stable identity of the patch operations."""
+        return MigrationIdentity(
+            "jsonpatch",
+            default_canonicalizer().dumps(self.patch),
+        )
 
     def __call__(
         self,

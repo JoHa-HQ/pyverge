@@ -9,22 +9,22 @@ from pydantic.fields import FieldInfo
 from pydantic_core import PydanticUndefined
 
 from pyverge.core.types import (
-    Comparable,
-    Diffable,
     ModelData,
     ModelHandle,
     ModelVersionKey,
-    Versionable,
     VersionValue,
 )
-from pyverge.core.versioning import (
+from pyverge.schemas.base import AbstractModelAdapter
+from pyverge.schemas.diff import FieldDescriptor, SchemaDiffer
+from pyverge.versioning import (
+    Comparable,
+    Diff,
+    Diffable,
+    DiffOrigin,
+    Versionable,
     VersionKey,
     VersionNode,
 )
-from pyverge.providers.base import AbstractModelAdapter
-from pyverge.providers.json_patch.migration import JsonPatchMigration
-from pyverge.reflection.diff import Diff
-from pyverge.reflection.render import JsonPatchRender
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +228,10 @@ class PydanticModelAdapter(AbstractModelAdapter):
             models.extend(self._iter_models(arg))
         return models
 
+    def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
+        """Describe fields for provider-neutral diffing."""
+        return _describe_fields(model_cls)
+
     def versionable(
         self,
         model_cls: ModelHandle,
@@ -242,6 +246,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
             _kind=self.kind(model_cls),
             references=self.references(model_cls),
             fields=self.fields(model_cls),
+            model_id=self.model_id(model_cls),
         )
 
     def version_key(
@@ -257,8 +262,6 @@ class PydanticModelAdapter(AbstractModelAdapter):
         self,
         source: Versionable[VersionValue],
         target: Comparable[VersionValue],
-        *,
-        is_backward_compatible: bool = False,
     ) -> Diff[VersionValue]:
         """Compute a diff between two model versions.
 
@@ -269,12 +272,12 @@ class PydanticModelAdapter(AbstractModelAdapter):
             return Diff(
                 source=source,
                 target=target,
-                is_backward_compatible=is_backward_compatible,
+                fields={},
+                origin=DiffOrigin.SCHEMA,
             )
         return PydanticDiff.from_pair(
             source,
             cast("Versionable[VersionValue]", target),
-            is_backward_compatible=is_backward_compatible,
         )
 
     @staticmethod
@@ -325,26 +328,14 @@ class PydanticModelAdapter(AbstractModelAdapter):
             **fields,
         )
 
-    def materialize_migration(
-        self,
-        diff: Diffable[VersionValue],
-    ) -> JsonPatchMigration:
-        """Materialize an RFC 6902 JSON Patch migration from a diff."""
-        spec = {
-            "from": str(diff.source.version[1]),
-            "to": str(diff.target.version[1]),
-            "ops": JsonPatchRender(diff)(),
-        }
-        return JsonPatchMigration(spec)
-
 
 @dataclass(frozen=True)
 class PydanticDiff(Diff[VersionValue]):
     """Differences between two Pydantic model versions.
 
-    Computed eagerly from two Pydantic model classes.  No migration logic —
-    callers query the diff to decide what to do.  Render output via the
-    pluggable ``renderer`` strategy.
+    Computed eagerly from two Pydantic model classes. No migration logic —
+    callers query the diff to decide what to do; rendering is a separate
+    service.
     """
 
     @staticmethod
@@ -381,8 +372,6 @@ class PydanticDiff(Diff[VersionValue]):
         cls: type[Self],
         source: Versionable[VersionValue],
         target: Versionable[VersionValue],
-        *,
-        is_backward_compatible: bool = False,
     ) -> Self:
         """Compute a :class:`PydanticDiff` by comparing two Pydantic models."""
         if source.strategy != target.strategy:
@@ -396,44 +385,26 @@ class PydanticDiff(Diff[VersionValue]):
                 f"Cannot create diff across kinds: {source.kind} != {target.kind}"
             )
 
-        source_fields = source.model.model_fields
-        target_fields = target.model.model_fields
-
-        source_keys = set(source_fields.keys())
-        target_keys = set(target_fields.keys())
-
-        added = sorted(target_keys - source_keys)
-        removed = sorted(source_keys - target_keys)
-        common = source_keys & target_keys
-
-        modified: dict[str, dict[str, Any]] = {}
-        unchanged: list[str] = []
-
-        for fn in sorted(common):
-            sf = source_fields[fn]
-            tf = target_fields[fn]
-            changes = cls._diff_fields(sf, tf)
-            if changes:
-                modified[fn] = changes
-            else:
-                unchanged.append(fn)
-
-        added_info = {}
-        for fn in added:
-            tf = target_fields[fn]
-            added_info[fn] = {
-                "type": tf.annotation,
-                "required": tf.is_required(),
-                "default": tf.default if tf.default is not PydanticUndefined else None,
-            }
-
         return cls(
             source=source,
             target=target,
-            added_fields=added,
-            removed_fields=removed,
-            modified_fields=modified,
-            added_field_info=added_info,
-            unchanged_fields=unchanged,
-            is_backward_compatible=is_backward_compatible,
+            fields=SchemaDiffer().fields(
+                source.model,
+                target.model,
+                _describe_fields,
+            ),
+            origin=DiffOrigin.SCHEMA,
         )
+
+
+def _describe_fields(model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
+    """Describe Pydantic fields for provider-neutral diffing."""
+    return {
+        name: FieldDescriptor(
+            name=name,
+            annotation=field.annotation,
+            required=field.is_required(),
+            default=None if field.default is PydanticUndefined else field.default,
+        )
+        for name, field in model_cls.model_fields.items()
+    }

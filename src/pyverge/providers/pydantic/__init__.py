@@ -1,3 +1,4 @@
-from .adapter import PydanticDiff, PydanticModelAdapter
+"""Deprecated shim for :mod:`pyverge.schemas.pydantic`."""
 
-__all__ = ["PydanticDiff", "PydanticModelAdapter"]
+from pyverge.schemas.pydantic import *  # noqa: F403
+from pyverge.schemas.pydantic import __all__ as __all__
