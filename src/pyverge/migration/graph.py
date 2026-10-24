@@ -4,7 +4,11 @@ import bisect
 from dataclasses import dataclass
 from typing import Any, Generic
 
-from pyverge.core.exceptions import MaxDepthExceededError, RegistryError
+from pyverge.convergence.catalog import (
+    Registry,
+)
+from pyverge.convergence.errors import CatalogError
+from pyverge.core.errors import MaxDepthExceededError
 from pyverge.core.settings import DiscoverySettings
 from pyverge.core.types import (
     Attachable,
@@ -14,15 +18,13 @@ from pyverge.core.types import (
     TargetResolver,
     VersionValue,
 )
-from pyverge.core.versioning import (
-    EdgeKey,
-    VersionNode,
-)
 from pyverge.migration.types import (
     Walker,
 )
-
-from .registry import Registry
+from pyverge.versioning import (
+    EdgeKey,
+    VersionNode,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,13 +307,13 @@ class GraphBuilder(Generic[VersionValue]):
         kind_versions = self._registry.kind_versions(source.kind)
         lo = bisect.bisect_left(kind_versions, source)
         if lo >= len(kind_versions) or kind_versions[lo] != source:
-            raise RegistryError(
+            raise CatalogError(
                 self._registry.name,
                 f"Source version {source} is not registered for kind {source.kind}",
             )
         hi = bisect.bisect_left(kind_versions, target)
         if hi >= len(kind_versions) or kind_versions[hi] != target:
-            raise RegistryError(
+            raise CatalogError(
                 self._registry.name,
                 f"Target version {target} is not registered for kind {target.kind}",
             )

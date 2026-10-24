@@ -5,7 +5,7 @@ in per-package ``types.py`` modules; this shim re-exports the symbols from
 their new homes so internal importers keep working for one release.  Provider
 model TypeVars and ``ModelBase`` are **not** re-exported: they were removed
 from the public core surface (provider type parameters now live in
-:mod:`pyverge.providers.types`).
+:mod:`pyverge.schemas.types`).
 """
 
 from __future__ import annotations
@@ -13,8 +13,6 @@ from __future__ import annotations
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
     Attachable,
-    Comparable,
-    Diffable,
     DirectionViolationStrategy,
     ExtraFieldStrategy,
     JsonPrimities,
@@ -23,14 +21,10 @@ from pyverge.core.types import (
     JsonSchemaGenerator,
     JsonSchemaMode,
     JsonValue,
-    LookupKey,
     ManagerKey,
     ManagerMigrationKey,
-    Migratable,
     MigrationDirectionStrategy,
     MigrationFunc,
-    MigrationHookMap,
-    MigrationKey,
     MigrationKeyInput,
     MissingFieldStrategy,
     ModelData,
@@ -39,25 +33,14 @@ from pyverge.core.types import (
     ModelKind,
     ModelPair,
     ModelVersionKey,
-    Orderable,
-    Renderable,
     RenderingFormat,
     SchemaTransformer,
     TargetResolver,
     TargetStrategy,
-    Transitional,
     ValidationMode,
-    Versionable,
     VersionMissingStrategy,
-    VersionPair,
     VersionValue,
     VersionValue_co,
-)
-from pyverge.core.versioning import (
-    EdgeKey,
-    VersionEdge,
-    VersionKey,
-    VersionNode,
 )
 from pyverge.executor import (
     Executor,
@@ -75,15 +58,29 @@ from pyverge.migration.types import (
     Entry,
     Walker,
 )
-from pyverge.providers.types import (
+from pyverge.schemas.types import (
     ModelAdapter,
+)
+from pyverge.versioning import (
+    Comparable,
+    EdgeKey,
+    LookupKey,
+    Migratable,
+    MigrationHookMap,
+    MigrationKey,
+    Orderable,
+    Transitional,
+    Versionable,
+    VersionEdge,
+    VersionKey,
+    VersionNode,
+    VersionPair,
 )
 
 __all__ = [
     "MIGRATION_PAIR_LEN",
     "Attachable",
     "Comparable",
-    "Diffable",
     "DirectionViolationStrategy",
     "EdgeKey",
     "Entry",
@@ -116,7 +113,6 @@ __all__ = [
     "ModelPair",
     "ModelVersionKey",
     "Orderable",
-    "Renderable",
     "RenderingFormat",
     "ResolverFactory",
     "RunnableMigration",

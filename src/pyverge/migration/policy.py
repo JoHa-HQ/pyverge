@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pyverge.core.exceptions import RegistryError
+from pyverge.convergence.catalog import (
+    Registry,
+)
+from pyverge.convergence.errors import CatalogError
 from pyverge.core.types import (
     ModelKind,
     TargetResolver,
     VersionValue,
 )
-from pyverge.core.versioning import VersionNode
-
-from .registry import Registry
+from pyverge.versioning import VersionNode
 
 
 def skip_target_resolver(
@@ -61,7 +62,7 @@ def fixed_target_resolver(
     *target* is validated against *registry* immediately.
     """
     if not registry.has_model(target):
-        raise RegistryError(
+        raise CatalogError(
             registry.name,
             f"Target {target} is not registered",
         )
@@ -70,7 +71,7 @@ def fixed_target_resolver(
         current: VersionNode[VersionValue],
     ) -> VersionNode[VersionValue] | None:
         if current.kind != target.kind:
-            raise RegistryError(
+            raise CatalogError(
                 registry.name,
                 f"Target {target} belongs to kind {target.kind!r}, "
                 f"but entry kind is {current.kind!r}",

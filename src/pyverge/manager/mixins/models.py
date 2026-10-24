@@ -4,20 +4,16 @@ from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast
 
 from pyverge.core.types import (
-    Comparable,
     ModelData,
     ModelKey,
     ModelKind,
     ModelVersionKey,
-    Versionable,
     VersionValue,
 )
-from pyverge.core.versioning import (
-    VersionNode,
-)
-from pyverge.providers.types import (
+from pyverge.schemas.types import (
     ModelHandle,
 )
+from pyverge.versioning import Comparable, Versionable, VersionNode
 
 if TYPE_CHECKING:
     from pyverge.manager.manager import Manager

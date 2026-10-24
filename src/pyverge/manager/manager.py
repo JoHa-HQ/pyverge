@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
+from pyverge.convergence.catalog import Registry
 from pyverge.core.settings import MigrationSettings
 from pyverge.core.types import (
     VersionValue,
@@ -14,14 +15,21 @@ from pyverge.executor import (
 )
 from pyverge.migration.engine import Engine
 from pyverge.migration.graph import GraphBuilder
-from pyverge.migration.registry import Registry
 from pyverge.migration.types import (
     Walker,
 )
 from pyverge.migration.walker import CompoundKeyWalker
-from pyverge.providers.types import (
+from pyverge.migrations.identity import (
+    DefaultMigrationIdentityResolver,
+    MigrationIdentityResolver,
+)
+from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
+from pyverge.reflection import CompositeDiffDiscovery, DiffProvider, Reflection
+from pyverge.schemas.backend import ModelMaterializer
+from pyverge.schemas.types import (
     ModelAdapter,
 )
+from pyverge.versioning import ContentHasher, DiffMaterializer, default_content_hasher
 
 from .descriptors import ManagerMeta
 from .mixins import (
@@ -98,6 +106,10 @@ class Manager(
         walker: Walker | None = None,
         executor: Executor | AsyncExecutor | None = None,
         entry_migration: MigrationEntry[VersionValue] | None = None,
+        hasher: ContentHasher | None = None,
+        identity_resolver: MigrationIdentityResolver | None = None,
+        migration_materializer: DiffMaterializer[object] | None = None,
+        diff_provider: DiffProvider[VersionValue] | None = None,
     ) -> type[Manager[VersionValue]]:
         """Build a configured ``Manager`` subclass.
 
@@ -120,7 +132,7 @@ class Manager(
                 to :class:`~pyverge.migration.DefaultEntryPlanner`.
         """
         if walker is None:
-            registry = Registry[VersionValue]()
+            registry = Registry[VersionValue](hasher=hasher or default_content_hasher())
             active_walker = CompoundKeyWalker(
                 registry, settings=settings, adapter=adapter
             )
@@ -137,6 +149,15 @@ class Manager(
                 active_walker,
             ),
             adapter=adapter,
+            identity_resolver=identity_resolver or DefaultMigrationIdentityResolver(),
+            materializers={
+                "reconstruct_model": ModelMaterializer(adapter),
+                "reconstruct_migration": (
+                    migration_materializer or JsonPatchMigrationBackend()
+                ),
+            },
+            diff_provider=diff_provider
+            or Reflection(adapter, CompositeDiffDiscovery()),
             entry_migration=entry_migration or DefaultEntryPlanner(),
         )
         cls._default_engine = engine

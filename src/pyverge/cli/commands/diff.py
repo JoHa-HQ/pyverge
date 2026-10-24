@@ -8,6 +8,7 @@ from typing import Annotated
 import typer
 
 from pyverge.core.types import ManagerMigrationKey
+from pyverge.reflection import JsonPatchRenderer
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption
@@ -30,7 +31,11 @@ def diff(
         diff_result = mgr.diff(ManagerMigrationKey(schema, from_version, to_version))
 
         if format == "json":
-            typer.echo(json.dumps(diff_result.render(), indent=2, default=str))
+            typer.echo(
+                json.dumps(
+                    diff_result.render(JsonPatchRenderer()), indent=2, default=str
+                )
+            )
         else:
             typer.secho(f"Unknown format: {format}", fg=typer.colors.RED)
             raise typer.Exit(1)

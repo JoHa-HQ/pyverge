@@ -15,7 +15,7 @@ from pyverge.manager.types import (
     ManagerClassState,
 )
 from pyverge.providers import JsonataMigration, JsonPatchMigration
-from pyverge.providers.types import (
+from pyverge.schemas.types import (
     ModelHandle,
 )
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from pyverge.manager.manager import Manager
 
 
-MigrationStrategy = Literal["jsonata"]
+MigrationSyntax = Literal["jsonata"]
 
 
 class MigrationDecorator(Protocol):
@@ -56,7 +56,7 @@ class MigrationKeyDecorator:
         key: MigrationKeyInput,
         *,
         backward_compatible: bool = False,
-        strategy: MigrationStrategy | None = None,
+        strategy: MigrationSyntax | None = None,
     ) -> None:
         self._owner = owner
         self._key = key
@@ -198,7 +198,7 @@ class _MigrationDescriptor:
         def decorator(
             *args: Any,
             backward_compatible: bool = False,
-            strategy: MigrationStrategy | None = None,
+            strategy: MigrationSyntax | None = None,
         ) -> MigrationKeyDecorator:
             key = self._migration_key(args)
             return MigrationKeyDecorator(

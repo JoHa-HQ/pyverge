@@ -7,7 +7,7 @@ from typing import Annotated
 import typer
 
 from pyverge.core.types import ManagerMigrationKey
-from pyverge.reflection import CompatibilityReport
+from pyverge.versioning import CompatibilityReport
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption, dump_json
@@ -59,7 +59,7 @@ def compat(
             )
             for key in keys
         ]
-        breaking = any(report.breaking for report in reports)
+        breaking = any(report.structural_breaking for report in reports)
         if format == "json":
             dump_json(
                 {
@@ -70,10 +70,6 @@ def compat(
                             "from": report.source_version,
                             "to": report.target_version,
                             "structural_breaking": report.structural_breaking,
-                            "declared_backward_compatible": (
-                                report.declared_backward_compatible
-                            ),
-                            "breaking": report.breaking,
                             "added": list(report.added_fields),
                             "removed": list(report.removed_fields),
                             "modified": list(report.modified_fields),
@@ -84,7 +80,7 @@ def compat(
             )
         else:
             for report in reports:
-                status = "BREAKING" if report.breaking else "ok"
+                status = "BREAKING" if report.structural_breaking else "ok"
                 typer.echo(
                     f"{status} {report.kind} "
                     f"{report.source_version} -> {report.target_version}"

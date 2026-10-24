@@ -1,33 +1,34 @@
-from pyverge.core import (
-    AsyncExecutionRequired,
-    DiscoveryError,
-    DiscoverySettings,
-    DiscoveryValidationError,
-    EdgeKey,
-    EngineError,
-    ExecutionModeError,
-    MaxDepthExceededError,
+from pyverge.convergence.catalog import (
+    Registry,
+)
+from pyverge.convergence.errors import (
+    CatalogError,
     MigrationAlreadyRegisteredError,
-    MigrationContext,
-    MigrationError,
-    MigrationMissingFieldError,
     MigrationNotFoundError,
+    MigrationPathError,
     MigrationPathIntegrityError,
-    MigrationSettings,
     MissingReferenceError,
     ModelAlreadyRegisteredError,
     ModelConflictError,
     ModelNotFoundError,
+)
+from pyverge.core import (
+    DiscoverySettings,
+    MaxDepthExceededError,
+    MigrationContext,
+    MigrationSettings,
     Path,
-    RegistryError,
-    SyncExecutionRequired,
-    VersionEdge,
-    VersionedModelError,
+    PayloadError,
+    PayloadValidationError,
     VersioningSettings,
-    VersionKey,
-    VersionNode,
     get_at,
     set_at,
+)
+from pyverge.execution.errors import (
+    AsyncExecutionRequired,
+    ExecutionError,
+    ExecutionModeError,
+    SyncExecutionRequired,
 )
 from pyverge.executor import (
     AsyncLevelParallelExecutor,
@@ -61,11 +62,12 @@ from pyverge.providers import (
 from pyverge.reflection import (
     CallableDiffDiscovery,
     CompositeDiffDiscovery,
-    Diff,
     DiffDiscovery,
     JsonPatchDiffDiscovery,
-    JsonPatchRender,
+    JsonPatchRenderer,
 )
+from pyverge.versioning import Diff, EdgeKey, VersionEdge, VersionKey, VersionNode
+from pyverge.versioning.errors import MigrationApplicationError
 
 from .engine import Engine
 from .graph import GraphBuilder, GraphEntry, MigrationGraph, MigrationPlan
@@ -76,7 +78,6 @@ from .policy import (
     multi_target_resolver,
     skip_target_resolver,
 )
-from .registry import Registry
 from .walker import CompoundKeyWalker, PydanticWalker, Walker
 
 __all__ = [
@@ -84,20 +85,19 @@ __all__ = [
     "AsyncLevelParallelExecutor",
     "AsyncSequentialExecutor",
     "CallableDiffDiscovery",
+    "CatalogError",
     "CompositeDiffDiscovery",
     "CompoundKeyWalker",
     "DefaultEntryPlanner",
     "DefaultMigrationEntry",
     "Diff",
     "DiffDiscovery",
-    "DiscoveryError",
     "DiscoverySettings",
-    "DiscoveryValidationError",
     "EdgeKey",
     "Engine",
-    "EngineError",
     "Entry",
     "EntryMigrationTask",
+    "ExecutionError",
     "ExecutionModeError",
     "ExecutionPolicy",
     "ExecutionTransport",
@@ -106,7 +106,7 @@ __all__ = [
     "GraphEntry",
     "JsonPatchDiffDiscovery",
     "JsonPatchMigration",
-    "JsonPatchRender",
+    "JsonPatchRenderer",
     "JsonSchemaModelAdapter",
     "JsonataMigration",
     "JsonataTransform",
@@ -114,13 +114,13 @@ __all__ = [
     "LocalExecutionBackend",
     "MaxDepthExceededError",
     "MigrationAlreadyRegisteredError",
+    "MigrationApplicationError",
     "MigrationContext",
     "MigrationEntry",
-    "MigrationError",
     "MigrationGraph",
     "MigrationHook",
-    "MigrationMissingFieldError",
     "MigrationNotFoundError",
+    "MigrationPathError",
     "MigrationPathIntegrityError",
     "MigrationPlan",
     "MigrationRun",
@@ -130,11 +130,12 @@ __all__ = [
     "ModelConflictError",
     "ModelNotFoundError",
     "Path",
+    "PayloadError",
+    "PayloadValidationError",
     "PydanticDiff",
     "PydanticModelAdapter",
     "PydanticWalker",
     "Registry",
-    "RegistryError",
     "RunnableMigration",
     "SequentialExecutor",
     "StepExecutor",
@@ -142,7 +143,6 @@ __all__ = [
     "VersionEdge",
     "VersionKey",
     "VersionNode",
-    "VersionedModelError",
     "VersioningSettings",
     "Walker",
     "WalkerProtocol",

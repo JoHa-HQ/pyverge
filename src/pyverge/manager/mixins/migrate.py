@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Generic, cast, overload
 
 from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
-    Diffable,
     DirectionViolationStrategy,
     ManagerMigrationKey,
     MigrationDirectionStrategy,
@@ -26,9 +25,10 @@ from pyverge.executor import (
 from pyverge.manager.types import (
     TargetPolicy,
 )
-from pyverge.providers.types import (
+from pyverge.schemas.types import (
     TContainer,
 )
+from pyverge.versioning import Diffable
 
 if TYPE_CHECKING:
     from pyverge.manager.manager import Manager

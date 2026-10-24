@@ -43,7 +43,6 @@ def export(
                     "kind": edge.kind,
                     "from": str(edge.source.version[1]),
                     "to": str(edge.target.version[1]),
-                    "backward_compatible": edge.diff.is_backward_compatible,
                 }
                 for kind in registry.kinds
                 for edge in registry.migrations(kind)

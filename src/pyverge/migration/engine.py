@@ -1,33 +1,29 @@
-from typing import Any, Generic, Self, overload
+from collections.abc import Mapping
+from typing import Any, Generic, Self, cast, overload
 
-from pyverge.core.exceptions import (
+from pyverge.convergence.catalog import (
+    GraphCatalog,
+    Registry,
+)
+from pyverge.convergence.errors import (
+    BackwardCompatibilityError,
+    CatalogError,
     MigrationNotFoundError,
     MissingReferenceError,
     ModelNotFoundError,
-    RegistryError,
 )
 from pyverge.core.settings import MigrationSettings
 from pyverge.core.types import (
     Attachable,
-    Comparable,
     DirectionViolationStrategy,
-    Migratable,
     MigrationDirectionStrategy,
     MigrationFunc,
     ModelData,
     ModelHandle,
     ModelKind,
     TargetResolver,
-    Transitional,
-    Versionable,
     VersionMissingStrategy,
-    VersionPair,
     VersionValue,
-)
-from pyverge.core.versioning import (
-    EdgeKey,
-    VersionEdge,
-    VersionNode,
 )
 from pyverge.executor import (
     AsyncExecutor,
@@ -37,22 +33,26 @@ from pyverge.executor import (
     MigrationEntry,
     MigrationRun,
 )
-from pyverge.providers.json_patch import JsonPatch
-from pyverge.providers.json_patch.migration import JsonPatchMigration
-from pyverge.providers.types import (
+from pyverge.migrations.identity import MigrationIdentityResolver
+from pyverge.migrations.json_patch import JsonPatch
+from pyverge.reflection.ports import DiffProvider
+from pyverge.schemas.types import (
     ModelAdapter,
 )
-from pyverge.reflection.discovery import CompositeDiffDiscovery, DiffDiscovery
-from pyverge.reflection.reconstruction import (
-    MigrationReflection,
-    Reconstruction,
-    ReconstructionStrategy,
-    strategy_for,
+from pyverge.versioning import (
+    Comparable,
+    CompatibilityReport,
+    DiffMaterializer,
+    EdgeKey,
+    Migratable,
+    Transitional,
+    Versionable,
+    VersionEdge,
+    VersionNode,
+    VersionPair,
 )
-from pyverge.reflection.reflection import Reflection
 
 from .graph import GraphBuilder
-from .registry import Registry
 
 
 class Engine(Generic[VersionValue]):
@@ -72,6 +72,9 @@ class Engine(Generic[VersionValue]):
         default_executor: Executor[VersionValue] | AsyncExecutor[VersionValue] | None,
         graph_builder: GraphBuilder[VersionValue],
         adapter: ModelAdapter,
+        identity_resolver: MigrationIdentityResolver,
+        materializers: Mapping[str, DiffMaterializer[Any]],
+        diff_provider: DiffProvider[VersionValue],
         entry_migration: MigrationEntry[VersionValue] | None = None,
     ) -> None:
         self.registry = registry
@@ -80,10 +83,14 @@ class Engine(Generic[VersionValue]):
         self.default_executor = default_executor
         self.execution_policy = ExecutionPolicy(settings)
         self.adapter = adapter
+        self.identity_resolver = identity_resolver
+        self.materializers = materializers
+        self.diff_provider = diff_provider
         self.entry_migration = entry_migration or DefaultEntryPlanner()
-        self.discovery: DiffDiscovery[VersionValue, JsonPatch | MigrationFunc] = (
-            CompositeDiffDiscovery()
-        )
+
+    def lock(self) -> GraphCatalog:
+        """Freeze the catalog and return the runtime snapshot."""
+        return cast("GraphCatalog", self.registry.lock())
 
     def __contains__(self, index: Any) -> bool:
         """Check membership of a typed model version or migration edge.
@@ -93,7 +100,7 @@ class Engine(Generic[VersionValue]):
         """
         try:
             return index in self.registry
-        except (ModelNotFoundError, MigrationNotFoundError, RegistryError, TypeError):
+        except (ModelNotFoundError, MigrationNotFoundError, CatalogError, TypeError):
             return False
 
     @overload
@@ -222,7 +229,7 @@ class Engine(Generic[VersionValue]):
         v_from, v_to = key
 
         if v_from.kind != v_to.kind:
-            raise RegistryError(
+            raise CatalogError(
                 registry.name,
                 f"Cannot register migration across kinds: {v_from.kind} != {v_to.kind}",
             )
@@ -231,20 +238,38 @@ class Engine(Generic[VersionValue]):
         resolved_to = self._resolve(v_to, other=v_from, func=func)
 
         if not registry.is_adjacent(EdgeKey.from_pair(resolved_from, resolved_to)):
-            raise RegistryError(
+            raise CatalogError(
                 registry.name,
                 f"Cannot register migration with skip versions: {v_from}→{v_to}",
             )
 
+        diff = self.adapter.diff(resolved_from, resolved_to)
+        if backward_compatible:
+            report = CompatibilityReport.from_diff(
+                diff,
+                identity_fields=frozenset(
+                    {self.adapter.kind_property, self.adapter.version_property}
+                ),
+            )
+            if report.structural_breaking:
+                raise BackwardCompatibilityError(
+                    registry.name,
+                    (resolved_from, resolved_to),
+                    removed=tuple(report.removed_fields),
+                    modified=tuple(report.modified_fields),
+                    required_additions=tuple(
+                        field
+                        for field in report.added_fields
+                        if diff.is_added_required(field)
+                    ),
+                )
+
         edge = VersionEdge(
             source=resolved_from,
             target=resolved_to,
-            diff=self.adapter.diff(
-                resolved_from,
-                resolved_to,
-                is_backward_compatible=backward_compatible,
-            ),
+            diff=diff,
             func=func,
+            migration=self.identity_resolver.resolve(func),
         )
         registry.store_migration(edge)
 
@@ -260,8 +285,8 @@ class Engine(Generic[VersionValue]):
         """Return *endpoint*, reconstructing it when it is not registered.
 
         A registered endpoint is returned as-is; an unregistered one is
-        reconstructed from *other*'s model when ``on_missing`` selects the
-        model-reconstruction strategy, else ``ModelNotFoundError``.
+        reconstructed from *other*'s model when a model materializer is
+        configured, else ``ModelNotFoundError``.
         """
         registry = self.registry
         try:
@@ -269,7 +294,10 @@ class Engine(Generic[VersionValue]):
         except ModelNotFoundError:
             pass
 
-        if strategy_for(self.settings.on_missing, adapter=self.adapter) is None:
+        if (
+            self.settings.on_missing != "reconstruct_model"
+            or "reconstruct_model" not in self.materializers
+        ):
             raise ModelNotFoundError(registry.name, endpoint.version)
 
         try:
@@ -287,42 +315,16 @@ class Engine(Generic[VersionValue]):
         target: Comparable[VersionValue],
         func: MigrationFunc,
     ) -> VersionNode[VersionValue]:
-        """Reflect *target* from *anchor* and store the materialized node."""
-        outcome = self.reflect(anchor, target, migration=func)
-        if outcome.model is None:
+        """Materialize *target* from *anchor* and store the result."""
+        diff = self._reflection().diff(anchor, target, migration=func)
+        node = self.materializers["reconstruct_model"].materialize(diff)
+        if not isinstance(node, VersionNode):
             raise ModelNotFoundError(self.registry.name, target.version)
-        self.registry.store_model(outcome.model)
-        return outcome.model
+        self.registry.store_model(node)
+        return node
 
-    def reflect(
-        self: Self,
-        source: Versionable[VersionValue],
-        target: Comparable[VersionValue],
-        *,
-        migration: JsonPatch | MigrationFunc | None = None,
-        is_backward_compatible: bool = False,
-        strategy: ReconstructionStrategy | None = None,
-    ) -> Reconstruction:
-        """Uniform reflection: build a diff and materialize the artifact.
-
-        ``migration`` selects the migration-origin path; absent it, the diff is
-        computed from the two concrete schemas.  The strategy is selected from
-        ``settings.on_missing`` (explicit), else the diff's origin.
-        """
-        return self._reflection().reflect(
-            source,
-            target,
-            migration=migration,
-            is_backward_compatible=is_backward_compatible,
-            strategy=strategy,
-        )
-
-    def _reflection(self: Self) -> Reflection:
-        return Reflection(
-            self.adapter,
-            self.discovery,
-            on_missing=self.settings.on_missing,
-        )
+    def _reflection(self: Self) -> DiffProvider[VersionValue]:
+        return self.diff_provider
 
     def reconstruct(
         self: Self,
@@ -341,9 +343,7 @@ class Engine(Generic[VersionValue]):
         self: Self,
         source: VersionNode[VersionValue],
         target: VersionNode[VersionValue],
-        *,
-        is_backward_compatible: bool = False,
-    ) -> JsonPatchMigration:
+    ) -> Any:
         """Propose a version-edge migration from two schema versions.
 
         Diffs the two models' schemas and renders a declarative RFC 6902 spec
@@ -352,25 +352,19 @@ class Engine(Generic[VersionValue]):
         auto-registers and never touches endpoint models.
         """
         if source.kind != target.kind:
-            raise RegistryError(
+            raise CatalogError(
                 self.registry.name,
                 f"Cannot propose migration across kinds: "
                 f"{source.kind} != {target.kind}",
             )
         if source.strategy != target.strategy:
-            raise RegistryError(
+            raise CatalogError(
                 self.registry.name,
                 f"Cannot propose migration across strategies: "
                 f"{source.strategy.__name__} != {target.strategy.__name__}",
             )
-        outcome = self.reflect(
-            source,
-            target,
-            is_backward_compatible=is_backward_compatible,
-            strategy=MigrationReflection(self.adapter),
-        )
-        assert outcome.migration is not None  # proposal always yields a spec
-        return outcome.migration
+        diff = self._reflection().diff(source, target)
+        return self.materializers["reconstruct_migration"].materialize(diff)
 
     def get_migration(
         self: Self,
@@ -390,13 +384,13 @@ class Engine(Generic[VersionValue]):
 
         if not force:
             if not self.registry.is_adjacent(key):
-                raise RegistryError(
+                raise CatalogError(
                     self.registry.name,
                     f"Cannot remove migration {key.source}→{key.target}: "
                     "it is not adjacent to any other version.",
                 )
             if self.registry.is_critical_edge(key):
-                raise RegistryError(
+                raise CatalogError(
                     self.registry.name,
                     f"Cannot remove critical migration {key.source}→{key.target}. "
                     "It is on the critical path. Use force=True to override.",
@@ -425,7 +419,7 @@ class Engine(Generic[VersionValue]):
         for v in kind_versions:
             for edge in registry.migrations_of(v):
                 if edge.source not in version_set or edge.target not in version_set:
-                    raise RegistryError(
+                    raise CatalogError(
                         registry.name,
                         f"Cannot delete kind '{kind}': version is referenced "
                         f"by cross-kind migration {edge.source}→{edge.target}",
@@ -441,7 +435,7 @@ class Engine(Generic[VersionValue]):
         for v in reversed(kind_versions):
             try:
                 registry.remove_model(v)
-            except RegistryError:
+            except CatalogError:
                 pass
 
     def find_migration_path(

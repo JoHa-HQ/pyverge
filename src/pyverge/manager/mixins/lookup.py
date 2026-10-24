@@ -3,23 +3,24 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Any, Generic
 
-from pyverge.core.exceptions import (
-    MigrationError,
+from pyverge.convergence.errors import (
+    CatalogError,
+    MigrationPathError,
     ModelNotFoundError,
-    RegistryError,
 )
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
-    Comparable,
-    Migratable,
-    Transitional,
     VersionValue,
 )
-from pyverge.core.versioning import (
+from pyverge.versioning import (
+    Comparable,
     EdgeKey,
+    Migratable,
+    Transitional,
     VersionKey,
     VersionNode,
 )
+from pyverge.versioning.errors import MigrationApplicationError
 
 if TYPE_CHECKING:
     from pyverge.manager.manager import Manager
@@ -89,7 +90,7 @@ class LookupMixin(Generic[VersionValue]):
         """Map a fluent lookup key to a typed registry key."""
         if isinstance(index, (Comparable, Transitional, EdgeKey)):
             return index
-        raise RegistryError(
+        raise CatalogError(
             cls._default_engine.registry.name,
             f"Unsupported index type: {type(index)}",
         )
@@ -121,12 +122,24 @@ class LookupMixin(Generic[VersionValue]):
                 to_v = engine.get_model(type(self)._resolve_model_key(index.stop))
                 engine.find_migration_path(from_v, to_v)
                 return True
-            except (MigrationError, ModelNotFoundError, RegistryError, TypeError):
+            except (
+                CatalogError,
+                MigrationApplicationError,
+                MigrationPathError,
+                ModelNotFoundError,
+                TypeError,
+            ):
                 return False
 
         try:
             return type(self)._normalize_index(index) in engine.registry
-        except (MigrationError, ModelNotFoundError, RegistryError, TypeError):
+        except (
+            CatalogError,
+            MigrationApplicationError,
+            MigrationPathError,
+            ModelNotFoundError,
+            TypeError,
+        ):
             return False
 
     def __getitem__(

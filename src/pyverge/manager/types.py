@@ -13,17 +13,18 @@ from pyverge.core.types import (
     ModelKind,
     ModelPair,
     TargetResolver,
-    Versionable,
     VersionMissingStrategy,
     VersionValue,
     VersionValue_co,
 )
-from pyverge.providers.types import (
+from pyverge.schemas.types import (
     ModelAdapter,
     TContainer,
 )
+from pyverge.versioning import Versionable
 
 if TYPE_CHECKING:
+    from pyverge.convergence.catalog import Registry
     from pyverge.core.settings import MigrationSettings
     from pyverge.core.types import (
         Attachable,
@@ -35,12 +36,11 @@ if TYPE_CHECKING:
         MigrationRun,
     )
     from pyverge.migration.engine import Engine
-    from pyverge.migration.registry import Registry
     from pyverge.migration.types import (
         Walker,
     )
-    from pyverge.providers.json_patch import JsonPatchMigration
-    from pyverge.providers.jsonata import JsonataMigration
+    from pyverge.migrations.json_patch import JsonPatchMigration
+    from pyverge.migrations.jsonata import JsonataMigration
 
 TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]
 

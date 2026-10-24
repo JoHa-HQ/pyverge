@@ -14,9 +14,10 @@ from pyverge.core.types import (
 )
 
 if TYPE_CHECKING:
-    from pyverge.core.versioning import VersionNode
-
-    from .registry import Registry
+    from pyverge.convergence.catalog import (
+        Registry,
+    )
+    from pyverge.versioning import VersionNode
 
 #: A discovered versioned entry: ``(path, depth, source)``.
 Entry = tuple[tuple[str | int, ...], int, "VersionNode[VersionValue]"]

@@ -6,16 +6,13 @@ from typing import TYPE_CHECKING, Generic, cast
 from pyverge.core.types import (
     Attachable,
     ManagerMigrationKey,
-    Migratable,
     MigrationFunc,
     MigrationKeyInput,
     ModelPair,
     VersionValue,
 )
-from pyverge.core.versioning import (
-    EdgeKey,
-)
 from pyverge.providers import JsonataMigration, JsonPatchMigration
+from pyverge.versioning import EdgeKey, Migratable
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

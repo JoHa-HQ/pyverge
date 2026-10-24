@@ -3,25 +3,26 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any, Generic
 
-from pyverge.core.exceptions import DiscoveryValidationError, MaxDepthExceededError
+from pyverge.convergence.catalog import (
+    Registry,
+)
+from pyverge.core.errors import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.settings import DiscoverySettings
 from pyverge.core.types import (
     MigrationDirectionStrategy,
     TargetResolver,
     VersionValue,
 )
-from pyverge.core.versioning import (
-    VersionKey,
-    VersionNode,
-)
 from pyverge.migration.types import (
     Entry,
 )
-from pyverge.providers.types import (
+from pyverge.schemas.types import (
     ModelAdapter,
 )
-
-from .registry import Registry
+from pyverge.versioning import (
+    VersionKey,
+    VersionNode,
+)
 
 
 class Walker(Generic[VersionValue]):
@@ -33,7 +34,7 @@ class Walker(Generic[VersionValue]):
       the container and descent follows the container's field models
       (container-guided semantics).
     - ``container`` the adapter cannot handle: fail fast with
-      :class:`DiscoveryValidationError` before any migration runs.
+      :class:`PayloadValidationError` before any migration runs.
     """
 
     def __init__(
@@ -72,7 +73,7 @@ class Walker(Generic[VersionValue]):
             return
 
         if not self._adapter.can_handle(container):
-            raise DiscoveryValidationError(
+            raise PayloadValidationError(
                 path=(),
                 message="container is not a recognized model type",
             )
@@ -88,7 +89,7 @@ class Walker(Generic[VersionValue]):
                     strict=(validation_mode == "strict"),
                 )
             except Exception as exc:
-                raise DiscoveryValidationError(
+                raise PayloadValidationError(
                     path=(),
                     message=f"Payload failed container validation: {exc}",
                 ) from exc

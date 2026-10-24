@@ -3,15 +3,11 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
-from pyverge.core.exceptions import ModelNotFoundError, RegistryError
+from pyverge.convergence.errors import CatalogError, ModelNotFoundError
 from pyverge.core.types import (
     ModelKind,
     TargetResolver,
     VersionValue,
-)
-from pyverge.core.versioning import (
-    VersionKey,
-    VersionNode,
 )
 from pyverge.manager.types import (
     TargetPolicy,
@@ -25,8 +21,12 @@ from pyverge.migration.policy import (
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.providers.types import (
+from pyverge.schemas.types import (
     ModelHandle,
+)
+from pyverge.versioning import (
+    VersionKey,
+    VersionNode,
 )
 
 if TYPE_CHECKING:
@@ -116,7 +116,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
         try:
             target = engine.get_model_by_class(model_cls)
         except ModelNotFoundError as exc:
-            raise RegistryError(
+            raise CatalogError(
                 registry.name,
                 f"Target model {model_cls.__name__} is not registered",
             ) from exc
@@ -125,7 +125,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
             current: VersionNode[VersionValue],
         ) -> VersionNode[VersionValue] | None:
             if current.kind != target.kind:
-                raise RegistryError(
+                raise CatalogError(
                     registry.name,
                     f"Target model {model_cls.__name__} belongs to kind "
                     f"{target.kind!r}, but entry kind is {current.kind!r}",
@@ -149,7 +149,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
         try:
             parsed = adapter.of(value)
         except ValueError:
-            raise RegistryError(
+            raise CatalogError(
                 registry.name,
                 f"Could not resolve string target {value!r} to a version",
             ) from None
