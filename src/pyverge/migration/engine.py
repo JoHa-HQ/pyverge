@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any, Generic, Self, cast, overload
 
 from pyverge.core.types import (
@@ -12,11 +11,10 @@ from pyverge.core.types import (
     ModelKind,
     VersionValue,
 )
+from pyverge.discovery.reflection import Reflector
 from pyverge.migration.registration import MigrationRegistrationService
 from pyverge.migrations.identity import MigrationIdentityResolver
 from pyverge.migrations.json_patch import JsonPatch
-from pyverge.reflection import Reflector
-from pyverge.reflection.types import DiffProvider
 from pyverge.registry import GraphCatalog, Registry
 from pyverge.registry.errors import (
     CatalogError,
@@ -28,7 +26,6 @@ from pyverge.registry.explorer import GraphExplorer
 from pyverge.schemas.types import ModelAdapter
 from pyverge.versioning import (
     Comparable,
-    DiffMaterializer,
     EdgeKey,
     Migratable,
     Transitional,
@@ -46,22 +43,12 @@ class Engine(Generic[VersionValue]):
         registry: Registry[VersionValue],
         adapter: ModelAdapter,
         identity_resolver: MigrationIdentityResolver,
-        materializers: Mapping[str, DiffMaterializer[Any]],
-        diff_provider: DiffProvider[VersionValue],
-        on_missing: str = "raise",
+        reflector: Reflector[VersionValue],
     ) -> None:
         self.registry = registry
         self.adapter = adapter
         self.identity_resolver = identity_resolver
-        self.materializers = dict(materializers)
-        self.diff_provider = diff_provider
-        self.on_missing = on_missing
-        self.reflector = Reflector(
-            adapter,
-            diff_provider,
-            self.materializers,
-            on_missing=on_missing,
-        )
+        self.reflector = reflector
         self.migrations = MigrationRegistrationService(
             registry,
             adapter,
@@ -76,9 +63,7 @@ class Engine(Generic[VersionValue]):
             self.registry.copy(),
             self.adapter,
             self.identity_resolver,
-            self.materializers,
-            self.diff_provider,
-            self.on_missing,
+            self.reflector,
         )
 
     def copy_registry(self) -> Registry[VersionValue]:

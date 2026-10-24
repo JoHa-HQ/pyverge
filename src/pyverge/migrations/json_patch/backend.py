@@ -15,7 +15,7 @@ class JsonPatchMigrationBackend:
 
     def materialize(self, diff: Diffable) -> JsonPatchMigration:
         """Build a declarative migration from the diff."""
-        from pyverge.reflection.render import JsonPatchRenderer  # noqa: PLC0415
+        from pyverge.discovery.reflection.render import JsonPatchRenderer  # noqa: PLC0415
 
         return JsonPatchMigration(
             {

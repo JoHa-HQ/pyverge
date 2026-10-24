@@ -8,30 +8,25 @@ from pyverge import Manager
 from pyverge.core.types import (
     VersionValue,
 )
+from pyverge.discovery.reflection import CompositeDiffDiscovery, Reflection, Reflector
+from pyverge.execution import GraphBuilder, MigrationGraph, Walker
 from pyverge.manager.types import (
     ResolverFactory,
 )
 from pyverge.migration import (
-    CompoundKeyWalker,
     Engine,
-    GraphBuilder,
     JsonSchemaModelAdapter,
-    MigrationGraph,
     PydanticModelAdapter,
-    PydanticWalker,
     Registry,
 )
-from pyverge.migration.types import (
-    Walker,
-)
+from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.providers.types import (
     ModelAdapter,
 )
-from pyverge.reflection import CompositeDiffDiscovery, Reflection
 from pyverge.schemas.backend import ModelMaterializer
-from pyverge.versioning import default_content_hasher
+from pyverge.versioning import DiffMaterializer, default_content_hasher
 from tests.utils import register_models
 from tests.utils.engine import register_migrations
 from tests.utils.settings import (
@@ -121,16 +116,15 @@ def walker(
     migration_settings: MigrationSettings,
     model_adapter: PydanticModelAdapter,
 ) -> Walker:
-    """A preconfigured :class:`PydanticWalker` bound to the shared registry.
+    """A preconfigured :class:`Walker` bound to the shared registry.
 
     Pass it to ``Manager[VersionValue].configure(settings, adapter, walker=...)``
     to drive container-guided discovery.
     """
-    return PydanticWalker(
+    return Walker(
         registry,
         adapter=model_adapter,
         validation_mode=migration_settings.validation_mode,
-        direction=migration_settings.direction,
     )
 
 
@@ -143,13 +137,13 @@ def graph_builder(
     """Return a graph builder with the standard compound-key walker."""
     return GraphBuilder(
         registry,
-        CompoundKeyWalker(
+        Walker(
             registry,
             adapter=model_adapter,
             validation_mode=migration_settings.validation_mode,
-            direction=migration_settings.direction,
         ),
         max_migration_depth=migration_settings.max_migration_depth,
+        direction=migration_settings.direction,
     )
 
 
@@ -167,36 +161,51 @@ def migration_graph(
 
 
 @pytest.fixture
-def engine(
-    registry: Registry,
-    migration_settings: MigrationSettings,
+def model_materializer(model_adapter: ModelAdapter) -> ModelMaterializer:
+    return ModelMaterializer(model_adapter)
+
+
+@pytest.fixture
+def migration_materializer(request: pytest.FixtureRequest) -> MigrationMaterializer:
+    backend = getattr(request, "param", JsonPatchMigrationBackend)
+    return MigrationMaterializer(backend())
+
+
+@pytest.fixture
+def reflector(
     model_adapter: ModelAdapter,
-) -> Engine[VersionValue]:
-    return Engine(
-        registry,
+    model_materializer: ModelMaterializer,
+    migration_materializer: DiffMaterializer[object],
+    migration_settings: MigrationSettings,
+) -> Reflector[VersionValue]:
+    return Reflector[VersionValue](
         model_adapter,
-        DefaultMigrationIdentityResolver(),
-        {
-            "reconstruct_model": ModelMaterializer(model_adapter),
-            "reconstruct_migration": JsonPatchMigrationBackend(),
-        },
-        Reflection(model_adapter, CompositeDiffDiscovery()),
+        Reflection[VersionValue](model_adapter, CompositeDiffDiscovery()),
+        model_materializer=model_materializer,
+        migration_materializer=migration_materializer,
         on_missing=migration_settings.on_missing,
     )
 
 
 @pytest.fixture
-def source_factory():
-    """Build a static source from descriptors."""
+def engine(
+    registry: Registry,
+    model_adapter: ModelAdapter,
+    reflector: Reflector[VersionValue],
+) -> Engine[VersionValue]:
+    return Engine(
+        registry,
+        model_adapter,
+        DefaultMigrationIdentityResolver(),
+        reflector,
+    )
 
-    def make(
-        descriptors: list,
-        *,
-        source_id: str,
-    ) -> StaticSource:
-        return StaticSource(tuple(descriptors), source_id)
 
-    return make
+@pytest.fixture
+def source(request: pytest.FixtureRequest) -> StaticSource:
+    """Build a static source from ``(descriptors, source_id)`` params."""
+    descriptors, source_id = request.param
+    return StaticSource(tuple(descriptors), source_id)
 
 
 @pytest.fixture

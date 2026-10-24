@@ -11,12 +11,11 @@ import semver
 
 from pyverge import types
 from pyverge.core import MaxDepthExceededError, PayloadValidationError
+from pyverge.execution import Walker
 from pyverge.migration import (
-    CompoundKeyWalker,
     Engine,
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
-    PydanticWalker,
     Registry,
     fixed_target_resolver,
     latest_target_resolver,
@@ -60,10 +59,9 @@ def test_compound_key_empty_payload_returns_no_entries(
     discovery_settings,
     registry,
 ) -> None:
-    walker = CompoundKeyWalker[semver.Version](
+    walker = Walker[semver.Version](
         registry,
         validation_mode=discovery_settings.validation_mode,
-        direction=discovery_settings.direction,
         adapter=model_adapter,
     )
     entries = list(
@@ -75,19 +73,17 @@ def test_compound_key_empty_payload_returns_no_entries(
 
 
 @pytest.mark.parametrize(
-    "model_adapter, registry, walker_cls, container",
+    "model_adapter, registry, container",
     [
         pytest.param(
             PydanticModelAdapter,
             (semver.Version, "test", (UserV1, UserV2), ()),
-            CompoundKeyWalker,
             None,
             id="compound_key_semver",
         ),
         pytest.param(
             PydanticModelAdapter,
             (semver.Version, "test", (UserV1, UserV2), ()),
-            PydanticWalker,
             UserContainer,
             id="pydantic_container_semver",
         ),
@@ -98,7 +94,6 @@ def test_finds_registered_versioned_dict(
     model_adapter,
     discovery_settings,
     registry,
-    walker_cls: type[CompoundKeyWalker | PydanticWalker],
     container: type | None,
 ) -> None:
     payload = {
@@ -118,10 +113,9 @@ def test_finds_registered_versioned_dict(
         kwargs["container"] = container
     walker_kwargs: dict[str, Any] = {
         "validation_mode": discovery_settings.validation_mode,
-        "direction": discovery_settings.direction,
         "adapter": model_adapter,
     }
-    entries = list(walker_cls(registry, **walker_kwargs).discover(payload, **kwargs))
+    entries = list(Walker(registry, **walker_kwargs).discover(payload, **kwargs))
     assert len(entries) == 1
     assert entries[0][0] == ("document",)
     assert entries[0][2].model is UserV1
@@ -150,10 +144,9 @@ def test_compound_key_unknown_version_is_skipped(
             "name": "Alice",
         }
     }
-    walker = CompoundKeyWalker(
+    walker = Walker(
         registry,
         validation_mode=discovery_settings.validation_mode,
-        direction=discovery_settings.direction,
         adapter=model_adapter,
     )
     entries = list(
@@ -178,10 +171,9 @@ def test_compound_key_max_depth_exceeded_for_nested_entry(
     discovery_settings,
     registry,
 ) -> None:
-    walker = CompoundKeyWalker(
+    walker = Walker(
         registry,
         validation_mode=discovery_settings.validation_mode,
-        direction=discovery_settings.direction,
         adapter=model_adapter,
     )
     payload = {
@@ -222,10 +214,9 @@ def test_walker_incompatible_container_fails_fast(
     discovery_settings,
     registry,
 ) -> None:
-    walker = PydanticWalker(
+    walker = Walker(
         registry,
         validation_mode=discovery_settings.validation_mode,
-        direction=discovery_settings.direction,
         adapter=model_adapter,
     )
     with pytest.raises(PayloadValidationError, match="recognized model type"):
@@ -241,10 +232,9 @@ def test_walker_containerless_when_none(
     discovery_settings,
     registry,
 ) -> None:
-    walker = PydanticWalker(
+    walker = Walker(
         registry,
         validation_mode=discovery_settings.validation_mode,
-        direction=discovery_settings.direction,
         adapter=model_adapter,
     )
     assert (
@@ -275,10 +265,9 @@ def test_pydantic_walker_invalid_payload_raises(
     discovery_settings,
     registry,
 ) -> None:
-    walker = PydanticWalker(
+    walker = Walker(
         registry,
         validation_mode=discovery_settings.validation_mode,
-        direction=discovery_settings.direction,
         adapter=model_adapter,
     )
     payload = {
@@ -317,10 +306,9 @@ def test_pydantic_walker_validation_mode_none_skips_model_validate(
     discovery_settings,
     registry,
 ) -> None:
-    walker = PydanticWalker(
+    walker = Walker(
         registry,
         validation_mode=discovery_settings.validation_mode,
-        direction=discovery_settings.direction,
         adapter=model_adapter,
     )
     payload = {

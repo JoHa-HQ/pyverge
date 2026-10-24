@@ -8,7 +8,7 @@ from typing import Any, Protocol, runtime_checkable
 
 from pyverge.core.clock import Clock
 from pyverge.core.types import MigrationFunc
-from pyverge.reflection import Reflector
+from pyverge.discovery.reflection import Reflector
 from pyverge.schemas.types import ModelAdapter
 from pyverge.versioning import VersionNode
 

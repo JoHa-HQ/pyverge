@@ -42,16 +42,13 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
+from pyverge.execution.types import Entry, Walker
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
     ResolverFactory,
     TargetPolicy,
     TargetSpec,
-)
-from pyverge.migration.types import (
-    Entry,
-    Walker,
 )
 from pyverge.schemas.types import (
     ModelAdapter,

@@ -13,7 +13,8 @@ from pyverge.core.types import (
     TargetResolver,
     VersionValue,
 )
-from pyverge.migration.types import (
+from pyverge.execution.direction import direction_policy
+from pyverge.execution.types import (
     Walker,
 )
 from pyverge.registry import (
@@ -220,10 +221,12 @@ class GraphBuilder(Generic[VersionValue]):
         walker: Walker[VersionValue],
         *,
         max_migration_depth: int = -1,
+        direction: MigrationDirectionStrategy = "any",
     ) -> None:
         self._registry = registry
         self._max_migration_depth = max_migration_depth
         self._walker = walker
+        self._direction = direction_policy(direction)
 
     @property
     def walker(self) -> Walker[VersionValue]:
@@ -264,7 +267,7 @@ class GraphBuilder(Generic[VersionValue]):
                     max_depth=max_depth,
                 )
             target = target_resolver(source)
-            if target is None:
+            if target is None or not self._direction.allows(source, target):
                 continue
             path_steps = self._resolve_migration_path(source, target)
             hook_sets: list[tuple[Attachable, ...]] = []

@@ -1,5 +1,6 @@
 """Migration backends: callable identity, JSON Patch, JSONata."""
 
+from .backend import MigrationMaterializer
 from .identity import DefaultMigrationIdentityResolver, MigrationIdentityResolver
 from .json_patch import (
     CoerceOperation,
@@ -23,6 +24,7 @@ __all__ = [
     "JsonataTransform",
     "MapOperation",
     "MigrationIdentityResolver",
+    "MigrationMaterializer",
     "Pointer",
     "SetDefaultOperation",
     "SplitOperation",

@@ -11,9 +11,8 @@ from pydantic import BaseModel
 
 from pyverge import types
 from pyverge.core import MaxDepthExceededError
+from pyverge.execution import GraphEntry, MigrationGraph
 from pyverge.migration import (
-    GraphEntry,
-    MigrationGraph,
     PydanticModelAdapter,
     Registry,
     latest_target_resolver,

@@ -10,6 +10,7 @@ import pytest
 import semver
 
 from pyverge import types
+from pyverge.discovery.reflection import JsonPatchRenderer
 from pyverge.migration import (
     Diff,
     JsonataMigration,
@@ -23,7 +24,6 @@ from pyverge.migration import (
 from pyverge.providers.types import (
     ModelHandle,
 )
-from pyverge.reflection import JsonPatchRenderer
 from pyverge.versioning import (
     CompatibilityReport,
     DiffOrigin,

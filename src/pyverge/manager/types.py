@@ -30,19 +30,17 @@ if TYPE_CHECKING:
     from pyverge.core.types import (
         Attachable,
     )
+    from pyverge.discovery.reflection import DiffProvider
     from pyverge.discovery.types import (
         ReflectionReport,
         ReflectionStrategy,
         RegistrationContext,
     )
+    from pyverge.execution.types import Walker
     from pyverge.migration.engine import Engine
-    from pyverge.migration.types import (
-        Walker,
-    )
     from pyverge.migrations.identity import MigrationIdentityResolver
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
-    from pyverge.reflection import DiffProvider
     from pyverge.registry import Registry
     from pyverge.sources import SourcePort
     from pyverge.versioning import ContentHasher, DiffMaterializer
@@ -59,7 +57,7 @@ TargetPolicy: TypeAlias = (
 )
 
 #: A callable that binds a registry to a :data:`TargetResolver`; the shape of
-#: the ``*_target_resolver`` factories in :mod:`pyverge.migration.policy`.
+#: the ``*_target_resolver`` factories in :mod:`pyverge.execution.targets`.
 ResolverFactory: TypeAlias = Callable[
     ["Registry[VersionValue]"], TargetResolver[VersionValue]
 ]

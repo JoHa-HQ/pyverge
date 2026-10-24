@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from pyverge.discovery.reflection import Reflector
 from pyverge.discovery.types import (
     RegistrationContext,
     RegistrationPort,
     SourceDescriptor,
 )
-from pyverge.reflection import Reflector
 from pyverge.versioning import VersionNode
 
 _PAIR_LEN = 2

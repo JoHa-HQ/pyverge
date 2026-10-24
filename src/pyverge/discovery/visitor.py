@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from pyverge.discovery.reflection import Reflector
 from pyverge.discovery.types import (
     ReflectionReport,
     ReflectionStrategy,
@@ -13,7 +14,6 @@ from pyverge.discovery.types import (
     SourceDescriptor,
     SourceVisitor,
 )
-from pyverge.reflection import Reflector
 
 
 def _migration_count(registry: Any) -> int:

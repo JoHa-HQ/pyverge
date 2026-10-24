@@ -8,18 +8,18 @@ from pyverge.core.types import (
     TargetResolver,
     VersionValue,
 )
-from pyverge.manager.types import (
-    TargetPolicy,
-    TargetSpec,
-)
-from pyverge.migration.engine import Engine
-from pyverge.migration.policy import (
+from pyverge.execution.targets import (
     earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,
     multi_target_resolver,
     skip_target_resolver,
 )
+from pyverge.manager.types import (
+    TargetPolicy,
+    TargetSpec,
+)
+from pyverge.migration.engine import Engine
 from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import (
     ModelHandle,

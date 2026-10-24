@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 
 from pyverge.core.types import ManagerMigrationKey
-from pyverge.reflection import JsonPatchRenderer
+from pyverge.discovery.reflection import JsonPatchRenderer
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption

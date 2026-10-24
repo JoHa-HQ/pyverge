@@ -10,9 +10,9 @@ from pyverge.core.types import (
     ModelKind,
     VersionValue,
 )
+from pyverge.discovery.reflection import Reflector
 from pyverge.migration.errors import BackwardCompatibilityError
 from pyverge.migrations.identity import MigrationIdentityResolver
-from pyverge.reflection import Reflector
 from pyverge.registry import RegistryPort
 from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import ModelAdapter

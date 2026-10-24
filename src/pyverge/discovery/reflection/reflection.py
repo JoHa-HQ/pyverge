@@ -14,8 +14,8 @@ from .types import DiffProvider
 
 if TYPE_CHECKING:
     from pyverge.core.types import MigrationFunc
+    from pyverge.discovery.reflection.discovery import DiffDiscovery
     from pyverge.migrations.json_patch import JsonPatch
-    from pyverge.reflection.discovery import DiffDiscovery
     from pyverge.schemas.types import ModelAdapter
     from pyverge.versioning import Comparable, Diff, Versionable
 

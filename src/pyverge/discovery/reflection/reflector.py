@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any, Generic
 
 from pyverge.core.types import MigrationFunc, VersionValue
+from pyverge.discovery.reflection.types import DiffProvider
 from pyverge.migrations.json_patch import JsonPatch
-from pyverge.reflection.types import DiffProvider
 from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import ModelAdapter
 from pyverge.versioning import Comparable, DiffMaterializer, VersionNode
@@ -19,13 +19,15 @@ class Reflector(Generic[VersionValue]):
         self,
         adapter: ModelAdapter,
         diff_provider: DiffProvider[VersionValue],
-        materializers: dict[str, DiffMaterializer[Any]],
         *,
-        on_missing: str = "raise",
+        model_materializer: DiffMaterializer[Any],
+        migration_materializer: DiffMaterializer[Any],
+        on_missing: str,
     ) -> None:
         self._adapter = adapter
         self._diff_provider = diff_provider
-        self._materializers = materializers
+        self._model_materializer = model_materializer
+        self._migration_materializer = migration_materializer
         self._on_missing = on_missing
 
     def diff(
@@ -43,13 +45,10 @@ class Reflector(Generic[VersionValue]):
         target: Comparable[VersionValue],
         func: MigrationFunc,
     ) -> VersionNode[VersionValue]:
-        if (
-            self._on_missing != "reconstruct_model"
-            or "reconstruct_model" not in self._materializers
-        ):
+        if self._on_missing != "reconstruct_model":
             raise ModelNotFoundError("registry", target.version)
         diff = self.diff(anchor, target, migration=func)
-        node = self._materializers["reconstruct_model"].materialize(diff)
+        node = self._model_materializer.materialize(diff)
         if not isinstance(node, VersionNode):
             raise ModelNotFoundError("registry", target.version)
         return node
@@ -72,7 +71,7 @@ class Reflector(Generic[VersionValue]):
                 f"{source.strategy.__name__} != {target.strategy.__name__}",
             )
         diff = self.diff(source, target)
-        return self._materializers["reconstruct_migration"].materialize(diff)
+        return self._migration_materializer.materialize(diff)
 
 
 __all__ = ["Reflector"]

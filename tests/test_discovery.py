@@ -11,12 +11,56 @@ from pyverge.registry.errors import GraphLockedError
 from pyverge.sources import SourceDescriptor
 from pyverge.versioning import EdgeKey
 from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
+from tests.utils.source import StaticSource
 
 
 @pytest.mark.parametrize(
-    "descriptors, expected_models, expected_migrations",
+    "source, expected_models, expected_migrations",
     [
         pytest.param(
+            (
+                [
+                    SourceDescriptor("model", UserV1, "test", {}),
+                    SourceDescriptor("model", UserV2, "test", {}),
+                    SourceDescriptor(
+                        "migration",
+                        ((UserV1, UserV2), migrate_v1_to_v2),
+                        "test",
+                        {},
+                    ),
+                ],
+                "test",
+            ),
+            len((UserV1, UserV2)),
+            1,
+            id="models-and-migration",
+        ),
+        pytest.param(
+            ([SourceDescriptor("model", UserV1, "test", {})], "test"),
+            1,
+            0,
+            id="single-model",
+        ),
+    ],
+    indirect=["source"],
+)
+def test_reflect_registers(
+    manager: type[Manager],
+    source: StaticSource,
+    expected_models: int,
+    expected_migrations: int,
+) -> None:
+    report = manager.reflect(source)
+
+    assert report.registered_models == expected_models
+    assert report.registered_migrations == expected_migrations
+    assert len(manager._default_engine.registry.versions) == expected_models
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        (
             [
                 SourceDescriptor("model", UserV1, "test", {}),
                 SourceDescriptor("model", UserV2, "test", {}),
@@ -27,48 +71,17 @@ from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
                     {},
                 ),
             ],
-            len((UserV1, UserV2)),
-            1,
-            id="models-and-migration",
-        ),
-        pytest.param(
-            [SourceDescriptor("model", UserV1, "test", {})],
-            1,
-            0,
-            id="single-model",
-        ),
+            "test",
+        )
     ],
+    indirect=["source"],
 )
-def test_reflect_registers(
-    manager: type[Manager],
-    source_factory,
-    descriptors: list[SourceDescriptor],
-    expected_models: int,
-    expected_migrations: int,
-) -> None:
-    report = manager.reflect(source_factory(descriptors, source_id="test"))
-
-    assert report.registered_models == expected_models
-    assert report.registered_migrations == expected_migrations
-    assert len(manager._default_engine.registry.versions) == expected_models
-
-
 def test_reflect_registers_migration_edge(
     manager: type[Manager],
-    source_factory,
+    source: StaticSource,
 ) -> None:
-    descriptors = [
-        SourceDescriptor("model", UserV1, "test", {}),
-        SourceDescriptor("model", UserV2, "test", {}),
-        SourceDescriptor(
-            "migration",
-            ((UserV1, UserV2), migrate_v1_to_v2),
-            "test",
-            {},
-        ),
-    ]
     engine = manager._default_engine
-    manager.reflect(source_factory(descriptors, source_id="test"))
+    manager.reflect(source)
 
     edge = EdgeKey.from_pair(
         engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0")),
@@ -77,26 +90,29 @@ def test_reflect_registers_migration_edge(
     assert engine.registry.has_migration(edge)
 
 
-def test_reflect_skips_unknown_strategy(manager: type[Manager], source_factory) -> None:
-    report = manager.reflect(
-        source_factory(
-            [SourceDescriptor("unknown", None, "test", {})],
-            source_id="test",
-        )
-    )
+@pytest.mark.parametrize(
+    "source",
+    [([SourceDescriptor("unknown", None, "test", {})], "test")],
+    indirect=["source"],
+)
+def test_reflect_skips_unknown_strategy(
+    manager: type[Manager], source: StaticSource
+) -> None:
+    report = manager.reflect(source)
 
     assert report.descriptors == 0
     assert report.skipped == ("unknown",)
 
 
+@pytest.mark.parametrize("source", [([], "test")], indirect=["source"])
 def test_reflect_after_instance_raises(
     manager: type[Manager],
-    source_factory,
+    source: StaticSource,
 ) -> None:
     manager()
 
     with pytest.raises(GraphLockedError, match="locked"):
-        manager.reflect(source_factory([], source_id="test"))
+        manager.reflect(source)
 
 
 def test_manager_is_reflectable(manager: type[Manager]) -> None:

@@ -6,8 +6,8 @@ import textwrap
 from typing import Any, Generic
 
 from pyverge.core.types import MigrationFunc, VersionValue
+from pyverge.discovery.reflection.types import DiffDiscovery
 from pyverge.migrations.json_patch import JsonPatch
-from pyverge.reflection.types import DiffDiscovery
 from pyverge.versioning import (
     Comparable,
     Diff,

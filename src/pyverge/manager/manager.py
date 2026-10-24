@@ -3,16 +3,20 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pyverge.core.types import VersionValue
-from pyverge.migration.engine import Engine
-from pyverge.migration.types import (
-    Walker,
+from pyverge.discovery.reflection import (
+    CompositeDiffDiscovery,
+    DiffProvider,
+    Reflection,
+    Reflector,
 )
+from pyverge.execution.types import Walker
+from pyverge.migration.engine import Engine
+from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import (
     DefaultMigrationIdentityResolver,
     MigrationIdentityResolver,
 )
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.reflection import CompositeDiffDiscovery, DiffProvider, Reflection
 from pyverge.registry import Registry
 from pyverge.schemas.backend import ModelMaterializer
 from pyverge.schemas.types import (
@@ -91,6 +95,7 @@ class Manager(
         walker: Walker | None = None,
         hasher: ContentHasher | None = None,
         identity_resolver: MigrationIdentityResolver | None = None,
+        model_materializer: DiffMaterializer[object] | None = None,
         migration_materializer: DiffMaterializer[object] | None = None,
         diff_provider: DiffProvider[VersionValue] | None = None,
         on_missing: str = "raise",
@@ -104,10 +109,8 @@ class Manager(
             walker: Optional preconfigured payload walker.  When a walker
                 instance is given, its ``registry`` becomes the manager's
                 registry.  Defaults to the containerless
-                :class:`~pyverge.migration.CompoundKeyWalker`; supply a
-                schema-driven walker (e.g.
-                :class:`~pyverge.migration.PydanticWalker`) to enable
-                container-guided discovery.
+                :class:`~pyverge.execution.Walker`; container-guided
+                discovery is enabled by supplying a container at call time.
             entry_migration: Optional per-entry migration defaults.  Defaults
                 to :class:`~pyverge.migration.DefaultEntryPlanner`.
         """
@@ -115,19 +118,21 @@ class Manager(
             registry = Registry[VersionValue](hasher=hasher or default_content_hasher())
         else:
             registry = walker.registry
+        reflector = Reflector[VersionValue](
+            adapter,
+            diff_provider or Reflection(adapter, CompositeDiffDiscovery()),
+            model_materializer=model_materializer or ModelMaterializer(adapter),
+            migration_materializer=(
+                migration_materializer
+                or MigrationMaterializer(JsonPatchMigrationBackend())
+            ),
+            on_missing=on_missing,
+        )
         engine = engine or Engine[VersionValue](
             registry=registry,
             adapter=adapter,
             identity_resolver=identity_resolver or DefaultMigrationIdentityResolver(),
-            materializers={
-                "reconstruct_model": ModelMaterializer(adapter),
-                "reconstruct_migration": (
-                    migration_materializer or JsonPatchMigrationBackend()
-                ),
-            },
-            diff_provider=diff_provider
-            or Reflection(adapter, CompositeDiffDiscovery()),
-            on_missing=on_missing,
+            reflector=reflector,
         )
         cls._default_engine = engine
         cls._default_adapter = adapter

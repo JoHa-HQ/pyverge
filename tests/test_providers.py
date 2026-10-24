@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from pyverge.discovery.reflection import CompositeDiffDiscovery, Reflection
 from pyverge.migration import (
     Engine,
     JsonPatchMigration,
@@ -11,7 +12,6 @@ from pyverge.migration import (
     PydanticModelAdapter,
 )
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.reflection import CompositeDiffDiscovery, Reflection
 from pyverge.schemas import DataclassModelAdapter
 from pyverge.schemas.backend import ModelMaterializer
 from tests.examples.dataclasses import UserV1 as DataclassUserV1

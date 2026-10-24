@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
+from pyverge.discovery.reflection import Reflector
 from pyverge.discovery.strategies.migrations import MigrationStrategy
 from pyverge.discovery.strategies.models import ModelSchemaStrategy
 from pyverge.discovery.types import (
@@ -11,7 +12,6 @@ from pyverge.discovery.types import (
     RegistrationPort,
     SourceDescriptor,
 )
-from pyverge.reflection import Reflector
 
 
 class CompositeStrategy:

@@ -5,11 +5,10 @@ from typing import Any, Generic, Literal
 
 from pyverge.core.errors import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.types import (
-    MigrationDirectionStrategy,
     TargetResolver,
     VersionValue,
 )
-from pyverge.migration.types import (
+from pyverge.execution.types import (
     Entry,
 )
 from pyverge.registry import (
@@ -42,12 +41,10 @@ class Walker(Generic[VersionValue]):
         *,
         adapter: ModelAdapter,
         validation_mode: Literal["strict", "lax", "none"] = "lax",
-        direction: MigrationDirectionStrategy = "any",
     ) -> None:
         self._registry = registry
         self._validation_mode = validation_mode
         self._adapter = adapter
-        self._direction = direction
 
     @property
     def registry(self) -> Registry[VersionValue]:
@@ -126,19 +123,6 @@ class Walker(Generic[VersionValue]):
         except Exception:
             return None
 
-    def _forward_ok(
-        self,
-        source: VersionNode[VersionValue],
-        target: VersionNode[VersionValue],
-    ) -> bool:
-        if self._direction == "any":
-            return True
-        if self._direction == "forward":
-            return source < target
-        if self._direction == "backward":
-            return source > target
-        return True
-
     def _walk_containerless(
         self,
         value: Any,
@@ -164,7 +148,7 @@ class Walker(Generic[VersionValue]):
                         max_depth=max_depth,
                     )
                 target = target_resolver(source)
-                if target is not None and self._forward_ok(source, target):
+                if target is not None:
                     yield (path, depth, source)
 
             child_versioned_depth = (
@@ -263,8 +247,3 @@ class Walker(Generic[VersionValue]):
                     max_depth,
                     target_resolver,
                 )
-
-
-#: Backwards-compatible aliases — both names now resolve to the single walker.
-CompoundKeyWalker = Walker
-PydanticWalker = Walker
