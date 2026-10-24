@@ -4,6 +4,8 @@ Most behaviors are exercised for both the semver (pydantic) and chrono/JSON
 (``JsonSchemaModelAdapter`` + ``pendulum.Date``) strategies.
 """
 
+from __future__ import annotations
+
 from dataclasses import replace
 from typing import Any
 
@@ -26,7 +28,6 @@ from pyverge.convergence.errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
-from pyverge.core import VersioningSettings
 from pyverge.export import JgfExporter, ManifestDiff
 from pyverge.migration import (
     Engine,
@@ -75,6 +76,7 @@ from tests.examples.pydantic.semver_nested import (
     PersonV2,
 )
 from tests.utils import edge_from_models, envelope_model, meta_versionable
+from tests.utils.settings import VersioningSettings
 
 
 class TestModel:

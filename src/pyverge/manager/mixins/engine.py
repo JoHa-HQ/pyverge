@@ -30,7 +30,7 @@ class EngineLifecycleMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ):
         instance = super().__new__(cls)
-        instance.engine = engine or cls._default_engine
+        instance.engine = (engine or cls._default_engine).copy()
         return instance
 
     def __init__(

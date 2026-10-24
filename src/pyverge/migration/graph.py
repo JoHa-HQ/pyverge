@@ -9,7 +9,6 @@ from pyverge.convergence.catalog import (
 )
 from pyverge.convergence.errors import CatalogError
 from pyverge.core.errors import MaxDepthExceededError
-from pyverge.core.settings import DiscoverySettings
 from pyverge.core.types import (
     Attachable,
     MigrationDirectionStrategy,
@@ -218,11 +217,12 @@ class GraphBuilder(Generic[VersionValue]):
     def __init__(
         self,
         registry: Registry[VersionValue],
-        settings: DiscoverySettings,
         walker: Walker[VersionValue],
+        *,
+        max_migration_depth: int = -1,
     ) -> None:
         self._registry = registry
-        self._settings = settings
+        self._max_migration_depth = max_migration_depth
         self._walker = walker
 
     @property
@@ -245,7 +245,7 @@ class GraphBuilder(Generic[VersionValue]):
         (``0`` = top-level only, ``-1`` = unlimited).
         """
         active_walker = self._walker
-        default_depth = self._settings.max_migration_depth
+        default_depth = self._max_migration_depth
         limit = default_depth if max_depth is None else max_depth
         entries: list[GraphEntry[VersionValue]] = []
 

@@ -8,7 +8,6 @@ from typing import Any, cast
 import pytest
 from json_graph_lite.jgf import Graph as LiteGraph
 
-from pyverge.core import VersioningSettings
 from pyverge.migration import (
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
@@ -50,6 +49,7 @@ from tests.examples.pydantic.semver import (
 )
 from tests.examples.pydantic.semver_nested import AddressV1, AddressV2
 from tests.utils import edge_from_models, envelope_model
+from tests.utils.settings import VersioningSettings
 
 SHA256_HEX_LENGTH = 64
 

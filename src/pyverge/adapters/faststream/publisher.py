@@ -54,7 +54,9 @@ class ReturnConverger:
             result = await handler(*args, **kwargs)
             if result is None:
                 return None
-            return self._manager.migrate(self._dump(result), target=self._target)
+            return await self._manager.prepare(
+                self._dump(result), target=self._target
+            ).arun()
 
         if out_model is not None:
             annotations = dict(getattr(converged, "__annotations__", {}))
@@ -123,7 +125,7 @@ def publish_to(
                 return
             payload = manager.dump(result)
             for topic, target in routes.items():
-                converged = manager.migrate(payload, target=target)
+                converged = await manager.prepare(payload, target=target).arun()
                 version = converged.get("version")
                 headers: dict[str, Any] = {}
                 if version is not None:

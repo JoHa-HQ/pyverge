@@ -1,5 +1,6 @@
 """Convergence package (catalog, registrars, reflection)."""
 
+from .context import RegistrationContext
 from .errors import (
     BackwardCompatibilityError,
     CatalogError,
@@ -35,4 +36,5 @@ __all__ = [
     "ModelConflictError",
     "ModelNotFoundError",
     "NodeResolver",
+    "RegistrationContext",
 ]

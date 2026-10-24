@@ -17,7 +17,6 @@ from pyverge.convergence.errors import (
     CatalogError,
     MigrationNotFoundError,
 )
-from pyverge.core import MigrationSettings
 from pyverge.core.types import ModelData
 from pyverge.migration import (
     AsyncLevelParallelExecutor,
@@ -63,6 +62,7 @@ from tests.examples.pydantic.semver_nested import (
     promote_address,
 )
 from tests.utils import edge_from_models, envelope_model, run_engine
+from tests.utils.settings import MigrationSettings
 
 
 @pytest.mark.parametrize(

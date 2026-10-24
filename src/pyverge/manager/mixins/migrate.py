@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING, Any, Generic, cast, overload
+from typing import TYPE_CHECKING, Generic, cast
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     DirectionViolationStrategy,
     ManagerMigrationKey,
@@ -37,40 +35,6 @@ if TYPE_CHECKING:
 
 class MigrateMixin(Generic[VersionValue]):
     """Migrate, validate and diff payloads through the instance engine."""
-
-    @overload
-    def migrate(
-        self: Manager[VersionValue],
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: type[TContainer],
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-        context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> TContainer: ...
-
-    @overload
-    def migrate(
-        self: Manager[VersionValue],
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-        context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> ModelData: ...
 
     def prepare(  # noqa: PLR0913
         self: Manager[VersionValue],
@@ -105,105 +69,6 @@ class MigrateMixin(Generic[VersionValue]):
             entry_migration=entry_migration,
             materialize=True,
         )
-
-    def delegate(  # noqa: PLR0913
-        self: Manager[VersionValue],
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: type[TContainer] | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-    ) -> MigrationRun[VersionValue]:
-        """Return a prepared run; execution is delegated to the caller."""
-        return self.prepare(
-            data,
-            target,
-            container=container,
-            version_property=version_property,
-            depth_limit=depth_limit,
-            direction=direction,
-            on_direction_violation=on_direction_violation,
-            on_version_not_found=on_version_not_found,
-            executor=executor,
-            entry_migration=entry_migration,
-        )
-
-    def migrate(  # noqa: PLR0913
-        self: Manager[VersionValue],
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: type[TContainer] | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-        context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> ModelData | TContainer:
-        """Migrate *data* to the configured target policy synchronously.
-
-        *target* accepts a declarative spec (string, model class, versionable,
-        ``None``/``"skip"``), a per-kind mapping, or an existing callable
-        resolver. Defaults to ``"latest"``.
-
-        When *container* is given, the migrated payload is validated against it
-        and a typed container instance is returned instead of a dict.
-
-        *context* binds runtime values for migration providers. It is a view
-        over the supplied mapping and is not copied per step.
-        """
-        run = self.prepare(
-            data,
-            target,
-            container=container,
-            version_property=version_property,
-            depth_limit=depth_limit,
-            direction=direction,
-            on_direction_violation=on_direction_violation,
-            on_version_not_found=on_version_not_found,
-            executor=executor,
-            entry_migration=entry_migration,
-        )
-        return run.run(context=_as_context(context))
-
-    async def amigrate(  # noqa: PLR0913
-        self: Manager[VersionValue],
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: type[TContainer] | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-        context: Mapping[str, Any] | MigrationContext | None = None,
-    ) -> ModelData | TContainer:
-        """Async counterpart of :meth:`migrate`."""
-        run = self.prepare(
-            data,
-            target,
-            container=container,
-            version_property=version_property,
-            depth_limit=depth_limit,
-            direction=direction,
-            on_direction_violation=on_direction_violation,
-            on_version_not_found=on_version_not_found,
-            executor=executor,
-            entry_migration=entry_migration,
-        )
-        return await run.arun(context=_as_context(context))
 
     def info(
         self: Manager[VersionValue],
@@ -276,11 +141,3 @@ class MigrateMixin(Generic[VersionValue]):
             engine=engine,
         )
         return engine.adapter.diff(source, target)
-
-
-def _as_context(
-    value: Mapping[str, Any] | MigrationContext | None,
-) -> MigrationContext:
-    if isinstance(value, MigrationContext):
-        return value
-    return MigrationContext.create(value)

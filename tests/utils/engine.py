@@ -1,9 +1,11 @@
 """Utility functions for engine and model management in tests."""
 
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, cast
 
-from pyverge.core import MigrationFunc, VersioningSettings, VersionValue
+from pyverge.core import MigrationFunc, VersionValue
 from pyverge.core.context import MigrationContext
 from pyverge.migration import (
     PydanticDiff,
@@ -15,6 +17,7 @@ from pyverge.providers.types import (
     ModelHandle,
 )
 from pyverge.versioning import VersionEdge, VersionKey, VersionNode
+from tests.utils.settings import VersioningSettings
 
 
 def envelope_model(

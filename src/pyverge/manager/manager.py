@@ -3,22 +3,11 @@ from __future__ import annotations
 from typing import ClassVar
 
 from pyverge.convergence.catalog import Registry
-from pyverge.core.settings import MigrationSettings
-from pyverge.core.types import (
-    VersionValue,
-)
-from pyverge.executor import (
-    AsyncExecutor,
-    DefaultEntryPlanner,
-    Executor,
-    MigrationEntry,
-)
+from pyverge.core.types import VersionValue
 from pyverge.migration.engine import Engine
-from pyverge.migration.graph import GraphBuilder
 from pyverge.migration.types import (
     Walker,
 )
-from pyverge.migration.walker import CompoundKeyWalker
 from pyverge.migrations.identity import (
     DefaultMigrationIdentityResolver,
     MigrationIdentityResolver,
@@ -59,7 +48,6 @@ class Manager(
     """
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
-    _default_settings: ClassVar[MigrationSettings]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
 
@@ -71,7 +59,6 @@ class Manager(
             (cls,),
             {
                 "_strategy": strategy,
-                "_default_settings": None,
                 "_default_adapter": None,
                 "_default_engine": None,
                 "__module__": cls.__module__,
@@ -87,11 +74,6 @@ class Manager(
         return self.engine.adapter
 
     @property
-    def settings(self) -> MigrationSettings | None:
-        """Return the instance settings."""
-        return self.engine.settings
-
-    @property
     def registry(self) -> Registry[VersionValue]:
         """Return the instance registry."""
         return self.engine.registry
@@ -99,25 +81,22 @@ class Manager(
     @classmethod
     def configure(  # noqa: PLR0913
         cls,
-        settings: MigrationSettings,
         adapter: ModelAdapter,
         *,
         engine: Engine[VersionValue] | None = None,
         walker: Walker | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
         hasher: ContentHasher | None = None,
         identity_resolver: MigrationIdentityResolver | None = None,
         migration_materializer: DiffMaterializer[object] | None = None,
         diff_provider: DiffProvider[VersionValue] | None = None,
+        on_missing: str = "raise",
     ) -> type[Manager[VersionValue]]:
         """Build a configured ``Manager`` subclass.
 
         Args:
-            settings: Migration configuration.
-            adapter: Model adapter used to read version/kind from models.
-            engine: Optional pre-built engine.  The caller is responsible for
-                aligning it with the strategy, *adapter* and *settings*.
+            adapter: Model adapter used to read version and kind from models.
+            engine: Optional pre-built engine. The caller is responsible for
+                aligning it with the strategy and adapter.
             walker: Optional preconfigured payload walker.  When a walker
                 instance is given, its ``registry`` becomes the manager's
                 registry.  Defaults to the containerless
@@ -125,29 +104,15 @@ class Manager(
                 schema-driven walker (e.g.
                 :class:`~pyverge.migration.PydanticWalker`) to enable
                 container-guided discovery.
-            executor: Optional execution strategy override. When omitted, the
-                settings-driven :class:`ExecutionPolicy` selects sequential or
-                level-parallel, sync or async.
             entry_migration: Optional per-entry migration defaults.  Defaults
                 to :class:`~pyverge.migration.DefaultEntryPlanner`.
         """
         if walker is None:
             registry = Registry[VersionValue](hasher=hasher or default_content_hasher())
-            active_walker = CompoundKeyWalker(
-                registry, settings=settings, adapter=adapter
-            )
         else:
-            active_walker = walker
             registry = walker.registry
         engine = engine or Engine[VersionValue](
             registry=registry,
-            settings=settings,
-            default_executor=executor,
-            graph_builder=GraphBuilder(
-                registry,
-                settings,
-                active_walker,
-            ),
             adapter=adapter,
             identity_resolver=identity_resolver or DefaultMigrationIdentityResolver(),
             materializers={
@@ -158,9 +123,8 @@ class Manager(
             },
             diff_provider=diff_provider
             or Reflection(adapter, CompositeDiffDiscovery()),
-            entry_migration=entry_migration or DefaultEntryPlanner(),
+            on_missing=on_missing,
         )
         cls._default_engine = engine
         cls._default_adapter = adapter
-        cls._default_settings = settings
         return cls

@@ -11,6 +11,8 @@ Benefits:
 - Defers instantiation until needed
 """
 
+from __future__ import annotations
+
 from enum import StrEnum
 from typing import Annotated, Literal
 

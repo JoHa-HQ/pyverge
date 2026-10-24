@@ -10,7 +10,6 @@ import pytest
 import semver
 
 from pyverge import types
-from pyverge.core import VersioningSettings
 from pyverge.migration import (
     Diff,
     JsonataMigration,
@@ -45,6 +44,7 @@ from tests.examples.pydantic.semver import (
     UserV123,
 )
 from tests.utils import envelope_model, meta_versionable
+from tests.utils.settings import VersioningSettings
 
 
 def _migrate(ops: list[dict], data: dict) -> dict:

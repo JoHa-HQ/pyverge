@@ -19,7 +19,6 @@ from pyverge.convergence.errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
-from pyverge.core import MigrationSettings
 from pyverge.migration import (
     Engine,
     JsonPatchMigration,
@@ -63,6 +62,7 @@ from tests.examples.pydantic.semver_nested import (
     PersonV1,
 )
 from tests.utils import envelope_model, meta_versionable, run_engine
+from tests.utils.settings import MigrationSettings
 
 
 class TestModelManagement:

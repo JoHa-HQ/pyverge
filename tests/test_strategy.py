@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from pyverge import types
-from pyverge.core import DiscoverySettings
 from pyverge.migration import (
     DefaultEntryPlanner,
     DefaultMigrationEntry,
@@ -20,6 +19,7 @@ from pyverge.migration import (
 from pyverge.versioning.errors import MigrationApplicationError
 from tests.examples.pydantic.semver_nested import PersonV1, PersonV2
 from tests.utils import envelope_model
+from tests.utils.settings import MigrationSettings as DiscoverySettings
 
 
 class TestDefaultMigrationEntry:

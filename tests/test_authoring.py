@@ -15,20 +15,20 @@ import semver
 from pydantic import ValidationError
 
 from pyverge import Manager
-from pyverge.core import MigrationSettings, VersioningSettings
 from pyverge.migration import (
     JsonPatchMigration,
     PydanticModelAdapter,
 )
 from tests.examples.pydantic.semver import UserV1, UserV2
 from tests.utils import envelope_model, meta_versionable
+from tests.utils.settings import MigrationSettings, VersioningSettings, manager_kwargs
 
 
 def _engine(
     settings: MigrationSettings,
     adapter: PydanticModelAdapter,
 ):
-    UserManager = Manager[semver.Version].configure(settings, adapter)
+    UserManager = Manager[semver.Version].configure(adapter, **manager_kwargs(settings))
     return UserManager()
 
 

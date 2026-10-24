@@ -154,7 +154,13 @@ class DataclassEncoder:
 
 
 class Canonicalizer:
-    """Compose canonical value encoders and render canonical JSON."""
+    """Compose canonical value encoders and render canonical JSON.
+
+    Examples:
+        >>> from pyverge.versioning import default_canonicalizer
+        >>> default_canonicalizer().dumps({"b": 2, "a": [1, 3]})
+        '{"a":[1,3],"b":2}'
+    """
 
     __slots__ = ("_encoders",)
 

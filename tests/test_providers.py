@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from pyverge.core import MigrationSettings
 from pyverge.migration import (
     JsonPatchMigration,
     JsonSchemaModelAdapter,
@@ -19,6 +18,7 @@ from tests.examples.dataclasses import UserV2 as DataclassUserV2
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.semver import UserV1, UserV2
 from tests.utils import envelope_model
+from tests.utils.settings import MigrationSettings
 
 
 def _add_age():

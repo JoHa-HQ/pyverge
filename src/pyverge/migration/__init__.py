@@ -13,14 +13,11 @@ from pyverge.convergence.errors import (
     ModelNotFoundError,
 )
 from pyverge.core import (
-    DiscoverySettings,
     MaxDepthExceededError,
     MigrationContext,
-    MigrationSettings,
     Path,
     PayloadError,
     PayloadValidationError,
-    VersioningSettings,
     get_at,
     set_at,
 )
@@ -92,7 +89,6 @@ __all__ = [
     "DefaultMigrationEntry",
     "Diff",
     "DiffDiscovery",
-    "DiscoverySettings",
     "EdgeKey",
     "Engine",
     "Entry",
@@ -124,7 +120,6 @@ __all__ = [
     "MigrationPathIntegrityError",
     "MigrationPlan",
     "MigrationRun",
-    "MigrationSettings",
     "MissingReferenceError",
     "ModelAlreadyRegisteredError",
     "ModelConflictError",
@@ -143,7 +138,6 @@ __all__ = [
     "VersionEdge",
     "VersionKey",
     "VersionNode",
-    "VersioningSettings",
     "Walker",
     "WalkerProtocol",
     "earliest_target_resolver",

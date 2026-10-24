@@ -1,15 +1,66 @@
-from typing import Any
+"""Application-side test preset, not a library settings contract."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Literal
+
+
+@dataclass(frozen=True, slots=True)
+class MigrationSettings:
+    """Flat test preset for constructing library components explicitly."""
+
+    version_property: str = "version"
+    kind_property: str = "kind"
+    max_migration_depth: int = -1
+    validation_mode: Literal["strict", "lax", "none"] = "lax"
+    on_missing_field: Literal["raise", "skip"] = "raise"
+    on_extra_field: Literal["raise", "ignore"] = "ignore"
+    direction: Literal["any", "forward", "backward"] = "any"
+    on_direction_violation: Literal["skip", "raise"] = "skip"
+    on_missing_path: Literal["skip", "raise"] = "raise"
+    on_missing: Literal[
+        "reconstruct_model", "reconstruct_migration", "raise", "skip"
+    ] = "raise"
+    parallel_workers: int = 0
+    execution_mode: Literal["sync", "async"] = "sync"
 
 
 def overrides(options: dict[str, Any]) -> dict[str, Any]:
-    """Merge the standard defaults with ``options``, letting extras pass through."""
-    overrides = {
+    return dict(options)
+
+
+def without_identity(options: dict[str, Any]) -> dict[str, Any]:
+    return {
         key: value
         for key, value in options.items()
         if key not in {"version_property", "kind_property"}
     }
+
+
+def manager_kwargs(settings: MigrationSettings) -> dict[str, Any]:
+    """Explicit component parameters for ``Manager.configure``."""
     return {
-        "version_property": options.get("version_property", "version"),
-        "kind_property": options.get("kind_property", "kind"),
-        **overrides,
+        "max_migration_depth": settings.max_migration_depth,
+        "validation_mode": settings.validation_mode,
+        "on_missing_field": settings.on_missing_field,
+        "on_extra_field": settings.on_extra_field,
+        "direction": settings.direction,
+        "on_direction_violation": settings.on_direction_violation,
+        "on_missing_path": settings.on_missing_path,
+        "on_missing": settings.on_missing,
+        "parallel_workers": settings.parallel_workers,
+        "execution_mode": settings.execution_mode,
     }
+
+
+VersioningSettings = MigrationSettings
+DiscoverySettings = MigrationSettings
+
+__all__ = [
+    "MigrationSettings",
+    "VersioningSettings",
+    "manager_kwargs",
+    "overrides",
+    "without_identity",
+]

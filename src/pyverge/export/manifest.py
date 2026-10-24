@@ -66,7 +66,14 @@ class ManifestExporter:
 
 @dataclass(frozen=True, slots=True)
 class ManifestDiff:
-    """Semantic difference between two JGF documents."""
+    """Semantic difference between two JGF documents.
+
+    Examples:
+        >>> left = {"graph": {"nodes": {}, "edges": []}}
+        >>> right = {"graph": {"nodes": {"User@1.0.0": {}}, "edges": []}}
+        >>> ManifestDiff.compare(left, right).summary()
+        ['node added: User@1.0.0']
+    """
 
     nodes: ChangeSet[str] = field(default_factory=ChangeSet)
     edges: ChangeSet[str] = field(default_factory=ChangeSet)

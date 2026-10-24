@@ -10,7 +10,7 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import types
-from pyverge.core import DiscoverySettings, MaxDepthExceededError, MigrationSettings
+from pyverge.core import MaxDepthExceededError
 from pyverge.migration import (
     GraphEntry,
     MigrationGraph,
@@ -31,6 +31,8 @@ from tests.examples.pydantic.semver_nested import (
     PersonV2,
 )
 from tests.utils import envelope_model, register_models
+from tests.utils.settings import MigrationSettings, VersioningSettings
+from tests.utils.settings import MigrationSettings as DiscoverySettings
 
 
 class _Item(BaseModel):
@@ -583,7 +585,7 @@ class TestGraphBuilder:
             assert entry is not None and str(entry.source.version[1]) == version
 
     @pytest.mark.parametrize(
-        "migration_settings",
+        "versioning_settings",
         [{"version_property": "schema_version"}],
         indirect=True,
     )
@@ -602,16 +604,16 @@ class TestGraphBuilder:
         self,
         graph_builder,
         registry: Registry[types.VersionValue],
-        migration_settings: MigrationSettings,
+        versioning_settings: VersioningSettings,
     ) -> None:
         # The custom property name cannot be pre-registered through the shared
         # ``model_adapter``: the adapter must be rebuilt with the new property
         # before the model is stored.
         adapter = PydanticModelAdapter(
-            version_property=migration_settings.version_property,
-            kind_property=migration_settings.kind_property,
+            version_property=versioning_settings.version_property,
+            kind_property=versioning_settings.kind_property,
         )
-        register_models(adapter, registry, migration_settings, _Item)
+        register_models(adapter, registry, versioning_settings, _Item)
 
         graph = graph_builder.build(
             {"doc": {"kind": "Item", "schema_version": "1.0.0", "name": "X"}},

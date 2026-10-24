@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import Any, Generic
+from typing import Any, Generic, Literal
 
 from pyverge.convergence.catalog import (
     Registry,
 )
 from pyverge.core.errors import MaxDepthExceededError, PayloadValidationError
-from pyverge.core.settings import DiscoverySettings
 from pyverge.core.types import (
     MigrationDirectionStrategy,
     TargetResolver,
@@ -41,12 +40,12 @@ class Walker(Generic[VersionValue]):
         self,
         registry: Registry[VersionValue],
         *,
-        settings: DiscoverySettings,
         adapter: ModelAdapter,
+        validation_mode: Literal["strict", "lax", "none"] = "lax",
         direction: MigrationDirectionStrategy = "any",
     ) -> None:
         self._registry = registry
-        self._settings = settings
+        self._validation_mode = validation_mode
         self._adapter = adapter
         self._direction = direction
 
@@ -63,8 +62,8 @@ class Walker(Generic[VersionValue]):
         target_resolver: TargetResolver,
         max_depth: int = -1,
     ) -> Iterator[Entry]:
-        kp = self._settings.kind_property
-        vp = self._settings.version_property
+        kp = self._adapter.kind_property
+        vp = self._adapter.version_property
 
         if container is None:
             yield from self._walk_containerless(
@@ -78,7 +77,7 @@ class Walker(Generic[VersionValue]):
                 message="container is not a recognized model type",
             )
 
-        validation_mode = self._settings.validation_mode
+        validation_mode = self._validation_mode
         if validation_mode == "none":
             validated = data
         else:

@@ -84,7 +84,7 @@ def subscriber(
             target = selector.select(
                 TargetContext(topic, getattr(msg, "headers", {}) or {})
             )
-            return manager.migrate(payload, target=target)
+            return await manager.prepare(payload, target=target).arun()
 
         return converge_message
 

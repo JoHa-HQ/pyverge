@@ -18,9 +18,7 @@ from pyverge.convergence.errors import (
 from pyverge.core import (
     ManagerMigrationKey,
     MigrationKeyInput,
-    MigrationSettings,
     ModelPair,
-    VersioningSettings,
     VersionValue,
 )
 from pyverge.core.errors import PayloadValidationError
@@ -77,6 +75,7 @@ from tests.examples.pydantic.semver_nested import (
     PersonV2,
 )
 from tests.utils.engine import envelope_model
+from tests.utils.settings import MigrationSettings, VersioningSettings, manager_kwargs
 
 
 def _payload(version: str) -> dict:
@@ -101,9 +100,8 @@ class TestScoping:
         engine: Engine[VersionValue],
     ) -> None:
         UserManager = Manager[semver.Version].configure(
-            engine.settings,
             engine.adapter,
-            engine=engine,  # ty: ignore[invalid-argument-type]
+            engine=engine,
         )
 
         assert UserManager._default_engine is engine
@@ -125,7 +123,7 @@ class TestClassLevelRegistration:
             age: int | None = None
 
         versions = [str(v) for v in manager().registry.versions]
-        assert versions == ["User:1.0.0", "User:2.0.0"]
+        assert versions == ["User@1.0.0", "User@2.0.0"]
 
     @pytest.mark.parametrize(
         "model_adapter, registry, key",
@@ -281,8 +279,8 @@ class TestInstanceFacade:
 
         instance = RuntimeManager()
         assert {str(v) for v in instance.registry.versions} == {
-            "User:1.0.0",
-            "User:2.0.0",
+            "User@1.0.0",
+            "User@2.0.0",
         }
         assert instance.migrate(_payload("1.0.0"))["document"]["version"] == "2.0.0"
 
@@ -965,8 +963,8 @@ class TestMigrateWithContainer:
         walker: PydanticWalker,
     ) -> None:
         UserManager = Manager[semver.Version].configure(
-            migration_settings,
             model_adapter,
+            **manager_kwargs(migration_settings),
             walker=walker,
         )
         UserManager.model(UserV1)
@@ -983,8 +981,8 @@ class TestMigrateWithContainer:
         walker: PydanticWalker,
     ) -> None:
         UserManager = Manager[semver.Version].configure(
-            migration_settings,
             model_adapter,
+            **manager_kwargs(migration_settings),
             walker=walker,
         )
         UserManager.model(UserV1)
@@ -1002,8 +1000,8 @@ class TestMigrateWithContainer:
         walker: PydanticWalker,
     ) -> None:
         UserManager = Manager[semver.Version].configure(
-            migration_settings,
             model_adapter,
+            **manager_kwargs(migration_settings),
             walker=walker,
         )
         UserManager.model(UserV1)
@@ -1239,10 +1237,8 @@ def test_configured_manager_satisfies_class_state_contract(
 ) -> None:
     manager_cls = Manager[semver.Version]
     configured: type[ManagerClassState[semver.Version]] = manager_cls.configure(
-        migration_settings, model_adapter
+        model_adapter, **manager_kwargs(migration_settings)
     )
-
-    assert configured._default_settings is migration_settings
     assert configured._default_adapter is model_adapter
     assert configured._default_engine is not None
     assert configured._strategy is semver.Version
@@ -1253,12 +1249,13 @@ def test_instantiated_manager_satisfies_instance_state_contract(
     migration_settings: MigrationSettings,
     model_adapter: ModelAdapter,
 ) -> None:
-    configured = Manager[semver.Version].configure(migration_settings, model_adapter)
+    configured = Manager[semver.Version].configure(
+        model_adapter, **manager_kwargs(migration_settings)
+    )
     instance: ManagerInstanceState[semver.Version] = configured()
 
     assert instance.engine is configured._default_engine
     assert instance.registry is configured._default_engine.registry
-    assert instance.settings is migration_settings
     assert instance.adapter is model_adapter
 
 
@@ -1350,8 +1347,10 @@ class TestPreparedMigration:
 class TestAsyncExecution:
     def _async_manager(self, workers: int = 0) -> type[Manager[semver.Version]]:
         manager = Manager[semver.Version].configure(
-            MigrationSettings(execution_mode="async", parallel_workers=workers),
             PydanticModelAdapter(),
+            **manager_kwargs(
+                MigrationSettings(execution_mode="async", parallel_workers=workers)
+            ),
         )
         manager.model(UserV1)
         manager.model(UserV2)

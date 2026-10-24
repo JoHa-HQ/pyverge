@@ -5,7 +5,6 @@ from typing import cast
 import pytest
 
 from pyverge import Manager
-from pyverge.core import DiscoverySettings, MigrationSettings, VersioningSettings
 from pyverge.core.types import (
     VersionValue,
 )
@@ -14,7 +13,6 @@ from pyverge.manager.types import (
 )
 from pyverge.migration import (
     CompoundKeyWalker,
-    DefaultMigrationEntry,
     Engine,
     GraphBuilder,
     JsonSchemaModelAdapter,
@@ -22,7 +20,6 @@ from pyverge.migration import (
     PydanticModelAdapter,
     PydanticWalker,
     Registry,
-    SequentialExecutor,
 )
 from pyverge.migration.types import (
     Walker,
@@ -37,7 +34,14 @@ from pyverge.schemas.backend import ModelMaterializer
 from pyverge.versioning import default_content_hasher
 from tests.utils import register_models
 from tests.utils.engine import register_migrations
-from tests.utils.settings import overrides
+from tests.utils.settings import (
+    DiscoverySettings,
+    MigrationSettings,
+    VersioningSettings,
+    manager_kwargs,
+    overrides,
+    without_identity,
+)
 
 # Example model modules are imported by tests, not collected as tests.  With
 # ``--doctest-modules`` their basenames (e.g. ``semver.py``) collide with
@@ -54,7 +58,7 @@ def versioning_settings(request: pytest.FixtureRequest) -> VersioningSettings:
 @pytest.fixture
 def migration_settings(request: pytest.FixtureRequest) -> MigrationSettings:
     custom = cast(dict, getattr(request, "param", {}))
-    return MigrationSettings(**overrides(custom))
+    return MigrationSettings(**without_identity(custom))
 
 
 @pytest.fixture
@@ -123,8 +127,9 @@ def walker(
     """
     return PydanticWalker(
         registry,
-        settings=migration_settings,
         adapter=model_adapter,
+        validation_mode=migration_settings.validation_mode,
+        direction=migration_settings.direction,
     )
 
 
@@ -137,8 +142,13 @@ def graph_builder(
     """Return a graph builder with the standard compound-key walker."""
     return GraphBuilder(
         registry,
-        migration_settings,
-        CompoundKeyWalker(registry, settings=migration_settings, adapter=model_adapter),
+        CompoundKeyWalker(
+            registry,
+            adapter=model_adapter,
+            validation_mode=migration_settings.validation_mode,
+            direction=migration_settings.direction,
+        ),
+        max_migration_depth=migration_settings.max_migration_depth,
     )
 
 
@@ -163,14 +173,15 @@ def engine(
 ) -> Engine[VersionValue]:
     return Engine(
         registry,
-        migration_settings,
-        SequentialExecutor(),
         GraphBuilder(
             registry,
-            migration_settings,
             CompoundKeyWalker(
-                registry, settings=migration_settings, adapter=model_adapter
+                registry,
+                adapter=model_adapter,
+                validation_mode=migration_settings.validation_mode,
+                direction=migration_settings.direction,
             ),
+            max_migration_depth=migration_settings.max_migration_depth,
         ),
         model_adapter,
         DefaultMigrationIdentityResolver(),
@@ -179,14 +190,17 @@ def engine(
             "reconstruct_migration": JsonPatchMigrationBackend(),
         },
         Reflection(model_adapter, CompositeDiffDiscovery()),
-        entry_migration=DefaultMigrationEntry(),
+        on_missing=migration_settings.on_missing,
     )
 
 
 @pytest.fixture
 def manager(
     engine: Engine[VersionValue],
+    migration_settings: MigrationSettings,
 ) -> type[Manager[VersionValue]]:
     return Manager[VersionValue].configure(
-        engine.settings, engine.adapter, engine=engine
+        engine.adapter,
+        engine=engine,
+        **manager_kwargs(migration_settings),
     )

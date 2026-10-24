@@ -38,6 +38,8 @@ class MigrationContext(Mapping[str, Any]):
     @classmethod
     def create(cls, values: Mapping[str, Any] | None = None) -> Self:
         """Create a context from *values* without copying them."""
+        if isinstance(values, MigrationContext):
+            return cast(Self, values)
         return cls(cast(MappingProxyType[str, Any], values))
 
     @create.register(type(None))

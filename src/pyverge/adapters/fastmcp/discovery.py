@@ -92,7 +92,7 @@ class ToolDiscovery:
                 self._manager.reconcile_model(node.versionable())
             except ModelConflictError as error:
                 raise ModelConflictError(
-                    error.registry_name,
+                    error.catalog_name,
                     error.version,
                     error.registered,
                     error.incoming,
@@ -107,7 +107,7 @@ class ToolDiscovery:
                 self._manager.validate_graph(node)
             except MissingReferenceError as error:
                 raise MissingReferenceError(
-                    error.registry_name,
+                    error.catalog_name,
                     error.version,
                     error.absent,
                     subject=f"primitive {kind!r}@{version}",

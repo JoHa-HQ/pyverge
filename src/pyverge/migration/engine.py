@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from typing import Any, Generic, Self, cast, overload
 
@@ -12,26 +14,12 @@ from pyverge.convergence.errors import (
     MissingReferenceError,
     ModelNotFoundError,
 )
-from pyverge.core.settings import MigrationSettings
 from pyverge.core.types import (
     Attachable,
-    DirectionViolationStrategy,
-    MigrationDirectionStrategy,
     MigrationFunc,
-    ModelData,
     ModelHandle,
     ModelKind,
-    TargetResolver,
-    VersionMissingStrategy,
     VersionValue,
-)
-from pyverge.executor import (
-    AsyncExecutor,
-    DefaultEntryPlanner,
-    ExecutionPolicy,
-    Executor,
-    MigrationEntry,
-    MigrationRun,
 )
 from pyverge.migrations.identity import MigrationIdentityResolver
 from pyverge.migrations.json_patch import JsonPatch
@@ -52,8 +40,6 @@ from pyverge.versioning import (
     VersionPair,
 )
 
-from .graph import GraphBuilder
-
 
 class Engine(Generic[VersionValue]):
     """Convergent migration driven by an inferred dependency graph.
@@ -68,28 +54,40 @@ class Engine(Generic[VersionValue]):
     def __init__(
         self: Self,
         registry: Registry[VersionValue],
-        settings: MigrationSettings,
-        default_executor: Executor[VersionValue] | AsyncExecutor[VersionValue] | None,
-        graph_builder: GraphBuilder[VersionValue],
         adapter: ModelAdapter,
         identity_resolver: MigrationIdentityResolver,
         materializers: Mapping[str, DiffMaterializer[Any]],
         diff_provider: DiffProvider[VersionValue],
-        entry_migration: MigrationEntry[VersionValue] | None = None,
+        on_missing: str = "raise",
     ) -> None:
         self.registry = registry
-        self.settings = settings
-        self.graph_builder = graph_builder
-        self.default_executor = default_executor
-        self.execution_policy = ExecutionPolicy(settings)
         self.adapter = adapter
         self.identity_resolver = identity_resolver
         self.materializers = materializers
         self.diff_provider = diff_provider
-        self.entry_migration = entry_migration or DefaultEntryPlanner()
+        self.on_missing = on_missing
+
+    def copy(self) -> Engine[VersionValue]:
+        """Return a build engine over a mutable copy of this registry."""
+        return Engine(
+            self.registry.copy(),
+            self.adapter,
+            self.identity_resolver,
+            self.materializers,
+            self.diff_provider,
+            self.on_missing,
+        )
+
+    def copy_registry(self) -> Registry[VersionValue]:
+        """Return a mutable copy of the build registry."""
+        return self.registry.copy()
+
+    def snapshot(self) -> GraphCatalog:
+        """Return a frozen snapshot of the current registry graph."""
+        return cast("GraphCatalog", self.registry.snapshot())
 
     def lock(self) -> GraphCatalog:
-        """Freeze the catalog and return the runtime snapshot."""
+        """Freeze this build registry and return the runtime snapshot."""
         return cast("GraphCatalog", self.registry.lock())
 
     def __contains__(self, index: Any) -> bool:
@@ -295,7 +293,7 @@ class Engine(Generic[VersionValue]):
             pass
 
         if (
-            self.settings.on_missing != "reconstruct_model"
+            self.on_missing != "reconstruct_model"
             or "reconstruct_model" not in self.materializers
         ):
             raise ModelNotFoundError(registry.name, endpoint.version)
@@ -474,53 +472,3 @@ class Engine(Generic[VersionValue]):
         else:
             edge = self.registry.get_migration_by_edge(key)
             self.registry.clear_hooks(edge)
-
-    def prepare(
-        self: Self,
-        data: ModelData,
-        target: TargetResolver,
-        *,
-        container: ModelHandle | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor[VersionValue] | AsyncExecutor[VersionValue] | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-        materialize: bool = False,
-    ) -> MigrationRun[VersionValue]:
-        """Build a runnable migration without executing it.
-
-        The executor is taken from the per-call override, the engine default, or
-        the settings-driven :class:`ExecutionPolicy` — in that order. Context is
-        supplied later, when ``run``/``arun`` is called.
-        """
-        effective_direction = direction or self.settings.direction
-        effective_on_direction_violation = (
-            on_direction_violation or self.settings.on_direction_violation
-        )
-        effective_on_missing = on_version_not_found or self.settings.on_missing_path
-        vp = version_property or self.settings.version_property
-
-        plan = self.graph_builder.build(
-            data,
-            container=container,
-            target_resolver=target,
-            max_depth=depth_limit,
-        )
-        active_executor = (
-            executor or self.default_executor or self.execution_policy.build()
-        )
-        return MigrationRun(
-            plan,
-            executor=active_executor,
-            registry=self.registry,
-            entry_migration=entry_migration or self.entry_migration,
-            adapter=self.adapter,
-            version_property=vp,
-            direction=effective_direction,
-            on_direction_violation=effective_on_direction_violation,
-            on_missing_path=effective_on_missing,
-            materialize=materialize,
-        )

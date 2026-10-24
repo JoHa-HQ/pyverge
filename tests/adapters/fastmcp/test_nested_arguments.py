@@ -17,7 +17,7 @@ from pydantic import create_model
 from pyverge import Manager
 from pyverge.adapters.fastmcp import ToolDiscovery, ToolReflection
 from pyverge.convergence.errors import MissingReferenceError, ModelConflictError
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.migration import PydanticModelAdapter
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
     AddressV2,
@@ -31,6 +31,7 @@ from tests.examples.pydantic.semver_nested import (
     migrate_contact_100_200,
     preserve_children_person,
 )
+from tests.utils.settings import MigrationSettings, manager_kwargs
 
 
 async def _run_lifecycle(discovery: ToolDiscovery, server: FastMCP) -> None:
@@ -51,7 +52,8 @@ class TestUnregisteredReference:
         the discovery lifecycle instead of silently serving stale children.
         """
         manager = Manager[semver.Version].configure(
-            MigrationSettings(on_missing="reconstruct_model"), pydantic_model_adapter
+            pydantic_model_adapter,
+            **manager_kwargs(MigrationSettings(on_missing="reconstruct_model")),
         )()
         location = create_model(
             "Location", kind=(str, "location"), version=(str, "1.0.0"), city=(str, ...)
@@ -91,7 +93,8 @@ class TestSchemaConflict:
         primitive so the operator can see which entity drifted.
         """
         manager = Manager[semver.Version].configure(
-            MigrationSettings(), pydantic_model_adapter
+            pydantic_model_adapter,
+            **manager_kwargs(MigrationSettings()),
         )()
         registered = create_model(
             "SearchWeather",

@@ -13,7 +13,6 @@ from .errors import (
 )
 from .ids import IdFactory, UuidIdFactory
 from .path import Path, get_at, set_at
-from .settings import DiscoverySettings, MigrationSettings, VersioningSettings
 from .types import (
     MIGRATION_PAIR_LEN,
     Attachable,
@@ -43,7 +42,6 @@ __all__ = [
     "Attachable",
     "Clock",
     "DirectionViolationStrategy",
-    "DiscoverySettings",
     "IdFactory",
     "ManagerKey",
     "ManagerMigrationKey",
@@ -52,7 +50,6 @@ __all__ = [
     "MigrationDirectionStrategy",
     "MigrationFunc",
     "MigrationKeyInput",
-    "MigrationSettings",
     "ModelData",
     "ModelHandle",
     "ModelKey",
@@ -71,7 +68,6 @@ __all__ = [
     "VersionMissingStrategy",
     "VersionValue",
     "VersionValue_co",
-    "VersioningSettings",
     "get_at",
     "set_at",
 ]

@@ -25,7 +25,6 @@ from pyverge.versioning import Versionable
 
 if TYPE_CHECKING:
     from pyverge.convergence.catalog import Registry
-    from pyverge.core.settings import MigrationSettings
     from pyverge.core.types import (
         Attachable,
     )
@@ -39,8 +38,11 @@ if TYPE_CHECKING:
     from pyverge.migration.types import (
         Walker,
     )
+    from pyverge.migrations.identity import MigrationIdentityResolver
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
+    from pyverge.reflection import DiffProvider
+    from pyverge.versioning import ContentHasher, DiffMaterializer
 
 TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]
 
@@ -68,20 +70,21 @@ class ManagerClassState(Protocol[VersionValue]):
     """
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
-    _default_settings: ClassVar[MigrationSettings]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
 
     @classmethod
     def configure(
         cls,
-        settings: MigrationSettings,
         adapter: ModelAdapter,
         *,
         engine: Engine[VersionValue] | None = None,
         walker: Walker | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
+        hasher: ContentHasher | None = None,
+        identity_resolver: MigrationIdentityResolver | None = None,
+        migration_materializer: DiffMaterializer[object] | None = None,
+        diff_provider: DiffProvider[VersionValue] | None = None,
+        on_missing: str = "raise",
     ) -> type[Self]: ...
 
     @classmethod
@@ -121,25 +124,7 @@ class ManagerInstanceState(Protocol[VersionValue]):
     def registry(self) -> Registry[VersionValue]: ...
 
     @property
-    def settings(self) -> MigrationSettings | None: ...
-
-    @property
     def adapter(self) -> ModelAdapter: ...
-
-    def delegate(
-        self,
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: type[TContainer] | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-    ) -> MigrationRun[VersionValue]: ...
 
     def prepare(
         self,
