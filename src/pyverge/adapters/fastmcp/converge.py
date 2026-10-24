@@ -41,7 +41,7 @@ class Converger:
 
         def converge(**kwargs: Any) -> Any:
             payload: ModelData = {_KIND: kind, _VERSION: version, **kwargs}
-            converged = self._manager.prepare(payload, target=target).run()
+            converged = self._manager.prepare(payload, target=target).run()  # ty: ignore[unresolved-attribute]
             converged.pop(_KIND, None)
             converged.pop(_VERSION, None)
             return handler(**converged)

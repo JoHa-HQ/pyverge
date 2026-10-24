@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 import pendulum
 import pytest
@@ -136,7 +137,7 @@ def test_diff_exposes_field_changes(
     )
 
     class _Renderer:
-        def render(self, value: object) -> list[str]:
+        def render(self, diff: Any) -> list[str]:
             return list(diff.added_fields)
 
     assert diff.render(_Renderer()) == ["age"]

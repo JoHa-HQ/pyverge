@@ -22,7 +22,7 @@ from tests.utils.settings import VersioningSettings
 
 def envelope_model(
     adapter: ModelAdapter,
-    versioning_settings: VersioningSettings,
+    versioning_settings: VersioningSettings | None,
     model_cls: ModelHandle | dict[str, Any],
 ) -> VersionNode[VersionValue]:
     """Build a versionable from a model class or a JSON schema.
@@ -143,5 +143,5 @@ def run_engine(
     context: Mapping[str, Any] | MigrationContext | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Prepare and immediately run a migration through an engine."""
-    return engine.prepare(data, target, **kwargs).run(context=context)
+    """Placeholder until the execution runtime is rebuilt (task 7.11)."""
+    raise NotImplementedError("execution runtime removed; see task 7.11")

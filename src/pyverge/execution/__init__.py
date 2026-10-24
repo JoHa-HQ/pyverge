@@ -6,10 +6,12 @@ from .errors import (
     ExecutionModeError,
     SyncExecutionRequired,
 )
+from .hooks import MigrationHook
 
 __all__ = [
     "AsyncExecutionRequired",
     "ExecutionError",
     "ExecutionModeError",
+    "MigrationHook",
     "SyncExecutionRequired",
 ]

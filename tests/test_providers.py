@@ -184,4 +184,4 @@ def test_proposes_migration_from_schema_diff(
     assert migration.spec["from"] == "1.0.0"
     assert migration.spec["to"] == "2.0.0"
     assert {"op": "add", "path": "/age", "value": None} in migration.spec["ops"]
-    assert engine.registry.migrations_of(anchor.kind) == frozenset()
+    assert engine.registry.migrations_of(anchor) == frozenset()

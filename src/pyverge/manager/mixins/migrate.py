@@ -4,27 +4,12 @@ from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast
 
 from pyverge.core.types import (
-    DirectionViolationStrategy,
     ManagerMigrationKey,
-    MigrationDirectionStrategy,
     ModelData,
     ModelKey,
     ModelKind,
     ModelPair,
-    VersionMissingStrategy,
     VersionValue,
-)
-from pyverge.executor import (
-    AsyncExecutor,
-    Executor,
-    MigrationEntry,
-    MigrationRun,
-)
-from pyverge.manager.types import (
-    TargetPolicy,
-)
-from pyverge.schemas.types import (
-    TContainer,
 )
 from pyverge.versioning import Diffable
 
@@ -35,40 +20,6 @@ if TYPE_CHECKING:
 
 class MigrateMixin(Generic[VersionValue]):
     """Migrate, validate and diff payloads through the instance engine."""
-
-    def prepare(  # noqa: PLR0913
-        self: Manager[VersionValue],
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: type[TContainer] | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-    ) -> MigrationRun[VersionValue]:
-        """Build a runnable migration without executing it.
-
-        Context is passed later to ``run``/``arun``. The run materializes the
-        container when one was supplied.
-        """
-        resolved_target = self._resolve_target_policy(target, engine=self.engine)
-        return self.engine.prepare(
-            data,
-            target=resolved_target,
-            container=container,
-            version_property=version_property,
-            depth_limit=depth_limit,
-            direction=direction,
-            on_direction_violation=on_direction_violation,
-            on_version_not_found=on_version_not_found,
-            executor=executor,
-            entry_migration=entry_migration,
-            materialize=True,
-        )
 
     def info(
         self: Manager[VersionValue],

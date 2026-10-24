@@ -11,7 +11,6 @@ import semver
 from pyverge import Manager
 from pyverge.migration import (
     MigrationContext,
-    MigrationSettings,
     PydanticModelAdapter,
 )
 from pyverge.types import ManagerMigrationKey
@@ -36,18 +35,13 @@ def _drop_status(data: dict, context: MigrationContext | None = None) -> dict:
     return data
 
 
-def user_manager(
-    settings: MigrationSettings | None = None,
-) -> Manager[semver.Version]:
+def user_manager() -> Manager[semver.Version]:
     """A linear ``User`` chain, both directions: v1 ↔ v2 ↔ v3.
 
     Reverse edges let a produce seam converge a returned ``latest`` (v3) payload
     down to a pinned older target.
     """
-    user_manager_cls = Manager[semver.Version].configure(
-        settings or MigrationSettings(),
-        PydanticModelAdapter(),
-    )
+    user_manager_cls = Manager[semver.Version].configure(PydanticModelAdapter())
     manager = user_manager_cls()
     manager.store_model(UserV1)
     manager.store_model(UserV2)

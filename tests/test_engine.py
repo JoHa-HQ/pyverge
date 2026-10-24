@@ -11,12 +11,12 @@ import pytest
 import semver
 
 from pyverge import types
+from pyverge.execution import MigrationHook
 from pyverge.migration import (
     Engine,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
     MigrationContext,
-    MigrationEntry,
     PydanticModelAdapter,
     fixed_target_resolver,
     latest_target_resolver,
@@ -876,7 +876,7 @@ class TestMigrationManagement:
 
         key = EdgeKey.from_pair(versions[0], versions[1])
         if scenario == "add_remove":
-            hook = object()
+            hook = MigrationHook()
             engine.add_hook(EdgeKey.from_pair(versions[0], versions[1]), hook)
             assert engine.registry.has_hooks(engine.registry.get_migration_by_edge(key))
 
@@ -886,7 +886,7 @@ class TestMigrationManagement:
             )
             return
 
-        engine.add_hook(EdgeKey.from_pair(versions[0], versions[1]), object())
+        engine.add_hook(EdgeKey.from_pair(versions[0], versions[1]), MigrationHook())
         engine.clear_hooks()
         assert not engine.registry._hooks
 
@@ -1043,7 +1043,7 @@ class TestMigrationEntryIntegration:
             def run(self) -> dict[str, Any]:
                 return {"custom": True}
 
-        custom_strategy = MagicMock(spec=MigrationEntry)
+        custom_strategy = MagicMock()
         custom_strategy.migrate.return_value = _CustomTask()
         result = run_engine(
             engine,

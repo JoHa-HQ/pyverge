@@ -4,34 +4,23 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, ClassVar, Literal, Protocol, Self, TypeAlias
 
 from pyverge.core.types import (
-    DirectionViolationStrategy,
     ManagerMigrationKey,
-    MigrationDirectionStrategy,
     MigrationFunc,
-    ModelData,
     ModelHandle,
     ModelKind,
     ModelPair,
     TargetResolver,
-    VersionMissingStrategy,
     VersionValue,
     VersionValue_co,
 )
 from pyverge.schemas.types import (
     ModelAdapter,
-    TContainer,
 )
 from pyverge.versioning import Versionable
 
 if TYPE_CHECKING:
     from pyverge.core.types import (
         Attachable,
-    )
-    from pyverge.executor import (
-        AsyncExecutor,
-        Executor,
-        MigrationEntry,
-        MigrationRun,
     )
     from pyverge.migration.engine import Engine
     from pyverge.migration.types import (
@@ -125,18 +114,3 @@ class ManagerInstanceState(Protocol[VersionValue]):
 
     @property
     def adapter(self) -> ModelAdapter: ...
-
-    def prepare(
-        self,
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: type[TContainer] | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-    ) -> MigrationRun[VersionValue]: ...

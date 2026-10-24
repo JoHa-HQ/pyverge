@@ -42,11 +42,6 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
-from pyverge.executor import (
-    Executor,
-    MigrationEntry,
-    RunnableMigration,
-)
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
@@ -84,7 +79,6 @@ __all__ = [
     "DirectionViolationStrategy",
     "EdgeKey",
     "Entry",
-    "Executor",
     "ExtraFieldStrategy",
     "JsonPrimities",
     "JsonSchema",
@@ -99,7 +93,6 @@ __all__ = [
     "ManagerMigrationKey",
     "Migratable",
     "MigrationDirectionStrategy",
-    "MigrationEntry",
     "MigrationFunc",
     "MigrationHookMap",
     "MigrationKey",
@@ -115,7 +108,6 @@ __all__ = [
     "Orderable",
     "RenderingFormat",
     "ResolverFactory",
-    "RunnableMigration",
     "SchemaTransformer",
     "TargetPolicy",
     "TargetResolver",

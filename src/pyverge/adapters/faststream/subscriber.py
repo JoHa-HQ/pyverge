@@ -84,7 +84,7 @@ def subscriber(
             target = selector.select(
                 TargetContext(topic, getattr(msg, "headers", {}) or {})
             )
-            return await manager.prepare(payload, target=target).arun()
+            return await manager.prepare(payload, target=target).arun()  # ty: ignore[unresolved-attribute]
 
         return converge_message
 

@@ -14,12 +14,12 @@ import pytest
 import semver
 
 from pyverge import types
+from pyverge.execution import MigrationHook
 from pyverge.export import ManifestDiff
 from pyverge.jgf import JgfExporter, JgfImporter
 from pyverge.migration import (
     Engine,
     MigrationContext,
-    MigrationHook,
     PydanticModelAdapter,
     Registry,
 )

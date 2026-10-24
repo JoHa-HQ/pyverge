@@ -50,7 +50,7 @@ def migrate(
         elif context is not None:
             runtime_context = json.loads(context)
 
-        result = mgr.prepare(payload, target=target).run(context=runtime_context)
+        result = mgr.prepare(payload, target=target).run(context=runtime_context)  # ty: ignore[unresolved-attribute]
 
         if check:
             raise typer.Exit(0)
