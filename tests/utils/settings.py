@@ -38,24 +38,14 @@ def without_identity(options: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def manager_kwargs(settings: MigrationSettings) -> dict[str, Any]:
-    """Explicit component parameters for ``Manager.configure``."""
-    return {
-        "max_migration_depth": settings.max_migration_depth,
-        "validation_mode": settings.validation_mode,
-        "on_missing_field": settings.on_missing_field,
-        "on_extra_field": settings.on_extra_field,
-        "direction": settings.direction,
-        "on_direction_violation": settings.on_direction_violation,
-        "on_missing_path": settings.on_missing_path,
-        "on_missing": settings.on_missing,
-        "parallel_workers": settings.parallel_workers,
-        "execution_mode": settings.execution_mode,
-    }
-
-
 VersioningSettings = MigrationSettings
 DiscoverySettings = MigrationSettings
+
+
+def manager_kwargs(settings: MigrationSettings) -> dict[str, Any]:
+    """Build-time manager parameters only."""
+    return {"on_missing": settings.on_missing}
+
 
 __all__ = [
     "MigrationSettings",

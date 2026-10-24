@@ -173,16 +173,6 @@ def engine(
 ) -> Engine[VersionValue]:
     return Engine(
         registry,
-        GraphBuilder(
-            registry,
-            CompoundKeyWalker(
-                registry,
-                adapter=model_adapter,
-                validation_mode=migration_settings.validation_mode,
-                direction=migration_settings.direction,
-            ),
-            max_migration_depth=migration_settings.max_migration_depth,
-        ),
         model_adapter,
         DefaultMigrationIdentityResolver(),
         {
