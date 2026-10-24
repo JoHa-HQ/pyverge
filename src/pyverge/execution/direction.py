@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
-from pyverge.core.types import MigrationDirectionStrategy
+from pyverge.core.types import MigrationDirectionStrategy, VersionValue
 from pyverge.versioning import VersionNode
 
 
@@ -13,14 +13,18 @@ from pyverge.versioning import VersionNode
 class DirectionPolicy(Protocol):
     """Allow or reject a source -> target direction."""
 
-    def allows(self, source: VersionNode, target: VersionNode) -> bool: ...
+    def allows(
+        self, source: VersionNode[VersionValue], target: VersionNode[VersionValue]
+    ) -> bool: ...
 
 
 @dataclass(frozen=True, slots=True)
 class AnyDirection:
     """Allow every direction."""
 
-    def allows(self, source: VersionNode, target: VersionNode) -> bool:
+    def allows(
+        self, source: VersionNode[VersionValue], target: VersionNode[VersionValue]
+    ) -> bool:
         return True
 
 
@@ -28,7 +32,9 @@ class AnyDirection:
 class ForwardDirection:
     """Allow only ascending versions."""
 
-    def allows(self, source: VersionNode, target: VersionNode) -> bool:
+    def allows(
+        self, source: VersionNode[VersionValue], target: VersionNode[VersionValue]
+    ) -> bool:
         return source < target
 
 
@@ -36,7 +42,9 @@ class ForwardDirection:
 class BackwardDirection:
     """Allow only descending versions."""
 
-    def allows(self, source: VersionNode, target: VersionNode) -> bool:
+    def allows(
+        self, source: VersionNode[VersionValue], target: VersionNode[VersionValue]
+    ) -> bool:
         return source > target
 
 

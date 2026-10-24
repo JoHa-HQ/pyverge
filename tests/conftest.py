@@ -6,6 +6,8 @@ from typing import cast
 import pytest
 
 from pyverge import Manager
+from pyverge.core.clock import SystemClock
+from pyverge.core.ids import UuidIdFactory
 from pyverge.core.types import (
     VersionValue,
 )
@@ -26,6 +28,7 @@ from pyverge.execution import (
     Runner,
     RuntimeCapabilities,
 )
+from pyverge.execution.context import ExecutionEnvironment
 from pyverge.migration import (
     Engine,
     JsonSchemaModelAdapter,
@@ -141,11 +144,27 @@ def walker(
     )
 
 
+@pytest.fixture(
+    params=[(SystemClock, UuidIdFactory)],
+    ids=["system-uuid"],
+)
+def execution_environment(
+    request: pytest.FixtureRequest,
+) -> ExecutionEnvironment:
+    clock_cls, id_cls = request.param
+    return ExecutionEnvironment(
+        clock=clock_cls(),
+        id_factory=id_cls(),
+        logger=None,
+        tracer=None,
+    )
+
+
 @pytest.fixture
 def coordinator(
-    walker: CompositeExtractor,
-    registry: Registry,
-) -> ExecutionCoordinator:
+    walker: CompositeExtractor[VersionValue],
+    registry: Registry[VersionValue],
+) -> ExecutionCoordinator[VersionValue]:
     return ExecutionCoordinator(
         extractor=walker,
         paths=PathResolver(registry),
@@ -180,10 +199,10 @@ def runtime_backend(
 
 @pytest.fixture
 def runner(
-    coordinator: ExecutionCoordinator,
+    coordinator: ExecutionCoordinator[VersionValue],
     model_adapter: ModelAdapter,
     runtime_backend: ConcurrencyBackend,
-) -> Runner:
+) -> Runner[VersionValue]:
     return Runner(
         coordinator=coordinator,
         adapter=model_adapter,

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic
 
 from pyverge.core.context import MigrationContext
-from pyverge.core.types import TargetResolver
+from pyverge.core.types import TargetResolver, VersionValue
 from pyverge.execution.coordinator import ExecutionCoordinator
 from pyverge.execution.path import Path
 from pyverge.execution.plan import ExecutionPlan, ExtractedEntry
@@ -16,10 +16,10 @@ from pyverge.schemas.types import ModelAdapter
 
 
 @dataclass(frozen=True, slots=True)
-class Runner:
+class Runner(Generic[VersionValue]):
     """Execute a payload through a frozen graph and configured runtime policy."""
 
-    coordinator: ExecutionCoordinator
+    coordinator: ExecutionCoordinator[VersionValue]
     adapter: ModelAdapter
     capabilities: RuntimeCapabilities
     concurrency: ConcurrencyBackend
@@ -30,7 +30,7 @@ class Runner:
         *,
         container: type[Any] | None,
         max_depth: int,
-    ) -> list[ExtractedEntry]:
+    ) -> list[ExtractedEntry[VersionValue]]:
         """Extract versioned entries from a payload."""
         return self.coordinator.extract(
             payload,
@@ -45,7 +45,7 @@ class Runner:
         *,
         container: type[Any] | None,
         max_depth: int,
-    ) -> ExecutionPlan:
+    ) -> ExecutionPlan[VersionValue]:
         """Build a runtime plan through the coordinator."""
         return self.coordinator.plan(
             payload,
@@ -54,9 +54,27 @@ class Runner:
             max_depth=max_depth,
         )
 
+    def run(
+        self,
+        payload: dict[str, Any],
+        target_resolver: TargetResolver,
+        *,
+        container: type[Any] | None,
+        max_depth: int,
+        context: MigrationContext | None,
+    ) -> dict[str, Any]:
+        """Plan and execute in one call."""
+        plan = self.plan(
+            payload,
+            target_resolver,
+            container=container,
+            max_depth=max_depth,
+        )
+        return self.execute(plan, context=context)
+
     def execute(
         self,
-        plan: ExecutionPlan,
+        plan: ExecutionPlan[VersionValue],
         *,
         context: MigrationContext | None,
     ) -> dict[str, Any]:

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Generic
 
+from pyverge.core.types import VersionValue
 from pyverge.execution.path import Path
 from pyverge.execution.plan import (
     BackendDeclaration,
@@ -14,12 +16,14 @@ from pyverge.execution.plan import (
 
 
 @dataclass(frozen=True, slots=True)
-class ExecutionPlanner:
+class ExecutionPlanner(Generic[VersionValue]):
     """Turn a PathPlan into runtime-bound levels and execution options."""
 
     backend: BackendDeclaration
 
-    def build(self, path: PathPlan, payload: dict) -> ExecutionPlan:
+    def build(
+        self, path: PathPlan[VersionValue], payload: dict
+    ) -> ExecutionPlan[VersionValue]:
         """Group entries into dependency levels and attach execution options."""
         return ExecutionPlan(
             path=path,
@@ -30,9 +34,9 @@ class ExecutionPlanner:
 
     def _levels(
         self, entries: tuple[PathPlanEntry, ...]
-    ) -> tuple[tuple[PathPlanEntry, ...], ...]:
+    ) -> tuple[tuple[PathPlanEntry[VersionValue], ...], ...]:
         remaining = list(entries)
-        levels: list[tuple[PathPlanEntry, ...]] = []
+        levels: list[tuple[PathPlanEntry[VersionValue], ...]] = []
         while remaining:
             ready = [
                 entry

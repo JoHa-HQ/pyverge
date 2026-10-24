@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any, TypeVar, assert_type, cast
 
 import pendulum
 import pytest
 import semver
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
 
 from pyverge.core import MaxDepthExceededError, PayloadValidationError
+from pyverge.core.context import MigrationContext
 from pyverge.execution import (
     AnyDirection,
     BackendDeclaration,
@@ -32,6 +35,7 @@ from pyverge.execution import (
     skip_target_resolver,
 )
 from pyverge.execution.backends import PlainBackend, ProcessBackend
+from pyverge.execution.context import LayeredView, RunContext, StepContext
 from pyverge.migration import (
     Engine,
     JsonSchemaModelAdapter,
@@ -40,6 +44,7 @@ from pyverge.migration import (
 )
 from pyverge.registry import GraphCatalog
 from pyverge.registry.errors import CatalogError
+from pyverge.versioning import EdgeKey, VersionNode
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -57,6 +62,21 @@ from tests.examples.pydantic.semver import (
     migrate_v2_to_v3,
 )
 from tests.utils.engine import envelope_model
+
+V = TypeVar("V", semver.Version, pendulum.Date)
+
+
+@st.composite
+def _user_v1_payloads(draw):
+    return {
+        "document": {
+            "kind": "User",
+            "version": "1.0.0",
+            "name": draw(st.text(min_size=1, max_size=20)),
+            "email": draw(st.emails()),
+            "role": draw(st.sampled_from(["admin", "user", "guest"])),
+        }
+    }
 
 
 @pytest.mark.parametrize(
@@ -82,15 +102,56 @@ def test_runner_plans_and_executes(
 ) -> None:
     payload = _payload()
 
-    plan = runner.plan(
+    result = runner.run(
         payload,
         latest_target_resolver(registry),
         container=None,
         max_depth=-1,
+        context=None,
     )
-    result = runner.execute(plan, context=None)
 
     assert result == snapshot
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@settings(
+    max_examples=25,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+@given(payload=_user_v1_payloads())
+def test_runner_preserves_generated_payload(
+    registry: Registry,
+    runner: Runner,
+    payload: dict,
+) -> None:
+    result = runner.run(
+        payload,
+        latest_target_resolver(registry),
+        container=None,
+        max_depth=-1,
+        context=None,
+    )
+
+    assert result["document"]["version"] == "2.0.0"
+    assert result["document"]["name"] == payload["document"]["name"]
+    assert result["document"]["email"] == payload["document"]["email"]
+    assert result["document"]["role"] == payload["document"]["role"]
+    assert result["document"]["age"] is None
 
 
 @pytest.mark.parametrize(
@@ -293,12 +354,12 @@ def _graph() -> GraphCatalog:
 
 
 def _path_entry(
-    source,
-    target,
+    source: VersionNode[V],
+    target: VersionNode[V],
     *,
     path: tuple[str | int, ...],
     steps=(),
-):
+) -> PathPlanEntry[V]:
     return PathPlanEntry(
         path=path,
         source=source,
@@ -706,7 +767,7 @@ def test_extractor_validation_mode_none_skips_validate(
                 ),
             ),
             "3.0.0",
-            0,
+            None,
             id="engine_migrate_latest",
         ),
         pytest.param(
@@ -736,16 +797,16 @@ def test_runner_migrates_to_latest(
     expected_version: str,
     expected_age: int | None,
 ) -> None:
-    plan = runner.plan(
+    result = runner.run(
         _payload(),
         latest_target_resolver(registry),
         container=None,
         max_depth=-1,
+        context=None,
     )
-    result = runner.execute(plan, context=None)
 
     assert result["document"]["version"] == expected_version
-    assert result["document"]["age"] == expected_age
+    assert result["document"].get("age") == expected_age
 
 
 @pytest.mark.parametrize(
@@ -812,8 +873,7 @@ def test_runner_explicit_target_versionable(
     target_model = envelope_model(model_adapter, discovery_settings, UserV2)
     target = fixed_target_resolver(registry, target_model)
 
-    plan = runner.plan(_payload(), target, container=None, max_depth=-1)
-    result = runner.execute(plan, context=None)
+    result = runner.run(_payload(), target, container=None, max_depth=-1, context=None)
 
     assert result["document"]["version"] == "2.0.0"
     assert result["document"]["age"] is None
@@ -862,13 +922,13 @@ def test_runner_target_policy(
     resolver_factory: Callable[[Registry[semver.Version]], Any],
     expected_version: str,
 ) -> None:
-    plan = runner.plan(
+    result = runner.run(
         _payload(),
         resolver_factory(registry),
         container=None,
         max_depth=-1,
+        context=None,
     )
-    result = runner.execute(plan, context=None)
 
     assert result["document"]["version"] == expected_version
 
@@ -908,14 +968,15 @@ def test_runner_no_op_when_source_equals_target(
             "status": "active",
         }
     }
-    plan = runner.plan(
+    result = runner.run(
         payload,
         latest_target_resolver(registry),
         container=None,
         max_depth=-1,
+        context=None,
     )
 
-    assert runner.execute(plan, context=None)["document"]["version"] == "3.0.0"
+    assert result["document"]["version"] == "3.0.0"
 
 
 @pytest.mark.parametrize(
@@ -948,11 +1009,120 @@ def test_chrono_runner_migrates_to_latest(
             "role": "user",
         }
     }
-    plan = runner.plan(
+    result = runner.run(
         payload,
         latest_target_resolver(registry),
         container=None,
         max_depth=-1,
+        context=None,
     )
 
-    assert runner.execute(plan, context=None)["document"]["version"] == "2025-12-31"
+    assert result["document"]["version"] == "2025-12-31"
+
+
+def test_layered_view_resolves_precedence() -> None:
+    view = LayeredView(({"a": 1}, {"a": 2, "b": 3}))
+
+    assert view["a"] == 1
+    assert view["b"] == 3  # noqa: PLR2004
+    assert dict(view) == {"a": 1, "b": 3}
+    assert len(view) == len(("a", "b"))
+
+
+def test_step_context_layers_bindings(execution_environment) -> None:
+    run = RunContext(
+        run_id="run-1",
+        environment=execution_environment,
+        bindings=MigrationContext.create({"tenant": "acme", "region": "eu"}),
+    )
+    source = envelope_model(
+        PydanticModelAdapter(),
+        None,
+        UserV1,
+    )
+    target = envelope_model(
+        PydanticModelAdapter(),
+        None,
+        UserV2,
+    )
+    step = StepContext(
+        run=run,
+        path=("document",),
+        index=0,
+        source=source,
+        target=target,
+        edge=EdgeKey.from_pair(source, target),
+        bindings=MigrationContext.create({"tenant": "override"}),
+    )
+
+    assert step.view["tenant"] == "override"
+    assert step.view["region"] == "eu"
+
+
+def test_plan_generics_enforce_version_value(
+    model_adapter,
+    versioning_settings,
+) -> None:
+
+    low = envelope_model(model_adapter, versioning_settings, UserV1)
+    high = envelope_model(model_adapter, versioning_settings, UserV2)
+    entry = _path_entry(low, high, path=())
+    plan: PathPlan[semver.Version] = PathPlan(
+        entries=(entry,),
+        container=None,
+        target_fields=frozenset(),
+    )
+    resolved = plan.entries[0]
+
+    assert_type(resolved.source, VersionNode[semver.Version])
+
+
+@pytest.mark.parametrize(
+    "model_adapter, versioning_settings, source_cls, target_cls, version_type",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            {},
+            UserV1,
+            UserV2,
+            semver.Version,
+            id="semver",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            {},
+            UserV20250310,
+            UserV20251231,
+            pendulum.Date,
+            id="date",
+        ),
+    ],
+    indirect=["model_adapter", "versioning_settings"],
+)
+def test_plan_preserves_version_value(
+    model_adapter,
+    versioning_settings,
+    source_cls,
+    target_cls,
+    version_type,
+) -> None:
+    source = envelope_model(model_adapter, versioning_settings, source_cls)
+    target = envelope_model(model_adapter, versioning_settings, target_cls)
+    entry = PathPlanEntry(
+        path=(),
+        source=cast("Any", source),
+        target=cast("Any", target),
+        target_model=target.model,
+        steps=(),
+        hooks=(),
+        migrations=(),
+    )
+    plan = PathPlan(
+        entries=(entry,),
+        container=None,
+        target_fields=frozenset(),
+    )
+    resolved = plan.entries[0]
+
+    assert type(resolved.source.version[1]) is version_type
+    assert type(resolved.target.version[1]) is version_type

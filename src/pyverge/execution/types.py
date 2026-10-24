@@ -58,7 +58,7 @@ class ConcurrencyBackend(Protocol):
 
 
 @runtime_checkable
-class RuntimePort(Protocol):
+class RuntimePort(Protocol[VersionValue]):
     """Runtime facade consumed by manager/adapters."""
 
     @property
@@ -70,7 +70,7 @@ class RuntimePort(Protocol):
         *,
         container: type[Any] | None,
         max_depth: int,
-    ) -> list[ExtractedEntry]: ...
+    ) -> list[ExtractedEntry[VersionValue]]: ...
 
     def plan(
         self,
@@ -79,7 +79,17 @@ class RuntimePort(Protocol):
         *,
         container: type[Any] | None,
         max_depth: int,
-    ) -> ExecutionPlan: ...
+    ) -> ExecutionPlan[VersionValue]: ...
+
+    def run(
+        self,
+        payload: dict[str, Any],
+        target_resolver: TargetResolver,
+        *,
+        container: type[Any] | None,
+        max_depth: int,
+        context: MigrationContext | None,
+    ) -> dict[str, Any]: ...
 
     def execute(
         self,

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from typing import Generic
 
+from pyverge.core.types import VersionValue
 from pyverge.execution.direction import DirectionPolicy
 from pyverge.execution.plan import PathPlan, PathPlanEntry
 from pyverge.registry import GraphCatalog
@@ -12,7 +14,7 @@ from pyverge.versioning import EdgeKey
 
 
 @dataclass(frozen=True, slots=True)
-class PolicyEngine:
+class PolicyEngine(Generic[VersionValue]):
     """Filter a resolved path plan against path policy.
 
     Target and path resolution happen before this service; the engine enforces
@@ -25,9 +27,11 @@ class PolicyEngine:
     depth_limit: int
     on_depth_violation: str
 
-    def apply(self, plan: PathPlan, *, graph: GraphCatalog) -> PathPlan:
+    def apply(
+        self, plan: PathPlan[VersionValue], *, graph: GraphCatalog[VersionValue]
+    ) -> PathPlan[VersionValue]:
         """Return *plan* with policy-rejected entries removed or raise."""
-        kept: list[PathPlanEntry] = []
+        kept: list[PathPlanEntry[VersionValue]] = []
         for entry in plan.entries:
             if not self.direction.allows(entry.source, entry.target):
                 self._violation(
@@ -73,8 +77,8 @@ class PolicyEngine:
 
     def _violation(
         self,
-        graph: GraphCatalog,
-        entry: PathPlanEntry,
+        graph: GraphCatalog[VersionValue],
+        entry: PathPlanEntry[VersionValue],
         layer: str,
         strategy: str,
         message: str,

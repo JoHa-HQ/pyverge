@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Generic
 
-from pyverge.core.types import ModelHandle, TargetResolver
+from pyverge.core.types import ModelHandle, TargetResolver, VersionValue
 from pyverge.execution.plan import ExtractedEntry, PathPlan, PathPlanEntry
 from pyverge.registry import GraphCatalog
 from pyverge.registry.errors import CatalogError
@@ -13,12 +14,16 @@ from pyverge.versioning import EdgeKey, VersionNode
 
 
 @dataclass(frozen=True, slots=True)
-class PathResolver:
+class PathResolver(Generic[VersionValue]):
     """Resolve entries against a frozen graph."""
 
-    graph: GraphCatalog
+    graph: GraphCatalog[VersionValue]
 
-    def resolve(self, entry: ExtractedEntry, target: VersionNode) -> PathPlanEntry:
+    def resolve(
+        self,
+        entry: ExtractedEntry[VersionValue],
+        target: VersionNode[VersionValue],
+    ) -> PathPlanEntry[VersionValue]:
         """Resolve one entry to *target*, requiring a concrete target model."""
         target_node = target
         if target_node.model is None:
@@ -49,14 +54,14 @@ class PathResolver:
 
     def plan(
         self,
-        entries: Sequence[ExtractedEntry],
+        entries: Sequence[ExtractedEntry[VersionValue]],
         target_resolver: TargetResolver,
         *,
         container: ModelHandle | None,
         target_fields: frozenset[str],
-    ) -> PathPlan:
+    ) -> PathPlan[VersionValue]:
         """Resolve every entry and collect the payload-level plan."""
-        resolved: list[PathPlanEntry] = []
+        resolved: list[PathPlanEntry[VersionValue]] = []
         for entry in entries:
             target = target_resolver(entry.node)
             if target is None:

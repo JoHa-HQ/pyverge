@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generic
 
-from pyverge.core.types import TargetResolver
+from pyverge.core.types import TargetResolver, VersionValue
 from pyverge.execution.path_resolver import PathResolver
 from pyverge.execution.plan import ExecutionPlan, ExtractedEntry
 from pyverge.execution.planner import ExecutionPlanner
@@ -14,13 +14,13 @@ from pyverge.execution.types import EntryExtractor
 
 
 @dataclass(frozen=True, slots=True)
-class ExecutionCoordinator:
+class ExecutionCoordinator(Generic[VersionValue]):
     """Drive extraction, path resolution, policy, and plan construction."""
 
-    extractor: EntryExtractor
-    paths: PathResolver
-    policy: PolicyEngine
-    planner: ExecutionPlanner
+    extractor: EntryExtractor[VersionValue]
+    paths: PathResolver[VersionValue]
+    policy: PolicyEngine[VersionValue]
+    planner: ExecutionPlanner[VersionValue]
 
     def extract(
         self,
@@ -28,10 +28,10 @@ class ExecutionCoordinator:
         *,
         container: type[Any] | None,
         max_depth: int,
-    ) -> list[ExtractedEntry]:
+    ) -> list[ExtractedEntry[VersionValue]]:
         """Extract versioned entries from a payload."""
         return [
-            ExtractedEntry(path, node)
+            ExtractedEntry[VersionValue](path, node)
             for path, _depth, node in self.extractor.extract(
                 payload,
                 container=container,
@@ -46,7 +46,7 @@ class ExecutionCoordinator:
         *,
         container: type[Any] | None,
         max_depth: int,
-    ) -> ExecutionPlan:
+    ) -> ExecutionPlan[VersionValue]:
         """Build a runtime plan from a payload and frozen graph."""
         entries = self.extract(
             payload,
