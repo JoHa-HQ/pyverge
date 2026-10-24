@@ -105,6 +105,11 @@ LEAN_CALLS = (
             ],
             rich_call,
             id=f"pydantic-{rich_call.id}",
+            marks=(
+                pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
+                if rich_call.call_version == "1.0.0"
+                else ()
+            ),
         )
         for rich_call in RICH_CALLS
     ]
@@ -119,13 +124,16 @@ LEAN_CALLS = (
             ],
             lean_call,
             id=f"json-{lean_call.id}",
+            marks=(
+                pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
+                if lean_call.call_version == "1.0.0"
+                else ()
+            ),
         )
         for lean_call in LEAN_CALLS
     ],
     indirect=["model_adapter", "registry", "case"],
 )
-# xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-@pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
 async def test_call_at_any_version_reaches_the_handler(client, case: Case) -> None:
     result = await client.call_tool(case.kind, case.args, version=case.call_version)
     assert result.structured_content == case.expected
