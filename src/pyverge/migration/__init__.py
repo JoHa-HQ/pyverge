@@ -1,11 +1,8 @@
 from pyverge.core import (
     MaxDepthExceededError,
     MigrationContext,
-    Path,
     PayloadError,
     PayloadValidationError,
-    get_at,
-    set_at,
 )
 from pyverge.discovery.reflection import (
     CallableDiffDiscovery,
@@ -86,7 +83,6 @@ __all__ = [
     "ModelAlreadyRegisteredError",
     "ModelConflictError",
     "ModelNotFoundError",
-    "Path",
     "PayloadError",
     "PayloadValidationError",
     "PydanticDiff",
@@ -99,9 +95,7 @@ __all__ = [
     "WalkerProtocol",
     "earliest_target_resolver",
     "fixed_target_resolver",
-    "get_at",
     "latest_target_resolver",
     "multi_target_resolver",
-    "set_at",
     "skip_target_resolver",
 ]

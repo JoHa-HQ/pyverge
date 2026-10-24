@@ -12,7 +12,6 @@ from .errors import (
     PyvergeError,
 )
 from .ids import IdFactory, UuidIdFactory
-from .path import Path, get_at, set_at
 from .types import (
     MIGRATION_PAIR_LEN,
     Attachable,
@@ -56,7 +55,6 @@ __all__ = [
     "ModelKind",
     "ModelPair",
     "ModelVersionKey",
-    "Path",
     "PayloadError",
     "PayloadValidationError",
     "PyvergeError",
@@ -68,6 +66,4 @@ __all__ = [
     "VersionMissingStrategy",
     "VersionValue",
     "VersionValue_co",
-    "get_at",
-    "set_at",
 ]

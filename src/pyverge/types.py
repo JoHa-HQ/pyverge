@@ -42,7 +42,7 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
-from pyverge.execution.types import Entry, Walker
+from pyverge.execution.types import Entry, EntryExtractor
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
@@ -76,6 +76,7 @@ __all__ = [
     "DirectionViolationStrategy",
     "EdgeKey",
     "Entry",
+    "EntryExtractor",
     "ExtraFieldStrategy",
     "JsonPrimities",
     "JsonSchema",
@@ -120,5 +121,4 @@ __all__ = [
     "VersionValue",
     "VersionValue_co",
     "Versionable",
-    "Walker",
 ]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import cast
 
 import pytest
@@ -8,10 +9,22 @@ from pyverge import Manager
 from pyverge.core.types import (
     VersionValue,
 )
-from pyverge.discovery.reflection import CompositeDiffDiscovery, Reflection, Reflector
-from pyverge.execution import GraphBuilder, MigrationGraph, Walker
-from pyverge.manager.types import (
-    ResolverFactory,
+from pyverge.discovery.reflection import (
+    CompositeDiffDiscovery,
+    Reflection,
+    Reflector,
+)
+from pyverge.execution import (
+    AnyDirection,
+    BackendDeclaration,
+    CompositeExtractor,
+    ConcurrencyBackend,
+    ExecutionCoordinator,
+    ExecutionPlanner,
+    PathResolver,
+    PolicyEngine,
+    Runner,
+    RuntimeCapabilities,
 )
 from pyverge.migration import (
     Engine,
@@ -115,13 +128,13 @@ def walker(
     registry: Registry[VersionValue],
     migration_settings: MigrationSettings,
     model_adapter: PydanticModelAdapter,
-) -> Walker:
-    """A preconfigured :class:`Walker` bound to the shared registry.
+) -> CompositeExtractor:
+    """A preconfigured :class:`CompositeExtractor` bound to the shared registry.
 
     Pass it to ``Manager[VersionValue].configure(settings, adapter, walker=...)``
     to drive container-guided discovery.
     """
-    return Walker(
+    return CompositeExtractor(
         registry,
         adapter=model_adapter,
         validation_mode=migration_settings.validation_mode,
@@ -129,35 +142,54 @@ def walker(
 
 
 @pytest.fixture
-def graph_builder(
-    registry: Registry[VersionValue],
-    migration_settings: MigrationSettings,
-    model_adapter: ModelAdapter,
-) -> GraphBuilder[VersionValue]:
-    """Return a graph builder with the standard compound-key walker."""
-    return GraphBuilder(
-        registry,
-        Walker(
-            registry,
-            adapter=model_adapter,
-            validation_mode=migration_settings.validation_mode,
+def coordinator(
+    walker: CompositeExtractor,
+    registry: Registry,
+) -> ExecutionCoordinator:
+    return ExecutionCoordinator(
+        extractor=walker,
+        paths=PathResolver(registry),
+        policy=PolicyEngine(
+            direction=AnyDirection(),
+            on_direction_violation="raise",
+            on_missing_path="raise",
+            depth_limit=-1,
+            on_depth_violation="raise",
         ),
-        max_migration_depth=migration_settings.max_migration_depth,
-        direction=migration_settings.direction,
+        planner=ExecutionPlanner(
+            backend=BackendDeclaration(
+                name="local",
+                strategy="sequential",
+                middleware=(),
+            ),
+        ),
     )
 
 
 @pytest.fixture
-def migration_graph(
+def runtime_backend(
     request: pytest.FixtureRequest,
-    graph_builder: GraphBuilder[VersionValue],
-    registry: Registry[VersionValue],
-) -> MigrationGraph[VersionValue]:
-    resolver_factory, payload = cast("tuple[ResolverFactory, dict]", request.param)
-    return graph_builder.build(
-        payload,
-        target_resolver=resolver_factory(registry),
-    ).graph
+) -> Iterator[ConcurrencyBackend]:
+    backend_cls, kwargs = request.param
+    backend = backend_cls(**kwargs)
+    yield backend
+    close = getattr(backend, "close", None)
+    if close is not None:
+        close()
+
+
+@pytest.fixture
+def runner(
+    coordinator: ExecutionCoordinator,
+    model_adapter: ModelAdapter,
+    runtime_backend: ConcurrencyBackend,
+) -> Runner:
+    return Runner(
+        coordinator=coordinator,
+        adapter=model_adapter,
+        capabilities=RuntimeCapabilities(sync=True, async_=False, parallel=False),
+        concurrency=runtime_backend,
+    )
 
 
 @pytest.fixture

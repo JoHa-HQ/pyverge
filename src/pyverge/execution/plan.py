@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pyverge.core.types import Attachable, MigrationFunc, ModelHandle
 from pyverge.versioning import VersionNode
@@ -48,6 +48,25 @@ class PolicyDecision:
 
 
 @dataclass(frozen=True, slots=True)
+class BackendDeclaration:
+    """Backend selected for an execution plan."""
+
+    name: str
+    strategy: Literal["sequential", "parallel"]
+    middleware: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionPlan:
+    """Runtime-bound execution plan produced from a PathPlan."""
+
+    path: PathPlan
+    payload: dict[str, Any]
+    levels: tuple[tuple[PathPlanEntry, ...], ...]
+    backend: BackendDeclaration
+
+
+@dataclass(frozen=True, slots=True)
 class PlanningOptions:
     """Runtime-independent planning inputs."""
 
@@ -59,6 +78,8 @@ class PlanningOptions:
 
 
 __all__ = [
+    "BackendDeclaration",
+    "ExecutionPlan",
     "ExtractedEntry",
     "PathPlan",
     "PathPlanEntry",

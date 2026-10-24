@@ -36,7 +36,7 @@ if TYPE_CHECKING:
         ReflectionStrategy,
         RegistrationContext,
     )
-    from pyverge.execution.types import Walker
+    from pyverge.execution.types import EntryExtractor
     from pyverge.migration.engine import Engine
     from pyverge.migrations.identity import MigrationIdentityResolver
     from pyverge.migrations.json_patch import JsonPatchMigration
@@ -81,7 +81,7 @@ class ManagerClassState(Protocol[VersionValue]):
         adapter: ModelAdapter,
         *,
         engine: Engine[VersionValue] | None = None,
-        walker: Walker | None = None,
+        walker: EntryExtractor | None = None,
         hasher: ContentHasher | None = None,
         identity_resolver: MigrationIdentityResolver | None = None,
         migration_materializer: DiffMaterializer[object] | None = None,

@@ -9,7 +9,7 @@ from pyverge.discovery.reflection import (
     Reflection,
     Reflector,
 )
-from pyverge.execution.types import Walker
+from pyverge.execution.types import EntryExtractor
 from pyverge.migration.engine import Engine
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import (
@@ -92,7 +92,7 @@ class Manager(
         adapter: ModelAdapter,
         *,
         engine: Engine[VersionValue] | None = None,
-        walker: Walker | None = None,
+        walker: EntryExtractor | None = None,
         hasher: ContentHasher | None = None,
         identity_resolver: MigrationIdentityResolver | None = None,
         model_materializer: DiffMaterializer[object] | None = None,
@@ -109,7 +109,7 @@ class Manager(
             walker: Optional preconfigured payload walker.  When a walker
                 instance is given, its ``registry`` becomes the manager's
                 registry.  Defaults to the containerless
-                :class:`~pyverge.execution.Walker`; container-guided
+                :class:`~pyverge.execution.CompositeExtractor`; container-guided
                 discovery is enabled by supplying a container at call time.
             entry_migration: Optional per-entry migration defaults.  Defaults
                 to :class:`~pyverge.migration.DefaultEntryPlanner`.

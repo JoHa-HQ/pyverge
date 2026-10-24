@@ -4,10 +4,7 @@ from collections.abc import Iterator
 from typing import Any, Generic, Literal
 
 from pyverge.core.errors import MaxDepthExceededError, PayloadValidationError
-from pyverge.core.types import (
-    TargetResolver,
-    VersionValue,
-)
+from pyverge.core.types import VersionValue
 from pyverge.execution.types import (
     Entry,
 )
@@ -23,7 +20,7 @@ from pyverge.versioning import (
 )
 
 
-class Walker(Generic[VersionValue]):
+class CompositeExtractor(Generic[VersionValue]):
     """One container-aware walker for both discovery modes.
 
     - ``container is None``: dict scanning — every dict is checked for a
@@ -51,21 +48,18 @@ class Walker(Generic[VersionValue]):
         """The registry this walker discovers against."""
         return self._registry
 
-    def discover(
+    def extract(
         self,
         data: dict[str, Any],
         *,
         container: type[Any] | None = None,
-        target_resolver: TargetResolver,
         max_depth: int = -1,
     ) -> Iterator[Entry]:
         kp = self._adapter.kind_property
         vp = self._adapter.version_property
 
         if container is None:
-            yield from self._walk_containerless(
-                data, (), 0, 0, kp, vp, max_depth, target_resolver
-            )
+            yield from self._walk_containerless(data, (), 0, 0, kp, vp, max_depth)
             return
 
         if not self._adapter.can_handle(container):
@@ -90,18 +84,13 @@ class Walker(Generic[VersionValue]):
                     message=f"Payload failed container validation: {exc}",
                 ) from exc
 
-        yield from self._walk_guided(
-            validated, (), 0, container, kp, vp, max_depth, target_resolver
-        )
+        yield from self._walk_guided(validated, (), 0, container, kp, vp, max_depth)
 
     def _match(
         self,
         value: Any,
-        path: tuple[str | int, ...],
-        depth: int,
         kp: str,
         vp: str,
-        target_resolver: TargetResolver,
     ) -> VersionNode[VersionValue] | None:
         """Return the registered node for a versioned dict, or ``None``."""
         if not isinstance(value, dict):
@@ -132,11 +121,10 @@ class Walker(Generic[VersionValue]):
         kp: str,
         vp: str,
         max_depth: int,
-        target_resolver: TargetResolver,
     ) -> Iterator[Entry]:
         is_versioned = False
         if isinstance(value, dict):
-            source = self._match(value, path, depth, kp, vp, target_resolver)
+            source = self._match(value, kp, vp)
             if source is not None:
                 is_versioned = True
                 if max_depth >= 0 and versioned_depth > max_depth:
@@ -147,9 +135,7 @@ class Walker(Generic[VersionValue]):
                         version=str(source.version[1]),
                         max_depth=max_depth,
                     )
-                target = target_resolver(source)
-                if target is not None:
-                    yield (path, depth, source)
+                yield (path, depth, source)
 
             child_versioned_depth = (
                 versioned_depth + 1 if is_versioned else versioned_depth
@@ -163,7 +149,6 @@ class Walker(Generic[VersionValue]):
                     kp,
                     vp,
                     max_depth,
-                    target_resolver,
                 )
         elif isinstance(value, list):
             for idx, item in enumerate(value):
@@ -175,7 +160,6 @@ class Walker(Generic[VersionValue]):
                     kp,
                     vp,
                     max_depth,
-                    target_resolver,
                 )
 
     def _walk_guided(
@@ -187,7 +171,6 @@ class Walker(Generic[VersionValue]):
         kp: str,
         vp: str,
         max_depth: int,
-        target_resolver: TargetResolver,
     ) -> Iterator[Entry]:
         if max_depth >= 0 and depth > max_depth:
             kind = value.get(kp, "") if isinstance(value, dict) else ""
@@ -201,13 +184,11 @@ class Walker(Generic[VersionValue]):
             )
 
         if isinstance(value, dict):
-            source = self._match(value, path, depth, kp, vp, target_resolver)
+            source = self._match(value, kp, vp)
             if source is not None:
-                target = target_resolver(source)
-                if target is not None:
-                    yield (path, depth, source)
-                    # Do not recurse into already-discovered entries
-                    return
+                yield (path, depth, source)
+                # Do not recurse into already-discovered entries
+                return
 
             field_model: type[Any] | None = None
             if parent_model is not None and path:
@@ -228,7 +209,6 @@ class Walker(Generic[VersionValue]):
                     kp,
                     vp,
                     max_depth,
-                    target_resolver,
                 )
 
         elif isinstance(value, list):
@@ -245,5 +225,61 @@ class Walker(Generic[VersionValue]):
                     kp,
                     vp,
                     max_depth,
-                    target_resolver,
                 )
+
+
+class SchemaFieldsExtractor(CompositeExtractor[VersionValue]):
+    """Extract versioned dicts by scanning schema fields in the payload."""
+
+    def extract(
+        self,
+        data: dict[str, Any],
+        *,
+        container: type[Any] | None = None,
+        max_depth: int = -1,
+    ) -> Iterator[Entry]:
+        if container is not None:
+            raise ValueError("SchemaFieldsExtractor does not accept a container")
+        kp = self._adapter.kind_property
+        vp = self._adapter.version_property
+        yield from self._walk_containerless(data, (), 0, 0, kp, vp, max_depth)
+
+
+class ContainerExtractor(CompositeExtractor[VersionValue]):
+    """Extract entries by following a typed container's field models."""
+
+    def extract(
+        self,
+        data: dict[str, Any],
+        *,
+        container: type[Any] | None = None,
+        max_depth: int = -1,
+    ) -> Iterator[Entry]:
+        if container is None:
+            raise ValueError("ContainerExtractor requires a container")
+        if not self._adapter.can_handle(container):
+            raise PayloadValidationError(
+                path=(),
+                message="container is not a recognized model type",
+            )
+        validation_mode = self._validation_mode
+        if validation_mode == "none":
+            validated = data
+        else:
+            try:
+                validated = self._adapter.validate(
+                    data,
+                    container,
+                    strict=(validation_mode == "strict"),
+                )
+            except Exception as exc:
+                raise PayloadValidationError(
+                    path=(),
+                    message=f"Payload failed container validation: {exc}",
+                ) from exc
+        kp = self._adapter.kind_property
+        vp = self._adapter.version_property
+        yield from self._walk_guided(validated, (), 0, container, kp, vp, max_depth)
+
+
+__all__ = ["CompositeExtractor", "ContainerExtractor", "SchemaFieldsExtractor"]
