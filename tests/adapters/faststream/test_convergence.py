@@ -22,7 +22,7 @@ from pyverge.adapters.faststream import (
     publisher,
     subscriber,
 )
-from pyverge.core.exceptions import RegistryError
+from pyverge.convergence.errors import CatalogError
 from pyverge.migration import MigrationContext, PydanticModelAdapter
 from tests.examples.pydantic.semver import (
     UserV1,
@@ -237,5 +237,5 @@ class TestNegotiation:
 )
 class TestFailures:
     def test_no_migration_path_raises(self, manager) -> None:
-        with pytest.raises(RegistryError):
+        with pytest.raises(CatalogError):
             manager().migrate(V2_PAYLOAD, target="1.0.0")

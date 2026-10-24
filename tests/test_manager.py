@@ -11,22 +11,22 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.core import (
-    AsyncExecutionRequired,
-    DiscoveryValidationError,
-    MigrationSettings,
+from pyverge.convergence.errors import (
+    CatalogError,
     ModelNotFoundError,
-    RegistryError,
-    SyncExecutionRequired,
-    VersioningSettings,
 )
-from pyverge.core.types import (
+from pyverge.core import (
     ManagerMigrationKey,
-    Migratable,
     MigrationKeyInput,
+    MigrationSettings,
     ModelPair,
-    Versionable,
+    VersioningSettings,
     VersionValue,
+)
+from pyverge.core.errors import PayloadValidationError
+from pyverge.execution.errors import (
+    AsyncExecutionRequired,
+    SyncExecutionRequired,
 )
 from pyverge.manager.types import (
     ManagerClassState,
@@ -36,7 +36,6 @@ from pyverge.migration import (
     AsyncLevelParallelExecutor,
     Engine,
     MigrationContext,
-    MigrationError,
     MigrationHook,
     MigrationRun,
     PydanticModelAdapter,
@@ -47,6 +46,8 @@ from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,
 )
+from pyverge.versioning import Migratable, Versionable
+from pyverge.versioning.errors import MigrationApplicationError
 from tests.examples.json import (
     USER_V1_0_0,
     USER_V1_2_3,
@@ -597,7 +598,7 @@ class TestLookupHelpers:
         self,
         manager: type[Manager],
     ) -> None:
-        with pytest.raises(RegistryError):
+        with pytest.raises(CatalogError):
             manager.get_latest_model("Missing")
 
     @pytest.mark.parametrize(
@@ -1018,7 +1019,7 @@ class TestMigrateWithContainer:
                 "role": "bogus",
             }
         }
-        with pytest.raises(DiscoveryValidationError):
+        with pytest.raises(PayloadValidationError):
             UserManager().migrate(invalid, container=UserContainer)
 
 
@@ -1195,7 +1196,7 @@ def test_versionable_target_used_as_is(
 def test_unsupported_spec_raises(
     manager: type[Manager[semver.Version]],
 ) -> None:
-    with pytest.raises(RegistryError):
+    with pytest.raises(CatalogError):
         manager.compile_target_spec("unknown")
 
 
@@ -1216,14 +1217,14 @@ def test_model_class_wrong_kind_raises(
 ) -> None:
     source = envelope_model(model_adapter, versioning_settings, AddressV1)
     resolver = manager.compile_target_spec(PersonV2)
-    with pytest.raises(RegistryError):
+    with pytest.raises(CatalogError):
         resolver(source)
 
 
 def test_unregistered_model_class_raises(
     manager: type[Manager[semver.Version]],
 ) -> None:
-    with pytest.raises(RegistryError):
+    with pytest.raises(CatalogError):
         manager.compile_target_spec(PersonV2)
 
 
@@ -1479,7 +1480,7 @@ class TestAsyncExecution:
         instance.store_migration(ModelPair(UserV1, UserV2), _boom)
         instance.add_hook(ModelPair(UserV1, UserV2), _Hook())
 
-        with pytest.raises(MigrationError):
+        with pytest.raises(MigrationApplicationError):
             asyncio.run(instance.amigrate(_payload("1.0.0")))
 
         assert events[0] == "before"

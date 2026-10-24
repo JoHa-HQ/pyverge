@@ -10,11 +10,7 @@ import pytest
 import semver
 
 from pyverge import types
-from pyverge.core import (
-    VersioningSettings,
-    VersionKey,
-    VersionNode,
-)
+from pyverge.core import VersioningSettings
 from pyverge.migration import (
     Diff,
     JsonataMigration,
@@ -28,7 +24,16 @@ from pyverge.migration import (
 from pyverge.providers.types import (
     ModelHandle,
 )
-from pyverge.reflection import CompatibilityReport
+from pyverge.reflection import JsonPatchRenderer
+from pyverge.versioning import (
+    CompatibilityReport,
+    DiffOrigin,
+    FieldChange,
+    FieldStatus,
+    VersionKey,
+    VersionNode,
+    default_content_hasher,
+)
 from tests.examples.pydantic.chrono import (
     UserV20250310,
     UserV20251231,
@@ -343,12 +348,12 @@ class TestPydanticDiff:
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
     ) -> None:
-        """Default renderer produces RFC 6902 JSON Patch."""
+        """JsonPatchRender produces RFC 6902 JSON Patch."""
         source = envelope_model(model_adapter, versioning_settings, UserV1)
         target = envelope_model(model_adapter, versioning_settings, UserV2)
 
         diff = PydanticDiff.from_pair(source=source, target=target)
-        serialized = diff.render()
+        serialized = diff.render(JsonPatchRenderer())
         assert isinstance(serialized, list)
         add_ops = [op for op in serialized if op["op"] == "add"]
         assert any(op["path"] == "/age" for op in add_ops)
@@ -381,8 +386,8 @@ class TestPydanticDiff:
     @pytest.mark.parametrize(
         "registry, version",
         [
-            [Registry[semver.Version](), "0.1.0"],
-            [Registry[pendulum.Date](), "2024-01-01"],
+            [Registry[semver.Version](hasher=default_content_hasher()), "0.1.0"],
+            [Registry[pendulum.Date](hasher=default_content_hasher()), "2024-01-01"],
         ],
     )
     def test_meta_endpoint_produces_empty_diff(
@@ -559,25 +564,35 @@ class TestCompatibilityReport:
         removed: list[str] | None = None,
         modified: dict[str, dict[str, Any]] | None = None,
         added_info: dict[str, dict[str, Any]] | None = None,
-        backward_compatible: bool = False,
     ) -> CompatibilityReport:
         source = VersionNode(
             _model=type("Model", (), {}),
             _value=semver.Version.parse("1.0.0"),
             _kind="User",
+            references=frozenset(),
+            fields=frozenset(),
+            model_id="tests.Model",
         )
         target = VersionKey(
             _value=semver.Version.parse("2.0.0"),
             _kind="User",
         )
+        fields = {
+            **{
+                name: FieldChange(FieldStatus.ADDED, (added_info or {}).get(name, {}))
+                for name in (added or [])
+            },
+            **{name: FieldChange(FieldStatus.REMOVED, {}) for name in (removed or [])},
+            **{
+                name: FieldChange(FieldStatus.MODIFIED, changes)
+                for name, changes in (modified or {}).items()
+            },
+        }
         diff = Diff(
             source=source,
             target=target,
-            added_fields=added or [],
-            removed_fields=removed or [],
-            modified_fields=modified or {},
-            added_field_info=added_info or {},
-            is_backward_compatible=backward_compatible,
+            fields=fields,
+            origin=DiffOrigin.SCHEMA,
         )
         return CompatibilityReport.from_diff(
             diff,
@@ -591,7 +606,7 @@ class TestCompatibilityReport:
         )
 
         assert report.added_fields == ("age",)
-        assert report.breaking is False
+        assert report.structural_breaking is False
 
     def test_required_addition_is_breaking(self) -> None:
         report = self._report(
@@ -599,13 +614,13 @@ class TestCompatibilityReport:
             added_info={"age": {"required": True}},
         )
 
-        assert report.breaking is True
+        assert report.structural_breaking is True
 
     def test_removed_field_is_breaking(self) -> None:
         report = self._report(removed=["age"])
 
         assert report.removed_fields == ("age",)
-        assert report.breaking is True
+        assert report.structural_breaking is True
 
     def test_type_change_is_breaking(self) -> None:
         report = self._report(
@@ -613,7 +628,7 @@ class TestCompatibilityReport:
         )
 
         assert report.modified_fields == ("name",)
-        assert report.breaking is True
+        assert report.structural_breaking is True
 
     def test_identity_changes_are_ignored(self) -> None:
         report = self._report(
@@ -623,14 +638,7 @@ class TestCompatibilityReport:
 
         assert report.added_fields == ()
         assert report.modified_fields == ()
-        assert report.breaking is False
-
-    def test_declared_backward_compatible_overrides_structure(self) -> None:
-        report = self._report(removed=["age"], backward_compatible=True)
-
-        assert report.structural_breaking is True
-        assert report.declared_backward_compatible is True
-        assert report.breaking is False
+        assert report.structural_breaking is False
 
 
 class TestJsonataMigration:

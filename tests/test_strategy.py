@@ -9,10 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from pyverge import types
-from pyverge.core import (
-    DiscoverySettings,
-    MigrationError,
-)
+from pyverge.core import DiscoverySettings
 from pyverge.migration import (
     DefaultEntryPlanner,
     DefaultMigrationEntry,
@@ -20,6 +17,7 @@ from pyverge.migration import (
     GraphEntry,
     PydanticModelAdapter,
 )
+from pyverge.versioning.errors import MigrationApplicationError
 from tests.examples.pydantic.semver_nested import PersonV1, PersonV2
 from tests.utils import envelope_model
 
@@ -87,7 +85,7 @@ class TestDefaultMigrationEntry:
     ) -> None:
         strategy = DefaultMigrationEntry()
 
-        with pytest.raises(MigrationError):
+        with pytest.raises(MigrationApplicationError):
             strategy.migrate(
                 entry,
                 {"version": "1.0.0"},
@@ -239,7 +237,7 @@ class TestDefaultMigrationEntry:
         entry: GraphEntry[Any],
         execute_step: MagicMock,
     ) -> None:
-        execute_step.side_effect = MigrationError(
+        execute_step.side_effect = MigrationApplicationError(
             "Person",
             entry.source,
             entry.target,
@@ -267,7 +265,7 @@ class TestDefaultMigrationEntry:
         entry: GraphEntry[Any],
         execute_step: MagicMock,
     ) -> None:
-        execute_step.side_effect = MigrationError(
+        execute_step.side_effect = MigrationApplicationError(
             "Person",
             entry.source,
             entry.target,
@@ -275,7 +273,7 @@ class TestDefaultMigrationEntry:
         )
         strategy = DefaultMigrationEntry()
 
-        with pytest.raises(MigrationError):
+        with pytest.raises(MigrationApplicationError):
             strategy.migrate(
                 entry,
                 {"version": "1.0.0"},

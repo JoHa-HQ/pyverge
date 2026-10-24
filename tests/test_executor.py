@@ -10,18 +10,15 @@ from unittest.mock import MagicMock
 import pytest
 import semver
 from pydantic import BaseModel
+from pyverge.executor import StepRequest
 
 from pyverge import types
-from pyverge.core import (
-    DiscoveryValidationError,
-    MigrationError,
+from pyverge.convergence.errors import (
+    CatalogError,
     MigrationNotFoundError,
-    MigrationSettings,
-    RegistryError,
-    VersionNode,
 )
+from pyverge.core import MigrationSettings
 from pyverge.core.types import ModelData
-from pyverge.executor import StepRequest
 from pyverge.migration import (
     AsyncLevelParallelExecutor,
     AsyncSequentialExecutor,
@@ -45,9 +42,12 @@ from pyverge.migration import (
     multi_target_resolver,
     skip_target_resolver,
 )
+from pyverge.providers.errors import ProviderCapabilityError
 from pyverge.providers.types import (
     ModelHandle,
 )
+from pyverge.versioning import VersionNode
+from pyverge.versioning.errors import MigrationApplicationError
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
     AddressV2,
@@ -424,7 +424,7 @@ def test_executor_propagates_migration_error(
         }
     }
 
-    with pytest.raises(MigrationError, match="Migration failed"):
+    with pytest.raises(MigrationApplicationError, match="Migration failed"):
         run_engine(engine, payload, target=latest_target_resolver(engine.registry))
 
 
@@ -590,6 +590,9 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
                     _model=PersonV2,
                     _value=semver.Version(2, 0, 0),
                     _kind="Person",
+                    references=frozenset(),
+                    fields=frozenset(),
+                    model_id="tests.PersonV2",
                 ),
             ),
             None,
@@ -658,9 +661,12 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
                     _model=PersonV2,
                     _value=semver.Version(2, 0, 0),
                     _kind="Person",
+                    references=frozenset(),
+                    fields=frozenset(),
+                    model_id="tests.PersonV2",
                 ),
             ),
-            RegistryError,
+            CatalogError,
             id="fixed_wrong_kind_raises",
         ),
         pytest.param(
@@ -694,9 +700,12 @@ def test_level_parallel_executor_single_entry_uses_no_pool(
                     _model=PersonV2,
                     _value=semver.Version(9, 9, 9),
                     _kind="Person",
+                    references=frozenset(),
+                    fields=frozenset(),
+                    model_id="tests.PersonV2",
                 ),
             ),
-            RegistryError,
+            CatalogError,
             id="fixed_unregistered_target_raises",
         ),
     ],
@@ -754,7 +763,7 @@ def test_executor_gate_rejects_field_shallow_container(
     )
     # Force a container that recognizes the type but declares no fields.
     shallow = replace(plan, container=type("Empty", (BaseModel,), {}))
-    with pytest.raises(DiscoveryValidationError, match="incompatible"):
+    with pytest.raises(ProviderCapabilityError, match="incompatible"):
         SequentialExecutor().run(
             shallow,
             registry=engine.registry,

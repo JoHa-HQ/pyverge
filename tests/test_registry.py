@@ -5,25 +5,31 @@ Most behaviors are exercised for both the semver (pydantic) and chrono/JSON
 """
 
 from dataclasses import replace
+from typing import Any
 
 import pendulum
 import pytest
 import semver
 
 from pyverge import types
-from pyverge.core import (
-    EdgeKey,
-    MigrationAlreadyRegisteredError,
-    MigrationError,
+from pyverge.convergence import JgfImporter
+from pyverge.convergence.catalog import InMemoryCatalog
+from pyverge.convergence.catalog.ports import PathCatalog
+from pyverge.convergence.errors import (
+    BackwardCompatibilityError,
+    CatalogError,
+    GraphLockedError,
+    MigrationConflictError,
     MigrationNotFoundError,
+    MigrationPathError,
     ModelAlreadyRegisteredError,
     ModelConflictError,
     ModelNotFoundError,
-    RegistryError,
-    VersioningSettings,
-    VersionKey,
 )
+from pyverge.core import VersioningSettings
+from pyverge.export import JgfExporter, ManifestDiff
 from pyverge.migration import (
+    Engine,
     MigrationContext,
     MigrationHook,
     PydanticModelAdapter,
@@ -33,6 +39,13 @@ from pyverge.providers import JsonSchemaModelAdapter
 from pyverge.providers.types import (
     ModelHandle,
 )
+from pyverge.versioning import (
+    EdgeKey,
+    JgfNode,
+    VersionKey,
+    VersionNode,
+    default_content_hasher,
+)
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -41,6 +54,7 @@ from tests.examples.json import (
     USER_V0_1_1_DEV_7,
     USER_V1_0_0,
     USER_V1_2_3,
+    USER_V2_0_0,
     USER_V2025_01_01,
     USER_V2025_03_10,
     USER_V2025_12_31,
@@ -353,7 +367,7 @@ class TestModel:
         self,
         registry: Registry[types.VersionValue],
     ) -> None:
-        with pytest.raises(RegistryError):
+        with pytest.raises(CatalogError):
             registry.latest("User")
 
     @pytest.mark.parametrize(
@@ -447,7 +461,7 @@ class TestModel:
         registry: Registry[types.VersionValue],
         model: ModelHandle,
     ) -> None:
-        with pytest.raises(RegistryError, match="is not registered"):
+        with pytest.raises(CatalogError, match="is not registered"):
             registry.remove_model(
                 envelope_model(model_adapter, versioning_settings, model)
             )
@@ -685,7 +699,7 @@ class TestMigration:
         edge = edge_from_models(
             model_adapter, versioning_settings, models[0], models[1], func=_migrate
         )
-        with pytest.raises(MigrationAlreadyRegisteredError):
+        with pytest.raises(MigrationConflictError):
             registry.store_migration(edge)
 
     @pytest.mark.parametrize(
@@ -1009,7 +1023,7 @@ class TestHooks:
             func=lambda d, _: d,
         )
         key = EdgeKey.from_version_edge(edge)
-        with pytest.raises(RegistryError):
+        with pytest.raises(CatalogError):
             registry.remove_hook(key, MigrationHook())
 
     @pytest.mark.parametrize(
@@ -1457,7 +1471,7 @@ class TestVersionEdgeIndex:
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
 
-        with pytest.raises(RegistryError, match="referenced by migrations") as exc:
+        with pytest.raises(CatalogError, match="referenced by migrations") as exc:
             registry.remove_model(versions[0])
         assert "→" in str(exc.value)
 
@@ -1716,88 +1730,47 @@ class TestEdgePairLookup:
         [
             pytest.param(
                 PydanticModelAdapter,
+                [semver.Version, "validation_semver", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="semver_backward_validation",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
                 [
                     semver.Version,
-                    "semver_test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d, _: d)],
-                ],
-                [UserV1, UserV2],
-                id="semver_default_not_backward",
-            ),
-            pytest.param(
-                JsonSchemaModelAdapter,
-                [
-                    pendulum.Date,
-                    "json_chrono_test",
-                    [USER_V2025_01_01, USER_V2025_03_10],
-                    [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
-                ],
-                [USER_V2025_01_01, USER_V2025_03_10],
-                id="json_chrono_default_not_backward",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_is_backward_compatible_edge_default_false(
-        self,
-        model_adapter: types.ModelAdapter,
-        versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue],
-        models: list[ModelHandle],
-    ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-
-        key = EdgeKey.from_pair(versions[0], versions[1])
-        assert registry.get_migration_by_edge(key).diff.is_backward_compatible is False
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, models",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "semver_test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                id="semver_backward_compatible",
-            ),
-            pytest.param(
-                JsonSchemaModelAdapter,
-                [
-                    pendulum.Date,
-                    "json_chrono_test",
-                    [USER_V2025_01_01, USER_V2025_03_10],
+                    "validation_json_semver",
+                    [USER_V1_0_0, USER_V2_0_0],
                     [],
                 ],
-                [USER_V2025_01_01, USER_V2025_03_10],
-                id="json_chrono_backward_compatible",
+                [USER_V1_0_0, USER_V2_0_0],
+                id="json_semver_backward_validation",
             ),
         ],
         indirect=["model_adapter", "registry"],
     )
-    def test_is_backward_compatible_edge_true(
+    def test_backward_compatible_declaration_is_validated(
         self,
         model_adapter: types.ModelAdapter,
         versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue],
+        engine: Engine[types.VersionValue],
         models: list[ModelHandle],
     ) -> None:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        edge = edge_from_models(
-            model_adapter,
-            versioning_settings,
-            models[0],
-            models[1],
-            func=lambda d, _: d,
+
+        engine.store_migration(
+            (versions[0], versions[1]),
+            lambda d, _: d,
             backward_compatible=True,
         )
-        registry.store_migration(edge)
 
-        key = EdgeKey.from_pair(versions[0], versions[1])
-        assert registry.get_migration_by_edge(key).diff.is_backward_compatible is True
+        with pytest.raises(BackwardCompatibilityError):
+            engine.store_migration(
+                (versions[1], versions[0]),
+                lambda d, _: d,
+                backward_compatible=True,
+            )
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -2024,7 +1997,7 @@ class TestMigrationHookGuard:
         registry.add_hook(edge, MigrationHook())
 
         key = EdgeKey.from_version_edge(edge)
-        with pytest.raises(RegistryError, match="hooks"):
+        with pytest.raises(CatalogError, match="hooks"):
             registry.remove_migration(key)
 
         # Migration untouched
@@ -2371,7 +2344,7 @@ class TestNeutralGraphOps:
         forward = registry.migration_path(versions[0], versions[2])
         assert forward == [(versions[0], versions[1]), (versions[1], versions[2])]
         assert registry.migration_path(versions[0], versions[0]) == []
-        with pytest.raises(MigrationError):
+        with pytest.raises(MigrationPathError):
             registry.migration_path(versions[2], versions[0])
 
     def test_migration_path_unregistered_raises(
@@ -2381,7 +2354,7 @@ class TestNeutralGraphOps:
     ) -> None:
         missing = meta_versionable(model_adapter, "User", "9.9.9")
         other = meta_versionable(model_adapter, "User", "9.9.8")
-        with pytest.raises(MigrationError):
+        with pytest.raises(MigrationPathError):
             registry.migration_path(missing, other)
 
     @pytest.mark.parametrize(
@@ -2414,7 +2387,7 @@ class TestNeutralGraphOps:
         versions = [
             envelope_model(model_adapter, versioning_settings, m) for m in models
         ]
-        with pytest.raises(RegistryError):
+        with pytest.raises(CatalogError):
             registry.remove_migration_range(versions[0], versions[2])
 
     @pytest.mark.parametrize(
@@ -2486,3 +2459,250 @@ class TestNeutralGraphOps:
         registry.remove_model_by_handle(model)
         with pytest.raises(ModelNotFoundError):
             registry.get_model_by_handle(model)
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry, models",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "idempotent_semver", [UserV1, UserV2], []],
+            [UserV1, UserV2],
+            id="semver_user_v1_v2_idempotent",
+        ),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            [
+                pendulum.Date,
+                "idempotent_json_chrono",
+                [USER_V2025_01_01, USER_V2025_03_10],
+                [],
+            ],
+            [USER_V2025_01_01, USER_V2025_03_10],
+            id="json_chrono_user_2025_01_01_2025_03_10_idempotent",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_register_migration_identical_content_is_idempotent(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+    registry: Registry[types.VersionValue],
+    models: list[ModelHandle],
+) -> None:
+    def migrate(data: dict, context: MigrationContext | None = None) -> dict:
+        return data
+
+    edge = edge_from_models(
+        model_adapter,
+        versioning_settings,
+        models[0],
+        models[1],
+        func=migrate,
+    )
+
+    assert registry.store_migration(edge) is migrate
+    assert registry.store_migration(edge) is migrate
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry, models",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "catalog_semver",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), lambda d, _: d)],
+            ],
+            [UserV1, UserV2],
+            id="semver_catalog",
+        ),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            [
+                pendulum.Date,
+                "catalog_json_chrono",
+                [USER_V2025_01_01, USER_V2025_03_10],
+                [((USER_V2025_01_01, USER_V2025_03_10), lambda d, _: d)],
+            ],
+            [USER_V2025_01_01, USER_V2025_03_10],
+            id="json_chrono_catalog",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_catalog_exports_jgf_and_imports_nodes(
+    model_adapter: types.ModelAdapter,
+    registry: Registry[types.VersionValue],
+    models: list[ModelHandle],
+) -> None:
+    exporter = JgfExporter(default_content_hasher())
+    document = exporter.export_graph(registry).to_dict()
+
+    assert set(document["graph"]["nodes"]) == {
+        node.jgf_id for node in registry.versions
+    }
+    assert len(document["graph"]["edges"]) == sum(
+        len(registry.migrations(kind)) for kind in registry.kinds
+    )
+    assert exporter.content_hash(registry) == exporter.content_hash(registry)
+    assert not ManifestDiff.compare(document, document).changed
+
+    nodes_by_id = {
+        model_adapter.versionable(model).jgf_id: model_adapter.versionable(model)
+        for model in models
+    }
+
+    class _Resolver:
+        def resolve(self, node: JgfNode) -> types.VersionNode:
+            return nodes_by_id[node.id]
+
+    imported = InMemoryCatalog(name="imported", hasher=default_content_hasher())
+    node_document = {"graph": dict(document["graph"])}
+    node_document["graph"].pop("edges")
+    imported_graph = JgfImporter(_Resolver()).import_graph(
+        node_document,
+        models=imported,
+    )
+
+    assert {node.id for node in imported_graph.nodes} == set(nodes_by_id)
+    assert {node.jgf_id for node in imported.versions} == set(nodes_by_id)
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry, models",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "locked_semver", [UserV1, UserV2], []],
+            [UserV1, UserV2],
+            id="semver_locked",
+        ),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            [
+                pendulum.Date,
+                "locked_json_chrono",
+                [USER_V2025_01_01, USER_V2025_03_10],
+                [],
+            ],
+            [USER_V2025_01_01, USER_V2025_03_10],
+            id="json_chrono_locked",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_catalog_lock_freezes_writes(
+    model_adapter: types.ModelAdapter,
+    registry: Registry[types.VersionValue],
+    models: list[ModelHandle],
+) -> None:
+    snapshot = registry.lock()
+
+    exporter = JgfExporter(default_content_hasher())
+    assert (
+        exporter.export_graph(snapshot).to_dict()
+        == exporter.export_graph(registry).to_dict()
+    )
+    with pytest.raises(GraphLockedError):
+        registry.store_model(model_adapter.versionable(models[0]))
+    with pytest.raises(GraphLockedError):
+        snapshot.store_model(model_adapter.versionable(models[0]))
+
+
+@pytest.mark.parametrize(
+    "model_adapter, models",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [UserV1, UserV2],
+            id="semver_index",
+        ),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            [USER_V2025_01_01, USER_V2025_03_10],
+            id="json_chrono_index",
+        ),
+    ],
+    indirect=["model_adapter"],
+)
+def test_content_hash_index_tracks_registration(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+    models: list[ModelHandle],
+) -> None:
+    catalog = InMemoryCatalog(
+        name="indexed",
+        hasher=default_content_hasher(),
+        index_content_hashes=True,
+    )
+    nodes = [model_adapter.versionable(model) for model in models]
+    for node in nodes:
+        catalog.store_model(node)
+
+    edge = edge_from_models(
+        model_adapter,
+        versioning_settings,
+        models[0],
+        models[1],
+        func=_noop_migration,
+    )
+    catalog.store_migration(edge)
+
+    key = EdgeKey.from_version_edge(edge)
+    assert (
+        catalog.find_edge_by_content_hash(edge.content_hash(default_content_hasher()))
+        == key
+    )
+
+    catalog.remove_migration(key)
+    assert (
+        catalog.find_edge_by_content_hash(edge.content_hash(default_content_hasher()))
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "model_adapter, models",
+    [
+        pytest.param(PydanticModelAdapter, [UserV1, UserV2], id="semver_remote"),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            [USER_V2025_01_01, USER_V2025_03_10],
+            id="json_chrono_remote",
+        ),
+    ],
+    indirect=["model_adapter"],
+)
+def test_remote_path_catalog_is_substitutable(
+    model_adapter: types.ModelAdapter,
+    models: list[ModelHandle],
+) -> None:
+    source, target = (model_adapter.versionable(model) for model in models)
+
+    class _RemotePathCatalog:
+        """A remote adapter that answers path queries without graph download."""
+
+        def migration_path(
+            self,
+            from_version: types.Versionable,
+            to_version: types.Versionable,
+        ) -> list[tuple[VersionNode, VersionNode]]:
+            if from_version == source and to_version == target:
+                return [(source, target)]
+            return []
+
+    def resolve_path(
+        catalog: PathCatalog,
+        from_version: types.Versionable,
+        to_version: types.Versionable,
+    ) -> list[tuple[VersionNode, VersionNode]]:
+        return catalog.migration_path(from_version, to_version)
+
+    assert resolve_path(_RemotePathCatalog(), source, target) == [(source, target)]
+
+
+def _noop_migration(data: dict, context: Any = None) -> dict:
+    return data

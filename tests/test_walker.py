@@ -10,10 +10,7 @@ import pytest
 import semver
 
 from pyverge import types
-from pyverge.core import (
-    DiscoveryValidationError,
-    MaxDepthExceededError,
-)
+from pyverge.core import MaxDepthExceededError, PayloadValidationError
 from pyverge.migration import (
     CompoundKeyWalker,
     Engine,
@@ -218,7 +215,7 @@ def test_walker_incompatible_container_fails_fast(
     walker = PydanticWalker(
         registry, settings=discovery_settings, adapter=model_adapter
     )
-    with pytest.raises(DiscoveryValidationError, match="recognized model type"):
+    with pytest.raises(PayloadValidationError, match="recognized model type"):
         list(
             walker.discover(
                 {}, container=dict, target_resolver=skip_target_resolver(registry)
@@ -274,7 +271,7 @@ def test_pydantic_walker_invalid_payload_raises(
             "role": "wrong-role",
         }
     }
-    with pytest.raises(DiscoveryValidationError):
+    with pytest.raises(PayloadValidationError):
         list(
             walker.discover(
                 payload,

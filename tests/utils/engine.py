@@ -3,25 +3,18 @@
 from collections.abc import Mapping
 from typing import Any, cast
 
-from pyverge.core import (
-    VersionEdge,
-    VersioningSettings,
-    VersionKey,
-    VersionNode,
-)
+from pyverge.core import MigrationFunc, VersioningSettings, VersionValue
 from pyverge.core.context import MigrationContext
-from pyverge.core.types import (
-    MigrationFunc,
-    VersionValue,
-)
 from pyverge.migration import (
     PydanticDiff,
     Registry,
 )
+from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,
 )
+from pyverge.versioning import VersionEdge, VersionKey, VersionNode
 
 
 def envelope_model(
@@ -72,9 +65,9 @@ def edge_from_models(  # noqa: PLR0913
         diff=PydanticDiff.from_pair(
             source=source,
             target=target,
-            is_backward_compatible=backward_compatible,
         ),
         func=func,
+        migration=DefaultMigrationIdentityResolver().resolve(func),
     )
 
 
@@ -122,14 +115,21 @@ def register_migrations(
     parametrize data.
     """
     for migration in migrations:
-        pair, func, backward_compatible = _parse_migration(migration)
+        pair, func, _backward_compatible = _parse_migration(migration)
         versions = [adapter.versionable(model_cls) for model_cls in pair]
         diff = adapter.diff(
             versions[0],
             versions[1],
-            is_backward_compatible=backward_compatible,
         )
-        registry.store_migration(VersionEdge(versions[0], versions[1], diff, func))
+        registry.store_migration(
+            VersionEdge(
+                versions[0],
+                versions[1],
+                diff,
+                func,
+                migration=DefaultMigrationIdentityResolver().resolve(func),
+            )
+        )
 
 
 def run_engine(

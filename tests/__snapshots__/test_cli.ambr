@@ -6,6 +6,16 @@
       "op": "add",
       "path": "/age",
       "value": null
+    },
+    {
+      "op": "replace",
+      "path": "/version",
+      "changes": {
+        "default_changed": {
+          "from": "1.0.0",
+          "to": "2.0.0"
+        }
+      }
     }
   ]
   

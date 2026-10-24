@@ -15,10 +15,7 @@ import semver
 from pydantic import ValidationError
 
 from pyverge import Manager
-from pyverge.core import (
-    MigrationSettings,
-    VersioningSettings,
-)
+from pyverge.core import MigrationSettings, VersioningSettings
 from pyverge.migration import (
     JsonPatchMigration,
     PydanticModelAdapter,

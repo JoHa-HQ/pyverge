@@ -405,6 +405,34 @@ class TestCommands:
         assert graph["metadata"]["manifest_version"] == "1.0"
         assert all(c in "0123456789abcdef" for c in graph["metadata"]["content_hash"])
 
+    def test_manifest_options_override_identity(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(
+                app,
+                [
+                    "manifest",
+                    "-m",
+                    f"{manager_name}:manager",
+                    "--graph-id",
+                    "custom-graph",
+                    "--label",
+                    "custom label",
+                    "--manifest-version",
+                    "1.0",
+                ],
+            )
+
+        assert result.exit_code == 0
+        graph = json.loads(result.stdout)["graph"]
+        assert graph["id"] == "custom-graph"
+        assert graph["label"] == "custom label"
+        assert graph["metadata"]["manifest_version"] == "1.0"
+
     def test_manifest_compares_baseline(
         self,
         runner: CliRunner,

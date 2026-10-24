@@ -10,11 +10,7 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import types
-from pyverge.core import (
-    DiscoverySettings,
-    MaxDepthExceededError,
-    MigrationSettings,
-)
+from pyverge.core import DiscoverySettings, MaxDepthExceededError, MigrationSettings
 from pyverge.migration import (
     GraphEntry,
     MigrationGraph,

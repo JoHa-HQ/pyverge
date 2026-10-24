@@ -5,11 +5,7 @@ from typing import cast
 import pytest
 
 from pyverge import Manager
-from pyverge.core import (
-    DiscoverySettings,
-    MigrationSettings,
-    VersioningSettings,
-)
+from pyverge.core import DiscoverySettings, MigrationSettings, VersioningSettings
 from pyverge.core.types import (
     VersionValue,
 )
@@ -31,9 +27,14 @@ from pyverge.migration import (
 from pyverge.migration.types import (
     Walker,
 )
+from pyverge.migrations.identity import DefaultMigrationIdentityResolver
+from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.providers.types import (
     ModelAdapter,
 )
+from pyverge.reflection import CompositeDiffDiscovery, Reflection
+from pyverge.schemas.backend import ModelMaterializer
+from pyverge.versioning import default_content_hasher
 from tests.utils import register_models
 from tests.utils.engine import register_migrations
 from tests.utils.settings import overrides
@@ -101,7 +102,7 @@ def registry(
     migration_settings: MigrationSettings,
 ) -> Registry[VersionValue]:
     _strategy, name, models, migrations = request.param
-    registry = Registry[VersionValue](name=name)
+    registry = Registry[VersionValue](name=name, hasher=default_content_hasher())
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
     if migrations:
@@ -172,6 +173,12 @@ def engine(
             ),
         ),
         model_adapter,
+        DefaultMigrationIdentityResolver(),
+        {
+            "reconstruct_model": ModelMaterializer(model_adapter),
+            "reconstruct_migration": JsonPatchMigrationBackend(),
+        },
+        Reflection(model_adapter, CompositeDiffDiscovery()),
         entry_migration=DefaultMigrationEntry(),
     )
 

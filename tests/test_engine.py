@@ -11,17 +11,15 @@ import pytest
 import semver
 
 from pyverge import types
-from pyverge.core import (
-    EdgeKey,
+from pyverge.convergence.errors import (
+    CatalogError,
     MigrationAlreadyRegisteredError,
     MigrationNotFoundError,
-    MigrationSettings,
     MissingReferenceError,
     ModelConflictError,
     ModelNotFoundError,
-    RegistryError,
-    VersionKey,
 )
+from pyverge.core import MigrationSettings
 from pyverge.migration import (
     Engine,
     JsonPatchMigration,
@@ -36,6 +34,7 @@ from pyverge.migration import (
 from pyverge.providers.types import (
     ModelHandle,
 )
+from pyverge.versioning import EdgeKey, VersionKey
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -328,14 +327,14 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [semver.Version, "test", [], []],
                 UserV1,
-                RegistryError,
+                CatalogError,
                 id="unknown_kind_pydantic_semver",
             ),
             pytest.param(
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "test", [], []],
                 USER_V0_1_1_DEV_7,
-                RegistryError,
+                CatalogError,
                 id="unknown_kind_json_pendulum",
             ),
         ],
@@ -415,7 +414,7 @@ class TestModelManagement:
         models: ModelHandle,
     ) -> None:
         version = envelope_model(engine.adapter, engine.settings, models)
-        with pytest.raises(RegistryError):
+        with pytest.raises(CatalogError):
             engine.remove_model(version)
 
 
@@ -499,7 +498,7 @@ class TestMigrationManagement:
         versions = [
             envelope_model(engine.adapter, engine.settings, model) for model in models
         ]
-        with pytest.raises(RegistryError, match="across kinds"):
+        with pytest.raises(CatalogError, match="across kinds"):
             engine.store_migration(versions, lambda d, _: d)  # ty: ignore[invalid-argument-type]
 
     @pytest.mark.parametrize(
@@ -691,7 +690,7 @@ class TestMigrationManagement:
         models: list[ModelHandle],
     ) -> None:
         versions = [envelope_model(engine.adapter, engine.settings, m) for m in models]
-        with pytest.raises(RegistryError, match="critical"):
+        with pytest.raises(CatalogError, match="critical"):
             engine.remove_migration(EdgeKey.from_pair(versions[1], versions[2]))
 
     @pytest.mark.parametrize(
@@ -768,7 +767,7 @@ class TestMigrationManagement:
         engine.store_migration((versions[0], versions[1]), lambda d, _: d)
         engine.store_migration((versions[1], versions[2]), lambda d, _: d)
 
-        with pytest.raises(RegistryError, match="critical"):
+        with pytest.raises(CatalogError, match="critical"):
             engine.remove_migration_range(versions[0], versions[2])
 
     @pytest.mark.parametrize(
