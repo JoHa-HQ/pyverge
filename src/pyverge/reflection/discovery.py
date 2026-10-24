@@ -5,15 +5,17 @@ import inspect
 import textwrap
 from typing import Any, Generic
 
-from pyverge.core.types import (
-    Comparable,
-    MigrationFunc,
-    Versionable,
-    VersionValue,
-)
-from pyverge.providers.json_patch import JsonPatch
-from pyverge.reflection.diff import Diff
+from pyverge.core.types import MigrationFunc, VersionValue
+from pyverge.migrations.json_patch import JsonPatch
 from pyverge.reflection.types import DiffDiscovery
+from pyverge.versioning import (
+    Comparable,
+    Diff,
+    DiffOrigin,
+    FieldChange,
+    FieldStatus,
+    Versionable,
+)
 
 
 class JsonPatchDiffDiscovery(Generic[VersionValue]):
@@ -62,13 +64,19 @@ class JsonPatchDiffDiscovery(Generic[VersionValue]):
                     removed.append(from_field)
                 if field not in added:
                     added.append(field)
+        fields = {
+            **{name: FieldChange(FieldStatus.ADDED, {}) for name in sorted(added)},
+            **{name: FieldChange(FieldStatus.REMOVED, {}) for name in sorted(removed)},
+            **{
+                name: FieldChange(FieldStatus.MODIFIED, changes)
+                for name, changes in modified.items()
+            },
+        }
         return Diff(
             source=source,
             target=target,
-            added_fields=sorted(added),
-            removed_fields=sorted(removed),
-            modified_fields=modified,
-            origin="migration",
+            fields=fields,
+            origin=DiffOrigin.MIGRATION,
         )
 
 
@@ -98,7 +106,12 @@ class CallableDiffDiscovery(Generic[VersionValue]):
         try:
             src = inspect.getsource(migration)
         except (OSError, TypeError):
-            return Diff(source=source, target=target, origin="migration")
+            return Diff(
+                source=source,
+                target=target,
+                fields={},
+                origin=DiffOrigin.MIGRATION,
+            )
         tree = ast.parse(textwrap.dedent(src))
         added: list[str] = []
         removed: list[str] = []
@@ -142,13 +155,19 @@ class CallableDiffDiscovery(Generic[VersionValue]):
                     if isinstance(key, ast.Constant) and isinstance(key.value, str):
                         if key.value not in added:
                             added.append(key.value)
+        fields = {
+            **{name: FieldChange(FieldStatus.ADDED, {}) for name in sorted(added)},
+            **{name: FieldChange(FieldStatus.REMOVED, {}) for name in sorted(removed)},
+            **{
+                name: FieldChange(FieldStatus.MODIFIED, changes)
+                for name, changes in modified.items()
+            },
+        }
         return Diff(
             source=source,
             target=target,
-            added_fields=sorted(added),
-            removed_fields=sorted(removed),
-            modified_fields=modified,
-            origin="migration",
+            fields=fields,
+            origin=DiffOrigin.MIGRATION,
         )
 
 

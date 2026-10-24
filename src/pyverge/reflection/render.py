@@ -1,34 +1,32 @@
+"""Schema diff renderers."""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any, Generic
 
-from pyverge.core.types import Diffable, VersionValue
+from pyverge.core.types import VersionValue
+from pyverge.versioning import Diffable
 
 
 @dataclass(frozen=True, slots=True)
-class JsonPatchRender(Generic[VersionValue]):
-    """Render as RFC 6902 JSON Patch.
+class JsonPatchRenderer(Generic[VersionValue]):
+    """Render a diff as RFC 6902 JSON Patch."""
 
-    Preserves the ``diff`` it was built from, so the renderer can be kept and
-    (re)rendered or exported later without losing the patch state.
-    """
-
-    diff: Diffable[VersionValue]
     format: str = "json-patch"
 
-    def __call__(self) -> list[dict[str, Any]]:
-        return self.render(self.diff)
-
     def render(self, diff: Diffable[VersionValue]) -> list[dict[str, Any]]:
+        """Render *diff* as JSON Patch operations."""
         ops: list[dict[str, Any]] = []
-        for _field in diff.added_fields:
-            default = diff.added_default(_field)
-            ops.append({"op": "add", "path": f"/{_field}", "value": default})
-        for _field in diff.removed_fields:
-            ops.append({"op": "remove", "path": f"/{_field}"})
-        for _field, changes in diff.modified_fields.items():
+        for field in diff.added_fields:
+            default = diff.added_default(field)
+            ops.append({"op": "add", "path": f"/{field}", "value": default})
+        for field in diff.removed_fields:
+            ops.append({"op": "remove", "path": f"/{field}"})
+        for field, changes in diff.modified_fields.items():
             op: dict[str, Any] = {
                 "op": "replace",
-                "path": f"/{_field}",
+                "path": f"/{field}",
                 "changes": changes,
             }
             if "type_changed" in changes:
@@ -40,3 +38,10 @@ class JsonPatchRender(Generic[VersionValue]):
                 op["value"] = None
             ops.append(op)
         return ops
+
+    def __call__(self, diff: Diffable[VersionValue]) -> list[dict[str, Any]]:
+        """Callable shorthand for :meth:`render`."""
+        return self.render(diff)
+
+
+__all__ = ["JsonPatchRenderer"]

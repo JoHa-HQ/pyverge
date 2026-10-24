@@ -2,13 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol, TypeVar, runtime_checkable
 
-from pyverge.core.types import (
-    Comparable,
-    MigrationFunc,
-    Versionable,
-    VersionValue,
-)
-from pyverge.reflection.diff import Diff
+from pyverge.core.types import MigrationFunc, VersionValue
+from pyverge.versioning import Comparable, Diff, Versionable
 
 MigrationFunc_contra = TypeVar(
     "MigrationFunc_contra", bound=MigrationFunc, contravariant=True

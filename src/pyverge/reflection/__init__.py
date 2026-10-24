@@ -1,34 +1,19 @@
-from .compatibility import CompatibilityReport
-from .diff import Diff, DiffOrigin
 from .discovery import (
     CallableDiffDiscovery,
     CompositeDiffDiscovery,
     DiffDiscovery,
     JsonPatchDiffDiscovery,
 )
-from .reconstruction import (
-    MigrationReflection,
-    ModelReflection,
-    Reconstruction,
-    ReconstructionStrategy,
-    strategy_for,
-)
+from .ports import DiffProvider
 from .reflection import Reflection
-from .render import JsonPatchRender
+from .render import JsonPatchRenderer
 
 __all__ = [
     "CallableDiffDiscovery",
-    "CompatibilityReport",
     "CompositeDiffDiscovery",
-    "Diff",
     "DiffDiscovery",
-    "DiffOrigin",
+    "DiffProvider",
     "JsonPatchDiffDiscovery",
-    "JsonPatchRender",
-    "MigrationReflection",
-    "ModelReflection",
-    "Reconstruction",
-    "ReconstructionStrategy",
+    "JsonPatchRenderer",
     "Reflection",
-    "strategy_for",
 ]

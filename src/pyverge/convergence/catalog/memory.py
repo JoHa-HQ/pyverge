@@ -3,36 +3,37 @@ from collections import defaultdict
 from itertools import chain
 from typing import Generic, Self, cast
 
-from pyverge.core.exceptions import (
-    MigrationAlreadyRegisteredError,
-    MigrationError,
+from pyverge.convergence.errors import (
+    CatalogError,
+    GraphLockedError,
+    MigrationConflictError,
     MigrationNotFoundError,
+    MigrationPathError,
     ModelAlreadyRegisteredError,
     ModelConflictError,
     ModelNotFoundError,
-    RegistryError,
 )
 from pyverge.core.types import (
     Attachable,
-    Comparable,
-    ManagerKey,
-    Migratable,
     MigrationFunc,
     ModelHandle,
     ModelKind,
     ModelVersionKey,
-    Transitional,
     VersionValue,
 )
-from pyverge.core.versioning import (
+from pyverge.versioning import (
+    Comparable,
+    ContentHasher,
     EdgeKey,
+    Migratable,
+    Transitional,
     VersionKey,
     VersionNode,
 )
 
 
-class Registry(Generic[VersionValue]):
-    """Ordered storage for versioned models, migrations, and hooks.
+class InMemoryCatalog(Generic[VersionValue]):
+    """In-memory catalog for versioned models, migrations, and hooks.
 
     Provider-neutral: models are stored against an opaque :data:`ModelHandle`
     and lookups are keyed by version.  Class identification is the engine's
@@ -41,7 +42,9 @@ class Registry(Generic[VersionValue]):
     >>> from typing import Literal
     >>> import semver
     >>> from pydantic import BaseModel
-    >>> from pyverge.migration import PydanticModelAdapter, Registry
+    >>> from pyverge.convergence.catalog import Registry
+    >>> from pyverge.providers import PydanticModelAdapter
+    >>> from pyverge.versioning import default_content_hasher
     >>> adapter = PydanticModelAdapter()
     >>> class UserV1(BaseModel):
     ...     kind: Literal["User"] = "User"
@@ -52,7 +55,7 @@ class Registry(Generic[VersionValue]):
     ...     version: Literal["2.0.0"] = "2.0.0"
     ...     name: str
     ...     age: int | None = None
-    >>> registry = Registry[semver.Version]()
+    >>> registry = Registry[semver.Version](hasher=default_content_hasher())
     >>> v1 = adapter.versionable(UserV1)
     >>> v2 = adapter.versionable(UserV2)
     >>> _ = registry.store_model(v1)
@@ -63,8 +66,20 @@ class Registry(Generic[VersionValue]):
     True
     """
 
-    def __init__(self: Self, *, name: str | None = None) -> None:
+    def __init__(
+        self: Self,
+        *,
+        name: str | None = None,
+        hasher: ContentHasher,
+        index_content_hashes: bool = False,
+    ) -> None:
         self._name = name or "registry"
+        self._hasher = hasher
+        self._locked = False
+        self._index_content_hashes = index_content_hashes
+        self._content_hash_index: dict[str, EdgeKey[VersionValue]] | None = (
+            {} if index_content_hashes else None
+        )
         self._by_versions: list[VersionNode[VersionValue]] = []
         self._by_kinds: dict[ModelKind, list[VersionNode[VersionValue]]] = defaultdict(
             list
@@ -92,7 +107,7 @@ class Registry(Generic[VersionValue]):
                 return self.has_migration(index)
         except (ModelNotFoundError, MigrationNotFoundError, TypeError):
             return False
-        raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
+        raise CatalogError(self._name, f"Unsupported index type: {type(index)}")
 
     def __getitem__(
         self, index: object
@@ -102,7 +117,7 @@ class Registry(Generic[VersionValue]):
             return self.get_model(index)
         if isinstance(index, Transitional):
             return self.get_migration(index)
-        raise RegistryError(self._name, f"Unsupported index type: {type(index)}")
+        raise CatalogError(self._name, f"Unsupported index type: {type(index)}")
 
     @property
     def versions(self: Self) -> list[VersionNode[VersionValue]]:
@@ -128,7 +143,7 @@ class Registry(Generic[VersionValue]):
     def latest_version(self) -> VersionNode[VersionValue]:
         """The most recently registered version overall."""
         if not self._by_versions:
-            raise RegistryError(self._name, "No versions registered")
+            raise CatalogError(self._name, "No versions registered")
         return self._by_versions[-1]
 
     def is_adjacent(self, key: Transitional[VersionValue]) -> bool:
@@ -217,21 +232,28 @@ class Registry(Generic[VersionValue]):
 
     def latest(self: Self, kind: ModelKind) -> VersionNode[VersionValue]:
         if kind not in self._by_kinds:
-            raise RegistryError(self._name, "No versions registered")
+            raise CatalogError(self._name, "No versions registered")
         return self._by_kinds[kind][-1]
 
     def earliest(self: Self, kind: ModelKind) -> VersionNode[VersionValue]:
         if kind not in self._by_kinds:
-            raise RegistryError(self._name, "No versions registered")
+            raise CatalogError(self._name, "No versions registered")
         return self._by_kinds[kind][0]
 
-    def hooks(self: Self, key: Transitional | None) -> list[Attachable]:
+    def hooks(self: Self, key: Transitional | None = None) -> list[Attachable]:
         if key is None:
             return list(chain(*self._hooks.values()))
         return self._hooks[key]
 
-    def copy(self: Self, name: str | None = None) -> "Registry[VersionValue]":
-        new = cast("Registry[VersionValue]", Registry(name=name))
+    def copy(self: Self, name: str | None = None) -> "InMemoryCatalog[VersionValue]":
+        new = cast(
+            "InMemoryCatalog[VersionValue]",
+            InMemoryCatalog(
+                name=name or self._name,
+                hasher=self._hasher,
+                index_content_hashes=self._index_content_hashes,
+            ),
+        )
         new._by_versions = list(self._by_versions)
         new._by_kinds = defaultdict(
             list, {k: list(v) for k, v in self._by_kinds.items()}
@@ -244,7 +266,32 @@ class Registry(Generic[VersionValue]):
             set, {v: set(s) for v, s in self._edges_by_version.items()}
         )
         new._hooks = defaultdict(list, {k: list(v) for k, v in self._hooks.items()})
+        if self._content_hash_index is not None:
+            new._content_hash_index = dict(self._content_hash_index)
         return new
+
+    def _ensure_mutable(self: Self, operation: str) -> None:
+        if self._locked:
+            raise GraphLockedError(self._name, operation)
+
+    def lock(self: Self) -> "InMemoryCatalog[VersionValue]":
+        """Freeze this catalog and return an immutable snapshot."""
+        self._locked = True
+        snapshot = self.copy()
+        snapshot._locked = True
+        return snapshot
+
+    def snapshot(self: Self) -> "InMemoryCatalog[VersionValue]":
+        """Return a locked copy without freezing this catalog."""
+        snapshot = self.copy()
+        snapshot._locked = True
+        return snapshot
+
+    def find_edge_by_content_hash(self, value: str) -> EdgeKey[VersionValue] | None:
+        """Return the edge registered for *value* when the index is enabled."""
+        if self._content_hash_index is None:
+            return None
+        return self._content_hash_index.get(value)
 
     def store_model(
         self: Self,
@@ -256,9 +303,10 @@ class Registry(Generic[VersionValue]):
         :class:`ModelAlreadyRegisteredError`.  Callers that re-register
         identical shapes should use :meth:`reconcile_model` instead.
         """
+        self._ensure_mutable("store_model")
         if version in self._by_versions:
             raise ModelAlreadyRegisteredError(
-                registry_name=self._name,
+                catalog_name=self._name,
                 version=version.version,
             )
         self._by_models[version.model] = version
@@ -277,6 +325,7 @@ class Registry(Generic[VersionValue]):
         existing node; a differing surface raises :class:`ModelConflictError`.
         Reconciliation belongs to storage, not the engine.
         """
+        self._ensure_mutable("reconcile_model")
         try:
             existing = self.get_model(version)
         except ModelNotFoundError:
@@ -316,6 +365,7 @@ class Registry(Generic[VersionValue]):
 
     def remove_model(self: Self, key: Comparable) -> None:
         """Refuse to remove a version still referenced by a migration edge."""
+        self._ensure_mutable("remove_model")
 
         version_idx = bisect.bisect_left(self._by_versions, key)
         kind_idx = bisect.bisect_left(self._by_kinds[key.kind], key)
@@ -323,12 +373,12 @@ class Registry(Generic[VersionValue]):
             version_idx == len(self._by_versions)
             or self._by_versions[version_idx] != key
         ):
-            raise RegistryError(self._name, f"Version {key} is not registered")
+            raise CatalogError(self._name, f"Version {key} is not registered")
 
         affected = self.migrations_of(key)
         if affected:
             pairs = ", ".join(f"{e.source}→{e.target}" for e in sorted(affected))
-            raise RegistryError(
+            raise CatalogError(
                 self._name,
                 f"Cannot remove version {key}: it is referenced by migrations: {pairs}",
             )
@@ -341,13 +391,15 @@ class Registry(Generic[VersionValue]):
 
     def remove_model_by_handle(self: Self, handle: ModelHandle) -> None:
         """Remove the registered versionable for the opaque *handle*."""
+        self._ensure_mutable("remove_model_by_handle")
         if handle not in self._by_models:
             raise ModelNotFoundError(self._name, handle)
         self.remove_model(self._by_models[handle])
 
     def clear_models(self: Self) -> None:
+        self._ensure_mutable("clear_models")
         if self._migrations:
-            raise RegistryError(self._name, "Clear migrations first")
+            raise CatalogError(self._name, "Clear migrations first")
         self._by_versions.clear()
         self._by_models.clear()
         self._by_kinds.clear()
@@ -357,18 +409,33 @@ class Registry(Generic[VersionValue]):
         key: Migratable[VersionValue],
     ) -> MigrationFunc:
         """Register a migration function between two versions."""
+        self._ensure_mutable("store_migration")
         if any(v not in self._by_versions for v in key.edge):
             raise MigrationNotFoundError(self._name, key.edge)
 
         paths = self._migrations.get(key.kind, [])
 
-        if key in paths:
-            raise MigrationAlreadyRegisteredError(self._name, key.edge)
+        idx = bisect.bisect_left(paths, key)
+        if idx < len(paths) and paths[idx] == key:
+            existing = paths[idx]
+            registered_hash = existing.content_hash(self._hasher)
+            incoming_hash = key.content_hash(self._hasher)
+            if registered_hash == incoming_hash:
+                return existing.func
+            raise MigrationConflictError(
+                self._name,
+                key.edge,
+                registered_hash=registered_hash,
+                incoming_hash=incoming_hash,
+            )
 
         bisect.insort(self._migrations[key.kind], key)
         self._edges_by_version[key.source].add(key)
         self._edges_by_version[key.target].add(key)
-        return key
+        if self._content_hash_index is not None:
+            edge_key = EdgeKey.from_version_edge(key)
+            self._content_hash_index[key.content_hash(self._hasher)] = edge_key
+        return key.func
 
     def get_migration(
         self,
@@ -392,8 +459,9 @@ class Registry(Generic[VersionValue]):
         key: Transitional[VersionValue],
     ) -> None:
         """Remove a migration; refuses one with registered hooks."""
+        self._ensure_mutable("remove_migration")
         if key in self._hooks:
-            raise RegistryError(
+            raise CatalogError(
                 self._name,
                 f"Cannot remove migration {key}: "
                 "it has registered hooks. Clear hooks first.",
@@ -404,9 +472,12 @@ class Registry(Generic[VersionValue]):
             idx < len(self._migrations[key.kind])
             and self._migrations[key.kind][idx] == key
         ):
+            existing = self._migrations[key.kind][idx]
             del self._migrations[key.kind][idx]
             if not self._migrations[key.kind]:
                 del self._migrations[key.kind]
+            if self._content_hash_index is not None:
+                self._content_hash_index.pop(existing.content_hash(self._hasher), None)
             for endpoint in (key.source, key.target):
                 bucket = self._edges_by_version.get(endpoint)
                 if bucket is None:
@@ -417,9 +488,12 @@ class Registry(Generic[VersionValue]):
 
     def clear_migrations(self: Self) -> None:
         """Remove all migrations from the registry."""
+        self._ensure_mutable("clear_migrations")
         self.clear_hooks()
         self._migrations.clear()
         self._edges_by_version.clear()
+        if self._content_hash_index is not None:
+            self._content_hash_index.clear()
 
     def migration_path(
         self: Self,
@@ -432,7 +506,7 @@ class Registry(Generic[VersionValue]):
         registered migration must exist on every adjacent step.
         """
         if from_version.kind != to_version.kind:
-            raise RegistryError(
+            raise CatalogError(
                 self._name,
                 f"Cannot find path across kinds: "
                 f"{from_version.kind} != {to_version.kind}",
@@ -441,14 +515,14 @@ class Registry(Generic[VersionValue]):
         kind_versions = self.kind_versions(from_version.kind)
 
         if from_version not in kind_versions:
-            raise MigrationError(
+            raise MigrationPathError(
                 self._name,
                 from_version,
                 to_version,
                 f"Version {from_version} is not registered",
             )
         if to_version not in kind_versions:
-            raise MigrationError(
+            raise MigrationPathError(
                 self._name,
                 (from_version, to_version),
             )
@@ -469,7 +543,7 @@ class Registry(Generic[VersionValue]):
                 current = nxt
                 lo += step
             else:
-                raise MigrationError(
+                raise MigrationPathError(
                     self._name,
                     current,
                     nxt,
@@ -486,8 +560,9 @@ class Registry(Generic[VersionValue]):
 
         Refuses to remove a critical (adjacent) edge, or one carrying hooks.
         """
+        self._ensure_mutable("remove_migration_range")
         if from_version.version[0] != to_version.version[0]:
-            raise RegistryError(
+            raise CatalogError(
                 self._name,
                 f"Cannot remove range across kinds: "
                 f"{from_version.version[0]} != {to_version.version[0]}",
@@ -508,9 +583,9 @@ class Registry(Generic[VersionValue]):
                     f"{edge_key.target} in range. Remove it individually with "
                     "force=True or remove hooks first."
                 )
-                raise RegistryError(self._name, msg)
+                raise CatalogError(self._name, msg)
             if self.has_hooks(edge_key):
-                raise RegistryError(
+                raise CatalogError(
                     self._name,
                     f"Cannot remove migration {edge_key.source}→{edge_key.target}. "
                     "Remove hooks first.",
@@ -526,6 +601,7 @@ class Registry(Generic[VersionValue]):
         hook: Attachable,
     ) -> None:
         """Register a hook for a migration step."""
+        self._ensure_mutable("add_hook")
         self._hooks[key].append(hook)
 
     def get_hooks(
@@ -544,8 +620,9 @@ class Registry(Generic[VersionValue]):
         key: Transitional[VersionValue],
         hook: Attachable | None = None,
     ) -> None:
+        self._ensure_mutable("remove_hook")
         if key not in self._hooks:
-            raise RegistryError(self._name, f"No hooks registered for migration {key}")
+            raise CatalogError(self._name, f"No hooks registered for migration {key}")
 
         if hook is None:
             del self._hooks[key]
@@ -560,12 +637,13 @@ class Registry(Generic[VersionValue]):
         self: Self,
         key: Transitional[VersionValue] | None = None,
     ) -> None:
+        self._ensure_mutable("clear_hooks")
         if key is None:
             [hooks.clear() for hooks in self._hooks.values()]
             self._hooks.clear()
 
         if key is not None and key not in self._hooks:
-            raise RegistryError(self._name, f"No hooks registered for migration {key}")
+            raise CatalogError(self._name, f"No hooks registered for migration {key}")
 
         if key is None:
             [hooks.clear() for hooks in self._hooks.values()]
@@ -575,4 +653,5 @@ class Registry(Generic[VersionValue]):
             del self._hooks[key]
 
 
-_ = ManagerKey
+#: Backward-compatible name for the in-memory catalog.
+Registry = InMemoryCatalog
