@@ -38,46 +38,53 @@ class JsonPatchDiffDiscovery(Generic[VersionValue]):
         source: Versionable[VersionValue],
         target: Comparable[VersionValue],
     ) -> Diff[VersionValue]:
+        added, removed, modified = self._collect(migration)
+        return Diff(
+            source=source,
+            target=target,
+            fields=_fields(added, removed, modified),
+            origin=DiffOrigin.MIGRATION,
+        )
+
+    def _collect(
+        self, migration: JsonPatch
+    ) -> tuple[list[str], list[str], dict[str, dict[str, Any]]]:
         added: list[str] = []
         removed: list[str] = []
         modified: dict[str, dict[str, Any]] = {}
         for op in migration.patch:
-            path = op.get("path", "")
-            field = path.lstrip("/").split("/", 1)[0]
-            if not field:
-                continue
-            kind = op.get("op")
-            if kind == "add":
-                if field not in added:
-                    added.append(field)
-            elif kind == "remove":
-                if field not in removed:
-                    removed.append(field)
-            elif kind == "replace":
-                modified.setdefault(field, {})["value_changed"] = {
-                    "from": None,
-                    "to": op.get("value"),
-                }
-            elif kind in ("move", "copy"):
-                from_field = op.get("from", "").lstrip("/").split("/", 1)[0]
-                if from_field and from_field not in removed:
-                    removed.append(from_field)
-                if field not in added:
-                    added.append(field)
-        fields = {
-            **{name: FieldChange(FieldStatus.ADDED, {}) for name in sorted(added)},
-            **{name: FieldChange(FieldStatus.REMOVED, {}) for name in sorted(removed)},
-            **{
-                name: FieldChange(FieldStatus.MODIFIED, changes)
-                for name, changes in modified.items()
-            },
-        }
-        return Diff(
-            source=source,
-            target=target,
-            fields=fields,
-            origin=DiffOrigin.MIGRATION,
-        )
+            self._record(op, added, removed, modified)
+        return added, removed, modified
+
+    @staticmethod
+    def _record(
+        op: dict[str, Any],
+        added: list[str],
+        removed: list[str],
+        modified: dict[str, dict[str, Any]],
+    ) -> None:
+        path = op.get("path", "")
+        field = path.lstrip("/").split("/", 1)[0]
+        if not field:
+            return
+        kind = op.get("op")
+        if kind == "add":
+            if field not in added:
+                added.append(field)
+        elif kind == "remove":
+            if field not in removed:
+                removed.append(field)
+        elif kind == "replace":
+            modified.setdefault(field, {})["value_changed"] = {
+                "from": None,
+                "to": op.get("value"),
+            }
+        elif kind in ("move", "copy"):
+            from_field = op.get("from", "").lstrip("/").split("/", 1)[0]
+            if from_field and from_field not in removed:
+                removed.append(from_field)
+            if field not in added:
+                added.append(field)
 
 
 class CallableDiffDiscovery(Generic[VersionValue]):
@@ -112,63 +119,73 @@ class CallableDiffDiscovery(Generic[VersionValue]):
                 fields={},
                 origin=DiffOrigin.MIGRATION,
             )
-        tree = ast.parse(textwrap.dedent(src))
+        added, removed, modified = self._collect(ast.parse(textwrap.dedent(src)))
+        return Diff(
+            source=source,
+            target=target,
+            fields=_fields(added, removed, modified),
+            origin=DiffOrigin.MIGRATION,
+        )
+
+    def _collect(
+        self, tree: ast.AST
+    ) -> tuple[list[str], list[str], dict[str, dict[str, Any]]]:
         added: list[str] = []
         removed: list[str] = []
         modified: dict[str, dict[str, Any]] = {}
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
-                for target_node in node.targets:
-                    if isinstance(target_node, ast.Subscript) and isinstance(
-                        target_node.value, ast.Name
-                    ):
-                        if target_node.value.id != "data":
-                            continue
-                        key = _subscript_key(target_node.slice)
-                        if key is None:
-                            continue
-                        if key not in added:
-                            added.append(key)
-                    elif isinstance(target_node, ast.Subscript) and isinstance(
-                        target_node.value, ast.Subscript
-                    ):
-                        outer = target_node.value
-                        if (
-                            isinstance(outer.value, ast.Name)
-                            and outer.value.id == "data"
-                        ):
-                            key = _subscript_key(outer.slice)
-                            if key is not None:
-                                modified.setdefault(key, {})["nested_changed"] = True
+                self._assign(node, added, modified)
             elif isinstance(node, ast.Delete):
-                for target_node in node.targets:
-                    if isinstance(target_node, ast.Subscript) and isinstance(
-                        target_node.value, ast.Name
-                    ):
-                        if target_node.value.id != "data":
-                            continue
-                        key = _subscript_key(target_node.slice)
-                        if key is not None and key not in removed:
-                            removed.append(key)
-            elif isinstance(node, ast.Return) and isinstance(node.value, ast.Dict):
-                for key in node.value.keys:
-                    if isinstance(key, ast.Constant) and isinstance(key.value, str):
-                        if key.value not in added:
-                            added.append(key.value)
-        fields = {
-            **{name: FieldChange(FieldStatus.ADDED, {}) for name in sorted(added)},
-            **{name: FieldChange(FieldStatus.REMOVED, {}) for name in sorted(removed)},
-            **{
-                name: FieldChange(FieldStatus.MODIFIED, changes)
-                for name, changes in modified.items()
-            },
-        }
-        return Diff(
-            source=source,
-            target=target,
-            fields=fields,
-            origin=DiffOrigin.MIGRATION,
-        )
+                self._delete(node, removed)
+            elif isinstance(node, ast.Return):
+                self._return(node, added)
+        return added, removed, modified
+
+    @staticmethod
+    def _assign(
+        node: ast.Assign,
+        added: list[str],
+        modified: dict[str, dict[str, Any]],
+    ) -> None:
+        for target_node in node.targets:
+            if isinstance(target_node, ast.Subscript) and isinstance(
+                target_node.value, ast.Name
+            ):
+                if target_node.value.id != "data":
+                    continue
+                key = _subscript_key(target_node.slice)
+                if key is not None and key not in added:
+                    added.append(key)
+            elif isinstance(target_node, ast.Subscript) and isinstance(
+                target_node.value, ast.Subscript
+            ):
+                outer = target_node.value
+                if isinstance(outer.value, ast.Name) and outer.value.id == "data":
+                    key = _subscript_key(outer.slice)
+                    if key is not None:
+                        modified.setdefault(key, {})["nested_changed"] = True
+
+    @staticmethod
+    def _delete(node: ast.Delete, removed: list[str]) -> None:
+        for target_node in node.targets:
+            if isinstance(target_node, ast.Subscript) and isinstance(
+                target_node.value, ast.Name
+            ):
+                if target_node.value.id != "data":
+                    continue
+                key = _subscript_key(target_node.slice)
+                if key is not None and key not in removed:
+                    removed.append(key)
+
+    @staticmethod
+    def _return(node: ast.Return, added: list[str]) -> None:
+        if not isinstance(node.value, ast.Dict):
+            return
+        for key in node.value.keys:
+            if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                if key.value not in added:
+                    added.append(key.value)
 
 
 class CompositeDiffDiscovery(Generic[VersionValue]):
@@ -195,6 +212,21 @@ class CompositeDiffDiscovery(Generic[VersionValue]):
         if isinstance(migration, JsonPatch):
             return self._json_patch.discover(migration, source, target)
         return self._callable.discover(migration, source, target)
+
+
+def _fields(
+    added: list[str],
+    removed: list[str],
+    modified: dict[str, dict[str, Any]],
+) -> dict[str, FieldChange]:
+    return {
+        **{name: FieldChange(FieldStatus.ADDED, {}) for name in sorted(added)},
+        **{name: FieldChange(FieldStatus.REMOVED, {}) for name in sorted(removed)},
+        **{
+            name: FieldChange(FieldStatus.MODIFIED, changes)
+            for name, changes in modified.items()
+        },
+    }
 
 
 def _subscript_key(slice_: ast.expr) -> str | None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass, replace
 from typing import Any, Generic, Literal
 
 from pyverge.core.errors import MaxDepthExceededError, PayloadValidationError
@@ -18,6 +19,15 @@ from pyverge.versioning import (
     VersionKey,
     VersionNode,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _WalkContext:
+    kp: str
+    vp: str
+    max_depth: int
+    versioned_depth: int = 0
+    parent_model: type[Any] | None = None
 
 
 class CompositeExtractor(Generic[VersionValue]):
@@ -58,7 +68,12 @@ class CompositeExtractor(Generic[VersionValue]):
         vp = self._adapter.version_property
 
         if container is None:
-            yield from self._walk_containerless(data, (), 0, 0, kp, vp, max_depth)
+            yield from self._walk_containerless(
+                data,
+                (),
+                0,
+                _WalkContext(kp, vp, max_depth),
+            )
             return
 
         if not self._adapter.can_handle(container):
@@ -83,7 +98,12 @@ class CompositeExtractor(Generic[VersionValue]):
                     message=f"Payload failed container validation: {exc}",
                 ) from exc
 
-        yield from self._walk_guided(validated, (), 0, container, kp, vp, max_depth)
+        yield from self._walk_guided(
+            validated,
+            (),
+            0,
+            _WalkContext(kp, vp, max_depth, parent_model=container),
+        )
 
     def _match(
         self,
@@ -115,115 +135,97 @@ class CompositeExtractor(Generic[VersionValue]):
         value: Any,
         path: tuple[str | int, ...],
         depth: int,
-        versioned_depth: int,
-        kp: str,
-        vp: str,
-        max_depth: int,
+        ctx: _WalkContext,
     ) -> Iterator[Entry]:
-        is_versioned = False
         if isinstance(value, dict):
-            source = self._match(value, kp, vp)
+            source = self._match(value, ctx.kp, ctx.vp)
             if source is not None:
-                is_versioned = True
-                if max_depth >= 0 and versioned_depth > max_depth:
+                if ctx.max_depth >= 0 and ctx.versioned_depth > ctx.max_depth:
                     raise MaxDepthExceededError(
                         path=path,
                         depth=depth,
                         kind=source.kind,
                         version=str(source.version[1]),
-                        max_depth=max_depth,
+                        max_depth=ctx.max_depth,
                     )
                 yield (path, depth, source)
-
-            child_versioned_depth = (
-                versioned_depth + 1 if is_versioned else versioned_depth
-            )
+                ctx = replace(ctx, versioned_depth=ctx.versioned_depth + 1)
             for key, nested in value.items():
                 yield from self._walk_containerless(
-                    nested,
-                    (*path, key),
-                    depth + 1,
-                    child_versioned_depth,
-                    kp,
-                    vp,
-                    max_depth,
+                    nested, (*path, key), depth + 1, ctx
                 )
         elif isinstance(value, list):
             for idx, item in enumerate(value):
-                yield from self._walk_containerless(
-                    item,
-                    (*path, idx),
-                    depth + 1,
-                    versioned_depth,
-                    kp,
-                    vp,
-                    max_depth,
-                )
+                yield from self._walk_containerless(item, (*path, idx), depth + 1, ctx)
 
     def _walk_guided(
         self,
         value: Any,
         path: tuple[str | int, ...],
         depth: int,
-        parent_model: type[Any] | None,
-        kp: str,
-        vp: str,
-        max_depth: int,
+        ctx: _WalkContext,
     ) -> Iterator[Entry]:
-        if max_depth >= 0 and depth > max_depth:
-            kind = value.get(kp, "") if isinstance(value, dict) else ""
-            version = value.get(vp, "") if isinstance(value, dict) else ""
+        if ctx.max_depth >= 0 and depth > ctx.max_depth:
+            kind = value.get(ctx.kp, "") if isinstance(value, dict) else ""
+            version = value.get(ctx.vp, "") if isinstance(value, dict) else ""
             raise MaxDepthExceededError(
                 path=path,
                 depth=depth,
                 kind=str(kind),
                 version=str(version),
-                max_depth=max_depth,
+                max_depth=ctx.max_depth,
+            )
+        if isinstance(value, dict):
+            yield from self._walk_guided_dict(value, path, depth, ctx)
+        elif isinstance(value, list):
+            yield from self._walk_guided_list(value, path, depth, ctx)
+
+    def _walk_guided_dict(
+        self,
+        value: dict[str, Any],
+        path: tuple[str | int, ...],
+        depth: int,
+        ctx: _WalkContext,
+    ) -> Iterator[Entry]:
+        source = self._match(value, ctx.kp, ctx.vp)
+        if source is not None:
+            yield (path, depth, source)
+            return
+
+        field_model: type[Any] | None = None
+        if ctx.parent_model is not None and path:
+            field_model = self._adapter.field_model(ctx.parent_model, str(path[-1]))
+
+        for key, nested in value.items():
+            child_model = field_model
+            if child_model is not None:
+                child_model = (
+                    self._adapter.field_model(child_model, str(key)) or child_model
+                )
+            yield from self._walk_guided(
+                nested,
+                (*path, key),
+                depth + 1,
+                replace(ctx, parent_model=child_model),
             )
 
-        if isinstance(value, dict):
-            source = self._match(value, kp, vp)
-            if source is not None:
-                yield (path, depth, source)
-                # Do not recurse into already-discovered entries
-                return
-
-            field_model: type[Any] | None = None
-            if parent_model is not None and path:
-                field_model = self._adapter.field_model(parent_model, str(path[-1]))
-
-            for key, nested in value.items():
-                child_model = field_model
-                if child_model is not None:
-                    resolved = self._adapter.field_model(child_model, str(key))
-                    if resolved is not None:
-                        child_model = resolved
-
-                yield from self._walk_guided(
-                    nested,
-                    (*path, key),
-                    depth + 1,
-                    child_model,
-                    kp,
-                    vp,
-                    max_depth,
-                )
-
-        elif isinstance(value, list):
-            item_model: type[Any] | None = None
-            if parent_model is not None and path:
-                item_model = self._adapter.field_model(parent_model, str(path[-1]))
-
-            for idx, item in enumerate(value):
-                yield from self._walk_guided(
-                    item,
-                    (*path, idx),
-                    depth + 1,
-                    item_model,
-                    kp,
-                    vp,
-                    max_depth,
-                )
+    def _walk_guided_list(
+        self,
+        value: list[Any],
+        path: tuple[str | int, ...],
+        depth: int,
+        ctx: _WalkContext,
+    ) -> Iterator[Entry]:
+        item_model: type[Any] | None = None
+        if ctx.parent_model is not None and path:
+            item_model = self._adapter.field_model(ctx.parent_model, str(path[-1]))
+        for idx, item in enumerate(value):
+            yield from self._walk_guided(
+                item,
+                (*path, idx),
+                depth + 1,
+                replace(ctx, parent_model=item_model),
+            )
 
 
 class SchemaFieldsExtractor(CompositeExtractor[VersionValue]):
@@ -240,7 +242,12 @@ class SchemaFieldsExtractor(CompositeExtractor[VersionValue]):
             raise ValueError("SchemaFieldsExtractor does not accept a container")
         kp = self._adapter.kind_property
         vp = self._adapter.version_property
-        yield from self._walk_containerless(data, (), 0, 0, kp, vp, max_depth)
+        yield from self._walk_containerless(
+            data,
+            (),
+            0,
+            _WalkContext(kp, vp, max_depth),
+        )
 
 
 class ContainerExtractor(CompositeExtractor[VersionValue]):
@@ -277,7 +284,12 @@ class ContainerExtractor(CompositeExtractor[VersionValue]):
                 ) from exc
         kp = self._adapter.kind_property
         vp = self._adapter.version_property
-        yield from self._walk_guided(validated, (), 0, container, kp, vp, max_depth)
+        yield from self._walk_guided(
+            validated,
+            (),
+            0,
+            _WalkContext(kp, vp, max_depth, parent_model=container),
+        )
 
 
 __all__ = ["CompositeExtractor", "ContainerExtractor", "SchemaFieldsExtractor"]

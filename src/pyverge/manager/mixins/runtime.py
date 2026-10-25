@@ -17,6 +17,7 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
+from pyverge.engine import RunnerOptions
 from pyverge.execution import (
     AnyDirection,
     BackwardDirection,
@@ -62,21 +63,23 @@ class RuntimeMixin(Generic[VersionValue]):
         validation_mode: Literal["strict", "lax", "none"] = "lax",
     ) -> Runner[VersionValue]:
         return self.engine.runner(
-            backend=backend or runtime or ThreadedBackend(max_workers=0),
-            middleware=middleware,
-            environment=environment
-            or ExecutionEnvironment(
-                clock=SystemClock(),
-                id_factory=UuidIdFactory(),
-                logger=None,
-                tracer=None,
-            ),
-            direction=_direction(direction),
-            on_direction_violation=on_direction_violation,
-            on_missing_path=on_missing_path,
-            depth_limit=depth_limit,
-            on_depth_violation=on_depth_violation,
-            validation_mode=validation_mode,
+            RunnerOptions(
+                backend=backend or runtime or ThreadedBackend(max_workers=0),
+                middleware=middleware,
+                environment=environment
+                or ExecutionEnvironment(
+                    clock=SystemClock(),
+                    id_factory=UuidIdFactory(),
+                    logger=None,
+                    tracer=None,
+                ),
+                direction=_direction(direction),
+                on_direction_violation=on_direction_violation,
+                on_missing_path=on_missing_path,
+                depth_limit=depth_limit,
+                on_depth_violation=on_depth_violation,
+                validation_mode=validation_mode,
+            )
         )
 
     def info(

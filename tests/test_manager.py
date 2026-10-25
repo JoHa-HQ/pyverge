@@ -83,7 +83,7 @@ class TestScoping:
     ) -> None:
         UserManager = Manager[semver.Version].configure(
             engine.adapter,
-            engine=engine,  # ty: ignore[invalid-argument-type]
+            engine=engine,
         )
 
         assert UserManager._default_engine is engine

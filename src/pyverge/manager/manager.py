@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from pyverge.core.types import VersionValue
 from pyverge.discovery.reflection import (
     CompositeDiffDiscovery,
-    DiffProvider,
     Reflection,
     Reflector,
 )
 from pyverge.engine import Engine
-from pyverge.execution.types import EntryExtractor
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import (
     DefaultMigrationIdentityResolver,
-    MigrationIdentityResolver,
 )
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.registry import Registry
@@ -22,7 +19,7 @@ from pyverge.schemas.backend import ModelMaterializer
 from pyverge.schemas.types import (
     ModelAdapter,
 )
-from pyverge.versioning import ContentHasher, DiffMaterializer, default_content_hasher
+from pyverge.versioning import default_content_hasher
 
 from .descriptors import ManagerMeta
 from .mixins import (
@@ -34,6 +31,7 @@ from .mixins import (
     RuntimeMixin,
     TargetResolutionMixin,
 )
+from .types import ManagerConfig
 
 
 class Manager(
@@ -85,37 +83,39 @@ class Manager(
         return self.engine.registry
 
     @classmethod
-    def configure(  # noqa: PLR0913
+    def configure(
         cls,
         adapter: ModelAdapter,
         *,
-        engine: Engine[VersionValue] | None = None,
-        walker: EntryExtractor | None = None,
-        hasher: ContentHasher | None = None,
-        identity_resolver: MigrationIdentityResolver | None = None,
-        model_materializer: DiffMaterializer[object] | None = None,
-        migration_materializer: DiffMaterializer[object] | None = None,
-        diff_provider: DiffProvider[VersionValue] | None = None,
-        on_missing: str = "raise",
+        config: ManagerConfig[VersionValue] | None = None,
+        **options: Any,
     ) -> type[Manager[VersionValue]]:
-        if walker is None:
-            registry = Registry[VersionValue](hasher=hasher or default_content_hasher())
+        if config is not None and options:
+            raise TypeError("configure accepts either config or keyword options")
+        settings = config or ManagerConfig(**options)
+        if settings.walker is None:
+            registry = Registry[VersionValue](
+                hasher=settings.hasher or default_content_hasher()
+            )
         else:
-            registry = walker.registry
+            registry = settings.walker.registry
         reflector = Reflector[VersionValue](
             adapter,
-            diff_provider or Reflection(adapter, CompositeDiffDiscovery()),
-            model_materializer=model_materializer or ModelMaterializer(adapter),
+            settings.diff_provider or Reflection(adapter, CompositeDiffDiscovery()),
+            model_materializer=settings.model_materializer
+            or ModelMaterializer(adapter),
             migration_materializer=(
-                migration_materializer
+                settings.migration_materializer
                 or MigrationMaterializer(JsonPatchMigrationBackend())
             ),
-            on_missing=on_missing,
+            on_missing=settings.on_missing,
         )
-        engine = engine or Engine[VersionValue](
+        engine = settings.engine or Engine[VersionValue](
             registry=registry,
             adapter=adapter,
-            identity_resolver=identity_resolver or DefaultMigrationIdentityResolver(),
+            identity_resolver=(
+                settings.identity_resolver or DefaultMigrationIdentityResolver()
+            ),
             reflector=reflector,
         )
         cls._default_engine = engine

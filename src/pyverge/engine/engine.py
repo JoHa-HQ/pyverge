@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Generic, Literal, Self, cast, overload
 
 from pyverge.core.types import (
@@ -58,6 +59,21 @@ from pyverge.versioning import (
 from pyverge.versioning.errors import BackwardCompatibilityError
 
 
+@dataclass(frozen=True, slots=True)
+class RunnerOptions(Generic[VersionValue]):
+    """Inputs needed to build a runtime runner."""
+
+    backend: BackendPort[VersionValue]
+    environment: ExecutionEnvironment
+    direction: DirectionPolicy
+    on_direction_violation: DirectionViolationStrategy
+    on_missing_path: VersionMissingStrategy
+    depth_limit: int
+    on_depth_violation: DepthViolationStrategy
+    validation_mode: Literal["strict", "lax", "none"]
+    middleware: tuple[BackendMiddleware, ...] = ()
+
+
 class Engine(Generic[VersionValue]):
     """Build-phase facade over catalogs, registrars, and reflection."""
 
@@ -74,32 +90,20 @@ class Engine(Generic[VersionValue]):
         self.reflector = reflector
         self.explorer = GraphExplorer(registry)
 
-    def runner(
-        self,
-        *,
-        backend: BackendPort[VersionValue],
-        middleware: tuple[BackendMiddleware, ...] = (),
-        environment: ExecutionEnvironment,
-        direction: DirectionPolicy,
-        on_direction_violation: DirectionViolationStrategy,
-        on_missing_path: VersionMissingStrategy,
-        depth_limit: int,
-        on_depth_violation: DepthViolationStrategy,
-        validation_mode: Literal["strict", "lax", "none"],
-    ) -> Runner[VersionValue]:
+    def runner(self, options: RunnerOptions[VersionValue]) -> Runner[VersionValue]:
         coordinator = ExecutionCoordinator[VersionValue](
             extractor=CompositeExtractor[VersionValue](
                 self.registry,
                 adapter=self.adapter,
-                validation_mode=validation_mode,
+                validation_mode=options.validation_mode,
             ),
             paths=PathResolver[VersionValue](self.registry),
             policy=PolicyEngine[VersionValue](
-                direction=direction,
-                on_direction_violation=on_direction_violation,
-                on_missing_path=on_missing_path,
-                depth_limit=depth_limit,
-                on_depth_violation=on_depth_violation,
+                direction=options.direction,
+                on_direction_violation=options.on_direction_violation,
+                on_missing_path=options.on_missing_path,
+                depth_limit=options.depth_limit,
+                on_depth_violation=options.on_depth_violation,
             ),
             planner=ExecutionPlanner[VersionValue](),
         )
@@ -110,9 +114,9 @@ class Engine(Generic[VersionValue]):
                 self.registry,
                 self.adapter,
             ),
-            backend=backend,
-            middleware=middleware,
-            environment=environment,
+            backend=options.backend,
+            middleware=options.middleware,
+            environment=options.environment,
         )
 
     def copy(self) -> Engine[VersionValue]:
@@ -157,79 +161,83 @@ class Engine(Generic[VersionValue]):
         return self.registry[index]
 
     def register(self: Self, command: RegistrationCommand) -> Any:
+        """Execute one registration command."""
         if isinstance(command, RegisterModel):
-            payload = command.payload
-            version = (
-                payload
-                if isinstance(payload, VersionNode)
-                else self.adapter.versionable(payload)
-            )
-            if command.mode is ModelRegistrationMode.STRICT:
-                return self.registry.store_model(version)
-            return self.registry.reconcile_model(version)
+            return self._register_model(command)
         if isinstance(command, RegisterMigration):
-            spec = command.spec
-            v_from, v_to = spec.pair
-            if v_from.kind != v_to.kind:
-                raise CatalogError(
-                    self.registry.name,
-                    f"Cannot register migration across kinds: "
-                    f"{v_from.kind} != {v_to.kind}",
-                )
-            resolved_from = self.registry.find_model(v_from)
-            resolved_to = self.registry.find_model(v_to)
-            if resolved_from is None and resolved_to is None:
-                raise ModelNotFoundError(self.registry.name, v_from.version)
-            if resolved_from is None:
-                assert resolved_to is not None
-                resolved_from = self.reflector.materialize_missing(
-                    resolved_to, v_from, spec.func
-                )
-                self.registry.store_model(resolved_from)
-            if resolved_to is None:
-                resolved_to = self.reflector.materialize_missing(
-                    resolved_from, v_to, spec.func
-                )
-                self.registry.store_model(resolved_to)
-            if not self.registry.is_adjacent(
-                EdgeKey.from_pair(resolved_from, resolved_to)
-            ):
-                raise CatalogError(
-                    self.registry.name,
-                    f"Cannot register migration with skip versions: {v_from}→{v_to}",
-                )
-            diff = self.adapter.diff(resolved_from, resolved_to)
-            if spec.backward_compatible:
-                compatibility = BackwardCompatibilityGuard(
-                    frozenset(
-                        {
-                            self.adapter.kind_property,
-                            self.adapter.version_property,
-                        }
-                    )
-                )
-                report = compatibility.evaluate(diff)
-                if report.structural_breaking:
-                    raise BackwardCompatibilityError(
-                        self.registry.name,
-                        (resolved_from, resolved_to),
-                        removed=tuple(report.removed_fields),
-                        modified=tuple(report.modified_fields),
-                        required_additions=compatibility.required_additions(
-                            diff, report
-                        ),
-                    )
-            self.registry.store_migration(
-                VersionEdge(
-                    source=resolved_from,
-                    target=resolved_to,
-                    diff=diff,
-                    func=spec.func,
-                    migration=self.identity_resolver.resolve(spec.func),
+            return self._register_migration(command)
+        raise TypeError(f"Unsupported registration command: {command!r}")
+
+    def _register_model(
+        self: Self, command: RegisterModel
+    ) -> VersionNode[VersionValue]:
+        payload = command.payload
+        version = (
+            payload
+            if isinstance(payload, VersionNode)
+            else self.adapter.versionable(payload)
+        )
+        if command.mode is ModelRegistrationMode.STRICT:
+            return self.registry.store_model(version)
+        return self.registry.reconcile_model(version)
+
+    def _register_migration(self: Self, command: RegisterMigration) -> MigrationFunc:
+        spec = command.spec
+        v_from, v_to = spec.pair
+        if v_from.kind != v_to.kind:
+            raise CatalogError(
+                self.registry.name,
+                f"Cannot register migration across kinds: {v_from.kind} != {v_to.kind}",
+            )
+        resolved_from = self.registry.find_model(v_from)
+        resolved_to = self.registry.find_model(v_to)
+        if resolved_from is None and resolved_to is None:
+            raise ModelNotFoundError(self.registry.name, v_from.version)
+        if resolved_from is None:
+            assert resolved_to is not None
+            resolved_from = self.reflector.materialize_missing(
+                resolved_to, v_from, spec.func
+            )
+            self.registry.store_model(resolved_from)
+        if resolved_to is None:
+            resolved_to = self.reflector.materialize_missing(
+                resolved_from, v_to, spec.func
+            )
+            self.registry.store_model(resolved_to)
+        if not self.registry.is_adjacent(EdgeKey.from_pair(resolved_from, resolved_to)):
+            raise CatalogError(
+                self.registry.name,
+                f"Cannot register migration with skip versions: {v_from}→{v_to}",
+            )
+        diff = self.adapter.diff(resolved_from, resolved_to)
+        if spec.backward_compatible:
+            compatibility = BackwardCompatibilityGuard(
+                frozenset(
+                    {
+                        self.adapter.kind_property,
+                        self.adapter.version_property,
+                    }
                 )
             )
-            return spec.func
-        raise TypeError(f"Unsupported registration command: {command!r}")
+            report = compatibility.evaluate(diff)
+            if report.structural_breaking:
+                raise BackwardCompatibilityError(
+                    self.registry.name,
+                    (resolved_from, resolved_to),
+                    removed=tuple(report.removed_fields),
+                    modified=tuple(report.modified_fields),
+                    required_additions=compatibility.required_additions(diff, report),
+                )
+        self.registry.store_migration(
+            VersionEdge(
+                source=resolved_from,
+                target=resolved_to,
+                diff=diff,
+                func=spec.func,
+                migration=self.identity_resolver.resolve(spec.func),
+            )
+        )
+        return spec.func
 
     def store_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
         return self.register(RegisterModel(payload, ModelRegistrationMode.STRICT))

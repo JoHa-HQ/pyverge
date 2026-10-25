@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     ClassVar,
+    Generic,
     Protocol,
     Self,
     TypeAlias,
@@ -58,6 +60,18 @@ ResolverFactory: TypeAlias = Callable[
 ]
 
 
+@dataclass(frozen=True, slots=True)
+class ManagerConfig(Generic[VersionValue]):
+    engine: Engine[VersionValue] | None = None
+    walker: EntryExtractor | None = None
+    hasher: ContentHasher | None = None
+    identity_resolver: MigrationIdentityResolver | None = None
+    model_materializer: DiffMaterializer[object] | None = None
+    migration_materializer: DiffMaterializer[object] | None = None
+    diff_provider: DiffProvider[VersionValue] | None = None
+    on_missing: str = "raise"
+
+
 class ManagerClassState(Protocol[VersionValue]):
     """Class-level defaults shared by every manager instance.
 
@@ -75,13 +89,8 @@ class ManagerClassState(Protocol[VersionValue]):
         cls,
         adapter: ModelAdapter,
         *,
-        engine: Engine[VersionValue] | None = None,
-        walker: EntryExtractor | None = None,
-        hasher: ContentHasher | None = None,
-        identity_resolver: MigrationIdentityResolver | None = None,
-        migration_materializer: DiffMaterializer[object] | None = None,
-        diff_provider: DiffProvider[VersionValue] | None = None,
-        on_missing: str = "raise",
+        config: ManagerConfig[VersionValue] | None = None,
+        **options: object,
     ) -> type[Self]: ...
 
     @classmethod
