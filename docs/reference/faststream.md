@@ -1,138 +1,4 @@
-# FastStream Integration
-
-pyverge plugs into [FastStream](https://faststream.airt.ai/) as an adapter: your
-subscribers keep declaring FastStream handlers, and pyverge converges each
-message body to the policy target before the handler runs — and can converge the
-handler's return again on publish.
-
-The adapter lives in `pyverge.adapters.faststream`. pyverge core and its ports
-never import FastStream — everything is adapter-local composition over one
-`Manager` and one broker.
-
-```bash
-pip install "pyverge[faststream]" faststream[kafka]
-```
-
-## The model
-
-Nothing new is invented: pyverge converges ordinary payloads, and FastStream
-delivers them.
-
-- **Consume seam** — a subscriber registered with `@subscriber(...)` decodes the
-  body through a pyverge `decoder`, converging it to the target version. The
-  handler's typed parameter names the kind and is bound to the version actually
-  served, so validation matches what the handler receives.
-- **Produce seam** — a publisher registered with `@publisher(...)` converges the
-  handler's return value to an outgoing target before FastStream serializes it.
-  The two targets are independent, so a handler can bridge versions across a
-  topic boundary.
-- **Reflection** — `Reflector` reconciles each subscriber's declared payload
-  model into the manager graph at startup, failing fast on a broken graph.
-
-Versioning is pyverge's `(kind, version)` on the payload — the adapter adds no
-calling convention of FastStream's own.
-
-## End-to-end example
-
-```python
-import asyncio
-from typing import Literal, TypedDict, cast
-
-import semver
-from faststream import FastStream
-from faststream.kafka import KafkaBroker, TestKafkaBroker
-from pydantic import BaseModel
-
-from pyverge import Manager
-from pyverge.adapters.faststream import (
-    Reflector,
-    publish_to,
-    publisher,
-    subscriber,
-)
-from pyverge.settings import MigrationSettings
-from pyverge.providers import PydanticModelAdapter
-from pyverge.types import ManagerMigrationKey
-
-
-# 1. The anchor model: the newest shape (v2).
-class Order(BaseModel):
-    kind: Literal["Order"] = "Order"
-    version: Literal["2.0.0"] = "2.0.0"
-    order_id: str
-    total: float = 0.0
-    currency: str = "USD"
-
-
-# 2. Typed payload shapes per version, and the migrations between them.
-class OrderData(TypedDict):
-    kind: Literal["Order"]
-    order_id: str
-    total: float
-
-
-class OrderV1Data(OrderData):
-    version: Literal["1.0.0"]
-
-
-class OrderV2Data(OrderData):
-    version: Literal["2.0.0"]
-    currency: str
-
-
-def add_currency(data: OrderV1Data, context=None) -> OrderV2Data:
-    return {**data, "currency": "USD"}
-
-
-def drop_currency(data: OrderV2Data, context=None) -> OrderV1Data:
-    data = dict(data)
-    del data["currency"]
-    return cast(OrderV1Data, data)
-
-
-manager = Manager[semver.Version].configure(
-    MigrationSettings(), PydanticModelAdapter()
-)()
-manager.store_model(Order)
-manager.store_migration(ManagerMigrationKey("Order", "1.0.0", "2.0.0"), add_currency)
-manager.store_migration(ManagerMigrationKey("Order", "2.0.0", "1.0.0"), drop_currency)
-
-broker = KafkaBroker("localhost:9092")
-
-
-# 3. One handler on multiple topics: consume at `latest`, produce at `1.0.0`.
-@subscriber(
-    broker,
-    "orders.v1",
-    "orders.v2",
-    manager=manager,
-    targets="latest",
-)
-@publisher(broker, "out-topic", manager=manager, target="1.0.0")
-async def handle(order: Order) -> Order:
-    return order
-
-
-app = FastStream(broker, on_startup=[Reflector(manager)])
-
-
-async def main() -> None:
-    async with TestKafkaBroker(broker) as br:
-        # Either versioned topic reaches the same handler.
-        await br.publish(
-            {"kind": "Order", "version": "1.0.0", "order_id": "1", "total": 9.9},
-            "orders.v1",
-        )
-    # handle() received the v2 shape (currency filled in) and published a v1
-    # payload on `out-topic`.
-
-
-asyncio.run(main())
-```
-
-The `TypedDict`s are a documentation/IDE aid; migrations still receive and return
-plain dicts at runtime. See
-[Migrations → Type the payload shapes](migration.md#type-the-payload-shapes).
+# FastStream reference
 
 ## The seams
 
@@ -253,19 +119,13 @@ async def handle_order(order: Order) -> Order:
 This keeps routing declarative and removes manager/broker plumbing from the
 handler. For a single outgoing target, keep using `@publisher(...)`.
 
-## Reflection
+## Registration
 
-`Reflector(manager)` reflects each subscriber's declared payload model into the
-manager graph and validates it. Wire it as the app's startup hook:
-
-```python
-app = FastStream(broker, on_startup=[Reflector(manager)])
-```
-
-Subscribers are registered at decoration time, so reflection runs synchronously
-before the broker connects. A subscriber whose typed parameter is not a provider
-model (e.g. `dict`) is skipped. Union annotations are unwrapped to their first
-concrete model for reflection.
+Models and migrations must be registered on the manager class before the runtime
+instance is constructed. Subscribers bind their typed payload parameter at
+decoration time. A subscriber whose typed parameter is not a provider model
+(e.g. `dict`) is skipped. Union annotations are unwrapped to their first concrete
+model.
 
 ## Target policy
 
@@ -293,7 +153,7 @@ Convergence keys off the payload's own `(kind, version)`.
 ## Telemetry
 
 The adapter carries no tracing library and emits no spans. FastStream's own
-[OpenTelemetry](https://faststream.airt.ai/latest/getting-started/integrations/)
+[OpenTelemetryhttps://faststream.airt.ai/latest/getting-started/integrations/
 middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
 spans **as current**, so each step nests under the consume span:
 
@@ -305,18 +165,23 @@ broker.add_middleware(KafkaTelemetryMiddleware(tracer_provider=provider))
 manager.attach_hooks((OTELHook(tracer=provider.get_tracer("my-service")),))
 ```
 
-See [Telemetry & Hooks](telemetry.md) for the per-step `OTELHook`.
+See [Telemetry & Hooks](../how-to/telemetry.md) for the per-step `OTELHook`.
 
 ## Testing
 
 Drive the adapter through FastStream's in-memory `TestKafkaBroker` — no broker
 container. See the worked
-[`showcases/faststream`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream)
+[`showcases/faststream`https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream
 project (broker selection across Kafka/RabbitMQ/NATS/Redis, Jaeger + OTLP).
 
 ## See also
 
-- [Managers](managers.md) — the bounded-context invariant the adapter relies on.
-- [Migrations](migration.md) — reconstructing missing models and migrations.
+- [Managers](../explanation/managers.md) — the bounded-context invariant the adapter relies on.
+- [Migrations](../explanation/migrations.md) — reconstructing missing models and migrations.
 - [Target Policy](target-policy.md) — `latest`/`earliest`/pinned/per-kind.
-- [Telemetry & Hooks](telemetry.md) — per-step spans and call-level tracing.
+- [Telemetry & Hooks](../how-to/telemetry.md) — per-step spans and call-level tracing.
+
+## See also
+
+- [FastStream integration model](../explanation/faststream.md)
+- [Use FastStream with pyverge](../how-to/integrations/faststream.md)

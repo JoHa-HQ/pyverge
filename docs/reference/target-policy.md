@@ -32,7 +32,7 @@ Per-kind mappings are useful when different model families in the same payload
 need different convergence rules:
 
 ```python
-manager.migrate(
+manager.runner().run(
     data,
     target={
         "LegacySensor": "1.5.0",  # pin legacy data explicitly

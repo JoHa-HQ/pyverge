@@ -1,74 +1,4 @@
-# Migrations
-
-The engine converges every versioned entry in a payload along registered
-migration paths. A complete chain needs two kinds of facts:
-
-- a **model** per version (the concrete schema), and
-- a **migration** per version edge (how to transform one version into the next).
-
-You normally register both by hand. When one is missing, the engine can
-reconstruct it — but only from the other, so the two reconstruction strategies
-are **mutually exclusive**. Pick the one that matches *what you are missing*.
-
-## Two mutually exclusive strategies
-
-`on_missing` selects a single, **exclusive** fallback behavior for an edge
-endpoint with no concrete entry. The two reconstruction strategies are inverses
-and cannot be combined on one engine:
-
-| Value | Axis | You have | Missing | Engine action |
-| --- | --- | --- | --- | --- |
-| `"reconstruct_model"` | per **migration** (with anchor model) | anchor model + migration | the other endpoint's model | rebuild it from the anchor and the diff, then store it |
-| `"reconstruct_migration"` | per **model pair** | both endpoint models | the version-edge migration | diff the two schemas into a proposal |
-| `"raise"` (default) | — | — | — | fail with `ModelNotFoundError` |
-| `"skip"` | — | — | — | leave the version model-less |
-
-Because the setting is exclusive, enabling one reconstruction path disables the
-other. Choose based on which side of the pair your source of truth carries.
-
-```mermaid
-flowchart TD
-    A[Missing endpoint entry] --> B{What do you have?}
-    B -->|anchor model + migration| C[on_missing = reconstruct_model]
-    C --> D[Rebuild missing model from anchor + diff]
-    D --> E[Store model in registry]
-    B -->|both endpoint models| F[on_missing = reconstruct_migration]
-    F --> G[propose_migration: diff two schemas]
-    G --> H[Review proposal, register manually]
-    B -->|neither / not sure| I[on_missing = raise / skip]
-```
-
-## When to choose which
-
-Rule of thumb: **pick the strategy for the half you cannot produce by hand.**
-
-Choose `reconstruct_model` when:
-
-- You version **schemas** and author migrations explicitly — the migration is
-  the source of truth and carries business intent.
-- You keep one canonical (usually latest) model and treat older versions as
-  patch deltas — e.g. git-versioned JSON specs.
-- Registering every historical model by hand is the pain point.
-- You can accept registry mutation: the engine writes a new model during
-  `store_migration`, and it is immediately usable for validation and lookup.
-
-Choose `reconstruct_migration` when:
-
-- You already have every model registered (e.g. generated from schema files or
-  ORM classes) but no migration code between versions.
-- You want a **starting patch to review**, not an automatically trusted one.
-- You want zero side effects: `propose_migration` never registers anything and
-  never mutates endpoint models.
-- The gap is mechanical (added/removed/retyped fields) rather than semantic.
-
-Avoid or postpone reconstruction when:
-
-- The missing side carries business intent you cannot infer (field renames,
-  value remaps, splits/merges) — reconstruct, then **edit** the result.
-- The chain has non-adjacent jumps — reconstruction works per edge; register
-  the intermediate edges first.
-- You want both sides reconstructed at once — they are mutually exclusive by
-  design; pick one and register the other by hand.
+# Migrate missing models and migrations
 
 ## Reconstructing a model (per migration edge)
 
@@ -82,14 +12,12 @@ Enable the strategy in settings:
 
 ```python
 from pyverge import Manager
-from pyverge.settings import MigrationSettings
 from pyverge.providers import PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
-    MigrationSettings(on_missing="reconstruct_model"),
     PydanticModelAdapter(),
+    on_missing="reconstruct_model",
 )
-manager = UserManager()
 ```
 
 Then register only the concrete model you have, plus the migration. The engine
@@ -97,11 +25,11 @@ reconstructs every missing version on registration:
 
 ```python
 # Register the anchor model (the latest concrete schema).
-manager.store_model(UserV2)
+UserManager.store_model(UserV2)
 
 # Register a migration from an unregistered version.
 # The engine reconstructs the 1.0.0 model from UserV2 minus the added field.
-manager.store_migration(
+UserManager.store_migration(
     ("User", "1.0.0", "2.0.0"),
     JsonPatchMigration(
         {
@@ -111,6 +39,9 @@ manager.store_migration(
         }
     ),
 )
+
+# Runtime instances copy the graph at construction time.
+manager = UserManager()
 
 # The 1.0.0 model is now materialized.
 v1 = manager.get("User", "1.0.0")
@@ -145,7 +76,7 @@ user_v2 = manager.get("User", "2.0.0")
 proposal = manager.engine.propose_migration(user_v1, user_v2)
 
 # The proposal is a JsonPatchMigration — review it before registering.
-manager.store_migration(
+UserManager.store_migration(
     ManagerMigrationKey("User", "1.0.0", "2.0.0"), proposal
 )
 ```
@@ -178,7 +109,7 @@ from pyverge.core import ManagerMigrationKey
 from pyverge.providers import JsonPatchMigration
 
 # Declarative JSON Patch spec — preferred when no context is needed
-manager.store_migration(
+UserManager.store_migration(
     ManagerMigrationKey("User", "1.0.0", "2.0.0"),
     JsonPatchMigration(
         {
@@ -190,7 +121,7 @@ manager.store_migration(
 )
 
 # Runtime callable — use when the migration needs context or imperative logic
-manager.store_migration(ManagerMigrationKey("User", "1.0.0", "2.0.0"), add_age)
+UserManager.store_migration(ManagerMigrationKey("User", "1.0.0", "2.0.0"), add_age)
 ```
 
 ## Runtime context
@@ -200,7 +131,7 @@ request timestamps, exchange rates. Pass them to `migrate`; the same
 `MigrationContext` reaches every step:
 
 ```python
-result = manager.migrate(payload, context={"tenant_id": "tenant_99"})
+result = manager.runner().run(payload, "latest", context={"tenant_id": "tenant_99"})
 ```
 
 The context is a read-only **view** over the mapping you pass, not a copy.
@@ -220,7 +151,7 @@ def migrate_v1_to_v2(data, context=None):
     data["tenant_id"] = context["tenant_id"]
     return data
 
-manager.store_migration(
+UserManager.store_migration(
     ManagerMigrationKey("User", "1.0.0", "2.0.0"),
     migrate_v1_to_v2,
 )
@@ -308,7 +239,7 @@ from hypothesis import given, strategies as st
 
 @given(st.from_type(UserV2))
 def test_v2_to_v3_is_total(v2):
-    manager.migrate(v2.model_dump(), target="3.0.0")
+    manager.runner().run(v2.model_dump(), target="3.0.0")
 ```
 
 ## Backward migration
@@ -318,14 +249,19 @@ Backward migration across a chain works by registering a reverse edge with
 
 ```python
 # Forward edge: 0.1.0 -> 0.2.0
-manager.store_migration(
+UserManager.store_migration(
     ManagerMigrationKey("User", "0.1.0", "0.2.0"), forward_ops
 )
 
 # Reverse edge: 0.2.0 -> 0.1.0 (swapped spec, own ops)
-manager.store_migration(
+UserManager.store_migration(
     ManagerMigrationKey("User", "0.2.0", "0.1.0"), reverse_ops
 )
 ```
 
 Without a registered reverse edge, a backward migration raises.
+
+## See also
+
+- [Migration strategies](../explanation/migrations.md)
+- [Migration format reference](../reference/migration-formats.md)

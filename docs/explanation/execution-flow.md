@@ -91,23 +91,15 @@ its versioned models, then migrate a nested payload:
 
 ```python
 from pyverge import Manager
-from pyverge.settings import MigrationSettings
 from pyverge.providers import PydanticModelAdapter
-from pyverge.migration import PydanticWalker
 
-UserManager = Manager[semver.Version].configure(
-    MigrationSettings(),
-    PydanticModelAdapter(),
-    walker=PydanticWalker(
-        registry,
-        settings=MigrationSettings(),
-        adapter=PydanticModelAdapter(),
-    ),
-)
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
-# Register versioned models (PersonV1, PersonV2, AddressV1, AddressV2, ...)
-# and their migrations, then migrate a nested payload:
-migrated = manager.migrate(
+# Register Person/Address models and migrations on UserManager before
+# constructing the runtime instance.
+manager = UserManager()
+
+migrated = manager.runner().run(
     {
         "document": {
             "kind": "Person",
@@ -116,6 +108,7 @@ migrated = manager.migrate(
             "address": {"kind": "Address", "version": "1.0.0", "street": "Main"},
         }
     },
+    "latest",
     container=PersonContainer,
 )
 ```
@@ -123,63 +116,19 @@ migrated = manager.migrate(
 The walker discovers `Address 1.0.0` and `Person 1.0.0`, converges the address
 first, then the person — so the parent migration never sees stale children.
 
-## Executors
-
-The engine selects an executor from `MigrationSettings`:
-
-- `parallel_workers=0` -> sequential
-- `parallel_workers>0` -> level-parallel, capped at `os.cpu_count()`
-- `execution_mode="sync"` -> thread pool
-- `execution_mode="async"` -> `asyncio.gather`
+## Execution backends
 
 ```python
-from pyverge import Manager
-from pyverge.settings import MigrationSettings
-from pyverge.providers import PydanticModelAdapter
+from pyverge.execution import AsyncBackend, ThreadedBackend
 
-UserManager = Manager[semver.Version].configure(
-    MigrationSettings(execution_mode="async", parallel_workers=4),
-    PydanticModelAdapter(),
+runner = manager.runner(runtime=ThreadedBackend(max_workers=4))
+result = runner.run(payload, "latest")
+
+async_runner = manager.runner(
+    runtime=AsyncBackend(backend="asyncio", backend_options={}, max_workers=4)
 )
-
-result = await manager.amigrate(payload)
+result = await async_runner.run(payload, "latest")
 ```
 
-Use `migrate` for sync runs and `amigrate` for async runs. Mismatches raise
-`AsyncExecutionRequired` / `SyncExecutionRequired`; there is no implicit event
-loop creation.
-
-### Prepared runs
-
-`prepare` builds the plan and binds the executor without executing anything.
-Context is supplied when the run executes, so one prepared run can be reused:
-
-```python
-run = manager.delegate(payload)
-
-first = run.run(context={"tenant_id": "tenant_a"})
-second = run.run(context={"tenant_id": "tenant_b"})
-```
-
-`manager.prepare` is the underlying form; `manager.delegate` is the same
-deferred execution seam. Async runs use `await run.arun(context=...)`. `run()`
-on an async run raises `AsyncExecutionRequired`; `arun()` on a sync run raises
-`SyncExecutionRequired`.
-
-When `container=` is supplied, the run returns the typed container instance
-after migration — materialization belongs to the run, not the manager.
-
-### Async hooks
-
-Async executors detect the hook shape: an overridden `abefore_migrate`,
-`aafter_migrate`, or `aon_error` is awaited as a coroutine; otherwise the sync
-method runs in a worker thread via `asyncio.to_thread`. Sync hooks therefore
-work on both paths without blocking the event loop.
-
-You can still inject a custom executor per call:
-
-```python
-from pyverge.migration import LevelParallelExecutor
-
-manager.migrate(payload, executor=LevelParallelExecutor(max_workers=4))
-```
+The backend owns execution; the runner owns planning and materialization. Hooks
+wrap each migration step, and middleware wraps the backend execution seam.

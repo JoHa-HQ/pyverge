@@ -118,12 +118,12 @@ materializes every missing version from the anchor model and the migration
 diffs, so no historical model needs to be registered by hand. When you instead
 hold both models but no migration, `on_missing="reconstruct_migration"` (via
 `propose_migration`) derives a starting patch. The two strategies are mutually
-exclusive. See [migrations](migration.md).
+exclusive. See [migrations](migrations.md).
 
 ## Next steps
 
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
 - [Managers](managers.md) — registration and one complete version graph per manager.
-- [Target policy](target-policy.md) — declarative convergence rules.
-- [Migrations](migration.md) — reconstruct missing models or migrations.
+- [Target policy](../reference/target-policy.md) — declarative convergence rules.
+- [Migrations](migrations.md) — reconstruct missing models or migrations.
 - [Real-world scenarios](scenarios.md) — where this applies.

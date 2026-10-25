@@ -115,7 +115,7 @@ schema hashes, migration hashes, and a content hash. Lifespan/startup does not
 write it. CI commands (`doctor`, `validate`, `migrate --check`, `compat`)
 return non-zero on failure. Config auto-discovery is not wired yet.
 
-See [CLI Reference](docs/cli.md).
+See [CLI Reference](docs/reference/cli.md).
 
 ## Features
 
@@ -139,14 +139,14 @@ timeline.
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md)
-- [Managers](docs/managers.md) · [Concepts](docs/concepts.md)
-- [Providers](docs/providers.md)
-- [Migrations](docs/migration.md) · [Migration Formats](docs/migration-formats.md)
-- [Runtime & Execution](docs/runtime.md) · [Execution Flow](docs/execution-flow.md)
-- [Target Policy](docs/target-policy.md) · [Compatibility](docs/compatibility.md)
-- [CLI Reference](docs/cli.md) · [Telemetry & Hooks](docs/telemetry.md)
-- [FastMCP](docs/fastmcp.md) · [FastStream](docs/faststream.md)
-- [Testing](docs/testing.md) · [Benchmarking](docs/benchmarking.md)
-- [Usage Patterns](docs/usage.md) · [Scenarios](docs/scenarios.md)
+- [Getting Started](docs/tutorials/getting-started.md)
+- [Managers](docs/explanation/managers.md) · [Concepts](docs/explanation/concepts.md)
+- [Providers](docs/explanation/providers.md)
+- [Migrations](docs/explanation/migrations.md) · [Migration Formats](docs/reference/migration-formats.md)
+- [Runtime & Execution](docs/reference/runtime.md) · [Execution Flow](docs/explanation/execution-flow.md)
+- [Target Policy](docs/reference/target-policy.md) · [Compatibility](docs/reference/compatibility.md)
+- [CLI Reference](docs/reference/cli.md) · [Telemetry & Hooks](docs/how-to/telemetry.md)
+- [FastMCP](docs/explanation/fastmcp.md) · [FastStream](docs/explanation/faststream.md)
+- [Testing](docs/how-to/testing.md) · [Benchmarking](docs/how-to/benchmarking.md)
+- [Usage Patterns](docs/reference/manager.md) · [Scenarios](docs/explanation/scenarios.md)
 - [Showcases](showcases/README.md)

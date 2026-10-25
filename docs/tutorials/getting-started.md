@@ -25,12 +25,10 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.settings import MigrationSettings
 from pyverge.providers import PydanticModelAdapter
 
 # A manager binds a version strategy to an adapter and settings.
 UserManager = Manager[semver.Version].configure(
-    MigrationSettings(),
     PydanticModelAdapter(),
 )
 
@@ -62,13 +60,14 @@ def add_age(data: dict, context=None) -> dict:
 manager = UserManager()
 
 # Migrate data — converges every versioned entry to the configured target.
-migrated = manager.migrate(
-    {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"}
+migrated = manager.runner().run(
+    {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"},
+    "latest",
 )
 ```
 
-`migrate()` converges the payload to the configured target policy (by default
-`latest`, the most recently registered version of each kind).
+`runner.run()` converges the payload to the requested target policy (`latest`
+here, the most recently registered version of each kind).
 
 ## JSON Schema models
 
@@ -79,10 +78,8 @@ same `ModelAdapter` contract:
 ```python
 from pyverge import Manager
 from pyverge.providers import JsonSchemaModelAdapter
-from pyverge.settings import MigrationSettings
 
 UserManager = Manager[semver.Version].configure(
-    MigrationSettings(),
     JsonSchemaModelAdapter(),
 )
 
@@ -116,7 +113,7 @@ migration = JsonPatchMigration(
         "ops": [{"op": "add", "path": "/age", "value": None}],
     }
 )
-manager.store_migration(
+UserManager.store_migration(
     ManagerMigrationKey("User", "1.0.0", "2.0.0"), migration
 )
 ```
@@ -135,11 +132,9 @@ import pendulum
 from typing import Literal
 
 from pyverge import Manager
-from pyverge.settings import MigrationSettings
 from pyverge.providers import PydanticModelAdapter
 
 UserManager = Manager[pendulum.Date].configure(
-    MigrationSettings(),
     PydanticModelAdapter(),
 )
 
@@ -158,12 +153,12 @@ understands both formats.
 
 ## Next steps
 
-- [Managers](managers.md) — registration (decorator vs. lazy) and one complete version graph per manager.
-- [Common usage patterns](usage.md) — lookup, validation, diffing, hooks.
-- [Migrations](migration.md) — reconstruct missing models or migrations, and the mutually exclusive `on_missing` strategies.
-- [Target policy](target-policy.md) — declarative convergence rules.
-- [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
-- [Telemetry & Hooks](telemetry.md) — observability via hooks and OpenTelemetry.
-- [Testing](testing.md) — the time-travel topology round trip and other patterns.
-- [Concepts](concepts.md) — the problem and the approach.
-- [Showcases](https://github.com/JoHa-HQ/pyverge/tree/main/showcases) — end-to-end examples.
+- [Managers](../explanation/managers.md) — registration (decorator vs. lazy) and one complete version graph per manager.
+- [Common usage patterns](../reference/manager.md) — lookup, validation, diffing, hooks.
+- [Migrations](../explanation/migrations.md) — reconstruct missing models or migrations, and the mutually exclusive `on_missing` strategies.
+- [Target policy](../reference/target-policy.md) — declarative convergence rules.
+- [Execution flow](../explanation/execution-flow.md) — how the engine discovers, plans, and runs migrations.
+- [Telemetry & Hooks](../how-to/telemetry.md) — observability via hooks and OpenTelemetry.
+- [Testing](../how-to/testing.md) — the time-travel topology round trip and other patterns.
+- [Concepts](../explanation/concepts.md) — the problem and the approach.
+- [Showcaseshttps://github.com/JoHa-HQ/pyverge/tree/main/showcases — end-to-end examples.

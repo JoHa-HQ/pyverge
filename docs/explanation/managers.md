@@ -27,11 +27,9 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.settings import MigrationSettings
 from pyverge.providers import PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
-    MigrationSettings(),
     PydanticModelAdapter(),
 )
 
@@ -90,20 +88,13 @@ UserManager.model()(UserV1)
 UserManager.model()(UserV2)
 UserManager.migration("User", "1.0.0", "2.0.0")(add_age)
 
-# Instance-level registration (alternative) — use a separate manager class.
-OtherManager = Manager[semver.Version].configure(
-    MigrationSettings(),
-    PydanticModelAdapter(),
-)
-manager = OtherManager()
-manager.store_model(UserV1)
-manager.store_model(UserV2)
-manager.store_migration(ModelPair(UserV1, UserV2), add_age)
+# Runtime instances copy the graph at construction time.
+manager = UserManager()
 ```
 
-Class-level and instance-level registration are alternatives — an instance shares
-its class's registry, so registering the same model through both would raise
-`ModelAlreadyRegisteredError`.
+Register on the configured manager class before creating a runtime instance.
+Registration through an instance after construction writes to the class graph,
+not to that instance's runtime copy.
 
 ### Which manager owns what
 
@@ -132,21 +123,21 @@ an MCP tool server, a tenant track — not by kind, file, or team ownership.
 ```python
 # One bounded context: the Weather service, its own complete graph.
 WeatherManager = Manager[semver.Version].configure(
-    MigrationSettings(),
     JsonSchemaModelAdapter(),
 )
 
 # Everything Weather can reach lives here: the tool kind AND its nested kinds.
-manager.store_model(search_weather_v1)
-manager.store_model(search_weather_v2)
-manager.store_model(location_v1)   # nested inside search_weather
-manager.store_model(location_v2)
-manager.store_migration(
+WeatherManager.store_model(search_weather_v1)
+WeatherManager.store_model(search_weather_v2)
+WeatherManager.store_model(location_v1)   # nested inside search_weather
+WeatherManager.store_model(location_v2)
+WeatherManager.store_migration(
     ManagerMigrationKey("search_weather", "1.0.0", "2.0.0"), ...
 )
-manager.store_migration(
+WeatherManager.store_migration(
     ManagerMigrationKey("location", "1.0.0", "2.0.0"), ...
 )
+manager = WeatherManager()
 ```
 
 The same rule applies to decorator registration: every `@Manager.model()` for a
@@ -159,8 +150,8 @@ lossy** migrations:
 
 ```python
 # location lives in A, user lives in B, but a user payload embeds a location.
-A.migrate(user_payload)   # location converges; parent user left at 1.0.0
-B.migrate(user_payload)   # user converges; nested location silently dropped
+A().runner().run(user_payload, "latest")   # location converges; parent user left at 1.0.0
+B().runner().run(user_payload, "latest")   # user converges; nested location silently dropped
 ```
 
 | Symptom | Cause |
@@ -169,13 +160,13 @@ B.migrate(user_payload)   # user converges; nested location silently dropped
 | Parent migrated but children stale | missing containment edge -> wrong order |
 | Fields vanish after migration | nested entry not in the target model -> dropped at finalize |
 
-The FastMCP adapter follows this invariant directly: `ToolDiscovery` binds
+The FastMCP adapter follows this invariant directly: `FastMCPDiscovery` binds
 **one** manager, so there is no routing to do — the manager owns the whole graph
 and every tool kind resolves within it.
 
 
 ## See also
 
-- [Getting Started](getting-started.md) — a minimal end-to-end example.
-- [Migrations](migration.md) — reconstruct missing models or migrations.
+- [Getting Started](../tutorials/getting-started.md) — a minimal end-to-end example.
+- [Migrations](migrations.md) — reconstruct missing models or migrations.
 - [Execution Flow](execution-flow.md) — discovery, ordering, and finalize.

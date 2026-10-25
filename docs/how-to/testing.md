@@ -23,13 +23,13 @@ def test_migration_topology(manager, kind, versions):
     # Down-walk: newest -> oldest, validating each hop against its model.
     for version in reversed(versions):
         cls = manager.get(kind, version).model
-        result = manager.migrate(
+        result = manager.runner().run(
             data.model_dump(mode="json"), target=version, container=cls
         )
         assert isinstance(result, cls)
 
     # Return trip: oldest -> newest.
-    back = manager.migrate(
+    back = manager.runner().run(
         result.model_dump(mode="json"), target=newest, container=newest_cls
     )
     assert isinstance(back, newest_cls)
@@ -196,7 +196,7 @@ in-memory one and check the spans a migration emits:
 
 ```python
 def test_one_span_per_step(manager, span_exporter):
-    manager.migrate(payload)
+    manager.runner().run(payload, "latest")
     spans = span_exporter.get_finished_spans()
     assert all(s.name.endswith(".migrate") for s in spans)
     assert span_exporter.get_finished_spans()[0].attributes["migration.kind"] == kind
@@ -226,7 +226,7 @@ wire the version graph as a provider and override it in tests. See
 
 Build the application through its **composition root** and drive it through
 public interfaces only — the server (`server.call_tool`) and the manager
-(`manager.migrate`). A test that reassembles internal wiring couples itself to
+(`manager.runner().run`). A test that reassembles internal wiring couples itself to
 the implementation and breaks on every refactor; a test that calls the public
 surface survives it.
 
@@ -250,6 +250,6 @@ usually enough.
 
 ## See also
 
-- [Execution Flow](execution-flow.md) — discovery, ordering, and finalize.
-- [Migrations](migration.md) — reconstruct missing models or migrations.
+- [Execution Flow](../explanation/execution-flow.md) — discovery, ordering, and finalize.
+- [Migrations](../explanation/migrations.md) — reconstruct missing models or migrations.
 - [Telemetry & Hooks](telemetry.md) — observability for assertions.

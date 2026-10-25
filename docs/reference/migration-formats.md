@@ -68,7 +68,7 @@ class UserV1ToV2:
 ```
 
 ```python
-result = manager.migrate(payload, context={"tenant_id": "tenant_99"})
+result = manager.runner().run(payload, "latest", context={"tenant_id": "tenant_99"})
 ```
 
 `JsonataMigration` is a declarative spec; it produces a callable
@@ -109,5 +109,5 @@ def migrate(data, context=None):
 Use for business logic that JSON Patch cannot express. Callables are the escape
 hatch, not portable configuration.
 
-See [Migrations](migration.md) for full op syntax, authoring rules, and
+See [Migrations](../explanation/migrations.md) for full op syntax, authoring rules, and
 reconstruction.

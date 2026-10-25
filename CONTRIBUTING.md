@@ -63,10 +63,38 @@ process for contributing code, documentation, and ideas.
 
 ### Documentation
 
-- Documentation lives in `docs/`.
-- Use reStructuredText or Markdown consistently.
-- Include examples for new features.
+Documentation lives in `docs/` and follows two external guides:
+
+- [Diátaxis](https://diataxis.fr/) — every page is one of `tutorials`,
+  `how-to`, `reference`, or `explanation`.
+- [Google developer documentation style](https://developers.google.com/style) —
+  address the reader as **you**, use active voice and present tense, sentence
+  case headings, and code font for commands, paths, and identifiers.
+
+Structure:
+
+```text
+docs/
+  tutorials/     # learning-oriented walkthroughs
+  how-to/        # task-oriented instructions
+  reference/     # API, formats, CLI
+  explanation/   # concepts, architecture, trade-offs
+```
+
+Guidelines:
+
+- Do not mix documentation types on one page.
+- Start how-to titles with a verb.
+- Keep reference pages neutral and structured for lookup.
+- Include runnable examples and test them.
+- Update links when moving pages.
 - Update the changelog if applicable.
+
+Validate the docs before committing:
+
+```bash
+uv run mkdocs build --strict
+```
 
 ## Code style
 
