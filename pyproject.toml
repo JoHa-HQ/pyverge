@@ -28,7 +28,7 @@ dev = [
   "rich>=13",
   "dependency-injector>=4.49.1",
   "mkdocstrings[python]>=1.0.8",
-  "pytest-codeblocks>=0.18.0",
+  "pytest-codeblocks>=0.18.0"
 ]
 
 [project]
