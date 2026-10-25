@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 
 from openlineage.client.event_v2 import (
     InputDataset,
@@ -29,6 +30,10 @@ class OpenLineageMiddleware:
         self._namespace = namespace
         self._producer = producer
 
+    @property
+    def client(self) -> Any:
+        return self._client
+
     def wrap(self, inner: Any) -> Any:
         return _OpenLineageRun(
             inner,
@@ -53,6 +58,7 @@ class _OpenLineageRun:
         self._producer = producer
 
     def execute(self, plan: Any, payload: Any, run: Any, adapter: Any) -> Any:
+        run_id = str(uuid5(NAMESPACE_URL, run.run_id))
         inputs = [
             InputDataset(
                 self._namespace,
@@ -72,7 +78,7 @@ class _OpenLineageRun:
                 eventTime=datetime.now(UTC).isoformat(),
                 producer=self._producer,
                 eventType=RunState.START,
-                run=Run(runId=run.run_id),
+                run=Run(runId=run_id),
                 job=Job(namespace=self._namespace, name="migration.run"),
                 inputs=inputs,
                 outputs=outputs,
@@ -86,19 +92,19 @@ class _OpenLineageRun:
                     eventTime=datetime.now(UTC).isoformat(),
                     producer=self._producer,
                     eventType=RunState.FAIL,
-                    run=Run(runId=run.run_id),
+                    run=Run(runId=run_id),
                     job=Job(namespace=self._namespace, name="migration.run"),
                 )
             )
             raise
         if hasattr(result, "__await__"):
-            return self._async_result(result, run.run_id)
+            return self._async_result(result, run_id)
         self._client.emit(
             RunEvent(
                 eventTime=datetime.now(UTC).isoformat(),
                 producer=self._producer,
                 eventType=RunState.COMPLETE,
-                run=Run(runId=run.run_id),
+                run=Run(runId=run_id),
                 job=Job(namespace=self._namespace, name="migration.run"),
             )
         )

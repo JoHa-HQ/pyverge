@@ -14,6 +14,10 @@ class OtelMiddleware:
         self._tracer = tracer
         self._service = service
 
+    @property
+    def tracer(self) -> Tracer:
+        return self._tracer
+
     def wrap(self, inner: Any) -> Any:
         return _OtelRun(inner, tracer=self._tracer, service=self._service)
 

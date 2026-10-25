@@ -18,10 +18,19 @@ from .errors import (
 from .extractors import CompositeExtractor, ContainerExtractor, SchemaFieldsExtractor
 from .hooks import MigrationHook, OpenLineageHook, OTELHook
 from .middleware import (
+    AuditEvent,
+    AuditMiddleware,
+    AuditSink,
     BackendMiddleware,
+    IdempotencyKeyFactory,
+    IdempotencyMiddleware,
+    IdempotencyStore,
     OpenLineageMiddleware,
     OtelMiddleware,
     RetryMiddleware,
+    Transaction,
+    TransactionManager,
+    TransactionMiddleware,
 )
 from .path import Path
 from .path_resolver import PathResolver
@@ -55,6 +64,9 @@ __all__ = [
     "AnyDirection",
     "AsyncBackend",
     "AsyncExecutionRequired",
+    "AuditEvent",
+    "AuditMiddleware",
+    "AuditSink",
     "BackendMiddleware",
     "BackendPort",
     "BackwardDirection",
@@ -70,6 +82,9 @@ __all__ = [
     "ExecutionPlanner",
     "ExtractedEntry",
     "ForwardDirection",
+    "IdempotencyKeyFactory",
+    "IdempotencyMiddleware",
+    "IdempotencyStore",
     "MigrationHook",
     "OTELHook",
     "OpenLineageHook",
@@ -90,6 +105,9 @@ __all__ = [
     "SyncExecutionRequired",
     "TargetCompiler",
     "ThreadedBackend",
+    "Transaction",
+    "TransactionManager",
+    "TransactionMiddleware",
     "direction_policy",
     "earliest_target_resolver",
     "fixed_target_resolver",
