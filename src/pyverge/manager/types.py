@@ -109,6 +109,7 @@ class ManagerClassState(Protocol[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
+        migration_id: str | None = None,
     ) -> MigrationFunc: ...
 
     @classmethod

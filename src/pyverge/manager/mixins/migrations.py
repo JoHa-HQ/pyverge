@@ -58,6 +58,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
+        migration_id: str | None = None,
     ) -> MigrationFunc:
         raise TypeError(f"Unsupported migration key: {key!r}")
 
@@ -70,17 +71,21 @@ class MigrationStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
+        migration_id: str | None = None,
     ) -> MigrationFunc:
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
+        func = cls._resolve_migration(func)
+        if migration_id is not None:
+            setattr(func, "__migration_id__", migration_id)
         return cast(
             MigrationFunc,
             engine.register(
                 RegisterMigration(
                     MigrationSpec(
                         pair,
-                        cls._resolve_migration(func),
+                        func,
                         backward_compatible,
                     )
                 )
@@ -96,6 +101,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
+        migration_id: str | None = None,
     ) -> MigrationFunc:
         engine = engine or cls._default_engine
         adapter = engine.adapter
@@ -103,13 +109,16 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.version_key(kind=key.kind, version=key.source_version),
             adapter.version_key(kind=key.kind, version=key.target_version),
         )
+        func = cls._resolve_migration(func)
+        if migration_id is not None:
+            setattr(func, "__migration_id__", migration_id)
         return cast(
             MigrationFunc,
             engine.register(
                 RegisterMigration(
                     MigrationSpec(
                         pair,
-                        cls._resolve_migration(func),
+                        func,
                         backward_compatible,
                     )
                 )
