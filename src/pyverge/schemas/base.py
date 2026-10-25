@@ -33,16 +33,13 @@ class AbstractModelAdapter:
 
     @property
     def version_property(self) -> str:
-        """The field name carrying a model's version."""
         return self._version_property
 
     @property
     def kind_property(self) -> str:
-        """The field name carrying a model's kind."""
         return self._kind_property
 
     def model_id(self, handle: ModelHandle) -> str:
-        """Stable provider identity for a model handle."""
         module = getattr(handle, "__module__", None) or type(handle).__module__
         qualname = getattr(handle, "__qualname__", None) or getattr(
             handle, "__name__", None
@@ -52,22 +49,13 @@ class AbstractModelAdapter:
         return f"{module}.{qualname}"
 
     def version(self, model_cls: type[Any]) -> str:
-        """Return the model's version string. Implemented by concrete adapters."""
         raise NotImplementedError
 
     def kind(self, model_cls: type[Any]) -> str:
-        """Return the model's kind. Implemented by concrete adapters."""
         raise NotImplementedError
 
     @classmethod
     def of(cls, value: str | VersionValue) -> VersionValue:
-        """Parse a version string, or pass through an already-parsed value.
-
-        Understands both semver and ISO date strings.  Idempotent: a
-        ``semver.Version`` or ``pendulum.Date`` produced by a previous call is
-        returned unchanged, so a value may cross the parse boundary more than
-        once.
-        """
         if isinstance(value, Version) or (
             isinstance(value, pendulum.Date)
             and not isinstance(value, pendulum.DateTime)
@@ -105,7 +93,6 @@ class AbstractModelAdapter:
         *,
         fields: frozenset[str] | None = None,
     ) -> bool:
-        """Return whether *container* is a recognized model shape."""
         raise NotImplementedError
 
     def ensure_compatible(
@@ -114,7 +101,6 @@ class AbstractModelAdapter:
         *,
         fields: frozenset[str],
     ) -> None:
-        """Raise when *container* cannot cover the migrated *fields*."""
         if container is None:
             return
         if not self.can_handle(container, fields=fields):
@@ -124,13 +110,6 @@ class AbstractModelAdapter:
             )
 
     def fields(self, model_cls: type[Any]) -> frozenset[str]:
-        """Return the model's field names, minus the identity fields.
-
-        The identity fields (``version``/``kind``, per the adapter's configured
-        property names) are owned by the version graph, so they are excluded:
-        two registrations of the same ``(kind, version)`` must agree on the
-        *payload* surface, not on the identity encoding.
-        """
         identity = {self._version_property, self._kind_property}
         fields = getattr(model_cls, "model_fields", None)
         if fields is None:

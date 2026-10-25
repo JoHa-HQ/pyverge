@@ -122,22 +122,12 @@ class ModelAdapter(ModelIdentity, Protocol):
     def version(self, model_cls: ModelHandle) -> str: ...
     def kind(self, model_cls: ModelHandle) -> str: ...
     @property
-    def version_property(self) -> str:
-        """The field name carrying a model's version."""
-        ...
+    def version_property(self) -> str: ...
 
     @property
-    def kind_property(self) -> str:
-        """The field name carrying a model's kind."""
-        ...
+    def kind_property(self) -> str: ...
 
-    def of(self, value: str | VersionValue) -> VersionValue:
-        """Parse a version string, or pass through an already-parsed value.
-
-        Understands both semver and ISO date strings.  Idempotent: an existing
-        ``VersionValue`` is returned unchanged.
-        """
-        ...
+    def of(self, value: str | VersionValue) -> VersionValue: ...
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
@@ -154,62 +144,27 @@ class ModelAdapter(ModelIdentity, Protocol):
         self, parent_model: ModelHandle, field_name: str
     ) -> ModelHandle | None: ...
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]: ...
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
-        """Return every versioned ``(kind, version)`` the model's fields declare.
-
-        Walks annotations recursively and collects **all** model classes they
-        mention — every ``Union`` member, ``list`` items — not just the first,
-        so a model declaring several versions of a nested kind reports all.
-        """
-        ...
+    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]: ...
 
     def ensure_compatible(
         self,
         container: Any,
         *,
         fields: frozenset[str],
-    ) -> None:
-        """Raise when *container* cannot cover the migrated *fields*.
-
-        The adapter owns container compatibility: it knows which model shapes
-        it recognizes and which fields they declare.
-        """
-        ...
+    ) -> None: ...
 
     def can_handle(
         self,
         container: Any,
         *,
         fields: frozenset[str] | None = None,
-    ) -> bool:
-        """Report whether *container* is a recognized model/container type.
+    ) -> bool: ...
 
-        With *fields*, also report whether the container covers those migrated
-        field names.  One predicate serves both the walker's type gate
-        (``fields=None``) and the pre-execution field gate.
-        """
-        ...
+    def instantiate(self, container: ModelHandle, data: ModelData) -> Any: ...
 
-    def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        """Build a typed container instance from a migrated payload."""
-        ...
+    def dump(self, model: object) -> ModelData: ...
 
-    def dump(self, model: object) -> ModelData:
-        """Serialize a provider model into a payload mapping.
-
-        The inverse of :meth:`instantiate`. Used where a typed instance (e.g. a
-        handler's return value) must become a payload again before it can be
-        converged or published.
-        """
-        ...
-
-    def identify(self, model_cls: ModelHandle) -> bool:
-        """Return whether the provider owns *model_cls*.
-
-        A truthy identification is usable for a neutral store lookup; a falsey
-        value means the class is unknown to this provider.
-        """
-        ...
+    def identify(self, model_cls: ModelHandle) -> bool: ...
 
     def versionable(
         self,
@@ -217,21 +172,14 @@ class ModelAdapter(ModelIdentity, Protocol):
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> VersionNode[VersionValue]:
-        """Wrap a model class into a materialized version node.
-
-        ``kind`` and ``version`` are read from the class when omitted.
-        """
-        ...
+    ) -> VersionNode[VersionValue]: ...
 
     def version_key(
         self,
         *,
         kind: str,
         version: str,
-    ) -> Comparable[VersionValue]:
-        """Build a temporary search key from *kind* and *version* strings."""
-        ...
+    ) -> Comparable[VersionValue]: ...
 
     def diff(
         self,
@@ -242,11 +190,4 @@ class ModelAdapter(ModelIdentity, Protocol):
     def materialize_model(
         self,
         diff: Diffable[VersionValue_co],
-    ) -> ModelHandle:
-        """Materialize a model from a diff.
-
-        The anchor is the diff's concrete ``source`` model and the version is
-        the diff's ``target`` version.  The returned model conforms to this
-        provider.
-        """
-        ...
+    ) -> ModelHandle: ...

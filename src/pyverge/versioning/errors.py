@@ -1,5 +1,3 @@
-"""Version-domain errors, including migration application failures."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -22,7 +20,6 @@ class MigrationApplicationError(PyvergeError):
         target: Any | None = None,
         reason: str | None = None,
     ) -> None:
-        """Accept ``(kind, source, target, reason)`` or a legacy pair form."""
         source_kind, target_kind = None, None
         if (
             isinstance(kind, tuple)

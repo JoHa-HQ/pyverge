@@ -30,7 +30,6 @@ class JsonataTransform:
         data: ModelData,
         context: MigrationContext | None = None,
     ) -> ModelData:
-        """Evaluate the expression against *data* and runtime context."""
         active = context if context is not None else EMPTY_CONTEXT
         bindings = dict(active)
         with self._lock:
@@ -44,7 +43,6 @@ class JsonataTransform:
 
     @property
     def migration_identity(self) -> MigrationIdentity:
-        """Stable identity of the JSONata expression."""
         return MigrationIdentity("jsonata", self.expression)
 
     def __repr__(self) -> str:
@@ -68,19 +66,16 @@ class JsonataMigration:
 
     @property
     def migration_identity(self) -> MigrationIdentity:
-        """Stable identity derived from the expression."""
         return MigrationIdentity("jsonata", self.expression)
 
     @classmethod
     def from_expression(cls, expression: str) -> Self:
-        """Build from a bare JSONata expression string."""
         if not isinstance(expression, str):
             raise TypeError("JSONata expression must be a string")
         return cls(expression)
 
     @classmethod
     def from_spec(cls, spec: Mapping[str, Any]) -> Self:
-        """Build from a declarative migration spec."""
         for key in ("from", "to"):
             if not isinstance(spec.get(key), str) or not spec[key]:
                 raise ValueError(
@@ -94,7 +89,6 @@ class JsonataMigration:
     @singledispatchmethod
     @classmethod
     def create(cls, value: str | Mapping[str, Any]) -> Self:
-        """Build from a string or mapping."""
         raise TypeError(f"Unsupported JSONata migration input: {type(value).__name__}")
 
     @create.register(str)
@@ -109,5 +103,4 @@ class JsonataMigration:
 
     @property
     def migration(self) -> JsonataTransform:
-        """The executable migration callable."""
         return self._migration

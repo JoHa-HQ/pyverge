@@ -1,8 +1,3 @@
-"""Versioning type surface: protocols, aliases, and type variables.
-
-Behavior lives in primitives, strategy, canonical, jgf, and errors.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Mapping

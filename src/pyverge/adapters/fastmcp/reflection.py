@@ -49,7 +49,6 @@ class ReflectedNode:
         return adapter.kind_property, adapter.version_property
 
     def compliant(self) -> dict[str, Any]:
-        """Schema with injected params dropped and identity fields injected."""
         document = {**self.schema}
         properties = dict(document.get("properties", {}))
         for name in self.injected:
@@ -65,15 +64,10 @@ class ReflectedNode:
         return document
 
     def fields(self) -> frozenset[str]:
-        """Payload fields, minus the identity fields."""
         identity = set(self._identity())
         return frozenset(set(self.compliant().get("properties", {})) - identity)
 
     def versionable(self) -> VersionNode:
-        """Wrap the compliant schema into a materialized version node.
-
-        The adapter must produce a model.  A key-only node is not valid here.
-        """
         adapter = self.provider.adapter
         document = self.compliant()
         try:
@@ -116,8 +110,7 @@ class ComponentReflection(ABC):
         return self._adapter
 
     @abstractmethod
-    def components(self, server: FastMCP) -> AsyncIterator[Any]:
-        """Yield every physical entity of this provider's type from *server*."""
+    def components(self, server: FastMCP) -> AsyncIterator[Any]: ...
 
     async def reflect(self, server: FastMCP) -> AsyncIterator[ReflectedNode]:
         async for component in self.components(server):
@@ -126,7 +119,6 @@ class ComponentReflection(ABC):
                 yield node
 
     def node(self, component: Any) -> ReflectedNode | None:
-        """Normalize *component*, or ``None`` when it declares no version."""
         version = self.version(component)
         if version is None:
             return None
@@ -141,11 +133,6 @@ class ComponentReflection(ABC):
         )
 
     def policy(self, component: Any) -> Policy | None:
-        """The convergence policy declared in the component's ``meta``, if any.
-
-        Accepts a version string or a per-kind mapping (the JSON subset of a
-        pyverge target policy); anything else is ignored.
-        """
         meta = getattr(component, "meta", None)
         if not isinstance(meta, dict):
             return None
@@ -175,18 +162,12 @@ class ComponentReflection(ABC):
         return frozenset(injected_names(handler, self._detector))
 
     @abstractmethod
-    def schema(self, component: Any) -> dict[str, Any]:
-        """Return the component's input schema document."""
+    def schema(self, component: Any) -> dict[str, Any]: ...
 
     @abstractmethod
     def virtual(
         self, server: FastMCP, kind: str, version: str, schema: dict, fn: Callable
-    ) -> Any:
-        """Materialize a virtual ``kind@version`` primitive on *server*.
-
-        The schema is the registered model's JSON schema (identity fields
-        dropped); *fn* is the converging callable.
-        """
+    ) -> Any: ...
 
     @staticmethod
     def schema_fields(schema: dict) -> list[str]:
@@ -194,13 +175,6 @@ class ComponentReflection(ABC):
 
     @staticmethod
     def signature(fn: Callable, names: list[str], *, required_first: bool) -> Callable:
-        """Wrap *fn* so FastMCP's ``from_function`` sees one parameter per field.
-
-        The converging callable is ``**kwargs``-only, but the FastMCP factories
-        validate parameters against the signature. This exposes each schema
-        field as a parameter (the first required when *required_first*, for a
-        resource URI's path parameter).
-        """
 
         def indirection(**kwargs):
             return fn(**kwargs)
@@ -324,11 +298,6 @@ class ResourceReflection(ComponentReflection):
         )
 
     def uri_template_for(self, kind: str, schema: dict) -> str:
-        """URI template a virtual resource for *schema* exposes.
-
-        The first property is the path parameter, the rest optional query
-        parameters. Without a scheme, the kind namespaces the path.
-        """
         names = self.schema_fields(schema)
         if not names:
             raise ValueError(f"kind {kind!r} has no properties for a URI template")

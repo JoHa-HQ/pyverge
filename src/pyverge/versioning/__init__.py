@@ -1,5 +1,3 @@
-"""Version graph domain: primitives, types, strategies, canonicalization, JGF."""
-
 from .canonical import (
     Canonicalizable,
     Canonicalizer,

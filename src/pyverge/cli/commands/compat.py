@@ -1,5 +1,3 @@
-"""Check structural compatibility of migrations."""
-
 from __future__ import annotations
 
 from typing import Annotated
@@ -31,7 +29,6 @@ def compat(
         str, typer.Option("--format", help="Output format (text/json)")
     ] = "text",
 ) -> None:
-    """Check structural compatibility of migrations."""
     try:
         mgr = resolve_manager(manager)
         keys: list[ManagerMigrationKey] = []

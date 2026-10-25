@@ -1,10 +1,3 @@
-"""Canonical JSON and content hashing as composed services.
-
-Canonicalization is an explicit encoder chain bound to a ``Canonicalizer``
-context. Hashing is a separate service composed with that canonicalizer. No
-module-level conversion helpers, ``repr``, ``vars()``, or provider dumps.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -21,21 +14,15 @@ Canonical = Any
 class Canonicalizable(Protocol):
     """A value that projects itself into canonical JSON data."""
 
-    def to_canonical(self) -> Canonical:
-        """Return a JSON-serializable canonical representation."""
-        ...
+    def to_canonical(self) -> Canonical: ...
 
 
 class ValueEncoder(Protocol):
     """One canonical-value encoder in the composition chain."""
 
-    def supports(self, value: object) -> bool:
-        """Return whether this encoder handles *value*."""
-        ...
+    def supports(self, value: object) -> bool: ...
 
-    def encode(self, value: Any, canonicalizer: Canonicalizer) -> Canonical:
-        """Encode *value* using the canonicalizer for recursion."""
-        ...
+    def encode(self, value: Any, canonicalizer: Canonicalizer) -> Canonical: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +147,9 @@ class Canonicalizer:
         >>> from pyverge.versioning import default_canonicalizer
         >>> default_canonicalizer().dumps({"b": 2, "a": [1, 3]})
         '{"a":[1,3],"b":2}'
+
+    Args:
+        encoders: Value encoders used to canonicalize values.
     """
 
     __slots__ = ("_encoders",)
@@ -169,11 +159,9 @@ class Canonicalizer:
 
     @property
     def encoders(self) -> tuple[ValueEncoder, ...]:
-        """The encoder chain in resolution order."""
         return self._encoders
 
     def encode(self, value: Any) -> Canonical:
-        """Encode *value* through the first supporting encoder."""
         for encoder in self._encoders:
             if encoder.supports(value):
                 return encoder.encode(value, self)
@@ -183,7 +171,6 @@ class Canonicalizer:
         )
 
     def dumps(self, value: Any) -> str:
-        """Canonical UTF-8 JSON: sorted keys, no whitespace, strict scalars."""
         return json.dumps(
             self.encode(value),
             sort_keys=True,
@@ -222,11 +209,9 @@ class ContentHasher:
 
     @property
     def name(self) -> str:
-        """Algorithm name."""
         return self.algorithm.name
 
     def digest(self, value: Any) -> str:
-        """Hash the canonical JSON form of *value*."""
         return self.algorithm.digest(self.canonicalizer.dumps(value).encode("utf-8"))
 
 

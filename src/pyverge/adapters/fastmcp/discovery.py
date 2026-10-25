@@ -49,13 +49,6 @@ class ToolDiscovery:
         return self._declared.get(kind) or self._policies.get(kind)
 
     async def search(self, server: Any) -> None:
-        """Index every versioned node the manager owns and a policy covers.
-
-        A node's policy comes from its primitive's ``meta["policy"]``, else the
-        discovery's ``policies`` map. An unowned kind is skipped; an owned kind
-        with no policy fails fast — every exposed kind needs one. Versions of a
-        kind must agree on their declared policy.
-        """
         self._nodes.clear()
         self._declared.clear()
         for provider in self._providers:
@@ -72,7 +65,6 @@ class ToolDiscovery:
                 self._accept(node, declared)
 
     def _accept(self, node: ReflectedNode, policy: Policy) -> None:
-        """Index *node*, enforcing one policy per kind."""
         existing = self._declared.get(node.kind)
         if existing is not None and existing != policy:
             raise ValueError(
@@ -83,15 +75,9 @@ class ToolDiscovery:
         self._nodes[(node.kind, node.version)] = node
 
     def source(self, server: Any) -> FastMCPSource:
-        """Expose the indexed nodes as a FastMCP source."""
         return FastMCPSource(server, nodes=self._nodes.values())
 
     async def register(self, server: Any) -> None:
-        """Register indexed nodes through ``FastMCPSource``, then validate.
-
-        References are validated only after every node is stored, since
-        completeness is a property of the whole graph.
-        """
         collector = RegistrationCollector()
         await self.source(server).accept(collector)
         for command in collector.commands:
@@ -124,12 +110,6 @@ class ToolDiscovery:
                 ) from error
 
     async def enrich(self, server: Any) -> None:
-        """Materialize a virtual component for every version that has no
-        physical primitive, then attach the hooks.
-
-        A virtual's schema comes from the registered model; its callable is the
-        converging delegate bound to the kind's physical anchor handler.
-        """
         for kind, versions in self._versions_by_kind().items():
             policy = self._policy_for(kind)
             if policy is None:
@@ -177,11 +157,6 @@ class ToolDiscovery:
         return kinds
 
     def _anchor_handler(self, kind: str, target: str) -> Callable[..., Any]:
-        """The physical handler a virtual converges calls to.
-
-        Prefers the physical node at *target*; falls back to the kind's newest
-        physical version (the target may itself be a virtual version).
-        """
         node = self._nodes.get((kind, target))
         if node is None:
             owners = sorted(v for (k, v) in self._nodes if k == kind)
@@ -191,7 +166,6 @@ class ToolDiscovery:
         return node.handler
 
     def _provider_for(self, kind: str) -> ComponentReflection:
-        """The provider that owns *kind* — a virtual must match its anchor's type."""
         providers = {
             p for (k, _), n in self._nodes.items() if k == kind for p in [n.provider]
         }
@@ -205,11 +179,6 @@ class ToolDiscovery:
         raise ValueError(f"no provider owns kind {kind!r}")
 
     def _policy_mapping(self, kind: str, policy: Policy) -> dict[str, str]:
-        """Normalize a policy to a per-kind mapping.
-
-        A pinned/named string applies to *kind* alone; a dict applies its own
-        entries, with ``"*"`` as the fallback for the kind itself.
-        """
         if isinstance(policy, str):
             return {kind: policy}
         mapping = dict(policy)
@@ -217,11 +186,6 @@ class ToolDiscovery:
         return mapping
 
     def _resolve_target(self, kind: str, policy: str) -> str:
-        """Translate a named policy (``latest``/``earliest``) to a version.
-
-        Any other value is passed through untouched — resolving and validating
-        a concrete target is the manager's job at migrate time.
-        """
         if policy not in ("latest", "earliest"):
             return policy
         versions = [str(v.version[1]) for v in self._manager.list_versions(kind)]

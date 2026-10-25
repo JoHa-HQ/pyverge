@@ -1,5 +1,3 @@
-"""Direction policies for path planning."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -49,7 +47,6 @@ class BackwardDirection:
 
 
 def direction_policy(strategy: MigrationDirectionStrategy) -> DirectionPolicy:
-    """Return the policy for *strategy*."""
     match strategy:
         case "any":
             return AnyDirection()

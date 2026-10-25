@@ -1,5 +1,3 @@
-"""Schema diff renderers."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -16,7 +14,6 @@ class JsonPatchRenderer(Generic[VersionValue]):
     format: str = "json-patch"
 
     def render(self, diff: Diffable[VersionValue]) -> list[dict[str, Any]]:
-        """Render *diff* as JSON Patch operations."""
         ops: list[dict[str, Any]] = []
         for field in diff.added_fields:
             default = diff.added_default(field)
@@ -40,7 +37,6 @@ class JsonPatchRenderer(Generic[VersionValue]):
         return ops
 
     def __call__(self, diff: Diffable[VersionValue]) -> list[dict[str, Any]]:
-        """Callable shorthand for :meth:`render`."""
         return self.render(diff)
 
 

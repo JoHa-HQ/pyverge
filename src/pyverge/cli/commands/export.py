@@ -1,5 +1,3 @@
-"""Export the registered graph manifest."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,7 +16,6 @@ def export(
         Path | None, typer.Option("--output", "-o", help="Write manifest file")
     ] = None,
 ) -> None:
-    """Export the registered graph as a machine-readable manifest."""
     try:
         mgr = resolve_manager(manager)
         registry = mgr.registry

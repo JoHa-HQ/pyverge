@@ -1,5 +1,3 @@
-"""Application-side settings presets consumed by CLI/tests."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -43,7 +41,6 @@ DiscoverySettings = MigrationSettings
 
 
 def manager_kwargs(settings: MigrationSettings) -> dict[str, Any]:
-    """Build-time manager parameters only."""
     return {"on_missing": settings.on_missing}
 
 

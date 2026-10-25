@@ -1,10 +1,3 @@
-"""The publish decorator: converge a handler's return to an outgoing target.
-
-The counterpart of :func:`.subscriber`. Applied at the endpoint, it converges the
-handler's return value to *target* before FastStream serializes and publishes it,
-so a handler can bridge schema versions across a topic boundary.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -81,11 +74,6 @@ def publisher(
     runner: Runner | None = None,
     **options: Any,
 ) -> Callable[[Fn], Any]:
-    """Return a decorator registering a converging publisher on *broker*.
-
-    The handler's return value is converged to *target* before publish. Extra
-    *options* pass through to ``broker.publisher``.
-    """
 
     def decorate(fn: Fn) -> Any:
         declared = HandlerView(fn).return_model
@@ -113,11 +101,6 @@ def publish_to(
     version_header: str = "content-version",
     runner: Runner | None = None,
 ) -> Callable[[Fn], Fn]:
-    """Publish one handler result to multiple topics with per-topic targets.
-
-    The handler returns a model (or mapping) unchanged. The result is dumped
-    once, then converged separately for each route before publishing.
-    """
 
     active_runner = runner or manager.runner()
 

@@ -1,5 +1,3 @@
-"""Manager runtime facade."""
-
 from __future__ import annotations
 
 from functools import singledispatchmethod
@@ -63,7 +61,6 @@ class RuntimeMixin(Generic[VersionValue]):
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
     ) -> Runner[VersionValue]:
-        """Build a runtime runner for this manager."""
         return self.engine.runner(
             backend=backend or runtime or ThreadedBackend(max_workers=0),
             middleware=middleware,
@@ -85,7 +82,6 @@ class RuntimeMixin(Generic[VersionValue]):
     def info(
         self: Manager[VersionValue],
     ) -> dict[str, str | int | dict[str, str | int]]:
-        """Return manager metadata."""
         engine = self.engine
         return {
             "adapter": type(engine.adapter).__name__,
@@ -102,10 +98,6 @@ class RuntimeMixin(Generic[VersionValue]):
         kind: ModelKind,
         version: str,
     ) -> None:
-        """Validate *data* against ``kind``@``version``.
-
-        Raises :class:`ValidationError` when the payload is invalid.
-        """
         versionable = self.get(kind, version, engine=self.engine)
         self.engine.adapter.validate(data, versionable.model)
 
@@ -117,7 +109,6 @@ class RuntimeMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> Diffable[VersionValue]:
-        """Build a diff between two model classes or two versions of a kind."""
         raise TypeError(f"Unsupported diff key: {key!r}")
 
     @diff.register(ModelPair)

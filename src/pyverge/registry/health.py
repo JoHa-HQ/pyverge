@@ -1,5 +1,3 @@
-"""Catalog health diagnostics for CI and doctor commands."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,11 +19,9 @@ class HealthReport:
 
     @property
     def status(self) -> Literal["ok", "error"]:
-        """Overall status."""
         return "ok" if not self.issues else "error"
 
     def to_dict(self, *, manager: str | None = None) -> dict[str, object]:
-        """Serialize for CLI/JSON consumers."""
         report: dict[str, object] = {
             "status": self.status,
             "kinds": self.kinds,
@@ -41,7 +37,6 @@ class CatalogHealth:
     """Validate missing references and gaps in the migration path."""
 
     def check(self, catalog: GraphCatalog) -> HealthReport:
-        """Return every catalog health issue."""
         issues: list[str] = []
         for node in catalog.versions:
             absent = catalog.missing_references(node)

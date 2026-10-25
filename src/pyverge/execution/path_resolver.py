@@ -1,5 +1,3 @@
-"""Resolve extracted entries into a path plan."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -24,7 +22,6 @@ class PathResolver(Generic[VersionValue]):
         entry: ExtractedEntry[VersionValue],
         target: VersionNode[VersionValue],
     ) -> PathPlanEntry[VersionValue]:
-        """Resolve one entry to *target*, requiring a concrete target model."""
         target_node = target
         if target_node.model is None:
             raise CatalogError(
@@ -60,7 +57,6 @@ class PathResolver(Generic[VersionValue]):
         container: ModelHandle | None,
         target_fields: frozenset[str],
     ) -> PathPlan[VersionValue]:
-        """Resolve every entry and collect the payload-level plan."""
         resolved: list[PathPlanEntry[VersionValue]] = []
         for entry in entries:
             target = target_resolver(entry.node)

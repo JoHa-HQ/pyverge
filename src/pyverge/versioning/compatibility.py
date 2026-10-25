@@ -1,5 +1,3 @@
-"""Backward-compatibility analysis for a schema diff."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -31,7 +29,6 @@ class CompatibilityReport:
         *,
         identity_fields: frozenset[str],
     ) -> Self:
-        """Build a report from a diff, excluding identity fields."""
         added = tuple(
             field for field in diff.added_fields if field not in identity_fields
         )

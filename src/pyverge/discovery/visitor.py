@@ -1,5 +1,3 @@
-"""Build-time descriptor collection."""
-
 from __future__ import annotations
 
 from pyverge.discovery.descriptors import SourceDescriptor, descriptor_commands

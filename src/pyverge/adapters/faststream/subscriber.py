@@ -1,12 +1,3 @@
-"""The endpoint decorator: bind a convergence policy to a subscriber.
-
-One decorator at the endpoint, pyverge config as keyword arguments. It resolves
-the handler's typed parameter (the kind) to the *target* version's model — a
-reconstructed class when the target is not the anchor — binds the parameter to
-it, and registers the subscriber with a convergence ``decoder``. The handler thus
-validates the converged payload against the version actually served.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -28,7 +19,6 @@ Fn = TypeVar("Fn", bound=Callable[..., Any])
 
 
 def _model_union(models: list[Any]) -> Any:
-    """Return one model or the union of all candidate models."""
     unique = list(dict.fromkeys(models))
     if not unique:
         return None
@@ -69,12 +59,6 @@ def subscriber(  # noqa: PLR0913
     runner: Runner | None = None,
     **options: Any,
 ) -> Callable[[Fn], Fn]:
-    """Register one converging subscriber per topic.
-
-    ``targets`` is either one policy for every topic or a :class:`TopicTargets`
-    mapping. ``header`` enables per-message negotiation, overriding both.
-    Extra *options* pass through to ``broker.subscriber``.
-    """
     if "decoder" in options:
         raise TypeError("subscriber() owns the decoder; drop the decoder option")
 

@@ -1,9 +1,3 @@
-"""Diff construction from a migration or two schemas.
-
-Materialization is delegated to `DiffMaterializer` backends; this module only
-builds the diff.
-"""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Generic
@@ -38,8 +32,6 @@ class Reflection(DiffProvider[VersionValue], Generic[VersionValue]):
         *,
         migration: JsonPatch | MigrationFunc | None = None,
     ) -> Diff[VersionValue]:
-        """Construct the diff — from a migration (origin ``migration``) or two
-        concrete schemas (origin ``schema``)."""
         if migration is not None:
             return self._discovery.discover(migration, source, target)
         return self._adapter.diff(source, target)

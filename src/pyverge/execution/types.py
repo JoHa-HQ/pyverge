@@ -1,5 +1,3 @@
-"""Execution protocols and type aliases."""
-
 from __future__ import annotations
 
 from collections.abc import Awaitable, Iterator

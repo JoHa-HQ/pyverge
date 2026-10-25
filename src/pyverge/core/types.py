@@ -1,10 +1,3 @@
-"""Core type surface: keys, aliases, and provider-neutral protocols.
-
-Behavior classes (``VersionNode``/``VersionEdge``/``EdgeKey``) live in
-:mod:`pyverge.versioning`; this module owns only passive type surface so
-the core can be imported by every layer without pulling behavior.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

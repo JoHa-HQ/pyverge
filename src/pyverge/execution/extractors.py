@@ -45,7 +45,6 @@ class CompositeExtractor(Generic[VersionValue]):
 
     @property
     def registry(self) -> Registry[VersionValue]:
-        """The registry this walker discovers against."""
         return self._registry
 
     def extract(
@@ -92,7 +91,6 @@ class CompositeExtractor(Generic[VersionValue]):
         kp: str,
         vp: str,
     ) -> VersionNode[VersionValue] | None:
-        """Return the registered node for a versioned dict, or ``None``."""
         if not isinstance(value, dict):
             return None
         kind = value.get(kp)

@@ -1,5 +1,3 @@
-"""Registration commands emitted by discovery and manager decorators."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

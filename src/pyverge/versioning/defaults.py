@@ -1,9 +1,3 @@
-"""Default canonicalization profiles for composition roots.
-
-These are factories, not shared module-level instances. Inject the resulting
-objects into services that need them.
-"""
-
 from __future__ import annotations
 
 from .canonical import (
@@ -24,7 +18,6 @@ from .canonical import (
 
 
 def default_encoders() -> tuple[ValueEncoder, ...]:
-    """Default encoder chain for ordinary JSON-compatible values."""
     return (
         ScalarEncoder(),
         FloatEncoder(),
@@ -39,12 +32,10 @@ def default_encoders() -> tuple[ValueEncoder, ...]:
 
 
 def default_canonicalizer() -> Canonicalizer:
-    """Build a canonicalizer with the default encoder chain."""
     return Canonicalizer(default_encoders())
 
 
 def default_content_hasher() -> ContentHasher:
-    """Build a SHA-256 content hasher with the default canonicalizer."""
     return ContentHasher(default_canonicalizer(), Sha256())
 
 

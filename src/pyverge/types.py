@@ -1,13 +1,3 @@
-"""Backward-compatibility re-export shim.
-
-The monolithic core type module was split by concern.  Type surface now lives
-in per-package ``types.py`` modules; this shim re-exports the symbols from
-their new homes so internal importers keep working for one release.  Provider
-model TypeVars and ``ModelBase`` are **not** re-exported: they were removed
-from the public core surface (provider type parameters now live in
-:mod:`pyverge.schemas.types`).
-"""
-
 from __future__ import annotations
 
 from pyverge.core.types import (

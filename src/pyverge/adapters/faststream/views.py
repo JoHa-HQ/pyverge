@@ -1,9 +1,3 @@
-"""Concrete FastStream wrappers.
-
-FastStream object access stays here. Reflection and decorators consume the
-ports from :mod:`.ports`, not FastStream internals.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -21,7 +15,6 @@ def _original_call(handler: Any) -> Any:
 
 
 def _first_model(annotation: Any) -> ModelHandle | None:
-    """Return the first concrete model in *annotation*, unwrapping unions."""
     if isinstance(annotation, type):
         return annotation
     if typing.get_origin(annotation) in (typing.Union, types.UnionType):

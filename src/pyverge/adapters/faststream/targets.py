@@ -1,9 +1,3 @@
-"""FastStream target selectors: headers, topics, and defaults.
-
-Transport logic lives with the FastStream adapter. A selector returns ``None``
-when it does not apply; ``FirstMatch`` composes selectors in precedence order.
-"""
-
 from __future__ import annotations
 
 from pyverge.manager.types import TargetPolicy
@@ -66,7 +60,6 @@ class FirstMatch:
         default_target: TargetPolicy,
         header: str | None = None,
     ) -> FirstMatch:
-        """Build the standard chain: header -> topic -> latest."""
         head = (HeaderTarget(header),) if header is not None else ()
         return cls(
             *head,

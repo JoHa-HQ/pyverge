@@ -1,5 +1,3 @@
-"""Adapter for standard-library dataclass models."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -221,7 +219,6 @@ class DataclassModelAdapter(AbstractModelAdapter):
         return self.dump(self.instantiate(container, data))
 
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
-        """Describe dataclass fields for provider-neutral diffing."""
         hints = self._hints(model_cls)
         return {
             field.name: FieldDescriptor(

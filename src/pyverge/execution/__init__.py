@@ -1,5 +1,3 @@
-"""Execution package (runtime, entry extraction, backends)."""
-
 from .backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from .coordinator import ExecutionCoordinator
 from .direction import (

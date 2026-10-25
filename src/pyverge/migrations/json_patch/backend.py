@@ -1,5 +1,3 @@
-"""JSON Patch migration materializer."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -14,7 +12,6 @@ class JsonPatchMigrationBackend:
     """Materialize a diff as an RFC 6902 JSON Patch migration."""
 
     def materialize(self, diff: Diffable) -> JsonPatchMigration:
-        """Build a declarative migration from the diff."""
         from pyverge.discovery.reflection.render import JsonPatchRenderer  # noqa: PLC0415
 
         return JsonPatchMigration(

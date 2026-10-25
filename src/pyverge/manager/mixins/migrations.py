@@ -243,12 +243,6 @@ class MigrationStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> None:
-        """Attach *hooks* to every registered migration edge.
-
-        The bulk form of :meth:`add_hook`, for observers that watch the whole
-        graph (e.g. tracing every step). Callable from the class or an instance;
-        pass *engine* to target a specific engine explicitly.
-        """
         engine = engine or cls._default_engine
         registry = engine.registry
         for kind in registry.kinds:

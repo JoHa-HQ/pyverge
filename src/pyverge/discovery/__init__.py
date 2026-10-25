@@ -1,5 +1,3 @@
-"""Build discovery: descriptors, commands, and source traversal."""
-
 from .commands import (
     MigrationSpec,
     ModelRegistrationMode,

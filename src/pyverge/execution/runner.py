@@ -1,5 +1,3 @@
-"""Runtime runner: plan and execute payload migrations."""
-
 from __future__ import annotations
 
 import copy
@@ -39,7 +37,6 @@ class Runner(Generic[VersionValue]):
         container: type[Any] | None,
         max_depth: int,
     ) -> ExecutionPlan[VersionValue]:
-        """Build a runtime plan through the coordinator."""
         resolver = self.target_compiler.compile(target)
         plan = self.coordinator.plan(
             payload,
@@ -64,7 +61,6 @@ class Runner(Generic[VersionValue]):
         context: MigrationContext | None,
         run_id: str | None = None,
     ) -> RunResult:
-        """Plan and execute through the configured backend."""
         plan = self.plan(
             payload,
             target,
@@ -80,7 +76,6 @@ class Runner(Generic[VersionValue]):
         context: MigrationContext | None,
         run_id: str | None = None,
     ) -> RunResult:
-        """Execute the plan through backend and middleware."""
         data = copy.deepcopy(plan.payload)
         active_run_id = run_id or self.environment.id_factory.new("run_")
         run = RunContext(

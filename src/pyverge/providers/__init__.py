@@ -1,9 +1,3 @@
-"""Deprecated compatibility surface.
-
-Use :mod:`pyverge.schemas` for model/schema providers and
-:mod:`pyverge.migrations` for migration backends.
-"""
-
 from pyverge.migrations import (
     CoerceOperation,
     DefaultMigrationIdentityResolver,

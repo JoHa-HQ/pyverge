@@ -1,5 +1,3 @@
-"""Migrate a payload file."""
-
 from __future__ import annotations
 
 import asyncio
@@ -40,7 +38,6 @@ async def migrate(
         bool, typer.Option("--check", help="Fail if migration does not converge")
     ] = False,
 ) -> None:
-    """Migrate a payload and optionally write the result."""
     if output is not None and in_place:
         typer.secho(
             "--output and --in-place are mutually exclusive", fg=typer.colors.RED

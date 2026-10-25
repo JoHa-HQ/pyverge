@@ -1,5 +1,3 @@
-"""OpenTelemetry control middleware."""
-
 from __future__ import annotations
 
 from typing import Any

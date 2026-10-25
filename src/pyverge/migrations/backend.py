@@ -1,5 +1,3 @@
-"""Migration-side materialization backend."""
-
 from __future__ import annotations
 
 from typing import Generic, TypeVar
@@ -16,7 +14,6 @@ class MigrationMaterializer(Generic[T]):
         self._backend = backend
 
     def materialize(self, diff: Diffable) -> T:
-        """Delegate artifact construction to the configured backend."""
         return self._backend.materialize(diff)
 
 

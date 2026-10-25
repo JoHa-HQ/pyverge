@@ -41,11 +41,6 @@ class LookupMixin(Generic[VersionValue]):
         cls: type[Manager[VersionValue]],
         key: Any,
     ) -> VersionKey[VersionValue]:
-        """Normalize a model key to a search key.
-
-        Fallback: any comparable exposing ``kind`` and ``version`` is reduced
-        to its ``(kind, version)`` key.
-        """
         return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
 
     @_resolve_model_key.register(tuple)
@@ -71,7 +66,6 @@ class LookupMixin(Generic[VersionValue]):
         cls: type[Manager[VersionValue]],
         key: type,
     ) -> VersionKey[VersionValue]:
-        """Resolve a bare model class through the adapter and a neutral lookup."""
         engine = cls._default_engine
         if not engine.adapter.identify(key):
             raise ModelNotFoundError(engine.registry.name, key)
@@ -87,7 +81,6 @@ class LookupMixin(Generic[VersionValue]):
         cls: type[Manager[VersionValue]],
         index: Any,
     ) -> Any:
-        """Map a fluent lookup key to a typed registry key."""
         if isinstance(index, (Comparable, Transitional, EdgeKey)):
             return index
         raise CatalogError(
@@ -114,7 +107,6 @@ class LookupMixin(Generic[VersionValue]):
         return cls._resolve_model_key(index)
 
     def __contains__(self: Manager[VersionValue], index: Any) -> bool:
-        """Fluent membership: version key, edge pair, model class, or slice."""
         engine = self.engine
         if isinstance(index, slice):
             try:
@@ -145,7 +137,6 @@ class LookupMixin(Generic[VersionValue]):
     def __getitem__(
         self: Manager[VersionValue], index: Any
     ) -> VersionNode[VersionValue] | Migratable | list[Migratable]:
-        """Fluent selection: a version, an edge, or a migration path (slice)."""
         engine = self.engine
         if isinstance(index, slice):
             from_v = engine.get_model(type(self)._resolve_model_key(index.start))
@@ -162,7 +153,6 @@ class LookupMixin(Generic[VersionValue]):
         from_version: Any,
         to_version: Any,
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
-        """Return the migration chain between two fluent keys."""
         engine = self.engine
         return engine.find_migration_path(
             engine.get_model(type(self)._resolve_model_key(from_version)),

@@ -1,5 +1,3 @@
-"""Build-time reflection: diff construction and artifact materialization."""
-
 from __future__ import annotations
 
 from typing import Any, Generic

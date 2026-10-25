@@ -1,5 +1,3 @@
-"""JGF import service: parse a document and register through registry write ports."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -25,7 +23,6 @@ class JgfImporter:
         migrations: MigrationWrite | None = None,
         edge_resolver: EdgeResolver | None = None,
     ) -> JgfGraph:
-        """Register nodes (and edges when a resolver is supplied)."""
         graph = JgfGraph.from_dict(document)
         for node in graph.nodes:
             models.store_model(self._node_resolver.resolve(node))

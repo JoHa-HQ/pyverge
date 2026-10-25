@@ -1,5 +1,3 @@
-"""Export domain: manifest assembly and manifest diff."""
-
 from .manifest import (
     ManifestDiff,
     ManifestExporter,

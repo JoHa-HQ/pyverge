@@ -1,5 +1,3 @@
-"""Execution control over the frozen graph."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,7 +27,6 @@ class ExecutionCoordinator(Generic[VersionValue]):
         container: type[Any] | None,
         max_depth: int,
     ) -> list[ExtractedEntry[VersionValue]]:
-        """Extract versioned entries from a payload."""
         return [
             ExtractedEntry[VersionValue](path, node)
             for path, _depth, node in self.extractor.extract(
@@ -47,7 +44,6 @@ class ExecutionCoordinator(Generic[VersionValue]):
         container: type[Any] | None,
         max_depth: int,
     ) -> ExecutionPlan[VersionValue]:
-        """Build a runtime plan from a payload and frozen graph."""
         entries = self.extract(
             payload,
             container=container,

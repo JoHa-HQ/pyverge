@@ -1,5 +1,3 @@
-"""Process backend for isolated sync migration work."""
-
 from __future__ import annotations
 
 import copy

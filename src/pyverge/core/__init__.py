@@ -1,8 +1,3 @@
-"""Core shared kernel: primitives, context contract, clock, ids, errors.
-
-Version graph types and protocols live in :mod:`pyverge.versioning`.
-"""
-
 from .clock import Clock, SystemClock
 from .context import EMPTY_CONTEXT, MigrationContext
 from .errors import (

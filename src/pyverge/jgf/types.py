@@ -1,5 +1,3 @@
-"""Export-domain protocols for JGF import resolution."""
-
 from __future__ import annotations
 
 from typing import Protocol

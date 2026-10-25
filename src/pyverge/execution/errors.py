@@ -1,5 +1,3 @@
-"""Execution runtime errors."""
-
 from __future__ import annotations
 
 from typing import Self
@@ -11,7 +9,6 @@ class ExecutionError(PyvergeError):
     """Raised when runtime execution fails."""
 
     def __init__(self: Self, msg: str) -> None:
-        """Initializes ExecutionError."""
         self.msg = msg
         super().__init__(msg)
 

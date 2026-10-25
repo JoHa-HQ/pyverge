@@ -1,9 +1,3 @@
-"""Minimal JSON Graph Format projection for version-domain values.
-
-This module owns document assembly only. Identity/content addressing stays on
-the primitives/traits; canonical hashing stays in :mod:`pyverge.core.canonical`.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
@@ -24,7 +18,6 @@ class JgfNode:
 
     @classmethod
     def from_dict(cls, node_id: str, value: Mapping[str, Any]) -> JgfNode:
-        """Parse a JGF node object."""
         return cls(
             id=node_id,
             label=value.get("label", node_id),
@@ -33,7 +26,6 @@ class JgfNode:
 
     @classmethod
     def from_version(cls, node: VersionNode[Any], hasher: ContentHasher) -> JgfNode:
-        """Project a version node into a JGF node."""
         return cls(
             id=node.jgf_id,
             label=node.jgf_id,
@@ -50,7 +42,6 @@ class JgfNode:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the JGF node object (without the injected id)."""
         return {
             "label": self.label,
             "metadata": dict(self.metadata),
@@ -69,7 +60,6 @@ class JgfEdge:
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> JgfEdge:
-        """Parse a JGF edge object."""
         return cls(
             id=value["id"],
             source=value["source"],
@@ -80,7 +70,6 @@ class JgfEdge:
 
     @classmethod
     def from_version_edge(cls, edge: VersionEdge[Any]) -> JgfEdge:
-        """Project a migration edge into a JGF edge."""
         return cls(
             id=edge.jgf_id,
             source=edge.source.jgf_id,
@@ -95,7 +84,6 @@ class JgfEdge:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the JGF edge object."""
         return {
             "id": self.id,
             "source": self.source,
@@ -117,7 +105,6 @@ class JgfGraph:
 
     @classmethod
     def from_dict(cls, document: Mapping[str, Any]) -> JgfGraph:
-        """Parse a JGF document envelope."""
         graph = document["graph"]
         nodes = [
             JgfNode.from_dict(node_id, node)
@@ -143,7 +130,6 @@ class JgfGraph:
         directed: bool,
         metadata: Mapping[str, Any] | None = None,
     ) -> JgfGraph:
-        """Build a graph from version nodes and migration edges."""
         return cls(
             id=id,
             directed=directed,
@@ -153,7 +139,6 @@ class JgfGraph:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the JGF document envelope expected by implementations."""
         graph: dict[str, Any] = {
             "id": self.id,
             "directed": self.directed,

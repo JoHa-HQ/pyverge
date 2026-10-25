@@ -1,5 +1,3 @@
-"""Whole-run audit middleware."""
-
 from __future__ import annotations
 
 import time

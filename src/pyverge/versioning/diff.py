@@ -1,5 +1,3 @@
-"""Schema-evolution diff value object and canonical fingerprint projection."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -29,7 +27,6 @@ class FieldStatus(StrEnum):
     UNCHANGED = "unchanged"
 
     def inverted(self) -> FieldStatus:
-        """Return the opposite direction for added/removed; otherwise self."""
         return {
             FieldStatus.ADDED: FieldStatus.REMOVED,
             FieldStatus.REMOVED: FieldStatus.ADDED,
@@ -58,15 +55,12 @@ class Diff(Generic[VersionValue]):
     origin: DiffOrigin
 
     def render(self, renderer: DiffRenderer[Any]) -> Any:
-        """Render this diff through an injected renderer strategy."""
         return renderer.render(self)
 
     def materialize(self, materializer: DiffMaterializer[Any]) -> Any:
-        """Materialize a migration artifact through an injected backend."""
         return materializer.materialize(self)
 
     def fingerprint_payload(self) -> Mapping[str, Any]:
-        """Canonical diff payload used by content addressing."""
         return {
             "fields": {
                 name: {
@@ -80,7 +74,6 @@ class Diff(Generic[VersionValue]):
 
     @property
     def field_changes(self) -> ChangeSet[str]:
-        """Added/removed/modified field identities."""
         return ChangeSet(
             added=frozenset(self.added_fields),
             removed=frozenset(self.removed_fields),
@@ -203,7 +196,6 @@ class Diff(Generic[VersionValue]):
         return rc is not None and not rc["from"] and rc["to"]
 
     def inverted(self) -> Diff[VersionValue]:
-        """Return the inverse diff: added/removed fields swap."""
         swapped = {
             name: FieldChange(
                 status=change.status.inverted(),

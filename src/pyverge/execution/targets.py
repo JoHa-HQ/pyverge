@@ -1,5 +1,3 @@
-"""Planning target strategies."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -33,7 +31,6 @@ TargetPolicy = (
 def skip_target_resolver(
     registry: GraphCatalog[VersionValue],
 ) -> TargetResolver:
-    """A resolver that always skips (returns ``None``)."""
 
     def resolve(
         current: VersionNode[VersionValue],
@@ -46,7 +43,6 @@ def skip_target_resolver(
 def latest_target_resolver(
     registry: GraphCatalog[VersionValue],
 ) -> TargetResolver:
-    """A resolver that converges to the latest registered version per kind."""
 
     def resolve(
         current: VersionNode[VersionValue],
@@ -59,7 +55,6 @@ def latest_target_resolver(
 def earliest_target_resolver(
     registry: GraphCatalog[VersionValue],
 ) -> TargetResolver:
-    """A resolver that converges to the earliest registered version per kind."""
 
     def resolve(
         current: VersionNode[VersionValue],
@@ -73,10 +68,6 @@ def fixed_target_resolver(
     registry: GraphCatalog[VersionValue],
     target: VersionNode[VersionValue],
 ) -> TargetResolver:
-    """A resolver that always returns *target* for its kind.
-
-    *target* is validated against *registry* immediately.
-    """
     if not registry.has_model(target):
         raise CatalogError(
             registry.name,
@@ -100,10 +91,6 @@ def fixed_target_resolver(
 def multi_target_resolver(
     resolvers: dict[ModelKind | Literal["*"], TargetResolver],
 ) -> TargetResolver:
-    """Compose per-kind resolvers into one dispatcher.
-
-    The special key ``"*"`` is the fallback for kinds not explicitly listed.
-    """
     fallback = resolvers.get("*")
     by_kind: dict[ModelKind, TargetResolver] = {
         k: v for k, v in resolvers.items() if k != "*"

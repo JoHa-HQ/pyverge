@@ -1,5 +1,3 @@
-"""Registry errors: storage, lookup, and migration-path failures."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -16,7 +14,6 @@ class GraphLockedError(CatalogError):
     """Raised when a build operation targets a locked catalog."""
 
     def __init__(self: Self, catalog_name: str, operation: str) -> None:
-        """Initializes GraphLockedError."""
         self.operation = operation
         super().__init__(
             catalog_name,
@@ -30,7 +27,6 @@ class ModelNotFoundError(CatalogError):
     def __init__(
         self: Self, catalog_name: str, key: ModelVersionKey | ModelHandle
     ) -> None:
-        """Initializes ModelNotFoundError."""
         self.key = key
         super().__init__(catalog_name, f"Model not found: {key}")
 
@@ -39,7 +35,6 @@ class ModelAlreadyRegisteredError(CatalogError):
     """Raised when a model is already registered."""
 
     def __init__(self: Self, catalog_name: str, version: ModelVersionKey) -> None:
-        """Initializes ModelAlreadyRegisteredError."""
         self.version = version
         super().__init__(
             catalog_name, f"Model at version '{version}' is already registered"
@@ -58,7 +53,6 @@ class ModelConflictError(ModelAlreadyRegisteredError):
         *,
         subject: str | None = None,
     ) -> None:
-        """Initializes ModelConflictError."""
         super().__init__(catalog_name, version)
         self.registered = registered
         self.incoming = incoming
@@ -88,7 +82,6 @@ class MissingReferenceError(CatalogError):
         *,
         subject: str | None = None,
     ) -> None:
-        """Initializes MissingReferenceError."""
         self.version = version
         self.absent = absent
         self.subject = subject or f"{version[0]}@{version[1]}"
@@ -106,7 +99,6 @@ class MigrationNotFoundError(CatalogError):
     """Raised when a migration cannot be found."""
 
     def __init__(self: Self, catalog_name: str, key: MigrationKey) -> None:
-        """Initializes MigrationNotFoundError."""
         self.key = key
         super().__init__(catalog_name, f"Migration not found: {key[0]} → {key[1]}")
 
@@ -115,7 +107,6 @@ class MigrationAlreadyRegisteredError(CatalogError):
     """Raised when a migration is already registered."""
 
     def __init__(self: Self, catalog_name: str, key: MigrationKey) -> None:
-        """Initializes MigrationAlreadyRegisteredError."""
         self.key = key
         super().__init__(
             catalog_name, f"Migration already registered: {key[0]} → {key[1]}"
@@ -133,7 +124,6 @@ class MigrationConflictError(MigrationAlreadyRegisteredError):
         registered_hash: str,
         incoming_hash: str,
     ) -> None:
-        """Initializes MigrationConflictError."""
         self.registered_hash = registered_hash
         self.incoming_hash = incoming_hash
         super().__init__(catalog_name, key)
@@ -165,7 +155,6 @@ class MigrationPathError(PyvergeError):
         target: Any | None = None,
         reason: str | None = None,
     ) -> None:
-        """Accept ``(kind, source, target, reason)`` or a legacy pair form."""
         source_kind, target_kind = None, None
         if (
             isinstance(kind, tuple)

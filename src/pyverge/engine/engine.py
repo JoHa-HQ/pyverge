@@ -1,5 +1,3 @@
-"""Convergence build engine: thin facade over registration and reflection."""
-
 from __future__ import annotations
 
 from typing import Any, Generic, Literal, Self, cast, overload
@@ -76,7 +74,7 @@ class Engine(Generic[VersionValue]):
         self.reflector = reflector
         self.explorer = GraphExplorer(registry)
 
-    def runner(  # noqa: PLR0913
+    def runner(
         self,
         *,
         backend: BackendPort[VersionValue],
@@ -89,7 +87,6 @@ class Engine(Generic[VersionValue]):
         on_depth_violation: DepthViolationStrategy,
         validation_mode: Literal["strict", "lax", "none"],
     ) -> Runner[VersionValue]:
-        """Build a runtime facade over this engine's dependencies."""
         coordinator = ExecutionCoordinator[VersionValue](
             extractor=CompositeExtractor[VersionValue](
                 self.registry,
@@ -119,7 +116,6 @@ class Engine(Generic[VersionValue]):
         )
 
     def copy(self) -> Engine[VersionValue]:
-        """Return a build engine over a mutable copy of this registry."""
         return Engine(
             self.registry.copy(),
             self.adapter,
@@ -128,19 +124,15 @@ class Engine(Generic[VersionValue]):
         )
 
     def copy_registry(self) -> Registry[VersionValue]:
-        """Return a mutable copy of the build registry."""
         return self.registry.copy()
 
     def snapshot(self) -> GraphCatalog:
-        """Return a frozen snapshot of the current registry graph."""
         return self.explorer.snapshot()
 
     def lock(self) -> GraphCatalog:
-        """Freeze this build registry and return the runtime snapshot."""
         return cast("GraphCatalog", self.registry.lock())
 
     def explore(self) -> GraphExplorer[VersionValue]:
-        """Return build-mode graph queries without constructing a runtime."""
         return self.explorer
 
     def __contains__(self, index: Any) -> bool:
@@ -164,8 +156,7 @@ class Engine(Generic[VersionValue]):
     ) -> Versionable[VersionValue] | Migratable[VersionValue]:
         return self.registry[index]
 
-    def register(self: Self, command: RegistrationCommand) -> Any:  # noqa: C901
-        """Execute one registration command."""
+    def register(self: Self, command: RegistrationCommand) -> Any:
         if isinstance(command, RegisterModel):
             payload = command.payload
             version = (

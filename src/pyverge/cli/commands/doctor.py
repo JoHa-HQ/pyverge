@@ -1,5 +1,3 @@
-"""Registry health gate for CI."""
-
 from __future__ import annotations
 
 from typing import Annotated, cast
@@ -19,7 +17,6 @@ def doctor(
         str, typer.Option("--format", help="Output format (text/json)")
     ] = "text",
 ) -> None:
-    """Validate registry health for CI."""
     try:
         mgr = resolve_manager(manager)
         health = CatalogHealth().check(cast("GraphCatalog", mgr.registry))

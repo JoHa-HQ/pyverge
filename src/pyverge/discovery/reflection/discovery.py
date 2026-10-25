@@ -198,7 +198,6 @@ class CompositeDiffDiscovery(Generic[VersionValue]):
 
 
 def _subscript_key(slice_: ast.expr) -> str | None:
-    """Return the string key of a subscript slice, if it is a constant."""
     if isinstance(slice_, ast.Constant) and isinstance(slice_.value, str):
         return slice_.value
     return None

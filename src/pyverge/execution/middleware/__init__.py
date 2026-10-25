@@ -1,5 +1,3 @@
-"""Execution middleware."""
-
 from .audit import AuditMiddleware
 from .idempotency import IdempotencyMiddleware
 from .openlineage import OpenLineageMiddleware

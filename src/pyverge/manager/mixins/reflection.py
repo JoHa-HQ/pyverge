@@ -1,5 +1,3 @@
-"""Build-time source reflection."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Generic
@@ -75,7 +73,6 @@ class ReflectionMixin(Generic[VersionValue]):
         logger: Any = None,
         clock: Clock | None = None,
     ) -> ReflectionReport:
-        """Reflect a synchronous source into the build registry."""
         registration_context, collector = cls._collector(
             source,
             context=context,
@@ -106,7 +103,6 @@ class ReflectionMixin(Generic[VersionValue]):
         logger: Any = None,
         clock: Clock | None = None,
     ) -> ReflectionReport:
-        """Reflect an asynchronous source into the build registry."""
         registration_context, collector = cls._collector(
             source,
             context=context,

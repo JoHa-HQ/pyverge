@@ -1,5 +1,3 @@
-"""Planning policy application."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -35,7 +33,6 @@ class PolicyEngine(Generic[VersionValue]):
     def apply(
         self, plan: PathPlan[VersionValue], *, graph: GraphCatalog[VersionValue]
     ) -> PathPlan[VersionValue]:
-        """Return *plan* with policy-rejected entries removed or raise."""
         kept: list[PathPlanEntry[VersionValue]] = []
         for entry in plan.entries:
             if not self.direction.allows(entry.source, entry.target):

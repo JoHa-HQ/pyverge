@@ -1,5 +1,3 @@
-"""Containment path value object and operations."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -20,7 +18,6 @@ class Path(tuple[str | int, ...]):
         return super().__new__(cls, steps)
 
     def get(self, data: ModelData) -> Any:
-        """Return the value at this path inside *data*."""
         if not self:
             return data
         current: Any = data
@@ -29,7 +26,6 @@ class Path(tuple[str | int, ...]):
         return current
 
     def set(self, data: ModelData, value: Any) -> None:
-        """Write *value* at this path, mutating *data* in place."""
         if not self:
             if value is data:
                 return
@@ -42,7 +38,6 @@ class Path(tuple[str | int, ...]):
         current[self[-1]] = value
 
     def is_descendant_of(self, parent: tuple[str | int, ...]) -> bool:
-        """Return whether this path is nested under *parent*."""
         return len(self) > len(parent) and self[: len(parent)] == parent
 
 

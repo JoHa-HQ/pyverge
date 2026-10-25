@@ -38,6 +38,5 @@ class EngineLifecycleMixin(Generic[VersionValue]):
         self,
         engine: Engine[VersionValue] | None = None,
     ) -> None:
-        """Apply an explicit engine override; ``__new__`` resolves the default."""
         if engine is not None:
             self.engine = engine

@@ -1,5 +1,3 @@
-"""Registry generic subdomain: types, in-memory store, explorer, and health."""
-
 from .errors import (
     CatalogError,
     GraphLockedError,

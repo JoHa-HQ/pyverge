@@ -1,5 +1,3 @@
-"""Build-discovery source and visitor contracts."""
-
 from __future__ import annotations
 
 from collections.abc import Iterator

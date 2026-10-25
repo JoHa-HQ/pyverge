@@ -158,7 +158,6 @@ class JsonPatch(jsonpatch.JsonPatch):
 
     @property
     def migration_identity(self) -> MigrationIdentity:
-        """Stable identity of the patch operations."""
         return MigrationIdentity(
             "jsonpatch",
             default_canonicalizer().dumps(self.patch),
@@ -169,5 +168,4 @@ class JsonPatch(jsonpatch.JsonPatch):
         data: ModelData,
         context: MigrationContext | None = None,
     ) -> ModelData:
-        """Apply the whole patch to the payload in one pass."""
         return self.apply(data)

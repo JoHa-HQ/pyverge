@@ -1,5 +1,3 @@
-"""Execution hooks."""
-
 from .openlineage import OpenLineageHook
 from .otel import OTELHook
 from .types import MigrationHook

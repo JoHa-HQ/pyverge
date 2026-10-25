@@ -1,5 +1,3 @@
-"""Execution plan construction."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,7 +19,6 @@ class ExecutionPlanner(Generic[VersionValue]):
     def build(
         self, path: PathPlan[VersionValue], payload: dict
     ) -> ExecutionPlan[VersionValue]:
-        """Group entries into dependency levels and attach execution options."""
         return ExecutionPlan(
             path=path,
             payload=payload,

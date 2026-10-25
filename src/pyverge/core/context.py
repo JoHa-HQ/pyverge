@@ -1,16 +1,3 @@
-"""Runtime values shared with migration providers.
-
-A migration may need values that are only known at execution time — tenant
-identifiers, request timestamps, exchange rates. They travel as a
-:class:`MigrationContext`: a read-only **view** over the caller's mapping, not a
-copy. Creating one is O(1), and the same instance is passed to every provider
-in a run.
-
-Because the context is a view, the caller must not mutate the underlying
-mapping while a migration is in flight. Read-only here means the context does
-not expose mutation, not that it snapshots the values.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
@@ -26,18 +13,15 @@ class MigrationContext(Mapping[str, Any]):
     _view: Mapping[str, Any]
 
     def __init__(self, view: MappingProxyType[str, Any] | None = None) -> None:
-        """Wrap an already prepared view; factories build the view first."""
         self._view = view if view is not None else MappingProxyType({})
 
     @classmethod
     def empty(cls) -> Self:
-        """Create an empty context."""
         return cls(MappingProxyType({}))
 
     @singledispatchmethod
     @classmethod
     def create(cls, values: Mapping[str, Any] | None = None) -> Self:
-        """Create a context from *values* without copying them."""
         if isinstance(values, MigrationContext):
             return cast(Self, values)
         return cls(cast(MappingProxyType[str, Any], values))
@@ -54,7 +38,6 @@ class MigrationContext(Mapping[str, Any]):
 
     @property
     def view(self) -> Mapping[str, Any]:
-        """The backing view, for providers that need a plain mapping."""
         return self._view
 
     def __getitem__(self, key: str) -> Any:

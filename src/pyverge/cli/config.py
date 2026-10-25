@@ -12,7 +12,6 @@ class ConfigError(Exception):
 
 
 def resolve_manager(spec: str) -> Manager:
-    """Resolve a manager from a ``module_path:object_path`` spec."""
 
     if ":" not in spec:
         raise ConfigError(f"Manager spec must be 'module:object_path', got '{spec}'")
@@ -47,7 +46,6 @@ def resolve_manager(spec: str) -> Manager:
 
 
 def _import_module(cwd: Path, module_path: str) -> ModuleType:
-    """Import a module, falling back to a local file when not on the path."""
     try:
         return importlib.import_module(module_path)
     except ImportError as e:
@@ -69,7 +67,6 @@ def _import_module(cwd: Path, module_path: str) -> ModuleType:
 
 
 def list_managers_from_module(module_path: str) -> list[str]:
-    """Return the names of ``Manager`` instances/subclasses in *module_path*."""
     module = importlib.import_module(module_path)
     return [
         name

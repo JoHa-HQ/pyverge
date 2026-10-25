@@ -22,26 +22,18 @@ class Pointer(tuple[str | int, ...]):
 
     @classmethod
     def from_pointer(cls, path: str) -> Pointer:
-        """Parse a JSON Pointer into a :class:`Pointer`.
-
-        Escapes (``~0``/``~1``) and array indices are resolved by
-        :mod:`jsonpointer`; numeric reference tokens become ``int`` (list
-        indices), everything else stays ``str`` (dict keys).
-        """
         if not path:
             return cls()
         parts = jsonpointer.JsonPointer(path).parts
         return cls(*(int(tok) if tok.isdigit() else tok for tok in parts))
 
     def get(self, data: ModelData) -> Any:
-        """Return the value at this pointer inside *data*."""
         current: Any = data
         for step in self:
             current = current[step]
         return current
 
     def set(self, data: ModelData, value: Any) -> None:
-        """Write *value* at this pointer, mutating *data* in place."""
         if not self:
             data.clear()
             data.update(value)

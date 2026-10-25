@@ -96,10 +96,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         )
 
     def __contains__(self, index: object) -> bool:
-        """Membership of a version node or migration edge.
-
-        Typed only: raw tuples are fluent sugar owned by the manager.
-        """
         try:
             if isinstance(index, Comparable):
                 return self.has_model(index)
@@ -112,7 +108,6 @@ class InMemoryCatalog(Generic[VersionValue]):
     def __getitem__(
         self, index: object
     ) -> VersionNode[VersionValue] | Migratable[VersionValue]:
-        """Lookup by version node or migration edge (typed only)."""
         if isinstance(index, Comparable):
             return self.get_model(index)
         if isinstance(index, Transitional):
@@ -121,33 +116,27 @@ class InMemoryCatalog(Generic[VersionValue]):
 
     @property
     def versions(self: Self) -> list[VersionNode[VersionValue]]:
-        """Registered versions in ascending order."""
         return self._by_versions
 
     @property
     def name(self: Self) -> str:
-        """Registry name, used in error messages."""
         return self._name
 
     @property
     def kinds(self: Self) -> list[ModelKind]:
-        """All model kinds that have registered migrations."""
         return list(self._migrations.keys())
 
     @property
     def entities(self: Self) -> list[ModelKind]:
-        """All model kinds that have at least one registered version."""
         return sorted(kind for kind, versions in self._by_kinds.items() if versions)
 
     @property
     def latest_version(self) -> VersionNode[VersionValue]:
-        """The most recently registered version overall."""
         if not self._by_versions:
             raise CatalogError(self._name, "No versions registered")
         return self._by_versions[-1]
 
     def is_adjacent(self, key: Transitional[VersionValue]) -> bool:
-        """True if *key* connects two neighbours in the kind's version list."""
         kind_versions = self._by_kinds[key.kind]
         from_idx = bisect.bisect_left(kind_versions, key.source)
         to_idx = bisect.bisect_left(kind_versions, key.target)
@@ -159,13 +148,11 @@ class InMemoryCatalog(Generic[VersionValue]):
         return frozenset(v.model for v in self._by_kinds.get(kind, []))
 
     def migrations(self: Self, kind: ModelKind) -> list[Migratable[VersionValue]]:
-        """Registered migrations for *kind*."""
         return self._migrations.get(kind, [])
 
     def migrations_of(
         self: Self, key: Comparable[VersionValue]
     ) -> frozenset[Migratable[VersionValue]]:
-        """Migration edges referencing *key* as source or target."""
         return frozenset(self._edges_by_version.get(key, ()))
 
     def kind_versions(self: Self, kind: ModelKind) -> list[VersionNode[VersionValue]]:
@@ -181,7 +168,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         *,
         require_registered: bool = True,
     ) -> frozenset[ModelVersionKey]:
-        """The ``(kind, version)`` pairs *node* declares but that are absent."""
         registered = cast(
             "VersionNode[VersionValue]",
             self.get_model(node)
@@ -208,11 +194,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         raise MigrationNotFoundError(self._name, pair)
 
     def has_migration(self: Self, key: Transitional[VersionValue]) -> bool:
-        """Whether a migration edge is registered.
-
-        Accepts any transitional edge (``VersionEdge``/``EdgeKey`` or any
-        object exposing ``kind`` and ``edge``).
-        """
         try:
             self._find_edge(key.kind, key.edge)
             return True
@@ -229,7 +210,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         key: Transitional[VersionValue],
     ) -> Migratable[VersionValue]:
-        """Return the registered migration edge for any transitional *key*."""
         return self._find_edge(key.kind, key.edge)
 
     def has_hooks(self: Self, key: Transitional[VersionValue]) -> bool:
@@ -280,20 +260,17 @@ class InMemoryCatalog(Generic[VersionValue]):
             raise GraphLockedError(self._name, operation)
 
     def lock(self: Self) -> "InMemoryCatalog[VersionValue]":
-        """Freeze this catalog and return an immutable snapshot."""
         self._locked = True
         snapshot = self.copy()
         snapshot._locked = True
         return snapshot
 
     def snapshot(self: Self) -> "InMemoryCatalog[VersionValue]":
-        """Return a locked copy without freezing this catalog."""
         snapshot = self.copy()
         snapshot._locked = True
         return snapshot
 
     def find_edge_by_content_hash(self, value: str) -> EdgeKey[VersionValue] | None:
-        """Return the edge registered for *value* when the index is enabled."""
         if self._content_hash_index is None:
             return None
         return self._content_hash_index.get(value)
@@ -302,12 +279,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         version: VersionNode[VersionValue],
     ) -> VersionNode[VersionValue]:
-        """Register a model at *version*.
-
-        Strict: a duplicate ``(kind, version)`` raises
-        :class:`ModelAlreadyRegisteredError`.  Callers that re-register
-        identical shapes should use :meth:`reconcile_model` instead.
-        """
         self._ensure_mutable("store_model")
         if version in self._by_versions:
             raise ModelAlreadyRegisteredError(
@@ -323,13 +294,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         version: VersionNode[VersionValue],
     ) -> VersionNode[VersionValue]:
-        """Register *version*, reconciling against an existing registration.
-
-        The fallback store: an unregistered version is stored; an identical
-        re-registration (same ``fields`` surface) is a no-op returning the
-        existing node; a differing surface raises :class:`ModelConflictError`.
-        Reconciliation belongs to storage, not the engine.
-        """
         self._ensure_mutable("reconcile_model")
         try:
             existing = self.get_model(version)
@@ -354,7 +318,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         raise ModelNotFoundError(self._name, key.version)
 
     def find_model(self: Self, key: Comparable) -> VersionNode[VersionValue] | None:
-        """Return the node for *key*, or ``None`` when it is not registered."""
         idx = bisect.bisect_left(self._by_versions, key)
         if idx < len(self._by_versions) and (model := self._by_versions[idx]) == key:
             return model
@@ -363,13 +326,11 @@ class InMemoryCatalog(Generic[VersionValue]):
     def get_model_by_handle(
         self: Self, handle: ModelHandle
     ) -> VersionNode[VersionValue]:
-        """Return the registered node for the opaque *handle*."""
         if target := self._by_models.get(handle):
             return target
         raise ModelNotFoundError(self._name, handle)
 
     def remove_model(self: Self, key: Comparable) -> None:
-        """Refuse to remove a version still referenced by a migration edge."""
         self._ensure_mutable("remove_model")
 
         version_idx = bisect.bisect_left(self._by_versions, key)
@@ -395,7 +356,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         del self._by_versions[version_idx]
 
     def remove_model_by_handle(self: Self, handle: ModelHandle) -> None:
-        """Remove the registered versionable for the opaque *handle*."""
         self._ensure_mutable("remove_model_by_handle")
         if handle not in self._by_models:
             raise ModelNotFoundError(self._name, handle)
@@ -410,10 +370,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self._by_kinds.clear()
 
     def delete_kind(self: Self, kind: ModelKind) -> None:  # noqa: C901
-        """Delete every version and migration belonging to *kind*.
-
-        Refuses when a version is referenced by a cross-kind migration.
-        """
         self._ensure_mutable("delete_kind")
         versions = self.kind_versions(kind)
         if not versions:
@@ -443,7 +399,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         key: Migratable[VersionValue],
     ) -> MigrationFunc:
-        """Register a migration function between two versions."""
         self._ensure_mutable("store_migration")
         if any(v not in self._by_versions for v in key.edge):
             raise MigrationNotFoundError(self._name, key.edge)
@@ -493,7 +448,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         key: Transitional[VersionValue],
     ) -> None:
-        """Remove a migration; refuses one with registered hooks."""
         self._ensure_mutable("remove_migration")
         if key in self._hooks:
             raise CatalogError(
@@ -522,7 +476,6 @@ class InMemoryCatalog(Generic[VersionValue]):
                     del self._edges_by_version[endpoint]
 
     def clear_migrations(self: Self) -> None:
-        """Remove all migrations from the registry."""
         self._ensure_mutable("clear_migrations")
         self.clear_hooks()
         self._migrations.clear()
@@ -535,11 +488,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         from_version: Comparable[VersionValue],
         to_version: Comparable[VersionValue],
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
-        """Return a complete migration chain between two versions.
-
-        Both endpoints must be registered versions of the same kind and a
-        registered migration must exist on every adjacent step.
-        """
         if from_version.kind != to_version.kind:
             raise CatalogError(
                 self._name,
@@ -591,10 +539,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         from_version: Comparable[VersionValue],
         to_version: Comparable[VersionValue],
     ) -> None:
-        """Remove every migration on edges between two versions of one kind.
-
-        Refuses to remove a critical (adjacent) edge, or one carrying hooks.
-        """
         self._ensure_mutable("remove_migration_range")
         if from_version.version[0] != to_version.version[0]:
             raise CatalogError(
@@ -635,7 +579,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         key: Transitional[VersionValue],
         hook: Attachable,
     ) -> None:
-        """Register a hook for a migration step."""
         self._ensure_mutable("add_hook")
         self._hooks[key].append(hook)
 
@@ -643,11 +586,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         key: Transitional[VersionValue],
     ) -> list[Attachable]:
-        """
-        Returns an empty list when no hooks are present so graph
-        construction and execution do not need to distinguish "no hooks"
-        from a missing edge.
-        """
         return list(self._hooks.get(key, []))
 
     def remove_hook(

@@ -1,5 +1,3 @@
-"""Shared kernel errors: payload traversal vocabulary and root type."""
-
 from __future__ import annotations
 
 from typing import Self
@@ -13,7 +11,6 @@ class CatalogError(PyvergeError):
     """Raised when a catalog operation fails."""
 
     def __init__(self: Self, catalog_name: str, message: str) -> None:
-        """Initializes CatalogError."""
         self.catalog_name = catalog_name
         super().__init__(message)
 
@@ -30,7 +27,6 @@ class PayloadValidationError(PayloadError):
         path: tuple[str | int, ...],
         message: str,
     ) -> None:
-        """Initializes PayloadValidationError."""
         self.path = path
         super().__init__(f"Payload validation failed at {path}: {message}")
 
@@ -46,7 +42,6 @@ class MaxDepthExceededError(PayloadError):
         version: str,
         max_depth: int,
     ) -> None:
-        """Initializes MaxDepthExceededError."""
         self.path = path
         self.depth = depth
         self.kind = kind

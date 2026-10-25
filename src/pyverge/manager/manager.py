@@ -78,12 +78,10 @@ class Manager(
 
     @property
     def adapter(self) -> ModelAdapter:
-        """Return the instance adapter."""
         return self.engine.adapter
 
     @property
     def registry(self) -> Registry[VersionValue]:
-        """Return the instance registry."""
         return self.engine.registry
 
     @classmethod
@@ -100,18 +98,6 @@ class Manager(
         diff_provider: DiffProvider[VersionValue] | None = None,
         on_missing: str = "raise",
     ) -> type[Manager[VersionValue]]:
-        """Build a configured ``Manager`` subclass.
-
-        Args:
-            adapter: Model adapter used to read version and kind from models.
-            engine: Optional pre-built engine. The caller is responsible for
-                aligning it with the strategy and adapter.
-            walker: Optional preconfigured payload walker.  When a walker
-                instance is given, its ``registry`` becomes the manager's
-                registry.  Defaults to the containerless
-                :class:`~pyverge.execution.CompositeExtractor`; container-guided
-                discovery is enabled by supplying a container at call time.
-        """
         if walker is None:
             registry = Registry[VersionValue](hasher=hasher or default_content_hasher())
         else:

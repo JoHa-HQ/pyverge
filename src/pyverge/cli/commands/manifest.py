@@ -1,5 +1,3 @@
-"""Export the migration graph as a JGF-enveloped manifest."""
-
 from __future__ import annotations
 
 import json
@@ -48,7 +46,6 @@ def manifest(
         typer.Option("--baseline", help="Compare against a manifest snapshot"),
     ] = None,
 ) -> None:
-    """Export the graph as a JGF v2 manifest snapshot."""
     try:
         mgr = resolve_manager(manager)
         exporter = ManifestExporter(

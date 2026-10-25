@@ -1,5 +1,3 @@
-"""JSON Schema provider, materialized through Pydantic."""
-
 from __future__ import annotations
 
 import json
@@ -42,7 +40,6 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
     def to_pydantic(
         self, document: dict[str, Any], *, class_name: str = "Model"
     ) -> ModelHandle:
-        """Materialize a Pydantic model from a schema document, cached by content."""
         key = json.dumps(document, sort_keys=True)
         if key not in self._cache:
             source = generate(

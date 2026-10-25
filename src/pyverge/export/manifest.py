@@ -1,8 +1,3 @@
-"""Manifest export over a catalog.
-
-CLI consumes this service; it does not assemble JGF manifests itself.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -46,7 +41,6 @@ class ManifestExporter:
         manager: str,
         generated_at: datetime | None = None,
     ) -> dict[str, Any]:
-        """Return a JGF envelope with provenance and content hash."""
         document = self.exporter.export_graph(catalog, id=self.spec.graph_id).to_dict()
         graph = document["graph"]
         graph["label"] = self.spec.label
@@ -80,11 +74,9 @@ class ManifestDiff:
 
     @property
     def changed(self) -> bool:
-        """Whether any semantic content differs."""
         return self.nodes.changed or self.edges.changed or self.manifest_version_changed
 
     def summary(self) -> list[str]:
-        """Human-readable change lines."""
         lines = self.nodes.summary("node") + self.edges.summary("edge")
         if self.manifest_version_changed:
             lines.append("manifest version changed")
@@ -96,7 +88,6 @@ class ManifestDiff:
         left: Mapping[str, Any],
         right: Mapping[str, Any],
     ) -> ManifestDiff:
-        """Compare graph content, ignoring generated_at/tool metadata."""
         left_graph = left["graph"]
         right_graph = right["graph"]
         left_nodes = left_graph.get("nodes", {})

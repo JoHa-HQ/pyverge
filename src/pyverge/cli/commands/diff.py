@@ -1,5 +1,3 @@
-"""Diff two schema versions."""
-
 from __future__ import annotations
 
 import json
@@ -25,7 +23,6 @@ def diff(
         str, typer.Option(..., "--format", help="Output format (json)")
     ] = "json",
 ) -> None:
-    """Show differences between schema versions."""
     try:
         mgr = resolve_manager(manager)
         diff_result = mgr.diff(ManagerMigrationKey(schema, from_version, to_version))

@@ -1,5 +1,3 @@
-"""Threaded backend: direct or thread-pool migration execution."""
-
 from __future__ import annotations
 
 import copy

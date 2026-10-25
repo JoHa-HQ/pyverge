@@ -1,5 +1,3 @@
-"""OpenTelemetry migration hook."""
-
 from __future__ import annotations
 
 import time

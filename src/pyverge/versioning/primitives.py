@@ -1,10 +1,3 @@
-"""Version graph value objects.
-
-These objects are the registry's index keys and stored values. They keep
-generic version parameters, total ordering, hashing, inheritance, and
-callability; do not flatten them into plain records.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -50,17 +43,14 @@ class VersionKey(Generic[VersionValue]):
 
     @property
     def strategy(self) -> type[VersionValue]:
-        """The concrete version type (semver, date, ordinal, ...)."""
         return type(self._value)
 
     @property
     def version(self) -> ModelVersionKey:
-        """The ``(kind, version)`` identity pair."""
         return self._kind, self._value
 
     @property
     def kind(self) -> ModelKind:
-        """The model family identifier."""
         return self._kind
 
     def __lt__(self, other: object) -> bool:
@@ -101,7 +91,6 @@ class VersionKey(Generic[VersionValue]):
 
     @property
     def jgf_id(self) -> str:
-        """Stable JGF node id: ``kind@version``."""
         return f"{self._kind}@{self._value}"
 
     def __str__(self) -> str:
@@ -127,11 +116,9 @@ class VersionNode(VersionKey[VersionValue]):
 
     @property
     def model(self) -> ModelHandle:
-        """The opaque provider model handle."""
         return self._model
 
     def content_payload(self) -> dict[str, object]:
-        """Canonical schema/content payload for hashing."""
         if not self.model_id:
             raise ValueError(
                 f"VersionNode {self.jgf_id} requires model_id for content hashing"
@@ -146,11 +133,9 @@ class VersionNode(VersionKey[VersionValue]):
         }
 
     def content_hash(self, hasher: ContentHasher) -> str:
-        """Content address derived with the supplied hashing strategy."""
         return hasher.digest(self.content_payload())
 
     def to_jgf(self, hasher: ContentHasher) -> JgfNode:
-        """Project this node into its JGF representation."""
         from .jgf import JgfNode  # noqa: PLC0415
 
         return JgfNode.from_version(self, hasher)
@@ -177,27 +162,22 @@ class EdgeKey(Generic[VersionValue]):
         source: Comparable[VersionValue],
         target: Comparable[VersionValue],
     ) -> Self:
-        """Build an edge key from two endpoint identities."""
         return cls(source, target)
 
     @classmethod
     def from_version_edge(cls, edge: Migratable[VersionValue]) -> Self:
-        """Build an edge key from a stored edge."""
         return cls(edge.source, edge.target)
 
     @property
     def kind(self) -> ModelKind:
-        """The model family identifier."""
         return self.source.kind
 
     @property
     def key(self) -> MigrationKey:
-        """The endpoint pair."""
         return (self.source, self.target)
 
     @property
     def edge(self) -> MigrationKey:
-        """The endpoint pair (alias of :attr:`key`)."""
         return (self.source, self.target)
 
     def __lt__(self, other: object) -> bool:
@@ -215,7 +195,6 @@ class EdgeKey(Generic[VersionValue]):
 
     @property
     def jgf_id(self) -> str:
-        """Stable JGF edge id: ``source->target``."""
         return f"{self.source.jgf_id}->{self.target.jgf_id}"
 
     def __str__(self) -> str:
@@ -241,7 +220,6 @@ class VersionEdge(EdgeKey[VersionValue]):
     migration: MigrationIdentity
 
     def content_payload(self, hasher: ContentHasher) -> dict[str, object]:
-        """Canonical edge payload: endpoint hashes, diff, migration, flag."""
         return {
             "id": self.jgf_id,
             "source": self.source.content_hash(hasher),
@@ -254,11 +232,9 @@ class VersionEdge(EdgeKey[VersionValue]):
         }
 
     def content_hash(self, hasher: ContentHasher) -> str:
-        """Content address derived with the supplied hashing strategy."""
         return hasher.digest(self.content_payload(hasher))
 
     def to_jgf(self) -> JgfEdge:
-        """Project this edge into its JGF representation."""
         from .jgf import JgfEdge  # noqa: PLC0415
 
         return JgfEdge.from_version_edge(self)
@@ -295,11 +271,9 @@ class ChangeSet(Generic[T]):
 
     @property
     def changed(self) -> bool:
-        """Whether any identity was added, removed, or modified."""
         return bool(self.added or self.removed or self.modified)
 
     def summary(self, label: str) -> list[str]:
-        """Render non-empty change lines for *label*."""
         lines: list[str] = []
         for verb, values in (
             ("added", self.added),

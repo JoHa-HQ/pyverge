@@ -1,5 +1,3 @@
-"""Registry ports: read models, write capabilities, and the aggregate."""
-
 from __future__ import annotations
 
 from typing import Any, Protocol

@@ -1,5 +1,3 @@
-"""Schema/model providers: Pydantic, JSON Schema."""
-
 from .backend import ModelMaterializer
 from .base import AbstractModelAdapter
 from .dataclasses import DataclassModelAdapter

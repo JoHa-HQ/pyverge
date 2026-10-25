@@ -1,5 +1,3 @@
-"""Build-time descriptors and their registration commands."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -38,7 +36,6 @@ class MigrationDescriptor(SourceDescriptor):
 def descriptor_commands(
     descriptor: SourceDescriptor,
 ) -> tuple[RegistrationCommand, ...]:
-    """Return no commands for descriptors without a handler."""
     return ()
 
 

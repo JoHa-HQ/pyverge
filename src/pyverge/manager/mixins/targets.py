@@ -49,14 +49,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Compile a single declarative target spec into a resolver closure.
-
-        This base handler is the fallback: any spec that is not ``None``, a
-        string or a model class is treated as an explicit versionable target.
-        Reading it as a versionable avoids an ``isinstance(spec, Versionable)``
-        protocol check, which would trigger the strict ``__eq__`` semantics of
-        :class:`VersionNode`.
-        """
         engine = engine or cls._default_engine
         return fixed_target_resolver(engine.registry, cast(VersionNode, spec))
 
@@ -68,7 +60,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Compile ``None`` — or ``"skip"`` — into a resolver that skips entries."""
         engine = engine or cls._default_engine
         return skip_target_resolver(engine.registry)
 
@@ -80,7 +71,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Compile a named (``skip``/``latest``/``earliest``) or version string."""
         engine = engine or cls._default_engine
         if spec == "skip":
             return skip_target_resolver(engine.registry)
@@ -98,7 +88,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Compile a model class into the resolver for its registered version."""
         engine = engine or cls._default_engine
         return cls._model_resolver(spec, engine=engine)
 
@@ -109,7 +98,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Resolve a model class target to its registered versionable."""
         engine = engine or cls._default_engine
         registry = engine.registry
 
@@ -141,7 +129,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Resolve an explicit version string to a registered versionable."""
         engine = engine or cls._default_engine
         registry = engine.registry
         adapter = engine.adapter
@@ -169,11 +156,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Compile a per-kind target mapping into a single resolver.
-
-        The special key ``"*"`` is used as the fallback for kinds not
-        explicitly listed.
-        """
         engine = engine or cls._default_engine
         resolvers: dict[ModelKind | Literal["*"], TargetResolver] = {
             kind: cls.compile_target_spec(spec, engine=engine)
@@ -189,7 +171,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Base: an existing callable resolver, else compile it as a spec."""
         engine = engine or cls._default_engine
         if callable(target):
             return cast(TargetResolver, target)
@@ -203,15 +184,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> ModelHandle | None:
-        """Resolve a declared model class to the model served at *target*.
-
-        The declared class names the kind (any registered version). The target
-        policy is compiled and applied to that kind's anchor, yielding the
-        versionable served — a reconstructed class when the target is not the
-        anchor. Returns its model handle, or ``None`` when the target skips the
-        kind. This is the façade the FastStream adapter uses to bind a handler's
-        payload type to the version actually served.
-        """
         engine = engine or cls._default_engine
         anchor = engine.get_model_by_class(declared)
         resolver = cls._resolve_target_policy(target, engine=engine)
@@ -226,7 +198,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Resolve a model class to its version, else keep a bare class as-is."""
         engine = engine or cls._default_engine
         if engine.adapter.identify(target):
             return cls.compile_target_spec(target, engine=engine)
@@ -241,7 +212,6 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Resolve a per-kind target mapping into a single resolver."""
         engine = engine or cls._default_engine
         return cls._resolve_kind_mapping(
             cast(dict[ModelKind | Literal["*"], TargetSpec], target), engine=engine
@@ -255,6 +225,5 @@ class TargetResolutionMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
-        """Resolve a named (``skip``/``latest``/``earliest``) or version string."""
         engine = engine or cls._default_engine
         return cls.compile_target_spec(target, engine=engine)

@@ -15,15 +15,12 @@ class JgfExporter:
 
     @property
     def content_hasher(self) -> ContentHasher:
-        """The configured content-hash strategy."""
         return self._content_hasher
 
     def digest(self, value: Any) -> str:
-        """Hash a JGF document/value with the configured strategy."""
         return self._content_hasher.digest(value)
 
     def export_nodes(self, catalog: ModelCatalog) -> tuple[JgfNode, ...]:
-        """Export model nodes in catalog order."""
         return tuple(node.to_jgf(self._content_hasher) for node in catalog.versions)
 
     def export_graph(
@@ -32,7 +29,6 @@ class JgfExporter:
         *,
         id: str | None = None,
     ) -> JgfGraph:
-        """Export the full JGF graph from a graph catalog."""
         edges = cast(
             Any,
             [edge for kind in catalog.kinds for edge in catalog.migrations(kind)],
@@ -51,7 +47,6 @@ class JgfExporter:
         *,
         id: str | None = None,
     ) -> str:
-        """Canonical content hash of the exported graph."""
         return self._content_hasher.digest(self.export_graph(catalog, id=id).to_dict())
 
 

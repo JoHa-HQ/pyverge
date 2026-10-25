@@ -34,11 +34,6 @@ class JsonPatchMigration:
 
     @staticmethod
     def _translate(ops: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Translate spec ops for :mod:`jsonpatch`.
-
-        ``jsonpatch`` names the move/copy target ``path``; the migration spec
-        uses ``to``.
-        """
         translated: list[dict[str, Any]] = []
         for op in ops:
             if op.get("op") in ("move", "copy"):
@@ -49,12 +44,10 @@ class JsonPatchMigration:
 
     @property
     def patch(self) -> JsonPatch:
-        """The compiled executable JSON Patch."""
         return self._patch
 
     @property
     def migration_identity(self) -> MigrationIdentity:
-        """Stable identity of the declarative spec."""
         return MigrationIdentity(
             "jsonpatch",
             default_canonicalizer().dumps(self.spec),

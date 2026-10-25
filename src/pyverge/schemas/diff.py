@@ -1,5 +1,3 @@
-"""Provider-neutral field diff construction."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -36,7 +34,6 @@ class SchemaDiffer:
         target: Comparable[VersionValue],
         describe: Callable[[ModelHandle], Mapping[str, FieldDescriptor]],
     ) -> Diff[VersionValue]:
-        """Build a diff; a meta target yields an empty field set."""
         target_model = getattr(target, "model", None)
         fields = {}
         if target_model is not None:
@@ -54,7 +51,6 @@ class SchemaDiffer:
         target_model: ModelHandle,
         describe: Callable[[ModelHandle], Mapping[str, FieldDescriptor]],
     ) -> Mapping[str, FieldChange]:
-        """Compare two field descriptor mappings."""
         source_fields = describe(source_model)
         target_fields = describe(target_model)
         source_keys = set(source_fields)
