@@ -1,14 +1,22 @@
-# pyverge
+<p align="center">
+  <a href="https://pypi.org/project/pyverge/"><img src="https://img.shields.io/pypi/v/pyverge.svg" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/pyverge/"><img src="https://img.shields.io/pypi/dm/pyverge.svg" alt="PyPI downloads"></a>
+  <a href="https://pypi.org/project/pyverge/"><img src="https://img.shields.io/pypi/pyversions/pyverge.svg" alt="Python versions"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/JoHa-HQ/pyverge"><img src="https://api.scorecard.dev/projects/github.com/JoHa-HQ/pyverge/badge" alt="OpenSSF Scorecard"></a>
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/pyverge.svg)](https://pypi.org/project/pyverge/)
-[![PyPI downloads](https://img.shields.io/pypi/dm/pyverge.svg)](https://pypi.org/project/pyverge/)
-[![Python versions](https://img.shields.io/pypi/pyversions/pyverge.svg)](https://pypi.org/project/pyverge/)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/JoHa-HQ/pyverge/badge)](https://scorecard.dev/viewer/?uri=github.com/JoHa-HQ/pyverge)
+<h1 align="center">pyverge</h1>
 
-Schema evolution and migrations for versioned data. Register model versions,
-define migrations between them, and converge payloads to a target schema at
-runtime. The engine is provider-agnostic; Pydantic and JSON Schema adapters ship
-today.
+<p align="center">
+  <strong>Converge versioned payloads to any target schema without coordinated releases.</strong>
+</p>
+
+<p align="center">
+  <a href="docs/tutorials/getting-started.md">Quick start</a> ·
+  <a href="docs/">Docs</a> ·
+  <a href="showcases/">Examples</a> ·
+  <a href="docs/reference/api.md">API</a>
+</p>
 
 ## Installation
 
