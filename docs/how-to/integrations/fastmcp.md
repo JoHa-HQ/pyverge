@@ -133,6 +133,31 @@ Both exceptions carry structured attributes (`missing`/`extra`, `absent`) and a
 resolution hint, so a startup failure tells you exactly which primitive drifted and
 how to fix it.
 
+## Telemetry
+
+The adapter is free of any tracing library. To trace calls, stack your own
+FastMCP middleware; the per-migration `OTELHook`s open their spans **as
+current**, so each step span nests under the call span you open:
+
+```python
+class CallSpanMiddleware(Middleware):
+    def __init__(self, tracer, service): ...
+    async def on_call_tool(self, context, call_next):
+        with self._tracer.start_as_current_span(f"{self._service}.call"):
+            return await call_next(context)
+
+server.middleware = [CallSpanMiddleware(tracer, "my-service")]
+```
+
+See [Telemetry & Hooks](../telemetry.md) for the per-step `OTELHook`.
+
+## Testing
+
+The adapter is designed to be driven through the public server surface. See the
+[Testing](../testing.md) guide and the worked
+[`showcases/fastmcp`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/fastmcp)
+project (a layered FastMCP app with `dependency-injector` and OpenTelemetry).
+
 ## See also
 
 - [FastMCP integration model](../../explanation/fastmcp.md)

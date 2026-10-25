@@ -34,24 +34,6 @@ providers = [
   rule to a physical function's signature — see
   [Injected parameters#injected-parameters.
 
-## Telemetry
-
-The adapter is free of any tracing library. To trace calls, stack your own
-FastMCP middleware; the per-migration `OTELHook`s open their spans **as
-current**, so each step span nests under the call span you open:
-
-```python
-class CallSpanMiddleware(Middleware):
-    def __init__(self, tracer, service): ...
-    async def on_call_tool(self, context, call_next):
-        with self._tracer.start_as_current_span(f"{self._service}.call"):
-            return await call_next(context)
-
-server.middleware = [CallSpanMiddleware(tracer, "my-service")]
-```
-
-See [Telemetry & Hooks](../how-to/telemetry.md) for the per-step `OTELHook`.
-
 ## Injected parameters
 
 A dependency-injected parameter (e.g. `Provide[...]`, `Depends(...)`) is wiring,
@@ -87,13 +69,6 @@ signature in place. The default detector recognizes `dependency_injector`'s
 `Provide` and FastMCP's `Depends`; `never_injected` disables detection,
 `marker_detector(*types)` matches your own, and the reflection providers apply
 the same detector when reflecting.
-
-## Testing
-
-The adapter is designed to be driven through the public server surface. See the
-[Testing](../how-to/testing.md) guide and the worked
-[`showcases/fastmcp`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/fastmcp)
-project (a layered FastMCP app with `dependency-injector` and OpenTelemetry).
 
 ## See also
 

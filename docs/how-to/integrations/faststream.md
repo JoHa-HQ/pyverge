@@ -103,6 +103,30 @@ The `TypedDict`s are a documentation/IDE aid; migrations still receive and retur
 plain dicts at runtime. See
 [Migrations → Type the payload shapes](../author-migrations.md#type-the-payload-shapes).
 
+## Telemetry
+
+The adapter carries no tracing library and emits no spans. FastStream's own
+[OpenTelemetry](https://faststream.airt.ai/latest/getting-started/integrations/)
+middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
+spans **as current**, so each step nests under the consume span:
+
+```python
+from faststream.kafka.opentelemetry import KafkaTelemetryMiddleware
+from pyverge.adapters.otel import OTELHook
+
+broker.add_middleware(KafkaTelemetryMiddleware(tracer_provider=provider))
+manager.attach_hooks((OTELHook(tracer=provider.get_tracer("my-service")),))
+```
+
+See [Telemetry & Hooks](../telemetry.md) for the per-step `OTELHook`.
+
+## Testing
+
+Drive the adapter through FastStream's in-memory `TestKafkaBroker` — no broker
+container. See the worked
+[`showcases/faststream`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream)
+project (broker selection across Kafka/RabbitMQ/NATS/Redis, Jaeger + OTLP).
+
 ## See also
 
 - [FastStream integration model](../../explanation/faststream.md)
