@@ -1,4 +1,4 @@
-"""Application-side test preset, not a library settings contract."""
+"""Application-side settings presets consumed by CLI/tests."""
 
 from __future__ import annotations
 

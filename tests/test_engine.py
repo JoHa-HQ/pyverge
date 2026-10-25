@@ -33,6 +33,7 @@ from pyverge.registry.errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
+from pyverge.settings import MigrationSettings
 from pyverge.versioning import EdgeKey, VersionKey
 from tests.examples.json import (
     ADDRESS_V1_0_0,
@@ -62,7 +63,6 @@ from tests.examples.pydantic.semver_nested import (
     PersonV1,
 )
 from tests.utils import envelope_model, meta_versionable
-from tests.utils.settings import MigrationSettings
 
 
 class TestModelManagement:

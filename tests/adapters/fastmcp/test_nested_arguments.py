@@ -18,6 +18,7 @@ from pyverge import Manager
 from pyverge.adapters.fastmcp import ToolDiscovery, ToolReflection
 from pyverge.migration import PydanticModelAdapter
 from pyverge.registry.errors import MissingReferenceError, ModelConflictError
+from pyverge.settings import MigrationSettings, manager_kwargs
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
     AddressV2,
@@ -31,7 +32,6 @@ from tests.examples.pydantic.semver_nested import (
     migrate_contact_100_200,
     preserve_children_person,
 )
-from tests.utils.settings import MigrationSettings, manager_kwargs
 
 
 async def _run_lifecycle(discovery: ToolDiscovery, server: FastMCP) -> None:

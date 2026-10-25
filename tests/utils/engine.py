@@ -14,8 +14,8 @@ from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,
 )
+from pyverge.settings import VersioningSettings
 from pyverge.versioning import VersionEdge, VersionKey, VersionNode
-from tests.utils.settings import VersioningSettings
 
 
 def envelope_model(

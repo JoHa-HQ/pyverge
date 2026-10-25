@@ -42,10 +42,7 @@ from pyverge.providers.types import (
     ModelAdapter,
 )
 from pyverge.schemas.backend import ModelMaterializer
-from pyverge.versioning import DiffMaterializer, default_content_hasher
-from tests.utils import register_models
-from tests.utils.engine import register_migrations
-from tests.utils.settings import (
+from pyverge.settings import (
     DiscoverySettings,
     MigrationSettings,
     VersioningSettings,
@@ -53,6 +50,9 @@ from tests.utils.settings import (
     overrides,
     without_identity,
 )
+from pyverge.versioning import DiffMaterializer, default_content_hasher
+from tests.utils import register_models
+from tests.utils.engine import register_migrations
 from tests.utils.source import StaticSource
 
 # Example model modules are imported by tests, not collected as tests.  With

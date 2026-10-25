@@ -24,6 +24,7 @@ from pyverge.migration import (
 from pyverge.providers.types import (
     ModelHandle,
 )
+from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     CompatibilityReport,
     DiffOrigin,
@@ -44,7 +45,6 @@ from tests.examples.pydantic.semver import (
     UserV123,
 )
 from tests.utils import envelope_model, meta_versionable
-from tests.utils.settings import VersioningSettings
 
 
 def _migrate(ops: list[dict], data: dict) -> dict:

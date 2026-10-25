@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 from collections.abc import Callable
 from typing import Literal, cast
 
@@ -15,6 +17,7 @@ from pyverge.core import (
     ModelPair,
     VersionValue,
 )
+from pyverge.execution.backends import AsyncBackend
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
@@ -33,6 +36,7 @@ from pyverge.registry.errors import (
     CatalogError,
     ModelNotFoundError,
 )
+from pyverge.settings import MigrationSettings, VersioningSettings, manager_kwargs
 from pyverge.versioning import Migratable, Versionable
 from tests.examples.json import (
     USER_V1_0_0,
@@ -57,7 +61,6 @@ from tests.examples.pydantic.semver_nested import (
     PersonV2,
 )
 from tests.utils.engine import envelope_model
-from tests.utils.settings import MigrationSettings, VersioningSettings, manager_kwargs
 
 
 def _payload(version: str) -> dict:
@@ -830,3 +833,74 @@ class TestMigrationContext:
 
         with pytest.raises(TypeError):
             context["tenant"] = "tenant_100"
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_engine_explore_build_mode(manager: type[Manager]) -> None:
+    engine = manager._default_engine
+    explorer = engine.explore()
+    source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
+    target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
+
+    assert explorer.versions("User") == engine.registry.kind_versions("User")
+    assert explorer.path(source, target) == [(source, target)]
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_manager_runner_sync_and_async_handles(
+    manager: type[Manager],
+) -> None:
+    instance = manager()
+    sync_result = instance.runner().run(
+        _payload("1.0.0"),
+        "latest",
+        container=None,
+        max_depth=-1,
+        context=None,
+    )
+    assert sync_result["document"]["version"] == "2.0.0"
+
+    pending = instance.runner(
+        runtime=AsyncBackend(
+            backend="asyncio",
+            backend_options={},
+            max_workers=0,
+        )
+    ).run(
+        _payload("1.0.0"),
+        "latest",
+        container=None,
+        max_depth=-1,
+        context=None,
+    )
+    assert inspect.isawaitable(pending)
+    async_result = asyncio.run(pending)
+    assert async_result["document"]["version"] == "2.0.0"

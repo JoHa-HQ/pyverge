@@ -12,6 +12,7 @@ from pyverge.migration import (
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
 )
+from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     Canonicalizer,
     Diff,
@@ -49,7 +50,6 @@ from tests.examples.pydantic.semver import (
 )
 from tests.examples.pydantic.semver_nested import AddressV1, AddressV2
 from tests.utils import edge_from_models, envelope_model
-from tests.utils.settings import VersioningSettings
 
 SHA256_HEX_LENGTH = 64
 

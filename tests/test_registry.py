@@ -41,6 +41,7 @@ from pyverge.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.registry.types import PathCatalog
+from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     EdgeKey,
     JgfNode,
@@ -77,7 +78,6 @@ from tests.examples.pydantic.semver_nested import (
     PersonV2,
 )
 from tests.utils import edge_from_models, envelope_model, meta_versionable
-from tests.utils.settings import VersioningSettings
 
 
 class TestModel:
