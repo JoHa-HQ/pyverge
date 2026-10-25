@@ -313,4 +313,4 @@ class DataclassModelAdapter(AbstractModelAdapter):
             else:
                 fields.append((name, annotation, dataclasses.field(default=default)))
         name = f"{anchor.__name__}V{str(version).replace('.', '_')}"
-        return dataclasses.make_dataclass(name, fields)
+        return dataclasses.make_dataclass(name, fields, kw_only=True)

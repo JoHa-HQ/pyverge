@@ -117,13 +117,15 @@ class TargetCompiler(Generic[VersionValue]):
     def compile(self, target: TargetPolicy) -> TargetResolver:  # noqa: PLR0911
         if callable(target) and not isinstance(target, type):
             return cast("TargetResolver", target)
-        if target is None or target == "skip":
+        if target is None:
             return skip_target_resolver(self.graph)
-        if target == "latest":
-            return latest_target_resolver(self.graph)
-        if target == "earliest":
-            return earliest_target_resolver(self.graph)
         if isinstance(target, str):
+            if target == "skip":
+                return skip_target_resolver(self.graph)
+            if target == "latest":
+                return latest_target_resolver(self.graph)
+            if target == "earliest":
+                return earliest_target_resolver(self.graph)
             return self._version_string(target)
         if isinstance(target, type):
             return self._model(target)
