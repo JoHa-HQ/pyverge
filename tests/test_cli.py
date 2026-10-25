@@ -506,3 +506,64 @@ def test_init_scaffolds_project(runner: CliRunner, tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert (tmp_path / "models.py").exists()
     assert (tmp_path / "pyproject.toml").exists()
+
+
+class TestBenchmarkCommand:
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry", "manager_name"),
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [
+                    semver.Version,
+                    "test",
+                    [UserV1, UserV2],
+                    [((UserV1, UserV2), migrate_v1_to_v2)],
+                ],
+                "e2e_pkg.benchmark",
+                id="pydantic",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    @pytest.mark.parametrize("mode", ["run", "plan"])
+    def test_benchmark_reports_metrics(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+        mode: str,
+    ) -> None:
+        data_file = tmp_path / "payload.json"
+        data_file.write_text(
+            '{"kind": "User", "version": "1.0.0", "name": "Alice", '
+            '"email": "alice@example.com", "role": "user"}'
+        )
+
+        iterations = 2
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(
+                app,
+                [
+                    "benchmark",
+                    "--manager",
+                    f"{manager_name}:manager",
+                    "--payload",
+                    str(data_file),
+                    "--iterations",
+                    str(iterations),
+                    "--warmup",
+                    "0",
+                    "--mode",
+                    mode,
+                    "--format",
+                    "json",
+                ],
+            )
+
+        assert result.exit_code == 0
+        report = json.loads(result.stdout)
+        assert report["mode"] == mode
+        assert report["metrics"]["count"] == iterations
+        assert report["metrics"]["mean_ms"] >= 0

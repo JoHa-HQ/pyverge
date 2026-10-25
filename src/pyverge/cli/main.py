@@ -3,6 +3,7 @@ from __future__ import annotations
 import typer
 
 from .commands import (
+    benchmark,
     check,
     compat,
     diff,
@@ -19,6 +20,7 @@ from .commands import (
 app = typer.Typer(help="Schema evolution and migrations for versioned models")
 
 commands = (
+    benchmark,
     check,
     managers,
     manifest,
