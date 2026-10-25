@@ -1,5 +1,5 @@
 from .converge import Converger
-from .discovery import ToolDiscovery
+from .discovery import FastMCPDiscovery
 from .injection import (
     InjectionDetector,
     default_injection_detector,
@@ -20,12 +20,12 @@ from .tools import hide_injected, prompt, resource, tool
 __all__ = [
     "ComponentReflection",
     "Converger",
+    "FastMCPDiscovery",
     "FastMCPSource",
     "InjectionDetector",
     "PromptReflection",
     "ReflectedNode",
     "ResourceReflection",
-    "ToolDiscovery",
     "ToolReflection",
     "default_injection_detector",
     "hide_injected",

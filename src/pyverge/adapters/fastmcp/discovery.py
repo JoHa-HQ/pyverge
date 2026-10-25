@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     )
 
 
-class ToolDiscovery:
+class FastMCPDiscovery:
     """Index a server's versioned primitives against one manager's graph.
 
     The lifecycle phases: :meth:`search` traverses the providers and indexes
@@ -198,4 +198,4 @@ class ToolDiscovery:
             self._manager.attach_hooks(self._hooks)
 
 
-__all__ = ["ToolDiscovery"]
+__all__ = ["FastMCPDiscovery"]

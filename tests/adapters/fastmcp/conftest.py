@@ -19,10 +19,10 @@ import pytest
 from fastmcp import Client, FastMCP
 
 from pyverge.adapters.fastmcp import (
+    FastMCPDiscovery,
     FastMCPSource,
     PromptReflection,
     ResourceReflection,
-    ToolDiscovery,
     ToolReflection,
 )
 
@@ -81,7 +81,7 @@ def app(request: pytest.FixtureRequest, manager: type, case: Case) -> FastMCP:
         {"_reflection_locked": False},
     )
     instance = runtime_manager()
-    discovery = ToolDiscovery(
+    discovery = FastMCPDiscovery(
         instance, [ToolReflection(instance.adapter)], policies=case.policies
     )
 

@@ -26,9 +26,9 @@ from fastmcp.tools.base import Tool, ToolResult
 from fastmcp.utilities.versions import VersionSpec
 
 from pyverge.adapters.fastmcp import (
+    FastMCPDiscovery,
     PromptReflection,
     ResourceReflection,
-    ToolDiscovery,
     ToolReflection,
 )
 from pyverge.types import Attachable
@@ -130,7 +130,7 @@ def build_discovery(
     graph: GraphSettings,
     *,
     hooks: Sequence[Attachable] = (),
-) -> ToolDiscovery:
+) -> FastMCPDiscovery:
     """Return the discovery owning *manager*'s kinds.
 
     One manager per source: the discovery binds exactly one bounded context and
@@ -138,7 +138,7 @@ def build_discovery(
     migration edge, so each step is observable.
     """
     adapter = manager.adapter
-    return ToolDiscovery(
+    return FastMCPDiscovery(
         manager,
         providers=[
             ToolReflection(adapter),
@@ -168,7 +168,7 @@ def build_search_transform(settings: ServerSettings) -> list[Any]:
     ]
 
 
-def build_lifespan(discovery: ToolDiscovery, *, transforms: Sequence[Any] = ()):
+def build_lifespan(discovery: FastMCPDiscovery, *, transforms: Sequence[Any] = ()):
     """Return the server lifespan that drives the discovery lifecycle.
 
     The user owns the ordering: ``search`` -> ``register`` -> ``enrich``, once at
