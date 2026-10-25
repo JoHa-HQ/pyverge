@@ -2,16 +2,34 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from pyverge import Manager
-from pyverge.discovery import RegistrationContext
+from pyverge.discovery import (
+    MigrationDescriptor,
+    MigrationSpec,
+    ModelDescriptor,
+    RegistrationContext,
+    SourceDescriptor,
+)
 from pyverge.manager.types import Reflectable
+from pyverge.providers import PydanticModelAdapter
 from pyverge.registry.errors import GraphLockedError
-from pyverge.sources import SourceDescriptor
 from pyverge.versioning import EdgeKey
 from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
 from tests.utils.source import StaticSource
+
+_ADAPTER = PydanticModelAdapter()
+_MIGRATION = MigrationDescriptor(
+    MigrationSpec(
+        (_ADAPTER.versionable(UserV1), _ADAPTER.versionable(UserV2)),
+        migrate_v1_to_v2,
+    ),
+    "test",
+    {},
+)
 
 
 @pytest.mark.parametrize(
@@ -20,14 +38,9 @@ from tests.utils.source import StaticSource
         pytest.param(
             (
                 [
-                    SourceDescriptor("model", UserV1, "test", {}),
-                    SourceDescriptor("model", UserV2, "test", {}),
-                    SourceDescriptor(
-                        "migration",
-                        ((UserV1, UserV2), migrate_v1_to_v2),
-                        "test",
-                        {},
-                    ),
+                    ModelDescriptor(UserV1, "test", {}),
+                    ModelDescriptor(UserV2, "test", {}),
+                    _MIGRATION,
                 ],
                 "test",
             ),
@@ -36,7 +49,7 @@ from tests.utils.source import StaticSource
             id="models-and-migration",
         ),
         pytest.param(
-            ([SourceDescriptor("model", UserV1, "test", {})], "test"),
+            ([ModelDescriptor(UserV1, "test", {})], "test"),
             1,
             0,
             id="single-model",
@@ -62,14 +75,9 @@ def test_reflect_registers(
     [
         (
             [
-                SourceDescriptor("model", UserV1, "test", {}),
-                SourceDescriptor("model", UserV2, "test", {}),
-                SourceDescriptor(
-                    "migration",
-                    ((UserV1, UserV2), migrate_v1_to_v2),
-                    "test",
-                    {},
-                ),
+                ModelDescriptor(UserV1, "test", {}),
+                ModelDescriptor(UserV2, "test", {}),
+                _MIGRATION,
             ],
             "test",
         )
@@ -92,16 +100,16 @@ def test_reflect_registers_migration_edge(
 
 @pytest.mark.parametrize(
     "source",
-    [([SourceDescriptor("unknown", None, "test", {})], "test")],
+    [([SourceDescriptor(None, "test", {})], "test")],
     indirect=["source"],
 )
-def test_reflect_skips_unknown_strategy(
+def test_reflect_skips_unknown_descriptor(
     manager: type[Manager], source: StaticSource
 ) -> None:
     report = manager.reflect(source)
 
     assert report.descriptors == 0
-    assert report.skipped == ("unknown",)
+    assert report.skipped == ("SourceDescriptor",)
 
 
 @pytest.mark.parametrize("source", [([], "test")], indirect=["source"])
@@ -122,3 +130,22 @@ def test_manager_is_reflectable(manager: type[Manager]) -> None:
 def test_registration_context_requires_validation_flag() -> None:
     with pytest.raises(TypeError):
         RegistrationContext(source_id="test", logger=None, clock=None)  # ty: ignore[missing-argument, invalid-argument-type]
+
+
+class _AsyncSource:
+    def __init__(self, descriptors: list[SourceDescriptor]) -> None:
+        self._descriptors = descriptors
+
+    async def accept(self, visitor) -> None:
+        for descriptor in self._descriptors:
+            visitor.visit(descriptor)
+
+
+def test_areflect_async_source(manager: type[Manager]) -> None:
+    source = _AsyncSource([ModelDescriptor(UserV1, "test", {})])
+    report = asyncio.run(manager.areflect(source))
+
+    assert report.registered_models == 1
+    assert [str(version) for version in manager._default_engine.registry.versions] == [
+        "User@1.0.0"
+    ]

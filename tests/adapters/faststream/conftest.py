@@ -8,41 +8,62 @@ Kafka container.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
+import semver
+from faststream import FastStream
 from faststream.kafka import KafkaBroker
 
-from pyverge.adapters.faststream import subscriber
+from pyverge import Manager
+from pyverge.adapters.faststream import FastStreamSource, subscriber
 from tests.examples.pydantic.semver import UserV2
 
-
-@pytest.fixture(params=["localhost:9092"], ids=["default"])
-def broker_settings(request) -> str:
-    """Connection settings for the broker, as fixture params."""
-    return request.param
-
-
-@pytest.fixture
-def payloads() -> list[dict[str, Any]]:
-    """Collects the payloads a wired subscriber handler saw."""
-    return []
+KAFKA_BROKER: tuple[type[Any], dict[str, Any], str | dict[str, str]] = (
+    KafkaBroker,
+    {"bootstrap_servers": "localhost:9092"},
+    "latest",
+)
 
 
-@pytest.fixture
-def broker(request, broker_settings, manager, payloads) -> KafkaBroker:
+@pytest.fixture(params=[KAFKA_BROKER], ids=["kafka"])
+def broker(request, manager) -> KafkaBroker:
     """A broker whose ``users`` subscriber converges through a fresh manager.
 
-    Built from ``broker_settings``; parametrize ``broker`` indirectly with the
-    target policy (defaults to ``"latest"``). The handler appends each payload it
-    sees to ``payloads``.
+    Fixture params carry the broker implementation, constructor settings, and
+    target policy.
     """
-    target = getattr(request, "param", "latest")
+    broker_cls, settings, target = request.param
     instance = manager()
-    broker = KafkaBroker(broker_settings)
+    broker = cast(Any, broker_cls(**settings))
+    broker.payloads = []
 
     @subscriber(broker, "users", manager=instance, targets=target)
     async def handle(user: UserV2) -> None:
-        payloads.append(user.model_dump())
+        broker.payloads.append(user.model_dump())
 
     return broker
+
+
+@pytest.fixture
+def source(model_adapter) -> FastStreamSource:
+    subscriber_manager = Manager[semver.Version].configure(model_adapter)
+    subscriber_manager.store_model(UserV2)
+    instance = subscriber_manager()
+    broker = KafkaBroker("localhost:9092")
+
+    @subscriber(broker, "source-users", manager=instance)
+    async def handle(user: UserV2) -> None: ...
+
+    return FastStreamSource(FastStream(broker), adapter=model_adapter)
+
+
+@pytest.fixture
+def publisher_source(model_adapter) -> FastStreamSource:
+    broker = KafkaBroker("localhost:9092")
+
+    @broker.publisher("source-out")
+    def emit(user: UserV2) -> UserV2:
+        return user
+
+    return FastStreamSource(FastStream(broker), adapter=model_adapter)

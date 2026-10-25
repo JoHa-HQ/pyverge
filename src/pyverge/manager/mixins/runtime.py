@@ -30,8 +30,8 @@ from pyverge.execution.types import BackendPort
 from pyverge.versioning import Diffable
 
 if TYPE_CHECKING:
+    from pyverge.engine import Engine
     from pyverge.manager.manager import Manager
-    from pyverge.migration.engine import Engine
 
 
 def _direction(strategy: MigrationDirectionStrategy) -> DirectionPolicy:

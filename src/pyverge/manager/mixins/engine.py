@@ -7,10 +7,10 @@ from pyverge.core.types import (
 )
 
 if TYPE_CHECKING:
+    from pyverge.engine import Engine
     from pyverge.manager.types import (
         ManagerClassState,
     )
-    from pyverge.migration.engine import Engine
 
 
 class EngineLifecycleMixin(Generic[VersionValue]):

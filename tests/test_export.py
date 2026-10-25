@@ -17,8 +17,12 @@ from pyverge.export import (
     ManifestVersion,
 )
 from pyverge.jgf import JgfExporter
-from pyverge.migration import JsonSchemaModelAdapter, PydanticModelAdapter, Registry
+from pyverge.providers import (
+    JsonSchemaModelAdapter,
+    PydanticModelAdapter,
+)
 from pyverge.providers.types import ModelHandle
+from pyverge.registry import Registry
 from pyverge.versioning import (
     ChangeSet,
     ContentHasher,

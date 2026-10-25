@@ -13,16 +13,12 @@ from functools import wraps
 from typing import Any, cast
 
 from pyverge import Manager
+from pyverge.execution import Runner
 from pyverge.manager.types import TargetPolicy
 from pyverge.schemas.types import ModelHandle
 
 from .types import Fn, PayloadDumper, ResultConverger
-from .views import HandlerView, PublisherView
-
-
-def return_model(handler: Any) -> ModelHandle | None:
-    """Return the handler's return annotation when it is a class."""
-    return HandlerView(handler).return_model
+from .views import HandlerView
 
 
 class ReturnConverger:
@@ -36,12 +32,12 @@ class ReturnConverger:
 
     def __init__(
         self,
-        manager: Manager,
+        runner: Runner,
         dump: PayloadDumper,
         target: TargetPolicy,
         out_model: ModelHandle | None = None,
     ) -> None:
-        self._manager = manager
+        self._runner = runner
         self._dump = dump
         self._target = target
         self._out_model = out_model
@@ -54,8 +50,7 @@ class ReturnConverger:
             result = await handler(*args, **kwargs)
             if result is None:
                 return None
-            runner = self._manager.runner()
-            migrated = runner.run(
+            migrated = self._runner.run(
                 self._dump(result),
                 self._target,
                 container=None,
@@ -83,6 +78,7 @@ def publisher(
     manager: Manager,
     target: TargetPolicy = "latest",
     result_converger: ResultConverger | None = None,
+    runner: Runner | None = None,
     **options: Any,
 ) -> Callable[[Fn], Any]:
     """Return a decorator registering a converging publisher on *broker*.
@@ -92,15 +88,14 @@ def publisher(
     """
 
     def decorate(fn: Fn) -> Any:
-        published = PublisherView(fn, topics)
-        declared = published.return_model
+        declared = HandlerView(fn).return_model
         out_model = (
             manager.resolve_target_model(declared, target)
             if declared is not None and manager.identifies(declared)
             else None
         )
         result = result_converger or ReturnConverger(
-            manager,
+            runner or manager.runner(),
             manager.dump,
             target,
             out_model=out_model,
@@ -116,12 +111,15 @@ def publish_to(
     routes: Mapping[str, TargetPolicy],
     manager: Manager,
     version_header: str = "content-version",
+    runner: Runner | None = None,
 ) -> Callable[[Fn], Fn]:
     """Publish one handler result to multiple topics with per-topic targets.
 
     The handler returns a model (or mapping) unchanged. The result is dumped
     once, then converged separately for each route before publishing.
     """
+
+    active_runner = runner or manager.runner()
 
     def decorate(fn: Fn) -> Fn:
         @wraps(fn)
@@ -131,8 +129,7 @@ def publish_to(
                 return
             payload = manager.dump(result)
             for topic, target in routes.items():
-                runner = manager.runner()
-                migrated = runner.run(
+                migrated = active_runner.run(
                     payload,
                     target,
                     container=None,
@@ -165,5 +162,4 @@ __all__ = [
     "ReturnConverger",
     "publish_to",
     "publisher",
-    "return_model",
 ]

@@ -58,3 +58,25 @@ class CompatibilityReport:
             modified_fields=tuple(sorted(modified)),
             structural_breaking=structural,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class BackwardCompatibilityGuard:
+    """Evaluate whether a declared compatible transition is structural breaking."""
+
+    identity_fields: frozenset[str]
+
+    def evaluate(self, diff: Diffable) -> CompatibilityReport:
+        return CompatibilityReport.from_diff(
+            diff,
+            identity_fields=self.identity_fields,
+        )
+
+    def required_additions(
+        self,
+        diff: Diffable,
+        report: CompatibilityReport,
+    ) -> tuple[str, ...]:
+        return tuple(
+            field for field in report.added_fields if diff.is_added_required(field)
+        )

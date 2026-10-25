@@ -9,8 +9,8 @@ from pyverge.discovery.reflection import (
     Reflection,
     Reflector,
 )
+from pyverge.engine import Engine
 from pyverge.execution.types import EntryExtractor
-from pyverge.migration.engine import Engine
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import (
     DefaultMigrationIdentityResolver,
@@ -111,8 +111,6 @@ class Manager(
                 registry.  Defaults to the containerless
                 :class:`~pyverge.execution.CompositeExtractor`; container-guided
                 discovery is enabled by supplying a container at call time.
-            entry_migration: Optional per-entry migration defaults.  Defaults
-                to :class:`~pyverge.migration.DefaultEntryPlanner`.
         """
         if walker is None:
             registry = Registry[VersionValue](hasher=hasher or default_content_hasher())

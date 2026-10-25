@@ -13,21 +13,18 @@ from pydantic import BaseModel
 from pyverge import Manager
 from pyverge.core import (
     ManagerMigrationKey,
+    MigrationContext,
     MigrationKeyInput,
     ModelPair,
     VersionValue,
 )
+from pyverge.engine import Engine
 from pyverge.execution.backends import AsyncBackend
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
 )
-from pyverge.migration import (
-    Engine,
-    MigrationContext,
-    PydanticModelAdapter,
-)
-from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.providers import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,

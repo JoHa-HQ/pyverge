@@ -10,23 +10,23 @@ import pytest
 import semver
 
 from pyverge import types
+from pyverge.core import MigrationContext
 from pyverge.discovery.reflection import JsonPatchRenderer
-from pyverge.migration import (
-    Diff,
+from pyverge.providers import (
     JsonataMigration,
     JsonPatchMigration,
     JsonSchemaModelAdapter,
-    MigrationContext,
     PydanticDiff,
     PydanticModelAdapter,
-    Registry,
 )
 from pyverge.providers.types import (
     ModelHandle,
 )
+from pyverge.registry import Registry
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     CompatibilityReport,
+    Diff,
     DiffOrigin,
     FieldChange,
     FieldStatus,

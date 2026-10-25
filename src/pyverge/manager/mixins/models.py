@@ -10,14 +10,15 @@ from pyverge.core.types import (
     ModelVersionKey,
     VersionValue,
 )
+from pyverge.discovery import ModelRegistrationMode, RegisterModel
 from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.versioning import Comparable, Versionable, VersionNode
 
 if TYPE_CHECKING:
+    from pyverge.engine import Engine
     from pyverge.manager.manager import Manager
-    from pyverge.migration.engine import Engine
 
 
 class ModelStoreMixin(Generic[VersionValue]):
@@ -33,7 +34,10 @@ class ModelStoreMixin(Generic[VersionValue]):
     ) -> Versionable[VersionValue]:
         """Register a model version through the engine."""
         engine = engine or cls._default_engine
-        return engine.store_model(engine.adapter.versionable(key))
+        return cast(
+            Versionable[VersionValue],
+            engine.register(RegisterModel(key, ModelRegistrationMode.STRICT)),
+        )
 
     @store_model.register(VersionNode)
     @classmethod
@@ -45,7 +49,10 @@ class ModelStoreMixin(Generic[VersionValue]):
     ) -> Versionable[VersionValue]:
         """Register an already-built versionable (strict; duplicates fail)."""
         engine = engine or cls._default_engine
-        return engine.store_model(version)
+        return cast(
+            Versionable[VersionValue],
+            engine.register(RegisterModel(version, ModelRegistrationMode.STRICT)),
+        )
 
     @singledispatchmethod
     @classmethod
@@ -61,7 +68,10 @@ class ModelStoreMixin(Generic[VersionValue]):
         a no-op, a differing one raises :class:`ModelConflictError`.
         """
         engine = engine or cls._default_engine
-        return engine.reconcile_model(engine.adapter.versionable(key))
+        return cast(
+            Versionable[VersionValue],
+            engine.register(RegisterModel(key, ModelRegistrationMode.RECONCILE)),
+        )
 
     @reconcile_model.register(VersionNode)
     @classmethod
@@ -72,7 +82,10 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return engine.reconcile_model(version)
+        return cast(
+            Versionable[VersionValue],
+            engine.register(RegisterModel(version, ModelRegistrationMode.RECONCILE)),
+        )
 
     def missing_references(
         self: Manager[VersionValue],

@@ -409,6 +409,36 @@ class InMemoryCatalog(Generic[VersionValue]):
         self._by_models.clear()
         self._by_kinds.clear()
 
+    def delete_kind(self: Self, kind: ModelKind) -> None:  # noqa: C901
+        """Delete every version and migration belonging to *kind*.
+
+        Refuses when a version is referenced by a cross-kind migration.
+        """
+        self._ensure_mutable("delete_kind")
+        versions = self.kind_versions(kind)
+        if not versions:
+            return
+        version_set = set(versions)
+        for version in versions:
+            for edge in self.migrations_of(version):
+                if edge.source not in version_set or edge.target not in version_set:
+                    raise CatalogError(
+                        self._name,
+                        f"Cannot delete kind '{kind}': version is referenced "
+                        f"by cross-kind migration {edge.source}→{edge.target}",
+                    )
+        for version in versions:
+            for edge in list(self.migrations_of(version)):
+                if edge.source in version_set and edge.target in version_set:
+                    if self.has_hooks(edge):
+                        self.clear_hooks(edge)
+                    self.remove_migration(EdgeKey.from_version_edge(edge))
+        for version in reversed(versions):
+            try:
+                self.remove_model(version)
+            except CatalogError:
+                pass
+
     def store_migration(
         self: Self,
         key: Migratable[VersionValue],

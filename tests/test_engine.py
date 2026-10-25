@@ -11,15 +11,17 @@ import pytest
 import semver
 
 from pyverge import types
-from pyverge.execution import MigrationHook
-from pyverge.migration import (
-    Engine,
-    JsonPatchMigration,
-    JsonSchemaModelAdapter,
-    MigrationContext,
-    PydanticModelAdapter,
+from pyverge.core import MigrationContext
+from pyverge.engine import Engine
+from pyverge.execution import (
+    MigrationHook,
     fixed_target_resolver,
     latest_target_resolver,
+)
+from pyverge.providers import (
+    JsonPatchMigration,
+    JsonSchemaModelAdapter,
+    PydanticModelAdapter,
 )
 from pyverge.providers.types import (
     ModelHandle,

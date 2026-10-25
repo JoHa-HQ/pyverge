@@ -14,11 +14,13 @@ from .reflection import (
     ResourceReflection,
     ToolReflection,
 )
+from .source import FastMCPSource
 from .tools import hide_injected, prompt, resource, tool
 
 __all__ = [
     "ComponentReflection",
     "Converger",
+    "FastMCPSource",
     "InjectionDetector",
     "PromptReflection",
     "ReflectedNode",

@@ -36,19 +36,18 @@ if TYPE_CHECKING:
     from pyverge.core.types import (
         Attachable,
     )
+    from pyverge.discovery import SourcePort
     from pyverge.discovery.reflection import DiffProvider
     from pyverge.discovery.types import (
         ReflectionReport,
-        ReflectionStrategy,
         RegistrationContext,
     )
+    from pyverge.engine import Engine
     from pyverge.execution.types import EntryExtractor
-    from pyverge.migration.engine import Engine
     from pyverge.migrations.identity import MigrationIdentityResolver
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
     from pyverge.registry import Registry
-    from pyverge.sources import SourcePort
     from pyverge.versioning import ContentHasher, DiffMaterializer
 
 
@@ -134,6 +133,5 @@ class Reflectable(Protocol):
         cls,
         source: SourcePort,
         *,
-        strategies: dict[str, ReflectionStrategy] | None = None,
         context: RegistrationContext | None = None,
     ) -> ReflectionReport: ...

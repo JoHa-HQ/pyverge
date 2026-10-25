@@ -12,7 +12,6 @@ The adapter is split by responsibility (ports & adapters):
 * :mod:`.binding` — the default ``HandlerBinder``.
 * :mod:`.subscriber` — the consume decorator (converges in FastStream's decoder).
 * :mod:`.publisher` — the produce decorator (in/out).
-* :mod:`.reflection` — ``SubscriberWalker`` / ``Reflector``.
 
 FastStream is imported only here; pyverge core and providers never import it.
 """
@@ -21,11 +20,14 @@ from __future__ import annotations
 
 from .binding import SignatureBinder
 from .publisher import ReturnConverger, publish_to, publisher
-from .reflection import Reflector, SubscriberModel, SubscriberWalker
+from .source import (
+    FastStreamProvider,
+    FastStreamSource,
+    PublisherProvider,
+    SubscriberProvider,
+)
 from .subscriber import subscriber
 from .targets import (
-    DEFAULT_TARGET,
-    DEFAULT_VERSION_HEADER,
     DefaultTarget,
     FirstMatch,
     HeaderTarget,
@@ -46,12 +48,12 @@ from .types import (
     TargetSelector,
     TopicTargets,
 )
-from .views import FastStreamSubscriber, HandlerView, PublisherView
+from .views import FastStreamSubscriber, HandlerView
 
 __all__ = [
-    "DEFAULT_TARGET",
-    "DEFAULT_VERSION_HEADER",
     "DefaultTarget",
+    "FastStreamProvider",
+    "FastStreamSource",
     "FastStreamSubscriber",
     "FirstMatch",
     "Fn",
@@ -64,14 +66,12 @@ __all__ = [
     "NegotiationError",
     "PayloadDumper",
     "PublisherPort",
-    "PublisherView",
-    "Reflector",
+    "PublisherProvider",
     "ResultConverger",
     "ReturnConverger",
     "SignatureBinder",
-    "SubscriberModel",
     "SubscriberPort",
-    "SubscriberWalker",
+    "SubscriberProvider",
     "TargetContext",
     "TargetSelector",
     "TopicTarget",

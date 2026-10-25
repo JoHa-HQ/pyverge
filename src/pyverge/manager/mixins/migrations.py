@@ -11,14 +11,15 @@ from pyverge.core.types import (
     ModelPair,
     VersionValue,
 )
+from pyverge.discovery import MigrationSpec, RegisterMigration
 from pyverge.providers import JsonataMigration, JsonPatchMigration
 from pyverge.versioning import EdgeKey, Migratable
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from pyverge.engine import Engine
     from pyverge.manager.manager import Manager
-    from pyverge.migration.engine import Engine
 
 
 class MigrationStoreMixin(Generic[VersionValue]):
@@ -73,10 +74,17 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
-        return engine.store_migration(
-            pair,
-            cls._resolve_migration(func),
-            backward_compatible=backward_compatible,
+        return cast(
+            MigrationFunc,
+            engine.register(
+                RegisterMigration(
+                    MigrationSpec(
+                        pair,
+                        cls._resolve_migration(func),
+                        backward_compatible,
+                    )
+                )
+            ),
         )
 
     @store_migration.register(ManagerMigrationKey)
@@ -95,10 +103,17 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.version_key(kind=key.kind, version=key.source_version),
             adapter.version_key(kind=key.kind, version=key.target_version),
         )
-        return engine.store_migration(
-            pair,
-            cls._resolve_migration(func),
-            backward_compatible=backward_compatible,
+        return cast(
+            MigrationFunc,
+            engine.register(
+                RegisterMigration(
+                    MigrationSpec(
+                        pair,
+                        cls._resolve_migration(func),
+                        backward_compatible,
+                    )
+                )
+            ),
         )
 
     @singledispatchmethod

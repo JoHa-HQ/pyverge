@@ -113,10 +113,17 @@ class MigrationWrite(Protocol[VersionValue]):
     def clear_hooks(self, key: Transitional | None = None) -> None: ...
 
 
+class KindWrite(Protocol):
+    """Write-side kind lifecycle capability."""
+
+    def delete_kind(self, kind: ModelKind) -> None: ...
+
+
 class RegistryPort(
     GraphCatalog[VersionValue],
     ModelWrite[VersionValue],
     MigrationWrite[VersionValue],
+    KindWrite,
     Protocol[VersionValue],
 ):
     """Full catalog contract for an in-memory or remote adapter."""
@@ -125,6 +132,7 @@ class RegistryPort(
 __all__ = [
     "ContentHashLookup",
     "GraphCatalog",
+    "KindWrite",
     "MigrationWrite",
     "ModelCatalog",
     "ModelWrite",

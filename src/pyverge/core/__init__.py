@@ -6,12 +6,14 @@ Version graph types and protocols live in :mod:`pyverge.versioning`.
 from .clock import Clock, SystemClock
 from .context import EMPTY_CONTEXT, MigrationContext
 from .errors import (
+    CatalogError,
     MaxDepthExceededError,
     PayloadError,
     PayloadValidationError,
     PyvergeError,
 )
 from .ids import IdFactory, UuidIdFactory
+from .lifecycle import LifecyclePort
 from .types import (
     MIGRATION_PAIR_LEN,
     Attachable,
@@ -39,9 +41,11 @@ __all__ = [
     "EMPTY_CONTEXT",
     "MIGRATION_PAIR_LEN",
     "Attachable",
+    "CatalogError",
     "Clock",
     "DirectionViolationStrategy",
     "IdFactory",
+    "LifecyclePort",
     "ManagerKey",
     "ManagerMigrationKey",
     "MaxDepthExceededError",

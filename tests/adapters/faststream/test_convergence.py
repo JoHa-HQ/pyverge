@@ -16,13 +16,14 @@ from faststream import FastStream
 from faststream.kafka import KafkaBroker, TestKafkaBroker
 
 from pyverge.adapters.faststream import (
-    Reflector,
+    FastStreamSource,
     TopicTargets,
     publish_to,
     publisher,
     subscriber,
 )
-from pyverge.migration import MigrationContext, PydanticModelAdapter
+from pyverge.core import MigrationContext
+from pyverge.providers import PydanticModelAdapter
 from pyverge.registry.errors import MigrationPathError
 from tests.examples.pydantic.semver import (
     UserV1,
@@ -65,6 +66,7 @@ V1_PAYLOAD = {
     "role": "user",
 }
 V2_PAYLOAD = {**V1_PAYLOAD, "version": "2.0.0", "age": None}
+KAFKA_BROKER = (KafkaBroker, {"bootstrap_servers": "localhost:9092"})
 
 
 @pytest.mark.anyio
@@ -76,43 +78,47 @@ V2_PAYLOAD = {**V1_PAYLOAD, "version": "2.0.0", "age": None}
 @pytest.mark.parametrize(
     "broker, payload, expected",
     [
-        pytest.param("latest", V1_PAYLOAD, V2_PAYLOAD, id="stale-to-latest"),
-        pytest.param("latest", V2_PAYLOAD, V2_PAYLOAD, id="current-passthrough"),
-        pytest.param("1.0.0", V2_PAYLOAD, V1_PAYLOAD, id="pinned-downgrade"),
-        pytest.param({"User": "1.0.0"}, V2_PAYLOAD, V1_PAYLOAD, id="per-kind"),
+        pytest.param(
+            (*KAFKA_BROKER, "latest"), V1_PAYLOAD, V2_PAYLOAD, id="stale-to-latest"
+        ),
+        pytest.param(
+            (*KAFKA_BROKER, "latest"), V2_PAYLOAD, V2_PAYLOAD, id="current-passthrough"
+        ),
+        pytest.param(
+            (*KAFKA_BROKER, "1.0.0"), V2_PAYLOAD, V1_PAYLOAD, id="pinned-downgrade"
+        ),
+        pytest.param(
+            (*KAFKA_BROKER, {"User": "1.0.0"}),
+            V2_PAYLOAD,
+            V1_PAYLOAD,
+            id="per-kind",
+        ),
     ],
     indirect=["broker"],
 )
-async def test_converges_to_target(broker, payloads, payload, expected) -> None:
+async def test_converges_to_target(broker, payload, expected) -> None:
     async with TestKafkaBroker(broker) as br:
         await br.publish(payload, "users")
-    assert payloads == [expected]
+    assert broker.payloads == [expected]
 
 
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [pytest.param(PydanticModelAdapter, REGISTRY, id="pydantic")],
-    indirect=True,
-)
-class TestReflection:
-    def test_reflect_reconciles_typed_handler(self, manager, broker) -> None:
-        reflected = Reflector(manager()).reflect(broker)
-        assert [r.model for r in reflected] == [UserV2]
-        assert reflected[0].topics == ("users",)
+def test_source_skips_handler_without_model(manager, model_adapter) -> None:
+    runtime_manager = type(
+        "RuntimeManager",
+        (manager,),
+        {"_reflection_locked": False},
+    )
+    instance = runtime_manager()
+    broker = KafkaBroker("localhost:9092")
 
-    def test_reflector_runs_on_startup(self, manager, broker) -> None:
-        app = FastStream(broker, on_startup=[Reflector(manager())])
-        assert app.brokers
+    @subscriber(broker, "raw", manager=instance)
+    async def handle(payload: dict) -> None: ...
 
-    def test_handler_without_model_is_skipped(self, manager) -> None:
-        instance = manager()
-        broker = KafkaBroker("localhost:9092")
+    report = manager.reflect(
+        FastStreamSource(FastStream(broker), adapter=model_adapter)
+    )
 
-        @subscriber(broker, "raw", manager=instance)
-        async def handle(payload: dict) -> None: ...
-
-        assert Reflector(instance).reflect(broker) == []
+    assert report.registered_models == 0
 
 
 @pytest.mark.anyio
@@ -245,3 +251,21 @@ class TestFailures:
                 max_depth=-1,
                 context=None,
             )
+
+
+def test_source_reflects_subscriber_models(manager, source) -> None:
+    report = manager.reflect(source)
+
+    assert report.registered_models == 1
+    assert [str(version) for version in manager._default_engine.registry.versions] == [
+        "User@2.0.0"
+    ]
+
+
+def test_source_reflects_publisher_models(manager, publisher_source) -> None:
+    report = manager.reflect(publisher_source)
+
+    assert report.registered_models == 1
+    assert [str(version) for version in manager._default_engine.registry.versions] == [
+        "User@2.0.0"
+    ]

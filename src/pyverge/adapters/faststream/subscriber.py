@@ -16,10 +16,11 @@ from functools import reduce
 from typing import Any, TypeVar
 
 from pyverge import Manager
+from pyverge.execution import Runner
 from pyverge.manager.types import TargetPolicy
 
 from .binding import SignatureBinder
-from .targets import DEFAULT_TARGET, FirstMatch
+from .targets import FirstMatch
 from .types import HandlerBinder, TargetContext, TopicTargets
 from .views import HandlerView
 
@@ -58,13 +59,14 @@ def _candidate_models(
     return [model] if model is not None else []
 
 
-def subscriber(
+def subscriber(  # noqa: PLR0913
     broker: Any,
     *topics: str,
     manager: Manager,
-    targets: TargetPolicy | TopicTargets = DEFAULT_TARGET,
+    targets: TargetPolicy | TopicTargets = "latest",
     header: str | None = None,
     binder: HandlerBinder | None = None,
+    runner: Runner | None = None,
     **options: Any,
 ) -> Callable[[Fn], Fn]:
     """Register one converging subscriber per topic.
@@ -76,8 +78,11 @@ def subscriber(
     if "decoder" in options:
         raise TypeError("subscriber() owns the decoder; drop the decoder option")
 
-    selector = FirstMatch.for_topics(topics, targets, header)
+    selector = FirstMatch.for_topics(
+        topics, targets, default_target="latest", header=header
+    )
     binder = binder or SignatureBinder()
+    active_runner = runner or manager.runner()
 
     def decode(topic: str) -> Callable[[Any, Any], Any]:
         async def converge_message(msg: Any, next_decoder: Any) -> dict[str, Any]:
@@ -85,8 +90,7 @@ def subscriber(
             target = selector.select(
                 TargetContext(topic, getattr(msg, "headers", {}) or {})
             )
-            runner = manager.runner()
-            migrated = runner.run(
+            migrated = active_runner.run(
                 payload,
                 target,
                 container=None,

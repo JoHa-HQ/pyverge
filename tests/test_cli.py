@@ -15,7 +15,10 @@ from pyverge.cli.main import app
 from pyverge.core.types import (
     VersionValue,
 )
-from pyverge.migration import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.providers import (
+    JsonSchemaModelAdapter,
+    PydanticModelAdapter,
+)
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.semver import (
     UserV1,

@@ -15,6 +15,7 @@ from hypothesis import strategies as st
 
 from pyverge.core import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.context import MigrationContext
+from pyverge.engine import Engine
 from pyverge.execution import (
     AnyDirection,
     BackwardDirection,
@@ -37,13 +38,11 @@ from pyverge.execution import (
 from pyverge.execution.backends import AsyncBackend, ThreadedBackend
 from pyverge.execution.context import LayeredView, RunContext, StepContext
 from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
-from pyverge.migration import (
-    Engine,
+from pyverge.providers import (
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
-    Registry,
 )
-from pyverge.registry import GraphCatalog
+from pyverge.registry import GraphCatalog, Registry
 from pyverge.registry.errors import CatalogError
 from pyverge.versioning import EdgeKey, VersionNode
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0

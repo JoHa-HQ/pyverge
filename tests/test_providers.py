@@ -5,13 +5,13 @@ from __future__ import annotations
 import pytest
 
 from pyverge.discovery.reflection import CompositeDiffDiscovery, Reflection
-from pyverge.migration import (
-    Engine,
+from pyverge.engine import Engine
+from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
+from pyverge.providers import (
     JsonPatchMigration,
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
 )
-from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.schemas import DataclassModelAdapter
 from pyverge.schemas.backend import ModelMaterializer
 from pyverge.settings import MigrationSettings, VersioningSettings

@@ -95,20 +95,7 @@ class FastStreamSubscriber:
         return HandlerView(handler).input_model if handler is not None else None
 
 
-@dataclass(frozen=True)
-class PublisherView:
-    """A publisher handler plus the topics it publishes to."""
-
-    handler: Callable[..., Any]
-    topics: tuple[str, ...]
-
-    @property
-    def return_model(self) -> ModelHandle | None:
-        return HandlerView(self.handler).return_model
-
-
 __all__ = [
     "FastStreamSubscriber",
     "HandlerView",
-    "PublisherView",
 ]

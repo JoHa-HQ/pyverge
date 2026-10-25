@@ -5,20 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Self
 
-from pyverge.core.errors import PyvergeError
+from pyverge.core.errors import CatalogError, PyvergeError
 from pyverge.core.types import MIGRATION_PAIR_LEN, ModelHandle, ModelVersionKey
 
 if TYPE_CHECKING:
     from pyverge.versioning import MigrationKey
-
-
-class CatalogError(PyvergeError):
-    """Raised when a catalog operation fails."""
-
-    def __init__(self: Self, catalog_name: str, message: str) -> None:
-        """Initializes CatalogError."""
-        self.catalog_name = catalog_name
-        super().__init__(message)
 
 
 class GraphLockedError(CatalogError):

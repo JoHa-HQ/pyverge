@@ -16,6 +16,7 @@ from pyverge.discovery.reflection import (
     Reflection,
     Reflector,
 )
+from pyverge.engine import Engine
 from pyverge.execution import (
     AnyDirection,
     CompositeExtractor,
@@ -29,18 +30,17 @@ from pyverge.execution import (
 from pyverge.execution.backends import ThreadedBackend
 from pyverge.execution.context import ExecutionEnvironment
 from pyverge.execution.types import BackendPort
-from pyverge.migration import (
-    Engine,
-    JsonSchemaModelAdapter,
-    PydanticModelAdapter,
-    Registry,
-)
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
+from pyverge.providers import (
+    JsonSchemaModelAdapter,
+    PydanticModelAdapter,
+)
 from pyverge.providers.types import (
     ModelAdapter,
 )
+from pyverge.registry import Registry
 from pyverge.schemas.backend import ModelMaterializer
 from pyverge.settings import (
     DiscoverySettings,

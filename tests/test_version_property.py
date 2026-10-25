@@ -8,7 +8,7 @@ from typing import Any, cast
 import pytest
 from json_graph_lite.jgf import Graph as LiteGraph
 
-from pyverge.migration import (
+from pyverge.providers import (
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
 )

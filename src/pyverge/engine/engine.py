@@ -11,6 +11,13 @@ from pyverge.core.types import (
     ModelKind,
     VersionValue,
 )
+from pyverge.discovery import (
+    MigrationSpec,
+    ModelRegistrationMode,
+    RegisterMigration,
+    RegisterModel,
+    RegistrationCommand,
+)
 from pyverge.discovery.reflection import Reflector
 from pyverge.execution import (
     CompositeExtractor,
@@ -25,7 +32,6 @@ from pyverge.execution.direction import DirectionPolicy
 from pyverge.execution.middleware import BackendMiddleware
 from pyverge.execution.targets import TargetCompiler
 from pyverge.execution.types import BackendPort
-from pyverge.migration.registration import MigrationRegistrationService
 from pyverge.migrations.identity import MigrationIdentityResolver
 from pyverge.migrations.json_patch import JsonPatch
 from pyverge.registry import GraphCatalog, Registry
@@ -38,14 +44,17 @@ from pyverge.registry.errors import (
 from pyverge.registry.explorer import GraphExplorer
 from pyverge.schemas.types import ModelAdapter
 from pyverge.versioning import (
+    BackwardCompatibilityGuard,
     Comparable,
     EdgeKey,
     Migratable,
     Transitional,
     Versionable,
+    VersionEdge,
     VersionNode,
     VersionPair,
 )
+from pyverge.versioning.errors import BackwardCompatibilityError
 
 
 class Engine(Generic[VersionValue]):
@@ -62,15 +71,9 @@ class Engine(Generic[VersionValue]):
         self.adapter = adapter
         self.identity_resolver = identity_resolver
         self.reflector = reflector
-        self.migrations = MigrationRegistrationService(
-            registry,
-            adapter,
-            identity_resolver,
-            self.reflector,
-        )
         self.explorer = GraphExplorer(registry)
 
-    def runner(
+    def runner(  # noqa: PLR0913
         self,
         *,
         backend: BackendPort[VersionValue],
@@ -158,15 +161,87 @@ class Engine(Generic[VersionValue]):
     ) -> Versionable[VersionValue] | Migratable[VersionValue]:
         return self.registry[index]
 
-    def store_model(
-        self: Self, version: VersionNode[VersionValue]
-    ) -> VersionNode[VersionValue]:
-        return self.registry.store_model(version)
+    def register(self: Self, command: RegistrationCommand) -> Any:  # noqa: C901
+        """Execute one registration command."""
+        if isinstance(command, RegisterModel):
+            payload = command.payload
+            version = (
+                payload
+                if isinstance(payload, VersionNode)
+                else self.adapter.versionable(payload)
+            )
+            if command.mode is ModelRegistrationMode.STRICT:
+                return self.registry.store_model(version)
+            return self.registry.reconcile_model(version)
+        if isinstance(command, RegisterMigration):
+            spec = command.spec
+            v_from, v_to = spec.pair
+            if v_from.kind != v_to.kind:
+                raise CatalogError(
+                    self.registry.name,
+                    f"Cannot register migration across kinds: "
+                    f"{v_from.kind} != {v_to.kind}",
+                )
+            resolved_from = self.registry.find_model(v_from)
+            resolved_to = self.registry.find_model(v_to)
+            if resolved_from is None and resolved_to is None:
+                raise ModelNotFoundError(self.registry.name, v_from.version)
+            if resolved_from is None:
+                assert resolved_to is not None
+                resolved_from = self.reflector.materialize_missing(
+                    resolved_to, v_from, spec.func
+                )
+                self.registry.store_model(resolved_from)
+            if resolved_to is None:
+                resolved_to = self.reflector.materialize_missing(
+                    resolved_from, v_to, spec.func
+                )
+                self.registry.store_model(resolved_to)
+            if not self.registry.is_adjacent(
+                EdgeKey.from_pair(resolved_from, resolved_to)
+            ):
+                raise CatalogError(
+                    self.registry.name,
+                    f"Cannot register migration with skip versions: {v_from}→{v_to}",
+                )
+            diff = self.adapter.diff(resolved_from, resolved_to)
+            if spec.backward_compatible:
+                compatibility = BackwardCompatibilityGuard(
+                    frozenset(
+                        {
+                            self.adapter.kind_property,
+                            self.adapter.version_property,
+                        }
+                    )
+                )
+                report = compatibility.evaluate(diff)
+                if report.structural_breaking:
+                    raise BackwardCompatibilityError(
+                        self.registry.name,
+                        (resolved_from, resolved_to),
+                        removed=tuple(report.removed_fields),
+                        modified=tuple(report.modified_fields),
+                        required_additions=compatibility.required_additions(
+                            diff, report
+                        ),
+                    )
+            self.registry.store_migration(
+                VersionEdge(
+                    source=resolved_from,
+                    target=resolved_to,
+                    diff=diff,
+                    func=spec.func,
+                    migration=self.identity_resolver.resolve(spec.func),
+                )
+            )
+            return spec.func
+        raise TypeError(f"Unsupported registration command: {command!r}")
 
-    def reconcile_model(
-        self: Self, version: VersionNode[VersionValue]
-    ) -> VersionNode[VersionValue]:
-        return self.registry.reconcile_model(version)
+    def store_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
+        return self.register(RegisterModel(payload, ModelRegistrationMode.STRICT))
+
+    def reconcile_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
+        return self.register(RegisterModel(payload, ModelRegistrationMode.RECONCILE))
 
     def validate(self: Self, key: Comparable[VersionValue] | None = None) -> None:
         if key is None:
@@ -214,10 +289,10 @@ class Engine(Generic[VersionValue]):
         *,
         backward_compatible: bool = False,
     ) -> MigrationFunc:
-        return self.migrations.store(
-            key,
-            func,
-            backward_compatible=backward_compatible,
+        return self.register(
+            RegisterMigration(
+                MigrationSpec(key, func, backward_compatible=backward_compatible)
+            )
         )
 
     def reconstruct(
@@ -226,17 +301,18 @@ class Engine(Generic[VersionValue]):
         target: Comparable[VersionValue],
         migration: JsonPatch | MigrationFunc,
     ) -> None:
-        self.migrations.reconstruct(anchor, target, migration)
+        node = self.reflector.materialize_missing(anchor, target, migration)
+        self.registry.store_model(node)
 
     def propose_migration(
         self: Self,
         source: VersionNode[VersionValue],
         target: VersionNode[VersionValue],
     ) -> Any:
-        return self.migrations.propose(source, target)
+        return self.reflector.propose(source, target)
 
     def get_migration(self: Self, key: Transitional[VersionValue]) -> Migratable:
-        return self.migrations.get(key)
+        return self.registry.get_migration_by_edge(key)
 
     def remove_migration(
         self: Self,
@@ -244,34 +320,54 @@ class Engine(Generic[VersionValue]):
         *,
         force: bool = False,
     ) -> None:
-        self.migrations.remove(key, force=force)
+        edge = self.registry.get_migration_by_edge(key)
+        if not force:
+            if not self.registry.is_adjacent(key):
+                raise CatalogError(
+                    self.registry.name,
+                    f"Cannot remove migration {key.source}→{key.target}: "
+                    "it is not adjacent to any other version.",
+                )
+            if self.registry.is_critical_edge(key):
+                raise CatalogError(
+                    self.registry.name,
+                    f"Cannot remove critical migration {key.source}→{key.target}. "
+                    "It is on the critical path. Use force=True to override.",
+                )
+        self.registry.remove_migration(EdgeKey.from_version_edge(edge))
 
     def remove_migration_range(
         self: Self,
         from_version: Versionable,
         to_version: Versionable,
     ) -> None:
-        self.migrations.remove_range(from_version, to_version)
+        self.registry.remove_migration_range(from_version, to_version)
 
     def delete_kind(self: Self, kind: ModelKind) -> None:
-        self.migrations.delete_kind(kind)
+        self.registry.delete_kind(kind)
 
     def find_migration_path(
         self: Self,
         from_version: Versionable,
         to_version: Versionable,
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
-        return self.migrations.path(from_version, to_version)
+        return self.registry.migration_path(from_version, to_version)
 
     def add_hook(self: Self, key: Transitional[VersionValue], hook: Attachable) -> None:
-        self.migrations.add_hook(key, hook)
+        edge = self.registry.get_migration_by_edge(key)
+        self.registry.add_hook(edge, hook)
 
     def remove_hook(
         self: Self,
         key: Transitional[VersionValue],
         hook: Attachable | None = None,
     ) -> None:
-        self.migrations.remove_hook(key, hook)
+        edge = self.registry.get_migration_by_edge(key)
+        self.registry.remove_hook(edge, hook)
 
     def clear_hooks(self: Self, key: Transitional[VersionValue] | None = None) -> None:
-        self.migrations.clear_hooks(key)
+        if key is None:
+            self.registry.clear_hooks()
+        else:
+            edge = self.registry.get_migration_by_edge(key)
+            self.registry.clear_hooks(edge)

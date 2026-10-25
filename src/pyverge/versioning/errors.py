@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
-from pyverge.core.errors import PyvergeError
+from pyverge.core.errors import CatalogError, PyvergeError
 from pyverge.core.types import MIGRATION_PAIR_LEN
+
+if TYPE_CHECKING:
+    from pyverge.versioning.types import MigrationKey
 
 
 class MigrationApplicationError(PyvergeError):
@@ -46,4 +49,34 @@ class MigrationApplicationError(PyvergeError):
         super().__init__(msg)
 
 
-__all__ = ["MigrationApplicationError"]
+__all__ = ["BackwardCompatibilityError", "MigrationApplicationError"]
+
+
+class BackwardCompatibilityError(CatalogError):
+    """Raised when a declared backward-compatible migration is structural breaking."""
+
+    def __init__(
+        self: Self,
+        catalog_name: str,
+        key: MigrationKey,
+        *,
+        removed: tuple[str, ...],
+        modified: tuple[str, ...],
+        required_additions: tuple[str, ...],
+    ) -> None:
+        self.key = key
+        self.removed = removed
+        self.modified = modified
+        self.required_additions = required_additions
+        details = []
+        if removed:
+            details.append(f"removed={list(removed)}")
+        if modified:
+            details.append(f"modified={list(modified)}")
+        if required_additions:
+            details.append(f"required_additions={list(required_additions)}")
+        super().__init__(
+            catalog_name,
+            f"Migration {key[0]} → {key[1]} was declared backward-compatible "
+            f"but is structurally breaking ({', '.join(details)})",
+        )

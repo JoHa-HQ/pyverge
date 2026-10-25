@@ -9,6 +9,15 @@ class PyvergeError(Exception):
     """Base exception for every pyverge domain error."""
 
 
+class CatalogError(PyvergeError):
+    """Raised when a catalog operation fails."""
+
+    def __init__(self: Self, catalog_name: str, message: str) -> None:
+        """Initializes CatalogError."""
+        self.catalog_name = catalog_name
+        super().__init__(message)
+
+
 class PayloadError(PyvergeError):
     """Raised when payload traversal or extraction fails."""
 
@@ -50,6 +59,7 @@ class MaxDepthExceededError(PayloadError):
 
 
 __all__ = [
+    "CatalogError",
     "MaxDepthExceededError",
     "PayloadError",
     "PayloadValidationError",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pyverge.sources import SourceDescriptor, SourceVisitor
+from pyverge.discovery import SourceDescriptor, SourceVisitor
 
 
 @dataclass(frozen=True, slots=True)

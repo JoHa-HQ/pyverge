@@ -18,7 +18,13 @@ from typing import Any
 import pytest
 from fastmcp import Client, FastMCP
 
-from pyverge.adapters.fastmcp import ToolDiscovery, ToolReflection
+from pyverge.adapters.fastmcp import (
+    FastMCPSource,
+    PromptReflection,
+    ResourceReflection,
+    ToolDiscovery,
+    ToolReflection,
+)
 
 
 @dataclass(frozen=True)
@@ -41,9 +47,24 @@ class Case:
     call_version: str | None = None
 
 
-@pytest.fixture
+def _source_handler(name: str, age: int | None = None) -> dict[str, Any]:
+    return {"name": name, "age": age}
+
+
+SOURCE_CASE = Case(
+    id="source",
+    kind="User",
+    handler=_source_handler,
+    version="2.0.0",
+    args={"name": "A"},
+    expected={"name": "A", "age": None},
+    call_version="2.0.0",
+)
+
+
+@pytest.fixture(params=[SOURCE_CASE], ids=["source"])
 def case(request: pytest.FixtureRequest) -> Case:
-    """The parametrized app/call case (set via indirect parametrize)."""
+    """The parametrized app/call case; defaults to the source case."""
     return request.param
 
 
@@ -54,7 +75,12 @@ def app(request: pytest.FixtureRequest, manager: type, case: Case) -> FastMCP:
     The physical tool and its policy come from *case*; FastMCP enters the
     lifespan when the ``client`` fixture opens its session.
     """
-    instance = manager()
+    runtime_manager = type(
+        "RuntimeManager",
+        (manager,),
+        {"_reflection_locked": False},
+    )
+    instance = runtime_manager()
     discovery = ToolDiscovery(
         instance, [ToolReflection(instance.adapter)], policies=case.policies
     )
@@ -77,3 +103,15 @@ async def client(app: FastMCP) -> AsyncIterator[Client]:
     """A live client session over *app*, so the lifespan runs per test."""
     async with Client(app) as active:
         yield active
+
+
+@pytest.fixture
+def source(app, model_adapter) -> FastMCPSource:
+    return FastMCPSource(
+        app,
+        providers=(
+            ToolReflection(model_adapter),
+            PromptReflection(model_adapter),
+            ResourceReflection(model_adapter),
+        ),
+    )

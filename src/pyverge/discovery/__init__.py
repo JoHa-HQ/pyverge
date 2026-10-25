@@ -1,39 +1,43 @@
-"""Build discovery: descriptor interpretation and registration."""
+"""Build discovery: descriptors, commands, and source traversal."""
 
-from .strategies import (
-    CompositeStrategy,
-    MigrationStrategy,
-    ModelSchemaStrategy,
-    RoutesStrategy,
-    TablesStrategy,
-    TopicsStrategy,
+from .commands import (
+    MigrationSpec,
+    ModelRegistrationMode,
+    RegisterMigration,
+    RegisterModel,
+)
+from .descriptors import (
+    MigrationDescriptor,
+    ModelDescriptor,
+    SourceDescriptor,
+    descriptor_commands,
 )
 from .types import (
+    AsyncSourcePort,
     DescriptorStrategy,
     ReflectionReport,
-    ReflectionStrategy,
+    RegistrationCommand,
     RegistrationContext,
-    RegistrationPort,
-    SourceDescriptor,
     SourcePort,
     SourceVisitor,
 )
-from .visitor import RegistrationVisitor
+from .visitor import RegistrationCollector
 
 __all__ = [
-    "CompositeStrategy",
+    "AsyncSourcePort",
     "DescriptorStrategy",
-    "MigrationStrategy",
-    "ModelSchemaStrategy",
+    "MigrationDescriptor",
+    "MigrationSpec",
+    "ModelDescriptor",
+    "ModelRegistrationMode",
     "ReflectionReport",
-    "ReflectionStrategy",
+    "RegisterMigration",
+    "RegisterModel",
+    "RegistrationCollector",
+    "RegistrationCommand",
     "RegistrationContext",
-    "RegistrationPort",
-    "RegistrationVisitor",
-    "RoutesStrategy",
     "SourceDescriptor",
     "SourcePort",
     "SourceVisitor",
-    "TablesStrategy",
-    "TopicsStrategy",
+    "descriptor_commands",
 ]

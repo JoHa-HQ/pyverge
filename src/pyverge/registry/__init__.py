@@ -19,6 +19,7 @@ from .memory import InMemoryCatalog, Registry
 from .types import (
     ContentHashLookup,
     GraphCatalog,
+    KindWrite,
     MigrationWrite,
     ModelCatalog,
     ModelWrite,
@@ -35,6 +36,7 @@ __all__ = [
     "GraphLockedError",
     "HealthReport",
     "InMemoryCatalog",
+    "KindWrite",
     "MigrationAlreadyRegisteredError",
     "MigrationConflictError",
     "MigrationNotFoundError",

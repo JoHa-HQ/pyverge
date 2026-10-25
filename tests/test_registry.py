@@ -15,21 +15,16 @@ import pytest
 import semver
 
 from pyverge import types
+from pyverge.core import MigrationContext
+from pyverge.engine import Engine
 from pyverge.execution import MigrationHook
 from pyverge.export import ManifestDiff
 from pyverge.jgf import JgfExporter, JgfImporter
-from pyverge.migration import (
-    Engine,
-    MigrationContext,
-    PydanticModelAdapter,
-    Registry,
-)
-from pyverge.migration.errors import BackwardCompatibilityError
-from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.providers import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.providers.types import (
     ModelHandle,
 )
-from pyverge.registry import InMemoryCatalog
+from pyverge.registry import InMemoryCatalog, Registry
 from pyverge.registry.errors import (
     CatalogError,
     GraphLockedError,
@@ -49,6 +44,7 @@ from pyverge.versioning import (
     VersionNode,
     default_content_hasher,
 )
+from pyverge.versioning.errors import BackwardCompatibilityError
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,

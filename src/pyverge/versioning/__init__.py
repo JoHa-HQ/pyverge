@@ -5,7 +5,7 @@ from .canonical import (
     Canonicalizer,
     ContentHasher,
 )
-from .compatibility import CompatibilityReport
+from .compatibility import BackwardCompatibilityGuard, CompatibilityReport
 from .defaults import (
     default_canonicalizer,
     default_content_hasher,
@@ -42,6 +42,7 @@ from .types import (
 )
 
 __all__ = [
+    "BackwardCompatibilityGuard",
     "Canonicalizable",
     "Canonicalizer",
     "ChangeSet",

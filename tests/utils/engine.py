@@ -5,15 +5,13 @@ from __future__ import annotations
 from typing import Any, cast
 
 from pyverge.core import MigrationFunc, VersionValue
-from pyverge.migration import (
-    PydanticDiff,
-    Registry,
-)
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
+from pyverge.providers import PydanticDiff
 from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,
 )
+from pyverge.registry import Registry
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import VersionEdge, VersionKey, VersionNode
 
