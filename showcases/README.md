@@ -18,8 +18,8 @@ involved, wrap a real driver in a thin adapter.
 
 ## HTTP APIs & LLM tools
 
-- [HTTP APIs (httpx transport)](http-apis.md) — converging request/response payloads around a versioned API (projected)
-- [LLM Tool Schemas (MCP SDK & FastMCP)](llm-tools.md) — converging tool-call arguments across MCP SDK and FastMCP (projected)
+- HTTP APIs (httpx transport) — projected; no standalone showcase yet.
+- LLM tool schemas — see the [FastMCP integration](../docs/integrations/fastmcp/index.md).
 
 ## Runnable examples
 
@@ -37,8 +37,9 @@ involved, wrap a real driver in a thin adapter.
 
 | Concern | Where it lives |
 |---------|----------------|
-| Registration and convergence | high-level `Manager` facade |
-| Target selection | `manager.migrate(..., target=...)` policies |
+| Registration | high-level `Manager` facade |
+| Execution | `manager.runner().run(payload, target)` |
+| Target selection | runner target policies |
 | Transport (polling, acks, publish, reconnects) | caller glue / driver adapter |
 | Offset/DLQ/replay decisions | caller glue |
 

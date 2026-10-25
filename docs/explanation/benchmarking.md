@@ -7,9 +7,10 @@ complexity.
 
 Measure the integration seam only:
 
-- **FastStream** — publish → decoder convergence → handler, in/out bridge,
-  startup source traversal.
-- **FastMCP** — primitive traversal and descriptor generation.
+- **FastStream** — per-message publish → decoder convergence → handler, in/out
+  bridge, and `FastStreamSource` descriptor traversal.
+- **FastMCP** — `FastMCPSource` descriptor traversal across tool, prompt, and
+  resource reflection providers.
 
 Adapter benchmarks keep payloads schema-rigorous: `benchmarks/synthesis.py`
 generates instances with Hypothesis, serializes them through the adapter, and

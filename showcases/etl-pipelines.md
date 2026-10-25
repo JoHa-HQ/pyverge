@@ -31,13 +31,14 @@ once per record. Sources stay untouched; the manager produces a uniform output.
 ## Batch migration
 
 ETL jobs often process batches of unrelated records. The manager works on a
-single payload, so run it once per record through a shared instance. For a
-payload with many nested versioned entries, pass an executor per call:
+single payload, so run it once per record through a shared runner. For a
+payload with many nested versioned entries, give the runner a thread backend:
 
 ```python
-from pyverge.migration import LevelParallelExecutor
+from pyverge.execution import ThreadedBackend
 
-manager.migrate(record, executor=LevelParallelExecutor(max_workers=4))
+runner = manager.runner(backend=ThreadedBackend(max_workers=4))
+runner.run(record, "latest")
 ```
 
 ## Quick start
@@ -49,15 +50,10 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.execution import ThreadedBackend
+from pyverge.schemas import PydanticModelAdapter
 
-CustomerManager = Manager[semver.Version].configure(
-    MigrationSettings(
-        direction="forward",
-        on_missing_path="raise",
-    ),
-    PydanticModelAdapter(),
-)
+CustomerManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
 
 @CustomerManager.model()
@@ -98,6 +94,11 @@ def add_segment(data: dict, context=None) -> dict:
 
 
 manager = CustomerManager()
+runner = manager.runner(
+    direction="forward",
+    on_missing_path="raise",
+    backend=ThreadedBackend(max_workers=4),
+)
 
 records = [
     {"kind": "Customer", "version": "1.0.0", "id": 1, "name": "Alice"},
@@ -105,7 +106,7 @@ records = [
 ]
 
 # Each record converges to the latest registered version by default.
-normalized = [manager.migrate(record) for record in records]
+normalized = [runner.run(record, "latest") for record in records]
 for record in normalized:
     assert record["version"] == "3.0.0"
 ```
@@ -115,11 +116,11 @@ for record in normalized:
 - **Manager** — configured once and reused per record.
 - **Default `target="latest"`** — defaults every entry to the newest registered
   version.
-- **`executor=` per call** — `LevelParallelExecutor` parallelizes independent
-  entries within a single payload.
+- **`ThreadedBackend`** — parallelizes independent entries within a single
+  payload.
 
 ## Out of scope
 
 - Source-specific I/O — the manager receives dicts; reading CSV/Parquet/DB rows is
   the caller's responsibility.
-- Dead-letter handling — decide what to do with `MigrationError` in your sink.
+- Dead-letter handling — catch migration errors at the sink boundary.

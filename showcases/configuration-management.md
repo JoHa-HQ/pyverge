@@ -32,7 +32,7 @@ the app reverts. Target policies per config kind make this explicit.
 When rolling back an app version, pin the config target to the older schema:
 
 ```python
-manager.migrate(payload, target={"FeatureFlags": "1.0.0"})
+runner.run(payload, {"FeatureFlags": "1.0.0"})
 ```
 
 ## Quick start
@@ -44,15 +44,9 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
-FeatureFlagsManager = Manager[semver.Version].configure(
-    MigrationSettings(
-        direction="any",
-        on_direction_violation="raise",
-    ),
-    PydanticModelAdapter(),
-)
+FeatureFlagsManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
 
 @FeatureFlagsManager.model()
@@ -81,23 +75,24 @@ def drop_notifications(data: dict, context=None) -> dict:
 
 
 manager = FeatureFlagsManager()
+runner = manager.runner(direction="any", on_direction_violation="raise")
 
 # Normal load: latest schema.
-migrated = manager.migrate(
-    {"kind": "FeatureFlags", "version": "1.0.0", "dark_mode": True}
+migrated = runner.run(
+    {"kind": "FeatureFlags", "version": "1.0.0", "dark_mode": True}, "latest"
 )
 assert migrated["version"] == "2.0.0"
 assert migrated["notifications"] is True
 
 # Rollback: pin to the earliest schema.
-rollback = manager.migrate(
+rollback = runner.run(
     {
         "kind": "FeatureFlags",
         "version": "2.0.0",
         "dark_mode": True,
         "notifications": False,
     },
-    target="earliest",
+    "earliest",
 )
 assert rollback["version"] == "1.0.0"
 assert "notifications" not in rollback
@@ -105,15 +100,14 @@ assert "notifications" not in rollback
 
 ### Abstractions used
 
-- **Manager** with `direction="any"` — supports both forward migration and
+- **Runner** with `direction="any"` — supports both forward migration and
   backward rollback.
-- **`target` policy** — `manager.migrate(payload, target=...)` pins a specific
-  schema at runtime (`"latest"`, `"earliest"`, or a per-kind dict).
+- **`target` policy** — `runner.run(payload, target)` pins a specific schema at
+  runtime (`"latest"`, `"earliest"`, or a per-kind dict).
 - **Migration functions** — registered both ways (`1.0.0 → 2.0.0` and back).
 
 ## Out of scope
 
 - Persistence — the engine returns a dict; where and how the config is stored is
   the caller's responsibility.
-- Validation of unknown keys — use `MigrationSettings.on_extra_field` or handle
-  it in migration functions.
+- Validation of unknown keys — handle it in migration functions.

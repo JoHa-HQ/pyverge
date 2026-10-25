@@ -33,12 +33,9 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
-OrderManager = Manager[semver.Version].configure(
-    MigrationSettings(direction="forward", on_missing_path="raise"),
-    PydanticModelAdapter(),
-)
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
 
 @OrderManager.model()
@@ -74,12 +71,14 @@ class TelemetryGateway:
 
     def __init__(self, client: mqtt.Client, manager, target=None):
         self._client = client
-        self._manager = manager
+        self._runner = manager.runner(
+            direction="forward", on_missing_path="raise"
+        )
         self._target = target or {"*": "latest"}
 
     def on_telemetry(self, _client, _userdata, msg: mqtt.MQTTMessage) -> None:
         payload = json.loads(msg.payload)
-        normalized = self._manager.migrate(payload, target=self._target)
+        normalized = self._runner.run(payload, self._target)
         self._client.publish(f"normalized/{payload['kind']}", json.dumps(normalized))
 
 
@@ -93,7 +92,7 @@ client.on_message = gateway.on_telemetry
 
 ## Abstractions used
 
-- **Manager** — stateless facade; `manager.migrate(payload, target=...)`
+- **Runner** — stateless execution facade; `runner.run(payload, target)`
   converges each device payload.
 - **TelemetryGateway** — thin adapter; converge-and-forward with no per-device
   state.

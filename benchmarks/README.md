@@ -10,8 +10,9 @@ validated against their source version.
 
 ## Run
 
-Benchmarks are excluded from the default suite (`testpaths = ["tests"]`) and are collected as `bench_*.py`. Run them with the global coverage/doctest addopts
-overridden:
+Only `benchmarks/tests` is in the default `testpaths`; adapter and migration
+benchmarks are collected as `bench_*.py` and run explicitly. Override the global
+coverage/doctest addopts:
 
 ```bash
 # all benchmarks
