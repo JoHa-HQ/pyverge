@@ -133,7 +133,7 @@ def test_diff_provider(adapter, source_model, target_model, payload):
     assert reflection.diff(source, target).origin == "schema"
 
 
-def test_dataclass_references() -> None:
+def test_dataclass_reference_cases() -> None:
     adapter = DataclassModelAdapter()
     assert {
         (kind, str(version)) for kind, version in adapter.references(DataclassUserV1)
@@ -202,77 +202,109 @@ def test_proposes_migration_from_schema_diff(
     assert engine.registry.migrations_of(anchor) == frozenset()
 
 
-def test_default_factory_identity() -> None:
-    adapter = DataclassModelAdapter()
-    assert adapter.kind(FactoryIdentity) == "FactoryIdentity"
-    assert adapter.version(FactoryIdentity) == "1.0.0"
+@pytest.fixture
+def dataclass_adapter() -> DataclassModelAdapter:
+    return DataclassModelAdapter()
 
 
-def test_identity_fields_and_dump() -> None:
-    adapter = DataclassModelAdapter()
-    assert adapter.version(PersonV1) == "1.0.0"
-    assert adapter.kind(PersonV1) == "Person"
-    assert adapter.identify(PersonV1)
-    assert not adapter.identify(int)
-    assert adapter.fields(PersonV1) == {"name", "address", "contacts"}
-    assert adapter.dump(PersonV1(name="Alice"))["name"] == "Alice"
+@pytest.mark.parametrize(
+    ("model", "kind", "version", "fields"),
+    [
+        pytest.param(FactoryIdentity, "FactoryIdentity", "1.0.0", set(), id="factory"),
+        pytest.param(
+            PersonV1,
+            "Person",
+            "1.0.0",
+            {"name", "address", "contacts"},
+            id="person",
+        ),
+    ],
+)
+def test_dataclass_identity(
+    dataclass_adapter: DataclassModelAdapter,
+    model: type,
+    kind: str,
+    version: str,
+    fields: set[str],
+) -> None:
+    assert dataclass_adapter.version(model) == version
+    assert dataclass_adapter.kind(model) == kind
+    assert dataclass_adapter.identify(model)
+    assert dataclass_adapter.fields(model) == fields
+
+
+def test_dataclass_dump(dataclass_adapter: DataclassModelAdapter) -> None:
+    assert not dataclass_adapter.identify(int)
+    assert dataclass_adapter.dump(PersonV1(name="Alice"))["name"] == "Alice"
     with pytest.raises(TypeError, match="expected a dataclass"):
-        adapter.dump({"name": "Alice"})
+        dataclass_adapter.dump({"name": "Alice"})
 
 
-def test_can_handle_and_field_models() -> None:
-    adapter = DataclassModelAdapter()
-    assert adapter.can_handle(PersonV1)
-    assert not adapter.can_handle(dict)
-    assert adapter.can_handle(PersonV1, fields=frozenset({"street"}))
-    assert not adapter.can_handle(PersonV1, fields=frozenset({"missing"}))
-    assert adapter.field_model(PersonV1, "address") is AddressV1
-    assert adapter.field_model(PersonV1, "contacts") is ContactV1
-    assert adapter.field_model(PersonV1, "name") is None
-    assert adapter.field_model(PersonV1, "missing") is None
+@pytest.mark.parametrize(
+    ("field", "expected"),
+    [
+        pytest.param("address", AddressV1, id="nested"),
+        pytest.param("contacts", ContactV1, id="list"),
+        pytest.param("name", None, id="scalar"),
+        pytest.param("missing", None, id="missing"),
+    ],
+)
+def test_dataclass_field_models(
+    dataclass_adapter: DataclassModelAdapter,
+    field: str,
+    expected: type | None,
+) -> None:
+    assert dataclass_adapter.can_handle(PersonV1)
+    assert not dataclass_adapter.can_handle(dict)
+    assert dataclass_adapter.can_handle(PersonV1, fields=frozenset({"street"}))
+    assert not dataclass_adapter.can_handle(PersonV1, fields=frozenset({"missing"}))
+    assert dataclass_adapter.field_model(PersonV1, field) is expected
 
 
-def test_resolve_model_and_references() -> None:
-    adapter = DataclassModelAdapter()
-    assert adapter.resolve_model(AddressV1) is AddressV1
-    assert adapter.resolve_model(list[AddressV1]) is AddressV1
-    assert adapter.resolve_model(AddressV1 | None) is AddressV1
-    assert adapter.resolve_model(int) is None
-    assert adapter.references(PersonV1) == {
-        ("Address", adapter.of("1.0.0")),
-        ("Contact", adapter.of("1.0.0")),
-    }
+@pytest.mark.parametrize(
+    ("annotation", "expected"),
+    [
+        pytest.param(AddressV1, AddressV1, id="model"),
+        pytest.param(list[AddressV1], AddressV1, id="list"),
+        pytest.param(AddressV1 | None, AddressV1, id="optional"),
+        pytest.param(int, None, id="unsupported"),
+    ],
+)
+def test_dataclass_resolve_model(
+    dataclass_adapter: DataclassModelAdapter,
+    annotation: object,
+    expected: type | None,
+) -> None:
+    assert dataclass_adapter.resolve_model(annotation) is expected
 
 
-def test_reference_edge_cases() -> None:
-    adapter = DataclassModelAdapter()
-    assert adapter.references(int) == frozenset()
-    assert adapter.references(DuplicateAddresses) == {
-        ("Address", adapter.of("1.0.0")),
-    }
-    assert adapter.references(MixedReferences) == {("Node", adapter.of("1.0.0"))}
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        pytest.param(
+            PersonV1,
+            {("Address", "1.0.0"), ("Contact", "1.0.0")},
+            id="person",
+        ),
+        pytest.param(DuplicateAddresses, {("Address", "1.0.0")}, id="duplicate"),
+        pytest.param(MixedReferences, {("Node", "1.0.0")}, id="mixed"),
+        pytest.param(int, set(), id="unsupported"),
+    ],
+)
+def test_dataclass_references(
+    dataclass_adapter: DataclassModelAdapter,
+    model: type,
+    expected: set[tuple[str, str]],
+) -> None:
+    assert {
+        (kind, str(version)) for kind, version in dataclass_adapter.references(model)
+    } == expected
 
 
-def test_coerce_existing_none_union_and_init_false() -> None:
-    adapter = DataclassModelAdapter()
-    address = AddressV1(street="Main")
-    person = adapter.instantiate(PersonV1, {"address": address})
-    assert person.address is address
-    assert adapter.instantiate(PersonV1, {"address": None}).address is None
-    init_false = adapter.instantiate(WithInitFalse, {"kind": "WithInitFalse"})
-    assert init_false.value == 0
-
-
-def test_diff_without_target_model() -> None:
-    adapter = DataclassModelAdapter()
-    source = adapter.versionable(AddressV1)
-    target = adapter.version_key(kind="Address", version="2.0.0")
-    assert adapter.diff(source, target).fields == {}
-
-
-def test_instantiate_nested_lists_defaults_and_errors() -> None:
-    adapter = DataclassModelAdapter()
-    person = adapter.instantiate(
+def test_dataclass_instantiate_nested_lists_defaults_and_errors(
+    dataclass_adapter: DataclassModelAdapter,
+) -> None:
+    person = dataclass_adapter.instantiate(
         PersonV1,
         {
             "name": "Alice",
@@ -284,40 +316,56 @@ def test_instantiate_nested_lists_defaults_and_errors() -> None:
     assert person.address.street == "Main"
     assert isinstance(person.contacts[0], ContactV1)
     assert person.contacts[0].phone == "123"
-    assert adapter.finalize(PersonV1, {"name": "Bob"})["name"] == "Bob"
-    assert adapter.validate({"name": "Cara"}, PersonV1)["name"] == "Cara"
+    assert dataclass_adapter.finalize(PersonV1, {"name": "Bob"})["name"] == "Bob"
+    assert dataclass_adapter.validate({"name": "Cara"}, PersonV1)["name"] == "Cara"
     with pytest.raises(TypeError, match="Missing required dataclass field"):
-        adapter.instantiate(RequiredValue, {})
+        dataclass_adapter.instantiate(RequiredValue, {})
 
 
-def test_describe_fields_and_materialize() -> None:
-    adapter = DataclassModelAdapter()
-    described = adapter.describe_fields(PersonV1)
+def test_dataclass_coerce_existing_none_union_and_init_false(
+    dataclass_adapter: DataclassModelAdapter,
+) -> None:
+    address = AddressV1(street="Main")
+    person = dataclass_adapter.instantiate(PersonV1, {"address": address})
+    assert person.address is address
+    assert dataclass_adapter.instantiate(PersonV1, {"address": None}).address is None
+    init_false = dataclass_adapter.instantiate(WithInitFalse, {"kind": "WithInitFalse"})
+    assert init_false.value == 0
+
+
+def test_dataclass_diff_without_target_model(
+    dataclass_adapter: DataclassModelAdapter,
+) -> None:
+    source = dataclass_adapter.versionable(AddressV1)
+    target = dataclass_adapter.version_key(kind="Address", version="2.0.0")
+    assert dataclass_adapter.diff(source, target).fields == {}
+
+
+def test_dataclass_describe_fields_and_materialize(
+    dataclass_adapter: DataclassModelAdapter,
+) -> None:
+    described = dataclass_adapter.describe_fields(PersonV1)
     assert not described["name"].required
     assert not described["address"].required
     assert described["address"].default == AddressV1()
-    assert adapter.describe_fields(RequiredValue)["value"].required
+    assert dataclass_adapter.describe_fields(RequiredValue)["value"].required
 
-    source = adapter.versionable(PersonV1)
-    target = adapter.version_key(kind="Person", version="2.0.0")
-    diff = Diff(
-        source=source,
-        target=target,
-        fields={},
-        origin=DiffOrigin.SCHEMA,
-    )
-    materialized = adapter.materialize_model(diff)
-    node = adapter.versionable(materialized)
+    source = dataclass_adapter.versionable(PersonV1)
+    target = dataclass_adapter.version_key(kind="Person", version="2.0.0")
+    diff = Diff(source=source, target=target, fields={}, origin=DiffOrigin.SCHEMA)
+    materialized = dataclass_adapter.materialize_model(diff)
+    node = dataclass_adapter.versionable(materialized)
     assert node.kind == "Person"
     assert str(node.version[1]) == "2.0.0"
-    assert "name" in adapter.fields(materialized)
+    assert "name" in dataclass_adapter.fields(materialized)
     assert EdgeKey.from_pair(source, node)
 
 
-def test_materialize_with_added_and_defaulted_fields() -> None:
-    adapter = DataclassModelAdapter()
-    source = adapter.versionable(AddressV1)
-    target = adapter.version_key(kind="Address", version="2.0.0")
+def test_dataclass_materialize_with_added_and_defaulted_fields(
+    dataclass_adapter: DataclassModelAdapter,
+) -> None:
+    source = dataclass_adapter.versionable(AddressV1)
+    target = dataclass_adapter.version_key(kind="Address", version="2.0.0")
     diff = Diff(
         source=source,
         target=target,
@@ -327,7 +375,7 @@ def test_materialize_with_added_and_defaulted_fields() -> None:
         },
         origin=DiffOrigin.SCHEMA,
     )
-    materialized = adapter.materialize_model(diff)
+    materialized = dataclass_adapter.materialize_model(diff)
     instance = materialized(zip="12345", country="DE")
     assert instance.zip == "12345"
     assert instance.country == "DE"
