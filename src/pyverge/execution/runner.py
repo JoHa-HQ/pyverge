@@ -56,9 +56,9 @@ class Runner(Generic[VersionValue]):
         payload: dict[str, Any],
         target: TargetPolicy,
         *,
-        container: type[Any] | None,
-        max_depth: int,
-        context: MigrationContext | None,
+        container: type[Any] | None = None,
+        max_depth: int = -1,
+        context: MigrationContext | None = None,
         run_id: str | None = None,
     ) -> RunResult:
         plan = self.plan(
