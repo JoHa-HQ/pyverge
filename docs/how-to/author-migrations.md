@@ -103,6 +103,6 @@ Without a registered reverse edge, a backward migration raises.
 
 ## See also
 
-- [Migrate missing models and migrations](migrations.md)
+- [Migrate missing models and migrations](reconstruct-missing-models.md)
 - [Migration strategies](../explanation/migrations.md)
 - [Migration format reference](../reference/migration-formats.md)

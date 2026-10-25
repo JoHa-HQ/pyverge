@@ -27,7 +27,9 @@ nav:
       - Migrate nested payloads: how-to/migrate-nested-payloads.md
       - Register models and migrations: how-to/register-models.md
       - Author migrations: how-to/author-migrations.md
-      - Migrate missing models and migrations: how-to/migrations.md
+      - Reconstruct missing models: how-to/reconstruct-missing-models.md
+      - Reconstruct missing migrations: how-to/reconstruct-missing-migrations.md
+      - Use runtime context in migrations: how-to/migration-context.md
       - Test migrations: how-to/testing.md
       - Telemetry and hooks: how-to/telemetry.md
       - Benchmark adapters: how-to/benchmarking.md

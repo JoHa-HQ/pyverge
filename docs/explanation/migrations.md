@@ -72,5 +72,6 @@ Avoid or postpone reconstruction when:
 
 ## Continue
 
-- [How to reconstruct missing models and migrations](../how-to/migrations.md)
+- [Reconstruct missing models](../how-to/reconstruct-missing-models.md)
+- [Reconstruct missing migrations](../how-to/reconstruct-missing-migrations.md)
 - [Migration format reference](../reference/migration-formats.md)
