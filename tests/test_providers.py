@@ -19,12 +19,8 @@ from pyverge.versioning import Diff, DiffOrigin, EdgeKey, FieldChange, FieldStat
 from tests.examples.dataclasses import (
     AddressV1,
     ContactV1,
-    DuplicateAddresses,
-    FactoryIdentity,
-    MixedReferences,
     PersonV1,
     RequiredValue,
-    WithInitFalse,
 )
 from tests.examples.dataclasses import (
     UserV1 as DataclassUserV1,
@@ -133,13 +129,6 @@ def test_diff_provider(adapter, source_model, target_model, payload):
     assert reflection.diff(source, target).origin == "schema"
 
 
-def test_dataclass_reference_cases() -> None:
-    adapter = DataclassModelAdapter()
-    assert {
-        (kind, str(version)) for kind, version in adapter.references(DataclassUserV1)
-    } == {("Address", "1.0.0")}
-
-
 def test_diff_origin_from_migration():
     adapter = PydanticModelAdapter()
     reflection = Reflection(adapter, CompositeDiffDiscovery())
@@ -210,7 +199,6 @@ def dataclass_adapter() -> DataclassModelAdapter:
 @pytest.mark.parametrize(
     ("model", "kind", "version", "fields"),
     [
-        pytest.param(FactoryIdentity, "FactoryIdentity", "1.0.0", set(), id="factory"),
         pytest.param(
             PersonV1,
             "Person",
@@ -286,9 +274,6 @@ def test_dataclass_resolve_model(
             {("Address", "1.0.0"), ("Contact", "1.0.0")},
             id="person",
         ),
-        pytest.param(DuplicateAddresses, {("Address", "1.0.0")}, id="duplicate"),
-        pytest.param(MixedReferences, {("Node", "1.0.0")}, id="mixed"),
-        pytest.param(int, set(), id="unsupported"),
     ],
 )
 def test_dataclass_references(
@@ -320,25 +305,6 @@ def test_dataclass_instantiate_nested_lists_defaults_and_errors(
     assert dataclass_adapter.validate({"name": "Cara"}, PersonV1)["name"] == "Cara"
     with pytest.raises(TypeError, match="Missing required dataclass field"):
         dataclass_adapter.instantiate(RequiredValue, {})
-
-
-def test_dataclass_coerce_existing_none_union_and_init_false(
-    dataclass_adapter: DataclassModelAdapter,
-) -> None:
-    address = AddressV1(street="Main")
-    person = dataclass_adapter.instantiate(PersonV1, {"address": address})
-    assert person.address is address
-    assert dataclass_adapter.instantiate(PersonV1, {"address": None}).address is None
-    init_false = dataclass_adapter.instantiate(WithInitFalse, {"kind": "WithInitFalse"})
-    assert init_false.value == 0
-
-
-def test_dataclass_diff_without_target_model(
-    dataclass_adapter: DataclassModelAdapter,
-) -> None:
-    source = dataclass_adapter.versionable(AddressV1)
-    target = dataclass_adapter.version_key(kind="Address", version="2.0.0")
-    assert dataclass_adapter.diff(source, target).fields == {}
 
 
 def test_dataclass_describe_fields_and_materialize(

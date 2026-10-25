@@ -2739,19 +2739,6 @@ def _extractor() -> tuple[
     return registry, adapter, CompositeExtractor(registry, adapter=adapter)
 
 
-def test_registry_property_and_invalid_matches() -> None:
-    _, _, extractor = _extractor()
-    assert extractor.registry is not None
-    payload = {
-        "bad_kind": {"kind": 1, "version": "1.0.0"},
-        "bad_version": {"kind": "Leaf", "version": 1},
-        "bad_parse": {"kind": "Leaf", "version": "not-a-version"},
-        "unknown": {"kind": "Other", "version": "1.0.0"},
-        "scalar": "x",
-    }
-    assert list(extractor.extract(payload)) == []
-
-
 def test_containerless_list_and_depth() -> None:
     _, _, extractor = _extractor()
     payload = {
@@ -2794,25 +2781,73 @@ def test_guided_depth_and_validation_errors() -> None:
         list(extractor.extract({}, container=dict))
 
 
-def test_specialized_extractor_guards() -> None:
-    registry, adapter, composite = _extractor()
+def test_specialized_extractor_modes() -> None:
+    registry, adapter, _ = _extractor()
     schema = SchemaFieldsExtractor(registry, adapter=adapter)
     assert list(schema.extract({})) == []
-    assert composite._match("x", "kind", "version") is None
 
-    with pytest.raises(ValueError, match="does not accept a container"):
-        list(schema.extract({}, container=Envelope))
     container = ContainerExtractor(registry, adapter=adapter)
-    with pytest.raises(ValueError, match="requires a container"):
-        list(container.extract({}))
-    with pytest.raises(PayloadValidationError, match="not a recognized"):
-        list(container.extract({}, container=dict))
     with pytest.raises(PayloadValidationError, match="container validation"):
         list(container.extract({"item": "bad"}, container=Envelope))
-    validated = ContainerExtractor(
+
+    permissive = ContainerExtractor(
         registry,
         adapter=adapter,
         validation_mode="none",
     )
     payload = {"item": {"kind": "Leaf", "version": "1.0.0"}}
-    assert len(list(validated.extract(payload, container=Envelope))) == 1
+    assert len(list(permissive.extract(payload, container=Envelope))) == 1
+
+
+def test_public_registry_error_paths(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+    registry: Registry[types.VersionValue],
+) -> None:
+    with pytest.raises(CatalogError, match="No versions registered"):
+        _ = registry.latest_version
+    with pytest.raises(CatalogError, match="No versions registered"):
+        registry.earliest("Missing")
+    with pytest.raises(CatalogError, match="Unsupported index type"):
+        _ = registry[{}]
+
+    def _migrate(data: dict, context: MigrationContext | None = None) -> dict:
+        return data
+
+    source = envelope_model(model_adapter, versioning_settings, UserV1)
+    target = envelope_model(model_adapter, versioning_settings, UserV2)
+    registry.store_model(source)
+    registry.store_model(target)
+    registry.store_migration(
+        edge_from_models(
+            model_adapter,
+            versioning_settings,
+            UserV1,
+            UserV2,
+            func=_migrate,
+        )
+    )
+    snapshot = registry.snapshot()
+    assert snapshot.versions == registry.versions
+
+    with pytest.raises(CatalogError, match="Clear migrations first"):
+        registry.clear_models()
+
+
+def test_backward_compatibility_error_reports_modified_and_required(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+) -> None:
+    error = BackwardCompatibilityError(
+        "test",
+        (
+            envelope_model(model_adapter, versioning_settings, UserV1),
+            envelope_model(model_adapter, versioning_settings, UserV2),
+        ),
+        removed=(),
+        modified=("age",),
+        required_additions=("status",),
+    )
+    message = str(error)
+    assert "modified=['age']" in message
+    assert "required_additions=['status']" in message

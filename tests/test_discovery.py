@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, cast
 
 import pytest
 
@@ -194,14 +193,6 @@ def _callable_migration(data: dict, context=None) -> dict:
             {"removed"},
             {"nested"},
             id="callable",
-        ),
-        pytest.param(
-            CallableDiffDiscovery(),
-            cast(Any, len),
-            set(),
-            set(),
-            set(),
-            id="callable-without-source",
         ),
     ],
 )

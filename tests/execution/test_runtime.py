@@ -35,7 +35,7 @@ from pyverge.execution import (
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.execution.backends import AsyncBackend, ThreadedBackend
+from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from pyverge.execution.context import LayeredView, RunContext, StepContext
 from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
 from pyverge.providers import (
@@ -497,6 +497,90 @@ def test_execution_planner_builds_levels(
 
 def _plus_one(value: int) -> int:
     return value + 1
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_runner_process_backend(manager, registry: Registry, model_adapter) -> None:
+    backend = ProcessBackend(max_workers=1)
+    try:
+        result = _run(
+            manager().runner(runtime=backend),
+            _payload(),
+            latest_target_resolver(registry),
+            container=None,
+            max_depth=-1,
+            context=None,
+        )
+    finally:
+        backend.close()
+
+    assert result["document"]["version"] == "2.0.0"
+
+
+@pytest.mark.parametrize(
+    ("target_case", "expected"),
+    [
+        pytest.param(None, "1.0.0", id="none"),
+        pytest.param("skip", "1.0.0", id="skip"),
+        pytest.param("latest", "2.0.0", id="latest"),
+        pytest.param("earliest", "1.0.0", id="earliest"),
+        pytest.param("2.0.0", "2.0.0", id="pinned"),
+        pytest.param("model", "2.0.0", id="model"),
+        pytest.param("dict", "2.0.0", id="per-kind"),
+        pytest.param("wildcard", "2.0.0", id="wildcard"),
+        pytest.param("fixed", "2.0.0", id="fixed"),
+    ],
+)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_runner_target_policy_forms(
+    manager,
+    model_adapter,
+    versioning_settings,
+    target_case,
+    expected: str,
+) -> None:
+    if target_case == "model":
+        target = UserV2
+    elif target_case == "dict":
+        target = {"User": "2.0.0"}
+    elif target_case == "wildcard":
+        target = {"*": "2.0.0"}
+    elif target_case == "fixed":
+        target = model_adapter.versionable(UserV2)
+    else:
+        target = target_case
+
+    result = manager().runner().run(_payload(), target)
+
+    assert result["document"]["version"] == expected
 
 
 def _payload() -> dict:

@@ -30,10 +30,13 @@ from pyverge.versioning import (
     DiffOrigin,
     FieldChange,
     FieldStatus,
+    MigrationIdentity,
+    VersionEdge,
     VersionKey,
     VersionNode,
     default_content_hasher,
 )
+from pyverge.versioning.errors import MigrationApplicationError
 from tests.examples.pydantic.chrono import (
     UserV20250310,
     UserV20251231,
@@ -687,3 +690,28 @@ class TestJsonataMigration:
 
         with pytest.raises(TypeError, match="JSON object"):
             migration.migration({"kind": "User", "version": "1.0.0"})
+
+
+def test_version_edge_wraps_migration_failure() -> None:
+    adapter = PydanticModelAdapter()
+    source = adapter.versionable(UserV1)
+    target = adapter.versionable(UserV2)
+
+    def fail(data, context=None):
+        raise RuntimeError("boom")
+
+    edge = VersionEdge(
+        source=source,
+        target=target,
+        diff=adapter.diff(source, target),
+        func=fail,
+        migration=MigrationIdentity("callable", "fail"),
+    )
+
+    with pytest.raises(MigrationApplicationError) as error:
+        edge({"kind": "User"})
+
+    assert error.value.kind == "User"
+    assert error.value.source is source
+    assert error.value.target is target
+    assert "boom" in str(error.value)
