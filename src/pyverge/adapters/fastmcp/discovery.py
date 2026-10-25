@@ -6,11 +6,13 @@ from typing import TYPE_CHECKING, Any, cast
 from pyverge.core.types import (
     Attachable,
 )
+from pyverge.discovery import RegisterModel, RegistrationCollector
 from pyverge.manager import Manager
 from pyverge.registry.errors import MissingReferenceError, ModelConflictError
 
 from .converge import Converger
 from .reflection import ComponentReflection, Policy, ReflectedNode
+from .source import FastMCPSource
 
 if TYPE_CHECKING:
     from pyverge.manager.types import (
@@ -22,9 +24,9 @@ class ToolDiscovery:
     """Index a server's versioned primitives against one manager's graph.
 
     The lifecycle phases: :meth:`search` traverses the providers and indexes
-    the nodes the manager owns; :meth:`register` materializes each as its anchor
-    model and validates the graph; :meth:`enrich` materializes the virtual
-    surface and attaches hooks. The caller owns the ordering.
+    the nodes the manager owns; :meth:`register` reflects those nodes through
+    ``FastMCPSource`` and validates the graph; :meth:`enrich` materializes the
+    virtual surface and attaches hooks. The caller owns the ordering.
     """
 
     def __init__(
@@ -80,23 +82,31 @@ class ToolDiscovery:
         self._declared[node.kind] = policy
         self._nodes[(node.kind, node.version)] = node
 
-    def register(self) -> None:
-        """Materialize each indexed node as its anchor model, then validate.
+    def source(self, server: Any) -> FastMCPSource:
+        """Expose the indexed nodes as a FastMCP source."""
+        return FastMCPSource(server, nodes=self._nodes.values())
 
-        The engine reconciles a node against an already-registered model (a
-        conflict names the primitive). References are validated only after every
-        node is stored, since completeness is a property of the whole graph.
+    async def register(self, server: Any) -> None:
+        """Register indexed nodes through ``FastMCPSource``, then validate.
+
+        References are validated only after every node is stored, since
+        completeness is a property of the whole graph.
         """
-        for (kind, version), node in self._nodes.items():
+        collector = RegistrationCollector()
+        await self.source(server).accept(collector)
+        for command in collector.commands:
             try:
-                self._manager.reconcile_model(node.versionable())
+                type(self._manager)._default_engine.register(command)
             except ModelConflictError as error:
+                if not isinstance(command, RegisterModel):
+                    raise
+                version = command.payload.version
                 raise ModelConflictError(
                     error.catalog_name,
                     error.version,
                     error.registered,
                     error.incoming,
-                    subject=f"primitive {kind!r}@{version}",
+                    subject=f"primitive {version[0]!r}@{version[1]}",
                 ) from error
         self._reconcile()
 

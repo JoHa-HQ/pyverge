@@ -199,7 +199,7 @@ async def test_policy_declared_in_meta(manager: type) -> None:
     server.tool(_rich_handler, name="User", version="2.0.0", meta={"policy": "latest"})
 
     await discovery.search(server)
-    discovery.register()
+    await discovery.register(server)
     await discovery.enrich(server)
 
     names = {t.name for t in await server.list_tools()}

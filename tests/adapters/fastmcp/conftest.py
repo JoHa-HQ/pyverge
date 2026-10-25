@@ -88,7 +88,7 @@ def app(request: pytest.FixtureRequest, manager: type, case: Case) -> FastMCP:
     @asynccontextmanager
     async def app_lifespan(server: FastMCP) -> AsyncGenerator[dict[str, Any], None]:
         await discovery.search(server)
-        discovery.register()
+        await discovery.register(server)
         await discovery.enrich(server)
         yield {"discovery": discovery}
 

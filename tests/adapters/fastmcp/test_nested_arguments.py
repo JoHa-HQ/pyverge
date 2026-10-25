@@ -36,7 +36,7 @@ from tests.examples.pydantic.semver_nested import (
 
 async def _run_lifecycle(discovery: ToolDiscovery, server: FastMCP) -> None:
     await discovery.search(server)
-    discovery.register()
+    await discovery.register(server)
     await discovery.enrich(server)
 
 
@@ -163,7 +163,7 @@ async def test_per_kind_policy_drives_nested_convergence(manager) -> None:
     @asynccontextmanager
     async def app_lifespan(server: FastMCP):
         await discovery.search(server)
-        discovery.register()
+        await discovery.register(server)
         await discovery.enrich(server)
         yield {}
 
