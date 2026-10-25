@@ -165,29 +165,54 @@ code.
 
 ## Release process
 
-Releases are automated via [commitizen](https://commitizen-tools.github.io/commitizen/):
+Releases use two channels:
 
-1. Commit messages determine the next version:
-   - `feat:` → minor version bump
-   - `fix:` → patch version bump
-   - `feat!:` or `fix!:` → major version bump
-   - a `BREAKING CHANGE:` footer also marks the change as breaking
+| Channel | Tag | Registry | Approval |
+| --- | --- | --- | --- |
+| Dev | `vX.Y.Z.devN` | TestPyPI | `testpypi` environment |
+| Stable | `vX.Y.Z` | PyPI | `pypi` environment |
 
-   With the issue scope, the form is `type(#issue)!: description`, for example
-   `feat(#56)!: replace the manager registration API`.
+Commit messages determine the next stable version:
 
-2. Merging to `main` runs the `Release` workflow plan job. It computes the
-   next version from commits and writes the proposed SHA, version, ticket, and
-   changelog to the run summary.
+- `feat:` → minor version bump
+- `fix:` → patch version bump
+- `feat!:` or `fix!:` → major version bump
+- a `BREAKING CHANGE:` footer also marks the change as breaking
 
-3. The `release` environment requires reviewer approval. Approval applies to
-   that exact planned SHA/version.
+With the issue scope, the form is `type(#issue)!: description`, for example
+`feat(#56)!: replace the manager registration API`.
 
-4. After approval, the workflow bumps the version, creates the tag, builds the
-   distribution once, publishes it to PyPI, and creates the GitHub Release.
+### Dev releases
 
-5. Pre-release tags (`vX.Y.Z-rcN`) or a manual `Publish Dev (TestPyPI)` run
-   publish to TestPyPI.
+1. Merge a reviewed PR to `main`.
+2. CI must pass.
+3. The TestPyPI workflow requests approval from the `testpypi` environment.
+4. After approval, the workflow computes the next dev version
+   (`X.Y.Z.devN`), builds the artifact, publishes it to TestPyPI, updates the
+   deployment record, verifies the install, and creates the dev tag.
+5. Dev releases do not modify `CHANGELOG.md`.
+
+### Stable release promotion
+
+1. Choose a TestPyPI-validated dev tag.
+2. Run the promotion workflow with that dev tag.
+3. The promotion verifies the tag points to `main`, CI passed, and the matching
+   TestPyPI version exists.
+4. The PyPI workflow requests approval from the `pypi` environment.
+5. After approval, the workflow computes the stable version, prepares the
+   release commit and changelog, builds the artifact, publishes it to PyPI,
+   updates the deployment record, verifies the install, pushes the stable tag,
+   and creates the GitHub Release.
+6. The stable tag is created only after PyPI verification succeeds.
+
+### Release invariants
+
+- TestPyPI dev releases run independently and never trigger PyPI automatically.
+- PyPI promotion is an explicit human decision followed by `pypi` approval.
+- No tag is created before environment approval and successful publication.
+- No stable changelog entry reaches `main` before the PyPI release succeeds.
+- One stable release runs at a time.
+
 
 ## Community
 
