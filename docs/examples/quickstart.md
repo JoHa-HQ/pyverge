@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 from pyverge import Manager
 from pyverge.providers import PydanticModelAdapter
-from pyverge.types import ManagerMigrationKey
 
 UserManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
@@ -28,12 +27,14 @@ class UserV2(BaseModel):
     age: int = 0
 
 
+@UserManager.migration(
+    "User",
+    "1.0.0",
+    "2.0.0",
+    migration_id="docs.quickstart.add_age",
+)
 def add_age(data: dict, context=None) -> dict:
     return {**data, "age": 0}
-
-
-add_age.__migration_id__ = "docs.quickstart.add_age"
-UserManager.store_migration(ManagerMigrationKey("User", "1.0.0", "2.0.0"), add_age)
 
 manager = UserManager()
 result = manager.runner().run(

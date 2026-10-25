@@ -22,6 +22,7 @@ nav:
       - Executable quickstart: examples/quickstart.md
   - How-to:
       - how-to/index.md
+      - Register models and migrations: how-to/register-models.md
       - Author migrations: how-to/author-migrations.md
       - Migrate missing models and migrations: how-to/migrations.md
       - Test migrations: how-to/testing.md

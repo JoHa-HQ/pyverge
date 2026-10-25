@@ -1,8 +1,9 @@
 # Managers
 
 A `Manager` is a **bounded context** — one version graph, one registry, one
-adapter. This page covers how to register models and migrations, and how the
-bounded-context invariant shapes how you organize one or several managers.
+adapter. This page explains the bounded-context invariant and how it shapes manager
+organization. See [Register models and migrations](../how-to/register-models.md)
+for the task.
 
 ## The invariant
 
@@ -13,90 +14,7 @@ The unit of ownership is not "a kind" — it is **the whole graph rooted at a
 source**. If a payload can reach a kind, that kind must live in the manager that
 handles the payload.
 
-## Registration
-
-### Decorator registration
-
-Register models and migrations with decorators at class definition time. Version
-and kind are read from the class itself.
-
-```python
-from typing import Literal
-
-import semver
-from pydantic import BaseModel
-
-from pyverge import Manager
-from pyverge.providers import PydanticModelAdapter
-
-UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(),
-)
-
-
-@UserManager.model()
-class UserV1(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["1.0.0"] = "1.0.0"
-    name: str
-    email: str
-
-
-@UserManager.model()
-class UserV2(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["2.0.0"] = "2.0.0"
-    name: str
-    email: str
-    age: int | None = None
-
-
-@UserManager.migration("User", "1.0.0", "2.0.0")
-def add_age(data: dict, context=None) -> dict:
-    return {**data, "age": None}
-```
-
-### Lazy registration
-
-Define model classes first and register them later, either at the class level
-or on a manager instance. This keeps schema definition separate from runtime
-wiring and makes testing easier.
-
-```python
-class UserV1(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["1.0.0"] = "1.0.0"
-    name: str
-    email: str
-
-
-class UserV2(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["2.0.0"] = "2.0.0"
-    name: str
-    email: str
-    age: int | None = None
-
-
-def add_age(data: dict, context=None) -> dict:
-    data["age"] = None
-    return data
-
-
-# Class-level registration (preferred) — no instance needed.
-UserManager.model()(UserV1)
-UserManager.model()(UserV2)
-UserManager.migration("User", "1.0.0", "2.0.0")(add_age)
-
-# Runtime instances copy the graph at construction time.
-manager = UserManager()
-```
-
-Register on the configured manager class before creating a runtime instance.
-Registration through an instance after construction writes to the class graph,
-not to that instance's runtime copy.
-
-### Which manager owns what
+## Which manager owns what
 
 A model belongs to the manager that owns its **whole version graph** — the kind
 and every kind it transitively contains. The rest of this page explains why.

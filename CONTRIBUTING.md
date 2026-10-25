@@ -96,6 +96,55 @@ Validate the docs before committing:
 uv run mkdocs build --strict
 ```
 
+### How-to page template
+
+Task-oriented pages use this shape:
+
+```markdown
+# Verb-led task title
+
+One-sentence outcome.
+
+## Prerequisites
+
+## Steps
+
+## Verify
+
+## Troubleshooting
+
+## See also
+```
+
+Keep reference facts out of how-tos; link to `docs/reference/` instead.
+
+## Docs analytics and feedback
+
+Selected provider: **Plausible**.
+
+- Privacy-friendly and cookieless.
+- Tracks page views, referrers, and custom events.
+- Requires a project domain in the Plausible account before enabling.
+
+Events to track:
+
+```text
+search
+zero-result-search
+copy-code
+docs-feedback
+```
+
+Feedback uses GitHub Issues rather than a hosted feedback widget. Add a
+prefilled issue link to a page when collecting targeted feedback:
+
+```text
+https://github.com/JoHa-HQ/pyverge/issues/new?labels=docs
+```
+
+Do not add a third-party feedback widget until ownership and privacy review are
+complete.
+
 ## Code style
 
 - **Formatting**: `ruff format` (Black-compatible)
