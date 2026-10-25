@@ -1,42 +1,59 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import cast
 
 import pytest
 
 from pyverge import Manager
-from pyverge.core import (
-    DiscoverySettings,
-    MigrationSettings,
-    VersioningSettings,
-)
+from pyverge.core.clock import SystemClock
+from pyverge.core.ids import UuidIdFactory
 from pyverge.core.types import (
     VersionValue,
 )
-from pyverge.manager.types import (
-    ResolverFactory,
+from pyverge.discovery.reflection import (
+    CompositeDiffDiscovery,
+    Reflection,
+    Reflector,
 )
-from pyverge.migration import (
-    CompoundKeyWalker,
-    DefaultMigrationEntry,
-    Engine,
-    GraphBuilder,
+from pyverge.engine import Engine
+from pyverge.execution import (
+    AnyDirection,
+    CompositeExtractor,
+    ExecutionCoordinator,
+    ExecutionPlanner,
+    PathResolver,
+    PolicyEngine,
+    Runner,
+    TargetCompiler,
+)
+from pyverge.execution.backends import ThreadedBackend
+from pyverge.execution.context import ExecutionEnvironment
+from pyverge.execution.types import BackendPort
+from pyverge.migrations.backend import MigrationMaterializer
+from pyverge.migrations.identity import DefaultMigrationIdentityResolver
+from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
+from pyverge.providers import (
     JsonSchemaModelAdapter,
-    MigrationGraph,
     PydanticModelAdapter,
-    PydanticWalker,
-    Registry,
-    SequentialExecutor,
-)
-from pyverge.migration.types import (
-    Walker,
 )
 from pyverge.providers.types import (
     ModelAdapter,
 )
+from pyverge.registry import Registry
+from pyverge.schemas.backend import ModelMaterializer
+from pyverge.settings import (
+    DiscoverySettings,
+    MigrationSettings,
+    VersioningSettings,
+    manager_kwargs,
+    overrides,
+    without_identity,
+)
+from pyverge.versioning import DiffMaterializer, default_content_hasher
 from tests.utils import register_models
 from tests.utils.engine import register_migrations
-from tests.utils.settings import overrides
+from tests.utils.source import StaticSource
 
 # Example model modules are imported by tests, not collected as tests.  With
 # ``--doctest-modules`` their basenames (e.g. ``semver.py``) collide with
@@ -53,7 +70,7 @@ def versioning_settings(request: pytest.FixtureRequest) -> VersioningSettings:
 @pytest.fixture
 def migration_settings(request: pytest.FixtureRequest) -> MigrationSettings:
     custom = cast(dict, getattr(request, "param", {}))
-    return MigrationSettings(**overrides(custom))
+    return MigrationSettings(**without_identity(custom))
 
 
 @pytest.fixture
@@ -101,7 +118,7 @@ def registry(
     migration_settings: MigrationSettings,
 ) -> Registry[VersionValue]:
     _strategy, name, models, migrations = request.param
-    registry = Registry[VersionValue](name=name)
+    registry = Registry[VersionValue](name=name, hasher=default_content_hasher())
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
     if migrations:
@@ -114,72 +131,151 @@ def walker(
     registry: Registry[VersionValue],
     migration_settings: MigrationSettings,
     model_adapter: PydanticModelAdapter,
-) -> Walker:
-    """A preconfigured :class:`PydanticWalker` bound to the shared registry.
+) -> CompositeExtractor:
+    """A preconfigured :class:`CompositeExtractor` bound to the shared registry.
 
     Pass it to ``Manager[VersionValue].configure(settings, adapter, walker=...)``
     to drive container-guided discovery.
     """
-    return PydanticWalker(
+    return CompositeExtractor(
         registry,
-        settings=migration_settings,
         adapter=model_adapter,
+        validation_mode=migration_settings.validation_mode,
     )
 
 
-@pytest.fixture
-def graph_builder(
-    registry: Registry[VersionValue],
-    migration_settings: MigrationSettings,
-    model_adapter: ModelAdapter,
-) -> GraphBuilder[VersionValue]:
-    """Return a graph builder with the standard compound-key walker."""
-    return GraphBuilder(
-        registry,
-        migration_settings,
-        CompoundKeyWalker(registry, settings=migration_settings, adapter=model_adapter),
-    )
-
-
-@pytest.fixture
-def migration_graph(
+@pytest.fixture(
+    params=[(SystemClock, UuidIdFactory)],
+    ids=["system-uuid"],
+)
+def execution_environment(
     request: pytest.FixtureRequest,
-    graph_builder: GraphBuilder[VersionValue],
+) -> ExecutionEnvironment:
+    clock_cls, id_cls = request.param
+    return ExecutionEnvironment(
+        clock=clock_cls(),
+        id_factory=id_cls(),
+        logger=None,
+        tracer=None,
+    )
+
+
+@pytest.fixture
+def coordinator(
+    walker: CompositeExtractor[VersionValue],
     registry: Registry[VersionValue],
-) -> MigrationGraph[VersionValue]:
-    resolver_factory, payload = cast("tuple[ResolverFactory, dict]", request.param)
-    return graph_builder.build(
-        payload,
-        target_resolver=resolver_factory(registry),
-    ).graph
+) -> ExecutionCoordinator[VersionValue]:
+    return ExecutionCoordinator(
+        extractor=walker,
+        paths=PathResolver(registry),
+        policy=PolicyEngine(
+            direction=AnyDirection(),
+            on_direction_violation="raise",
+            on_missing_path="raise",
+            depth_limit=-1,
+            on_depth_violation="raise",
+        ),
+        planner=ExecutionPlanner(),
+    )
+
+
+@pytest.fixture
+def runtime_backend(
+    request: pytest.FixtureRequest,
+) -> Iterator[BackendPort]:
+    backend_cls, kwargs = getattr(
+        request, "param", (ThreadedBackend, {"max_workers": 0})
+    )
+    backend = backend_cls(**kwargs)
+    yield backend
+    close = getattr(backend, "close", None)
+    if close is not None:
+        close()
+
+
+@pytest.fixture
+def runtime_environment() -> ExecutionEnvironment:
+    return ExecutionEnvironment(
+        clock=SystemClock(),
+        id_factory=UuidIdFactory(),
+        logger=None,
+        tracer=None,
+    )
+
+
+@pytest.fixture
+def runner(
+    coordinator: ExecutionCoordinator[VersionValue],
+    registry: Registry[VersionValue],
+    model_adapter: ModelAdapter,
+    runtime_backend: BackendPort,
+    runtime_environment: ExecutionEnvironment,
+) -> Runner[VersionValue]:
+    return Runner(
+        coordinator=coordinator,
+        adapter=model_adapter,
+        backend=runtime_backend,
+        middleware=(),
+        environment=runtime_environment,
+        target_compiler=TargetCompiler[VersionValue](registry, model_adapter),
+    )
+
+
+@pytest.fixture
+def model_materializer(model_adapter: ModelAdapter) -> ModelMaterializer:
+    return ModelMaterializer(model_adapter)
+
+
+@pytest.fixture
+def migration_materializer(request: pytest.FixtureRequest) -> MigrationMaterializer:
+    backend = getattr(request, "param", JsonPatchMigrationBackend)
+    return MigrationMaterializer(backend())
+
+
+@pytest.fixture
+def reflector(
+    model_adapter: ModelAdapter,
+    model_materializer: ModelMaterializer,
+    migration_materializer: DiffMaterializer[object],
+    migration_settings: MigrationSettings,
+) -> Reflector[VersionValue]:
+    return Reflector[VersionValue](
+        model_adapter,
+        Reflection[VersionValue](model_adapter, CompositeDiffDiscovery()),
+        model_materializer=model_materializer,
+        migration_materializer=migration_materializer,
+        on_missing=migration_settings.on_missing,
+    )
 
 
 @pytest.fixture
 def engine(
     registry: Registry,
-    migration_settings: MigrationSettings,
     model_adapter: ModelAdapter,
+    reflector: Reflector[VersionValue],
 ) -> Engine[VersionValue]:
     return Engine(
         registry,
-        migration_settings,
-        SequentialExecutor(),
-        GraphBuilder(
-            registry,
-            migration_settings,
-            CompoundKeyWalker(
-                registry, settings=migration_settings, adapter=model_adapter
-            ),
-        ),
         model_adapter,
-        entry_migration=DefaultMigrationEntry(),
+        DefaultMigrationIdentityResolver(),
+        reflector,
     )
+
+
+@pytest.fixture
+def source(request: pytest.FixtureRequest) -> StaticSource:
+    """Build a static source from ``(descriptors, source_id)`` params."""
+    descriptors, source_id = request.param
+    return StaticSource(tuple(descriptors), source_id)
 
 
 @pytest.fixture
 def manager(
     engine: Engine[VersionValue],
+    migration_settings: MigrationSettings,
 ) -> type[Manager[VersionValue]]:
     return Manager[VersionValue].configure(
-        engine.settings, engine.adapter, engine=engine
+        engine.adapter,
+        engine=engine,
+        **manager_kwargs(migration_settings),
     )

@@ -1,14 +1,22 @@
-# pyverge
+<p align="center">
+  <a href="https://pypi.org/project/pyverge/"><img src="https://img.shields.io/pypi/v/pyverge.svg" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/pyverge/"><img src="https://img.shields.io/pypi/dm/pyverge.svg" alt="PyPI downloads"></a>
+  <a href="https://pypi.org/project/pyverge/"><img src="https://img.shields.io/pypi/pyversions/pyverge.svg" alt="Python versions"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/JoHa-HQ/pyverge"><img src="https://api.scorecard.dev/projects/github.com/JoHa-HQ/pyverge/badge" alt="OpenSSF Scorecard"></a>
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/pyverge.svg)](https://pypi.org/project/pyverge/)
-[![PyPI downloads](https://img.shields.io/pypi/dm/pyverge.svg)](https://pypi.org/project/pyverge/)
-[![Python versions](https://img.shields.io/pypi/pyversions/pyverge.svg)](https://pypi.org/project/pyverge/)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/JoHa-HQ/pyverge/badge)](https://scorecard.dev/viewer/?uri=github.com/JoHa-HQ/pyverge)
+<h1 align="center">pyverge</h1>
 
-Schema evolution and migrations for versioned data. Register model versions,
-define migrations between them, and converge payloads to a target schema at
-runtime. The engine is provider-agnostic; Pydantic and JSON Schema adapters ship
-today.
+<p align="center">
+  <strong>Converge versioned payloads to any target schema without coordinated releases.</strong>
+</p>
+
+<p align="center">
+  <a href="docs/tutorials/getting-started.md">Quick start</a> ·
+  <a href="docs/">Docs</a> ·
+  <a href="showcases/">Examples</a> ·
+  <a href="docs/reference/api.md">API</a>
+</p>
 
 ## Installation
 
@@ -21,6 +29,10 @@ pip install "pyverge[faststream]"   # messaging adapter
 
 Development: `uv sync --group dev`.
 
+> Upgrading from the previous Manager API? See the
+> [upgrade guide](docs/reference/upgrades.md) for `migrate`/`amigrate`,
+> `MigrationSettings`, runner, and import-path replacements.
+
 ## Quick start
 
 ```python
@@ -29,12 +41,10 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge import Manager, MigrationSettings, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.schemas import PydanticModelAdapter
 
-UserManager = Manager[semver.Version].configure(
-    MigrationSettings(),
-    PydanticModelAdapter(),
-)
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
 
 @UserManager.model()
@@ -59,27 +69,45 @@ def add_age(data: dict, context=None) -> dict:
     return {**data, "age": None}
 
 
-migrated = UserManager().migrate(
-    {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"}
+manager = UserManager()
+migrated = manager.runner().run(
+    {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"},
+    "latest",
 )
 # {"kind": "User", "version": "2.0.0", "name": "Alice", "email": "a@b.com", "age": None}
 ```
 
-### Async and prepared runs
+### Async execution
 
 ```python
-result = await manager.amigrate(payload)
+from pyverge.execution import AsyncBackend
 
-run = manager.delegate(payload)
-first = run.run(context={"tenant_id": "tenant_a"})
-second = run.run(context={"tenant_id": "tenant_b"})
+runner = manager.runner(
+    runtime=AsyncBackend(
+        backend="asyncio",
+        backend_options={},
+        max_workers=4,
+    )
+)
+result = await runner.run(payload, "latest")
 ```
 
-`migrate`/`amigrate` execute immediately. `delegate` and `prepare` return a
-reusable `MigrationRun`. Execution policy comes from settings:
+`Runner.run()` defaults:
+
+```text
+container=None
+max_depth=-1
+context=None
+```
+
+Use `context=` for runtime bindings:
 
 ```python
-MigrationSettings(execution_mode="async", parallel_workers=4)
+result = manager.runner().run(
+    payload,
+    "latest",
+    context={"tenant_id": "tenant_99"},
+)
 ```
 
 ## Migration formats
@@ -115,7 +143,7 @@ schema hashes, migration hashes, and a content hash. Lifespan/startup does not
 write it. CI commands (`doctor`, `validate`, `migrate --check`, `compat`)
 return non-zero on failure. Config auto-discovery is not wired yet.
 
-See [CLI Reference](docs/cli.md).
+See [CLI Reference](docs/reference/cli.md).
 
 ## Features
 
@@ -123,7 +151,7 @@ See [CLI Reference](docs/cli.md).
 - **Convergent engine** — graph-driven migration of nested versioned entries
 - **Declarative migrations** — JSON Patch, JSONata expressions, or Python callables
 - **Runtime context** — shared read-only bindings across every step
-- **Sync/async executors** — sequential or level-parallel; prepared runs
+- **Sync/async backends** — threaded, async, or process execution
 - **Reflection** — reconstruct missing models or propose migrations from diffs
 - **Compatibility** — `CompatibilityReport`, breaking-change checks, JSON Patch rendering
 - **Graph manifest** — JGF v2 snapshot with stable hashes for CI divergence checks
@@ -139,14 +167,16 @@ timeline.
 
 ## Documentation
 
-- [Getting Started](docs/getting-started.md)
-- [Managers](docs/managers.md) · [Concepts](docs/concepts.md)
-- [Providers](docs/providers.md)
-- [Migrations](docs/migration.md) · [Migration Formats](docs/migration-formats.md)
-- [Runtime & Execution](docs/runtime.md) · [Execution Flow](docs/execution-flow.md)
-- [Target Policy](docs/target-policy.md) · [Compatibility](docs/compatibility.md)
-- [CLI Reference](docs/cli.md) · [Telemetry & Hooks](docs/telemetry.md)
-- [FastMCP](docs/fastmcp.md) · [FastStream](docs/faststream.md)
-- [Testing](docs/testing.md) · [Benchmarking](docs/benchmarking.md)
-- [Usage Patterns](docs/usage.md) · [Scenarios](docs/scenarios.md)
+- [Getting started](docs/tutorials/getting-started.md)
+- [Managers](docs/explanation/managers.md) · [Concepts](docs/explanation/concepts.md)
+- [Providers](docs/explanation/providers.md)
+- [Migrations](docs/explanation/migrations.md) · [Migration formats](docs/reference/migration-formats.md)
+- [Runtime and execution](docs/reference/runtime.md) · [Execution flow](docs/explanation/execution-flow.md)
+- [Target policy](docs/reference/target-policy.md) · [Compatibility](docs/reference/compatibility.md)
+- [API reference](docs/reference/api.md) · [Glossary](docs/explanation/glossary.md)
+- [Upgrade guide](docs/reference/upgrades.md)
+- [CLI reference](docs/reference/cli.md) · [Telemetry and hooks](docs/how-to/telemetry.md)
+- [FastMCP](docs/explanation/fastmcp.md) · [FastStream](docs/explanation/faststream.md)
+- [Testing](docs/how-to/testing.md) · [Benchmarking](docs/how-to/benchmarking.md)
+- [Manager reference](docs/reference/manager.md) · [Scenarios](docs/explanation/scenarios.md)
 - [Showcases](showcases/README.md)

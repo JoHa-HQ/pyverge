@@ -1,10 +1,3 @@
-"""The publish decorator: converge a handler's return to an outgoing target.
-
-The counterpart of :func:`.subscriber`. Applied at the endpoint, it converges the
-handler's return value to *target* before FastStream serializes and publishes it,
-so a handler can bridge schema versions across a topic boundary.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -13,16 +6,12 @@ from functools import wraps
 from typing import Any, cast
 
 from pyverge import Manager
+from pyverge.execution import Runner
 from pyverge.manager.types import TargetPolicy
-from pyverge.providers.types import ModelHandle
+from pyverge.schemas.types import ModelHandle
 
 from .types import Fn, PayloadDumper, ResultConverger
-from .views import HandlerView, PublisherView
-
-
-def return_model(handler: Any) -> ModelHandle | None:
-    """Return the handler's return annotation when it is a class."""
-    return HandlerView(handler).return_model
+from .views import HandlerView
 
 
 class ReturnConverger:
@@ -36,12 +25,12 @@ class ReturnConverger:
 
     def __init__(
         self,
-        manager: Manager,
+        runner: Runner,
         dump: PayloadDumper,
         target: TargetPolicy,
         out_model: ModelHandle | None = None,
     ) -> None:
-        self._manager = manager
+        self._runner = runner
         self._dump = dump
         self._target = target
         self._out_model = out_model
@@ -54,7 +43,14 @@ class ReturnConverger:
             result = await handler(*args, **kwargs)
             if result is None:
                 return None
-            return self._manager.migrate(self._dump(result), target=self._target)
+            migrated = self._runner.run(
+                self._dump(result),
+                self._target,
+                container=None,
+                max_depth=-1,
+                context=None,
+            )
+            return await migrated if inspect.isawaitable(migrated) else migrated
 
         if out_model is not None:
             annotations = dict(getattr(converged, "__annotations__", {}))
@@ -75,24 +71,19 @@ def publisher(
     manager: Manager,
     target: TargetPolicy = "latest",
     result_converger: ResultConverger | None = None,
+    runner: Runner | None = None,
     **options: Any,
 ) -> Callable[[Fn], Any]:
-    """Return a decorator registering a converging publisher on *broker*.
-
-    The handler's return value is converged to *target* before publish. Extra
-    *options* pass through to ``broker.publisher``.
-    """
 
     def decorate(fn: Fn) -> Any:
-        published = PublisherView(fn, topics)
-        declared = published.return_model
+        declared = HandlerView(fn).return_model
         out_model = (
             manager.resolve_target_model(declared, target)
             if declared is not None and manager.identifies(declared)
             else None
         )
         result = result_converger or ReturnConverger(
-            manager,
+            runner or manager.runner(),
             manager.dump,
             target,
             out_model=out_model,
@@ -108,12 +99,10 @@ def publish_to(
     routes: Mapping[str, TargetPolicy],
     manager: Manager,
     version_header: str = "content-version",
+    runner: Runner | None = None,
 ) -> Callable[[Fn], Fn]:
-    """Publish one handler result to multiple topics with per-topic targets.
 
-    The handler returns a model (or mapping) unchanged. The result is dumped
-    once, then converged separately for each route before publishing.
-    """
+    active_runner = runner or manager.runner()
 
     def decorate(fn: Fn) -> Fn:
         @wraps(fn)
@@ -123,7 +112,16 @@ def publish_to(
                 return
             payload = manager.dump(result)
             for topic, target in routes.items():
-                converged = manager.migrate(payload, target=target)
+                migrated = active_runner.run(
+                    payload,
+                    target,
+                    container=None,
+                    max_depth=-1,
+                    context=None,
+                )
+                converged = (
+                    await migrated if inspect.isawaitable(migrated) else migrated
+                )
                 version = converged.get("version")
                 headers: dict[str, Any] = {}
                 if version is not None:
@@ -147,5 +145,4 @@ __all__ = [
     "ReturnConverger",
     "publish_to",
     "publisher",
-    "return_model",
 ]

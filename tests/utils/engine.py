@@ -1,32 +1,24 @@
 """Utility functions for engine and model management in tests."""
 
-from collections.abc import Mapping
+from __future__ import annotations
+
 from typing import Any, cast
 
-from pyverge.core import (
-    VersionEdge,
-    VersioningSettings,
-    VersionKey,
-    VersionNode,
-)
-from pyverge.core.context import MigrationContext
-from pyverge.core.types import (
-    MigrationFunc,
-    VersionValue,
-)
-from pyverge.migration import (
-    PydanticDiff,
-    Registry,
-)
+from pyverge.core import MigrationFunc, VersionValue
+from pyverge.migrations.identity import DefaultMigrationIdentityResolver
+from pyverge.providers import PydanticDiff
 from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,
 )
+from pyverge.registry import Registry
+from pyverge.settings import VersioningSettings
+from pyverge.versioning import VersionEdge, VersionKey, VersionNode
 
 
 def envelope_model(
     adapter: ModelAdapter,
-    versioning_settings: VersioningSettings,
+    versioning_settings: VersioningSettings | None,
     model_cls: ModelHandle | dict[str, Any],
 ) -> VersionNode[VersionValue]:
     """Build a versionable from a model class or a JSON schema.
@@ -72,9 +64,9 @@ def edge_from_models(  # noqa: PLR0913
         diff=PydanticDiff.from_pair(
             source=source,
             target=target,
-            is_backward_compatible=backward_compatible,
         ),
         func=func,
+        migration=DefaultMigrationIdentityResolver().resolve(func),
     )
 
 
@@ -122,23 +114,18 @@ def register_migrations(
     parametrize data.
     """
     for migration in migrations:
-        pair, func, backward_compatible = _parse_migration(migration)
+        pair, func, _backward_compatible = _parse_migration(migration)
         versions = [adapter.versionable(model_cls) for model_cls in pair]
         diff = adapter.diff(
             versions[0],
             versions[1],
-            is_backward_compatible=backward_compatible,
         )
-        registry.store_migration(VersionEdge(versions[0], versions[1], diff, func))
-
-
-def run_engine(
-    engine: Any,
-    data: dict[str, Any],
-    target: Any,
-    *,
-    context: Mapping[str, Any] | MigrationContext | None = None,
-    **kwargs: Any,
-) -> dict[str, Any]:
-    """Prepare and immediately run a migration through an engine."""
-    return engine.prepare(data, target, **kwargs).run(context=context)
+        registry.store_migration(
+            VersionEdge(
+                versions[0],
+                versions[1],
+                diff,
+                func,
+                migration=DefaultMigrationIdentityResolver().resolve(func),
+            )
+        )

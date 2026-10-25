@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import threading
+import inspect
 from collections.abc import Callable
 from typing import Literal, cast
 
@@ -12,48 +12,32 @@ from pydantic import BaseModel
 
 from pyverge import Manager
 from pyverge.core import (
-    AsyncExecutionRequired,
-    DiscoveryValidationError,
-    MigrationSettings,
-    ModelNotFoundError,
-    RegistryError,
-    SyncExecutionRequired,
-    VersioningSettings,
-)
-from pyverge.core.types import (
     ManagerMigrationKey,
-    Migratable,
+    MigrationContext,
     MigrationKeyInput,
     ModelPair,
-    Versionable,
     VersionValue,
 )
+from pyverge.engine import Engine
+from pyverge.execution.backends import AsyncBackend
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
 )
-from pyverge.migration import (
-    AsyncLevelParallelExecutor,
-    Engine,
-    MigrationContext,
-    MigrationError,
-    MigrationHook,
-    MigrationRun,
-    PydanticModelAdapter,
-    PydanticWalker,
-)
-from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.providers import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,
 )
+from pyverge.registry.errors import (
+    CatalogError,
+    ModelNotFoundError,
+)
+from pyverge.settings import MigrationSettings, VersioningSettings, manager_kwargs
+from pyverge.versioning import Migratable, Versionable
 from tests.examples.json import (
     USER_V1_0_0,
     USER_V1_2_3,
-    USER_V2_0_0,
-    USER_V2025_01_01,
-    USER_V2025_03_10,
-    migrate_v20250101_to_v20250310,
 )
 from tests.examples.pydantic.base import UserBaseModel
 from tests.examples.pydantic.chrono import (
@@ -61,12 +45,10 @@ from tests.examples.pydantic.chrono import (
     UserV20251231,
 )
 from tests.examples.pydantic.semver import (
-    UserContainer,
     UserV1,
     UserV2,
     UserV3,
     migrate_v1_to_v2,
-    migrate_v2_to_v3,
 )
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
@@ -100,9 +82,8 @@ class TestScoping:
         engine: Engine[VersionValue],
     ) -> None:
         UserManager = Manager[semver.Version].configure(
-            engine.settings,
             engine.adapter,
-            engine=engine,  # ty: ignore[invalid-argument-type]
+            engine=engine,
         )
 
         assert UserManager._default_engine is engine
@@ -124,134 +105,7 @@ class TestClassLevelRegistration:
             age: int | None = None
 
         versions = [str(v) for v in manager().registry.versions]
-        assert versions == ["User:1.0.0", "User:2.0.0"]
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, key",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                ("User", "1.0.0", "2.0.0"),
-                id="pydantic_semver_user_v1_v2_migration_string",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                (UserV1, UserV2),
-                id="pydantic_semver_user_v1_v2_migration_schema",
-            ),
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                (ModelPair(UserV1, UserV2)),
-                id="pydantic_semver_user_v1_v2_migration_model_pair",
-            ),
-            pytest.param(
-                JsonSchemaModelAdapter,
-                [semver.Version, "test", [USER_V1_0_0, USER_V2_0_0], []],
-                ("User", "1.0.0", "2.0.0"),
-                id="json_schema_semver_user_v1_v2_migration_string",
-            ),
-            pytest.param(
-                JsonSchemaModelAdapter,
-                [semver.Version, "test", [USER_V1_0_0, USER_V2_0_0], []],
-                (USER_V1_0_0, USER_V2_0_0),
-                id="json_schema_semver_user_v1_v2_migration_schema",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_migration_decorator(
-        self,
-        manager: type[Manager[VersionValue]],
-        key: tuple[str, str, str] | tuple[ModelHandle, ModelHandle],
-    ) -> None:
-
-        @manager.migration(*key, backward_compatible=True)
-        def migrate(data: dict, context: MigrationContext | None = None) -> dict:
-            return migrate_v1_to_v2(data)
-
-        result = manager().migrate(_payload("1.0.0"))
-        assert result["document"]["version"] == "2.0.0"
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, key, anchor",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), migrate_v1_to_v2)],
-                ],
-                ("User", "1.0.0", "2.0.0"),
-                "1.0.0",
-                id="pydantic_semver_user_v1_v2_string",
-            ),
-            pytest.param(
-                JsonSchemaModelAdapter,
-                [
-                    pendulum.Date,
-                    "test",
-                    [USER_V2025_01_01, USER_V2025_03_10],
-                    [
-                        (
-                            (USER_V2025_01_01, USER_V2025_03_10),
-                            migrate_v20250101_to_v20250310,
-                        )
-                    ],
-                ],
-                ("User", "2025-01-01", "2025-03-10"),
-                "2025-01-01",
-                id="json_schema_semver_user_v1_v2_string",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_hook_decorator(
-        self,
-        manager: type[Manager[semver.Version]],
-        key: tuple[str, str, str] | tuple[ModelHandle, ModelHandle],
-        anchor: str,
-    ) -> None:
-        class CountingHook(MigrationHook):
-            def __init__(self) -> None:
-                self.calls = 0
-
-            def before_migrate(self, name, from_version, to_version, data) -> None:
-                self.calls += 1
-
-        hook = CountingHook()
-
-        @manager.hook(*key, hook)
-        class _HookMarker:
-            pass
-
-        manager().migrate(_payload(anchor))
-        assert hook.calls == 1
-
-    def test_jsonata_strategy_registers_class_expression(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        instance = manager()
-        instance.store_model(UserV1)
-        instance.store_model(UserV2)
-
-        @manager.migration("User", "1.0.0", "2.0.0", strategy="jsonata")
-        class _Migration:
-            expression = (
-                '{"kind": kind, "version": "2.0.0", '
-                '"name": $uppercase(name), "email": email, "role": role, '
-                '"age": $age}'
-            )
-
-        expected_age = 42
-        result = instance.migrate(_payload("1.0.0"), context={"age": expected_age})
-
-        assert result["document"]["name"] == "ALICE"
-        assert result["document"]["age"] == expected_age
+        assert versions == ["User@1.0.0", "User@2.0.0"]
 
     def test_jsonata_strategy_requires_expression(
         self, manager: type[Manager[semver.Version]]
@@ -268,129 +122,6 @@ class TestClassLevelRegistration:
 
 
 class TestInstanceFacade:
-    def test_runtime_registration_during_init(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        class RuntimeManager(manager):  # ty: ignore
-            def __init__(self) -> None:
-                super().__init__()
-                self.store_model(UserV1)
-                self.store_model(UserV2)
-                self.store_migration(ModelPair(UserV1, UserV2), migrate_v1_to_v2)
-
-        instance = RuntimeManager()
-        assert {str(v) for v in instance.registry.versions} == {
-            "User:1.0.0",
-            "User:2.0.0",
-        }
-        assert instance.migrate(_payload("1.0.0"))["document"]["version"] == "2.0.0"
-
-    def test_schema_registry_style_registration(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        instance = manager()
-        # Adapter-driven registration at runtime, e.g. loaded from a schema registry.
-        instance.store_model(UserV1)
-        instance.store_model(UserV2)
-        instance.store_model(UserV3)
-        instance.store_migration(ModelPair(UserV1, UserV2), migrate_v1_to_v2)
-        instance.store_migration(ModelPair(UserV2, UserV3), migrate_v2_to_v3)
-
-        assert instance.migrate(_payload("1.0.0"))["document"]["version"] == "3.0.0"
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, key",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                ManagerMigrationKey("User", "1.0.0", "2.0.0"),
-                id="pydantic_semver_user_v1_v2",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_migration_string_triple_form(
-        self,
-        manager: type[Manager[semver.Version]],
-        key: ManagerMigrationKey,
-    ) -> None:
-        instance = manager()
-        instance.store_migration(key, migrate_v1_to_v2)
-
-        assert instance.migrate(_payload("1.0.0"))["document"]["version"] == "2.0.0"
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2, UserV3], []],
-                id="pydantic_semver_user_v1_v2_v3",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_migrate_passes_same_context_to_every_step(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        seen: list[MigrationContext] = []
-
-        def _v1_to_v2(data: dict, context: MigrationContext | None = None) -> dict:
-            assert context is not None
-            seen.append(context)
-            return migrate_v1_to_v2(data)
-
-        def _v2_to_v3(data: dict, context: MigrationContext | None = None) -> dict:
-            assert context is not None
-            seen.append(context)
-            return migrate_v2_to_v3(data)
-
-        manager.store_migration(ModelPair(UserV1, UserV2), _v1_to_v2)
-        manager.store_migration(ModelPair(UserV2, UserV3), _v2_to_v3)
-
-        result = manager().migrate(_payload("1.0.0"), context={"tenant": "tenant_99"})
-
-        first, second = seen
-        assert result["document"]["version"] == "3.0.0"
-        assert first is second
-        assert dict(first) == {"tenant": "tenant_99"}
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, key",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), migrate_v1_to_v2)],
-                ],
-                ManagerMigrationKey("User", "1.0.0", "2.0.0"),
-                id="pydantic_semver_user_v1_v2",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_hook_via_instance_proxy(
-        self, manager: type[Manager[semver.Version]], key: ManagerMigrationKey
-    ) -> None:
-        instance = manager()
-
-        class CountingHook(MigrationHook):
-            def __init__(self) -> None:
-                self.calls = 0
-
-            def before_migrate(self, name, from_version, to_version, data) -> None:
-                self.calls += 1
-
-        hook = CountingHook()
-        instance.add_hook(key, hook)
-
-        instance.migrate(_payload("1.0.0"))
-        assert hook.calls == 1
-
     @pytest.mark.parametrize(
         ("model_adapter", "registry", "key"),
         [
@@ -459,9 +190,7 @@ class TestInstanceFacade:
         model: ModelHandle,
     ) -> None:
         instance = manager()
-        version = envelope_model(
-            instance.engine.adapter, instance.engine.settings, model
-        )
+        version = envelope_model(instance.engine.adapter, None, model)
         found = instance.engine.get_model(version)
         assert found.model is version.model
 
@@ -597,7 +326,7 @@ class TestLookupHelpers:
         self,
         manager: type[Manager],
     ) -> None:
-        with pytest.raises(RegistryError):
+        with pytest.raises(CatalogError):
             manager.get_latest_model("Missing")
 
     @pytest.mark.parametrize(
@@ -743,10 +472,7 @@ class TestFluentLookup:
         expected: bool,
     ) -> None:
         instance = manager()
-        versions = [
-            envelope_model(instance.engine.adapter, instance.engine.settings, m)
-            for m in models
-        ]
+        versions = [envelope_model(instance.engine.adapter, None, m) for m in models]
         assert (key_factory(versions) in instance) is expected
 
     @pytest.mark.parametrize(
@@ -804,10 +530,7 @@ class TestFluentLookup:
         kind: str,
     ) -> None:
         instance = manager()
-        versions = [
-            envelope_model(instance.engine.adapter, instance.engine.settings, m)
-            for m in models
-        ]
+        versions = [envelope_model(instance.engine.adapter, None, m) for m in models]
         result = instance[selector(versions)]
         if kind == "model":
             assert cast(Versionable, result).model in set(models)
@@ -861,7 +584,7 @@ class TestSharedEngine:
         indirect=["model_adapter", "registry"],
         ids=["semver", "date"],
     )
-    def test_instances_share_class_engine(
+    def test_instances_get_independent_engine_copies(
         self,
         manager: type[Manager],
         model: type,
@@ -870,8 +593,9 @@ class TestSharedEngine:
         manager.model(model)
 
         a, b = manager(), manager()
-        assert a.engine is b.engine
-        assert a.engine is manager._default_engine
+        assert a.engine is not b.engine
+        assert a.engine is not manager._default_engine
+        assert a.registry.versions == b.registry.versions
 
     @pytest.mark.parametrize(
         ("model_adapter", "registry", "model", "version"),
@@ -887,7 +611,7 @@ class TestSharedEngine:
         indirect=["model_adapter", "registry"],
         ids=["semver", "date"],
     )
-    def test_instance_writes_visible_to_class(
+    def test_instance_writes_do_not_leak_to_class(
         self,
         manager: type[Manager],
         model: type,
@@ -896,8 +620,8 @@ class TestSharedEngine:
         manager_instance = manager()
         manager_instance.store_model(model)
 
-        expected = f"User:{version}"
-        assert [str(v) for v in manager_instance.registry.versions] == [expected]
+        expected = f"User@{version}"
+        assert manager_instance.registry.versions == []
         assert [str(v) for v in manager().registry.versions] == [expected]
 
     @pytest.mark.parametrize(
@@ -914,7 +638,7 @@ class TestSharedEngine:
         indirect=["model_adapter", "registry"],
         ids=["semver", "date"],
     )
-    def test_class_registration_visible_to_existing_instances(
+    def test_class_registration_not_visible_to_existing_instances(
         self,
         manager: type[Manager],
         model: type,
@@ -923,185 +647,13 @@ class TestSharedEngine:
         manager_instance = manager()
         manager.model(model)
 
-        assert {str(v) for v in manager_instance.registry.versions} == {
-            f"User:{version}"
-        }
-
-
-class TestMigrateInstanceOnly:
-    def test_migrate_not_available_on_class(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        with pytest.raises(TypeError):
-            manager.migrate({})  # ty: ignore
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry",
-        [
-            [
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), migrate_v1_to_v2)],
-                ],
-            ]
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_instance_migrate(self, manager: type[Manager[semver.Version]]) -> None:
-        result = manager().migrate(_payload("1.0.0"))
-        assert result["document"]["version"] == "2.0.0"
-        assert result["document"]["age"] is None
-
-
-class TestMigrateWithContainer:
-    def test_container_guided_migration(
-        self,
-        migration_settings: MigrationSettings,
-        model_adapter: PydanticModelAdapter,
-        walker: PydanticWalker,
-    ) -> None:
-        UserManager = Manager[semver.Version].configure(
-            migration_settings,
-            model_adapter,
-            walker=walker,
-        )
-        UserManager.model(UserV1)
-        UserManager.model(UserV2)
-        UserManager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
-
-        result = UserManager().migrate(_payload("1.0.0"), container=UserContainer)
-        assert result.document.version == "2.0.0"
-
-    def test_container_returns_typed_instance(
-        self,
-        migration_settings: MigrationSettings,
-        model_adapter: PydanticModelAdapter,
-        walker: PydanticWalker,
-    ) -> None:
-        UserManager = Manager[semver.Version].configure(
-            migration_settings,
-            model_adapter,
-            walker=walker,
-        )
-        UserManager.model(UserV1)
-        UserManager.model(UserV2)
-        UserManager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
-
-        result = UserManager().migrate(_payload("1.0.0"), container=UserContainer)
-        assert isinstance(result, UserContainer)
-        assert result.document.version == "2.0.0"
-
-    def test_container_validates_payload(
-        self,
-        migration_settings: MigrationSettings,
-        model_adapter: PydanticModelAdapter,
-        walker: PydanticWalker,
-    ) -> None:
-        UserManager = Manager[semver.Version].configure(
-            migration_settings,
-            model_adapter,
-            walker=walker,
-        )
-        UserManager.model(UserV1)
-        UserManager.model(UserV2)
-        UserManager.migration("User", "1.0.0", "2.0.0")(migrate_v1_to_v2)
-
-        invalid = {
-            "document": {
-                "kind": "User",
-                "version": "1.0.0",
-                "name": "Alice",
-                "email": "alice@example.com",
-                "role": "bogus",
-            }
-        }
-        with pytest.raises(DiscoveryValidationError):
-            UserManager().migrate(invalid, container=UserContainer)
-
-
-class TestTargetPolicy:
-    @pytest.mark.parametrize(
-        "model_adapter, registry",
-        [
-            [
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), migrate_v1_to_v2)],
-                ],
-            ]
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_default_target_latest(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        result = manager().migrate(_payload("1.0.0"))
-        assert result["document"]["version"] == "2.0.0"
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry",
-        [
-            [
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), migrate_v1_to_v2)],
-                ],
-            ]
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_explicit_string_target(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        result = manager().migrate(_payload("1.0.0"), target="skip")
-        assert result["document"]["version"] == "1.0.0"
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry",
-        [
-            [
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2, UserV3],
-                    [
-                        ((UserV1, UserV2), migrate_v1_to_v2),
-                        ((UserV2, UserV3), migrate_v2_to_v3),
-                    ],
-                ],
-            ]
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_per_kind_policy_with_wildcard(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        result = manager().migrate(
-            _payload("1.0.0"),
-            target={"Other": "skip", "*": "latest"},
-        )
-        assert result["document"]["version"] == "3.0.0"
+        assert manager_instance.registry.versions == []
 
 
 @pytest.mark.parametrize(
     ("source_cls", "spec", "expected"),
     [
-        pytest.param(
-            PersonV1,
-            "skip",
-            None,
-            id="skip",
-        ),
+        pytest.param(PersonV1, "skip", None, id="skip"),
         pytest.param(
             PersonV1,
             "latest",
@@ -1114,12 +666,7 @@ class TestTargetPolicy:
             ("Address", semver.VersionInfo(1, 0, 0)),
             id="earliest",
         ),
-        pytest.param(
-            PersonV1,
-            None,
-            None,
-            id="none",
-        ),
+        pytest.param(PersonV1, None, None, id="none"),
         pytest.param(
             PersonV1,
             PersonV2,
@@ -1195,7 +742,7 @@ def test_versionable_target_used_as_is(
 def test_unsupported_spec_raises(
     manager: type[Manager[semver.Version]],
 ) -> None:
-    with pytest.raises(RegistryError):
+    with pytest.raises(CatalogError):
         manager.compile_target_spec("unknown")
 
 
@@ -1216,14 +763,14 @@ def test_model_class_wrong_kind_raises(
 ) -> None:
     source = envelope_model(model_adapter, versioning_settings, AddressV1)
     resolver = manager.compile_target_spec(PersonV2)
-    with pytest.raises(RegistryError):
+    with pytest.raises(CatalogError):
         resolver(source)
 
 
 def test_unregistered_model_class_raises(
     manager: type[Manager[semver.Version]],
 ) -> None:
-    with pytest.raises(RegistryError):
+    with pytest.raises(CatalogError):
         manager.compile_target_spec(PersonV2)
 
 
@@ -1238,10 +785,8 @@ def test_configured_manager_satisfies_class_state_contract(
 ) -> None:
     manager_cls = Manager[semver.Version]
     configured: type[ManagerClassState[semver.Version]] = manager_cls.configure(
-        migration_settings, model_adapter
+        model_adapter, **manager_kwargs(migration_settings)
     )
-
-    assert configured._default_settings is migration_settings
     assert configured._default_adapter is model_adapter
     assert configured._default_engine is not None
     assert configured._strategy is semver.Version
@@ -1252,12 +797,13 @@ def test_instantiated_manager_satisfies_instance_state_contract(
     migration_settings: MigrationSettings,
     model_adapter: ModelAdapter,
 ) -> None:
-    configured = Manager[semver.Version].configure(migration_settings, model_adapter)
+    configured = Manager[semver.Version].configure(
+        model_adapter, **manager_kwargs(migration_settings)
+    )
     instance: ManagerInstanceState[semver.Version] = configured()
 
-    assert instance.engine is configured._default_engine
-    assert instance.registry is configured._default_engine.registry
-    assert instance.settings is migration_settings
+    assert instance.engine is not configured._default_engine
+    assert instance.registry is not configured._default_engine.registry
     assert instance.adapter is model_adapter
 
 
@@ -1286,219 +832,72 @@ class TestMigrationContext:
             context["tenant"] = "tenant_100"
 
 
-class TestPreparedMigration:
-    def test_prepare_defers_execution_until_run(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        calls: list[MigrationContext] = []
-
-        def _migrate(data: dict, context: MigrationContext | None = None) -> dict:
-            assert context is not None
-            calls.append(context)
-            return migrate_v1_to_v2({**data, "name": context["name"]})
-
-        instance = manager()
-        instance.store_model(UserV1)
-        instance.store_model(UserV2)
-        instance.store_migration(ModelPair(UserV1, UserV2), _migrate)
-
-        run = instance.prepare(_payload("1.0.0"))
-
-        assert isinstance(run, MigrationRun)
-        assert calls == []
-
-        first = run.run(context={"name": "Alice"})
-        second = run.run(context={"name": "Bob"})
-
-        assert first["document"]["name"] == "Alice"
-        assert second["document"]["name"] == "Bob"
-        assert [call["name"] for call in calls] == ["Alice", "Bob"]
-
-    def test_delegate_returns_run_and_materializes_container(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        instance = manager()
-        instance.store_model(UserV1)
-        instance.store_model(UserV2)
-        instance.store_migration(ModelPair(UserV1, UserV2), migrate_v1_to_v2)
-
-        run = instance.delegate(_payload("1.0.0"), container=UserContainer)
-        result = run.run()
-
-        assert isinstance(run, MigrationRun)
-        assert isinstance(result, UserContainer)
-        assert result.document.version == "2.0.0"
-
-    def test_sync_entrypoint_rejects_async_run(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        instance = manager()
-        instance.store_model(UserV1)
-        instance.store_model(UserV2)
-        instance.store_migration(ModelPair(UserV1, UserV2), migrate_v1_to_v2)
-
-        run = instance.prepare(
-            _payload("1.0.0"), executor=AsyncLevelParallelExecutor(max_workers=2)
-        )
-
-        assert run.is_async
-        with pytest.raises(AsyncExecutionRequired):
-            run.run()
-
-
-class TestAsyncExecution:
-    def _async_manager(self, workers: int = 0) -> type[Manager[semver.Version]]:
-        manager = Manager[semver.Version].configure(
-            MigrationSettings(execution_mode="async", parallel_workers=workers),
-            PydanticModelAdapter(),
-        )
-        manager.model(UserV1)
-        manager.model(UserV2)
-        manager.migration(ModelPair(UserV1, UserV2))(migrate_v1_to_v2)
-        return manager
-
-    def test_amigrate_runs_async_sequential(self) -> None:
-        manager = self._async_manager()
-        result = asyncio.run(manager().amigrate(_payload("1.0.0")))
-
-        assert result["document"]["version"] == "2.0.0"
-
-    def test_amigrate_runs_async_parallel(self) -> None:
-        manager = self._async_manager(workers=2)
-        payload = {
-            "first": {
-                "kind": "User",
-                "version": "1.0.0",
-                "name": "Alice",
-                "email": "alice@example.com",
-                "role": "user",
-            },
-            "second": {
-                "kind": "User",
-                "version": "1.0.0",
-                "name": "Bob",
-                "email": "bob@example.com",
-                "role": "user",
-            },
-        }
-
-        result = asyncio.run(manager().amigrate(payload))
-
-        assert result["first"]["version"] == "2.0.0"
-        assert result["second"]["version"] == "2.0.0"
-
-    def test_async_hooks_are_awaited(self) -> None:
-        manager = self._async_manager()
-        order: list[str] = []
-
-        class _Hook(MigrationHook):
-            async def abefore_migrate(self, name, from_version, to_version, data):
-                order.append("before")
-
-            async def aafter_migrate(
-                self, name, from_version, to_version, original_data, migrated_data
-            ):
-                order.append("after")
-
-        instance = manager()
-        instance.add_hook(ModelPair(UserV1, UserV2), _Hook())
-
-        asyncio.run(instance.amigrate(_payload("1.0.0")))
-
-        assert order == ["before", "after"]
-
-    def test_async_hooks_fire_in_registration_order(self) -> None:
-        manager = self._async_manager()
-        order: list[str] = []
-
-        class _Hook(MigrationHook):
-            def __init__(self, label: str) -> None:
-                self._label = label
-
-            async def abefore_migrate(self, name, from_version, to_version, data):
-                order.append(f"{self._label}:before")
-
-            async def aafter_migrate(
-                self, name, from_version, to_version, original_data, migrated_data
-            ):
-                order.append(f"{self._label}:after")
-
-        instance = manager()
-        instance.add_hook(ModelPair(UserV1, UserV2), _Hook("first"))
-        instance.add_hook(ModelPair(UserV1, UserV2), _Hook("second"))
-
-        asyncio.run(instance.amigrate(_payload("1.0.0")))
-
-        assert order == [
-            "first:before",
-            "second:before",
-            "first:after",
-            "second:after",
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
         ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_engine_explore_build_mode(manager: type[Manager]) -> None:
+    engine = manager._default_engine
+    explorer = engine.explore()
+    source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
+    target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
 
-    def test_async_path_runs_sync_hook_in_thread(self) -> None:
-        manager = self._async_manager()
-        main_thread = threading.get_ident()
-        calls: list[str] = []
-        threads: list[int] = []
+    assert explorer.versions("User") == engine.registry.kind_versions("User")
+    assert explorer.path(source, target) == [(source, target)]
 
-        class _Hook(MigrationHook):
-            def before_migrate(self, name, from_version, to_version, data):
-                calls.append("before")
-                threads.append(threading.get_ident())
 
-            def after_migrate(
-                self, name, from_version, to_version, original_data, migrated_data
-            ):
-                calls.append("after")
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_manager_runner_sync_and_async_handles(
+    manager: type[Manager],
+) -> None:
+    instance = manager()
+    sync_result = instance.runner().run(
+        _payload("1.0.0"),
+        "latest",
+        container=None,
+        max_depth=-1,
+        context=None,
+    )
+    assert sync_result["document"]["version"] == "2.0.0"
 
-        instance = manager()
-        instance.add_hook(ModelPair(UserV1, UserV2), _Hook())
-
-        asyncio.run(instance.amigrate(_payload("1.0.0")))
-
-        assert calls == ["before", "after"]
-        assert threads[0] != main_thread
-
-    def test_async_on_error_is_awaited(self) -> None:
-        manager = self._async_manager()
-        events: list[str] = []
-
-        def _boom(data: dict, context: MigrationContext | None = None) -> dict:
-            raise RuntimeError("boom")
-
-        class _Hook(MigrationHook):
-            async def abefore_migrate(self, name, from_version, to_version, data):
-                events.append("before")
-
-            async def aon_error(self, name, from_version, to_version, data, error):
-                events.append(f"error:{error}")
-
-        instance = manager()
-        instance.remove_migration(ModelPair(UserV1, UserV2))
-        instance.store_migration(ModelPair(UserV1, UserV2), _boom)
-        instance.add_hook(ModelPair(UserV1, UserV2), _Hook())
-
-        with pytest.raises(MigrationError):
-            asyncio.run(instance.amigrate(_payload("1.0.0")))
-
-        assert events[0] == "before"
-        assert events[1].startswith("error:")
-        assert "boom" in events[1]
-
-    def test_sync_entrypoint_rejects_async_mode(self) -> None:
-        manager = self._async_manager()
-
-        with pytest.raises(AsyncExecutionRequired):
-            manager().migrate(_payload("1.0.0"))
-
-    def test_async_entrypoint_rejects_sync_mode(
-        self, manager: type[Manager[semver.Version]]
-    ) -> None:
-        instance = manager()
-        instance.store_model(UserV1)
-        instance.store_model(UserV2)
-        instance.store_migration(ModelPair(UserV1, UserV2), migrate_v1_to_v2)
-
-        with pytest.raises(SyncExecutionRequired):
-            asyncio.run(instance.amigrate(_payload("1.0.0")))
+    pending = instance.runner(
+        runtime=AsyncBackend(
+            backend="asyncio",
+            backend_options={},
+            max_workers=0,
+        )
+    ).run(
+        _payload("1.0.0"),
+        "latest",
+        container=None,
+        max_depth=-1,
+        context=None,
+    )
+    assert inspect.isawaitable(pending)
+    async_result = asyncio.run(pending)
+    assert async_result["document"]["version"] == "2.0.0"

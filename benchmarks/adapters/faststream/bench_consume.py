@@ -2,7 +2,7 @@
 
 Two benchmarks share the same broker and payload:
 
-* ``test_consume_with_pyverge`` — a converging ``subscriber`` (converges v1 → v2).
+* ``test_consume_with_pyverge`` — a converging ``subscriber`` (converges v1 → v3).
 * ``test_consume_baseline`` — a plain FastStream subscriber (no pyverge).
 
 The delta isolates the adapter's per-message cost from FastStream's own overhead.
@@ -21,7 +21,7 @@ from benchmarks.adapters.faststream._support import new_loop, run
 from benchmarks.graphs import user_manager
 from benchmarks.synthesis import payloads
 from pyverge.adapters.faststream import subscriber
-from tests.examples.pydantic.semver import UserV2
+from tests.examples.pydantic.semver import UserV3
 
 TOPIC = "bench"
 
@@ -53,7 +53,7 @@ def test_consume_with_pyverge(benchmark: Any, loop: Any, payload: dict) -> None:
     broker = KafkaBroker("localhost:9092")
 
     @subscriber(broker, TOPIC, manager=user_manager(), targets="latest")
-    async def handle(user: UserV2) -> None: ...
+    async def handle(user: UserV3) -> None: ...
 
     _bench_publish(benchmark, loop, broker, payload)
 

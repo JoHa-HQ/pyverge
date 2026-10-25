@@ -1,0 +1,17 @@
+pyverge
+FastMCP
+FastStream
+JSONata
+dicts
+doctest
+upcasting
+dataclasses
+virtuals
+awaitable
+callables
+Callables
+versionable
+joha
+Liquibase
+dbt
+Airbyte

@@ -1,5 +1,3 @@
-"""Check a payload against one schema version."""
-
 from __future__ import annotations
 
 import json
@@ -24,7 +22,6 @@ def check(
     ],
     manager: ManagerOption,
 ) -> None:
-    """Check a payload against a schema version."""
     try:
         mgr = resolve_manager(manager)
         data_dict = load_json_file(data)

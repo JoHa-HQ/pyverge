@@ -1,5 +1,3 @@
-"""CLI command implementations."""
-
 from .check import check
 from .compat import compat
 from .diff import diff

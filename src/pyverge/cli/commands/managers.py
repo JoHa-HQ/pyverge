@@ -1,5 +1,3 @@
-"""List managers defined in a module."""
-
 from __future__ import annotations
 
 from typing import Annotated
@@ -17,7 +15,6 @@ def managers(
         str, typer.Argument(..., help="Module path to inspect for managers")
     ],
 ) -> None:
-    """List Managers defined in a module."""
     try:
         names = list_managers_from_module(module)
 
