@@ -59,4 +59,4 @@ runner = manager.runner(
 result = runner.run(payload, target, *, container=None, max_depth=-1, context=None)
 ```
 
-See [Use the manager](../how-to/use-manager.md) for task examples.
+See [Use the manager](../how-to/models/use-manager.md) for task examples.

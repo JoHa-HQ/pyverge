@@ -2,6 +2,14 @@
 
 Task examples for sync, async, process-isolated, and context-aware execution.
 
+## Prerequisites
+
+- A configured runtime manager.
+- A target policy.
+- A backend matching sync, async, or process execution needs.
+
+## Steps
+
 ## Sync
 
 ```python
@@ -23,7 +31,7 @@ Materialize and validate a container result:
 result = manager.runner().run(payload, "latest", container=UserEnvelope)
 ```
 
-## Async
+### Async
 
 ```python
 from pyverge.execution import AsyncBackend
@@ -41,7 +49,7 @@ result = await runner.run(payload, "latest")
 No implicit event loop is created. Use `AsyncBackend` when migrations are async
 or when async concurrency is desired.
 
-## Process isolation
+### Process isolation
 
 ```python
 from pyverge.execution import ProcessBackend
@@ -53,7 +61,7 @@ finally:
     backend.close()
 ```
 
-## Runtime context
+### Runtime context
 
 ```python
 result = manager.runner().run(
@@ -73,8 +81,19 @@ def migrate(data, context=None):
 
 JSON Patch does not read context. JSONata reads context as variables.
 
+## Verify
+
+```python
+result = manager.runner().run(payload, "latest")
+```
+
+## Troubleshooting
+
+- Awaitable result with sync backend: use `AsyncBackend`.
+- Process failures: ensure migration callables and context are picklable.
+
 ## See also
 
-- [Runtime reference](../reference/runtime.md)
-- [Telemetry and hooks](telemetry.md)
-- [Target policy](../reference/target-policy.md)
+- [Runtime reference](../../reference/runtime.md)
+- [Telemetry and hooks](../operations/instrument-migrations.md)
+- [Target policy](../../reference/target-policy.md)

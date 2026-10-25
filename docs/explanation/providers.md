@@ -78,3 +78,32 @@ class MyModelAdapter(AbstractModelAdapter):
 Provider adapters must not import the engine, registry, or manager. The
 manager resolves a `MigrationSpec` to a `MigrationFunc`; the adapter never
 registers migrations itself.
+
+## Date versioning
+
+Versions can also be ISO calendar dates instead of semver. Use
+`pendulum.Date` as the version strategy:
+
+```python
+import pendulum
+from typing import Literal
+
+from pyverge import Manager
+from pyverge.schemas import PydanticModelAdapter
+
+UserManager = Manager[pendulum.Date].configure(
+    PydanticModelAdapter(),
+)
+
+
+@UserManager.model()
+class UserV20250310(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["2025-03-10"] = "2025-03-10"
+    name: str
+    email: str
+```
+
+The engine orders date versions chronologically and migrates across them the
+same way as semver. Version strings are parsed by the adapter, which
+understands both formats.

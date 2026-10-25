@@ -4,6 +4,13 @@
 > `await discovery.register(server)`. See the
 > [upgrade guide](../../reference/upgrades.md).
 
+## Prerequisites
+
+- Installed FastMCP adapter.
+- A configured manager with registered models and migrations.
+
+## Steps
+
 ## End-to-end example
 
 ```python
@@ -106,7 +113,7 @@ first client session or when serving over a transport. In-process
 in-process should prime it with one client session first (see the showcase's
 `running_app`/`running_client` fixtures).
 
-## The lifecycle
+### The lifecycle
 
 `FastMCPDiscovery` owns three phases. **The lifespan is the user's concern** —
 FastMCP's model is that setup runs once at startup, so wire the phases into a
@@ -133,7 +140,7 @@ Both exceptions carry structured attributes (`missing`/`extra`, `absent`) and a
 resolution hint, so a startup failure tells you exactly which primitive drifted and
 how to fix it.
 
-## Telemetry
+### Telemetry
 
 The adapter is free of any tracing library. To trace calls, stack your own
 FastMCP middleware; the per-migration `OTELHook`s open their spans **as
@@ -149,16 +156,27 @@ class CallSpanMiddleware(Middleware):
 server.middleware = [CallSpanMiddleware(tracer, "my-service")]
 ```
 
-See [Telemetry & Hooks](../telemetry.md) for the per-step `OTELHook`.
+See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the per-step `OTELHook`.
 
-## Testing
+### Testing
 
 The adapter is designed to be driven through the public server surface. See the
-[Testing](../testing.md) guide and the worked
-[`showcases/fastmcp`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/fastmcp)
+[Testing](../../how-to/operations/test-migrations.md) guide and the worked
+[`showcases/fastmcp`https://github.com/JoHa-HQ/pyverge/tree/main/showcases/fastmcp
 project (a layered FastMCP app with `dependency-injector` and OpenTelemetry).
+
+## Verify
+
+```python
+assert result.structured_content["wind"] == 0.0
+```
+
+## Troubleshooting
+
+- Lifecycle not run: open a client session.
+- Import error: install `pyverge[fastmcp]`.
 
 ## See also
 
-- [FastMCP integration model](../../explanation/fastmcp.md)
-- [FastMCP reference](../../reference/fastmcp.md)
+- [FastMCP integration model](index.md)
+- [FastMCP reference](reference.md)

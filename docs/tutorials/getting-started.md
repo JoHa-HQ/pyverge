@@ -1,4 +1,4 @@
-# Getting Started
+# Getting started
 
 pyverge is a runtime schema-evolution engine that lets independently deployed producers and consumers exchange versioned payloads without requiring synchronized releases.
 
@@ -6,7 +6,13 @@ pyverge is a runtime schema-evolution engine that lets independently deployed pr
 > [upgrade guide](../reference/upgrades.md) for `manager.migrate`,
 > `MigrationSettings`, runner, and import-path replacements.
 
-## Installation
+## What you will build
+
+A minimal manager with two model versions, one migration, and a converged payload.
+
+## Prerequisites
+
+Python 3.11 or newer.
 
 ```bash
 # Core library
@@ -20,7 +26,7 @@ The engine is provider-agnostic and works on plain dicts. The examples below
 use the shipped Pydantic adapter; a JSON Schema adapter is also available, and
 adapters for other model libraries plug in the same way.
 
-## Minimal example
+## Steps
 
 ```python
 from typing import Literal
@@ -73,96 +79,18 @@ migrated = manager.runner().run(
 `runner.run()` converges the payload to the requested target policy (`latest`
 here, the most recently registered version of each kind).
 
-## JSON Schema models
-
-Models can also be defined as JSON Schema documents. The adapter materializes
-each schema into a Pydantic model at registration time, so the engine sees the
-same `ModelAdapter` contract:
+## Verify
 
 ```python
-from pyverge import Manager
-from pyverge.schemas import JsonSchemaModelAdapter
-
-UserManager = Manager[semver.Version].configure(
-    JsonSchemaModelAdapter(),
-)
-
-user_schema = {
-    "kind": "User",
-    "version": "1.0.0",
-    "type": "object",
-    "properties": {
-        "kind": {"type": "string", "default": "User"},
-        "version": {"type": "string", "default": "1.0.0"},
-        "name": {"type": "string"},
-    },
-}
-
-UserManager.model()(UserManager.adapter.to_pydantic(user_schema))
+assert migrated["version"] == "2.0.0"
+assert migrated["age"] is None
 ```
 
-## Declarative migrations
+## See also
 
-A migration can be expressed as an RFC 6902 JSON Patch op list instead of a
-Python callable. `JsonPatchMigration` is a declarative spec whose `.transform`
-is the executable `JsonPatch` (`MigrationFunc`):
-
-```python
-from pyverge.migrations import JsonPatchMigration
-
-migration = JsonPatchMigration(
-    {
-        "from": "1.0.0",
-        "to": "2.0.0",
-        "ops": [{"op": "add", "path": "/age", "value": None}],
-    }
-)
-UserManager.store_migration(
-    ManagerMigrationKey("User", "1.0.0", "2.0.0"), migration
-)
-```
-
-The manager resolves the spec to its `.transform` automatically. Core ops
-(`add`, `remove`, `replace`, `move`, `copy`, `test`) follow RFC 6902; extended
-ops (`set_default`, `coerce`, `map`, `split`) are schema-aware conveniences.
-
-## Date versioning
-
-Versions can also be ISO calendar dates instead of semver. Use
-`pendulum.Date` as the version strategy:
-
-```python
-import pendulum
-from typing import Literal
-
-from pyverge import Manager
-from pyverge.schemas import PydanticModelAdapter
-
-UserManager = Manager[pendulum.Date].configure(
-    PydanticModelAdapter(),
-)
-
-
-@UserManager.model()
-class UserV20250310(BaseModel):
-    kind: Literal["User"] = "User"
-    version: Literal["2025-03-10"] = "2025-03-10"
-    name: str
-    email: str
-```
-
-The engine orders date versions chronologically and migrates across them the
-same way as semver. Version strings are parsed by the adapter, which
-understands both formats.
-
-## Next steps
-
-- [Managers](../explanation/managers.md) — registration (decorator vs. lazy) and one complete version graph per manager.
-- [Use the manager](../how-to/use-manager.md) — lookup, validation, diffing, hooks.
-- [Migrations](../explanation/migrations.md) — reconstruct missing models or migrations, and the mutually exclusive `on_missing` strategies.
-- [Target policy](../reference/target-policy.md) — declarative convergence rules.
-- [Execution flow](../explanation/execution-flow.md) — how the engine discovers, plans, and runs migrations.
-- [Telemetry & Hooks](../how-to/telemetry.md) — observability via hooks and OpenTelemetry.
-- [Testing](../how-to/testing.md) — the time-travel topology round trip and other patterns.
-- [Concepts](../explanation/concepts.md) — the problem and the approach.
-- [Showcases](https://github.com/JoHa-HQ/pyverge/tree/main/showcases) — end-to-end examples.
+- [Upgrade guide](../reference/upgrades.md)
+- [Providers and JSON Schema models](../explanation/providers.md)
+- [Migration formats](../reference/migration-formats.md)
+- [Managers](../explanation/managers.md)
+- [Author migrations](../how-to/migrations/author-migrations.md)
+- [Showcaseshttps://github.com/JoHa-HQ/pyverge/tree/main/showcases

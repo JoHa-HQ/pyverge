@@ -6,6 +6,13 @@ registration, and hooks.
 Use the configured manager class for graph operations and a runtime instance
 for execution.
 
+## Prerequisites
+
+- A configured manager class.
+- Models and migrations registered for the operations you need.
+
+## Steps
+
 ## Look up versions
 
 ```python
@@ -16,7 +23,7 @@ UserManager.list_versions()
 UserManager.get_entities()
 ```
 
-## Validate a payload
+### Validate a payload
 
 Validation is an instance operation:
 
@@ -25,7 +32,7 @@ manager = UserManager()
 manager.validate(data, "User", "1.0.0")
 ```
 
-## Diff two versions
+### Diff two versions
 
 ```python
 from pyverge.types import ManagerMigrationKey
@@ -37,7 +44,7 @@ diff.has_removals
 diff.has_modifications
 ```
 
-## Register a migration
+### Register a migration
 
 Register on the configured class before constructing the runtime instance:
 
@@ -62,7 +69,7 @@ UserManager.store_migration(
 )
 ```
 
-## Add hooks
+### Add hooks
 
 ```python
 UserManager.add_hook(
@@ -72,9 +79,20 @@ UserManager.add_hook(
 ```
 
 Hooks observe migrations before, after, and on error. See
-[Telemetry and hooks](telemetry.md).
+[Telemetry and hooks](../operations/instrument-migrations.md).
+
+## Verify
+
+```python
+assert UserManager.get("User", "1.0.0") is not None
+```
+
+## Troubleshooting
+
+- `TypeError` for tuple migration keys: use `ManagerMigrationKey` or `ModelPair`.
+- Registration after runtime instantiation affects the class graph, not the instance copy.
 
 ## See also
 
 - [Register models and migrations](register-models.md)
-- [Manager API](../reference/manager.md)
+- [Manager API](../../reference/manager.md)

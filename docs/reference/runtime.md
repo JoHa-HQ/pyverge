@@ -64,5 +64,5 @@ Async execution awaits async hook overrides (`abefore_migrate`,
 idempotency, transactions, audit, OpenTelemetry, and OpenLineage. Middleware
 wraps the backend execution seam, not individual migrations.
 
-See [Run payloads](../how-to/run-payloads.md) for examples and
+See [Run payloads](../how-to/runtime/run-payloads.md) for examples and
 [Execution flow](../explanation/execution-flow.md) for ordering.

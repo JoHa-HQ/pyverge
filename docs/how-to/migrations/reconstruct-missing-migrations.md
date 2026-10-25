@@ -1,5 +1,13 @@
 # Reconstruct missing migrations
 
+## Prerequisites
+
+- Both endpoint models registered.
+- No migration for the edge.
+- `on_missing="reconstruct_migration"`.
+
+## Steps
+
 The inverse case: you have both concrete models but no migration between them.
 Diff the two schemas and render the result as a declarative RFC 6902 spec:
 
@@ -25,8 +33,17 @@ Unlike model reconstruction, `propose_migration` **never auto-registers** and
 **never touches endpoint models** — it returns a proposal you review and
 register deliberately.
 
+## Verify
+
+Review the proposed patch before registering it, then validate the resulting edge.
+
+## Troubleshooting
+
+- Proposal is empty: schemas are structurally identical.
+- Review patch before registration; business semantics are not inferred.
+
 ## See also
 
 - [Reconstruct missing models](reconstruct-missing-models.md)
-- [Migration strategies](../explanation/migrations.md)
-- [Migration format reference](../reference/migration-formats.md)
+- [Migration strategies](../../explanation/migrations.md)
+- [Migration format reference](../../reference/migration-formats.md)

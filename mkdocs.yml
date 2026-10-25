@@ -19,23 +19,49 @@ nav:
   - Tutorials:
       - tutorials/index.md
       - Getting started: tutorials/getting-started.md
-      - Executable quickstart: examples/quickstart.md
+      - Examples:
+          - Executable quickstart: examples/quickstart.md
+          - Target policies: examples/target-policies.md
+          - Async execution: examples/async-runner.md
+          - Reconstruct a missing model: examples/reconstruct-missing-model.md
+          - Generate a migration from models: examples/generate-migration.md
+          - OTel hooks: examples/otel-hooks.md
+          - OpenLineage hooks: examples/openlineage-hooks.md
+          - CLI: examples/cli.md
+          - Benchmark latency: examples/benchmark.md
+          - JGF API: examples/jgf-api.md
+          - CI manifest comparison: examples/ci-manifest.md
   - How-to:
       - how-to/index.md
-      - Use the manager: how-to/use-manager.md
-      - Run payloads: how-to/run-payloads.md
-      - Migrate nested payloads: how-to/migrate-nested-payloads.md
-      - Register models and migrations: how-to/register-models.md
-      - Author migrations: how-to/author-migrations.md
-      - Reconstruct missing models: how-to/reconstruct-missing-models.md
-      - Reconstruct missing migrations: how-to/reconstruct-missing-migrations.md
-      - Use runtime context in migrations: how-to/migration-context.md
-      - Test migrations: how-to/testing.md
-      - Telemetry and hooks: how-to/telemetry.md
-      - Benchmark adapters: how-to/benchmarking.md
-      - Integrations:
-          - FastMCP: how-to/integrations/fastmcp.md
-          - FastStream: how-to/integrations/faststream.md
+      - Models:
+          - how-to/models/index.md
+          - Register models and migrations: how-to/models/register-models.md
+          - Use the manager: how-to/models/use-manager.md
+      - Migrations:
+          - how-to/migrations/index.md
+          - Author migrations: how-to/migrations/author-migrations.md
+          - Reconstruct missing models: how-to/migrations/reconstruct-missing-models.md
+          - Reconstruct missing migrations: how-to/migrations/reconstruct-missing-migrations.md
+          - Use runtime context in migrations: how-to/migrations/migration-context.md
+      - Runtime:
+          - how-to/runtime/index.md
+          - Run payloads: how-to/runtime/run-payloads.md
+          - Migrate nested payloads: how-to/runtime/migrate-nested-payloads.md
+      - Operations:
+          - how-to/operations/index.md
+          - Test migrations: how-to/operations/test-migrations.md
+          - Instrument migrations with hooks: how-to/operations/instrument-migrations.md
+          - Benchmark adapters: how-to/operations/benchmark-adapters.md
+  - Integrations:
+      - integrations/index.md
+      - FastMCP:
+          - integrations/fastmcp/index.md
+          - How-to: integrations/fastmcp/how-to.md
+          - Reference: integrations/fastmcp/reference.md
+      - FastStream:
+          - integrations/faststream/index.md
+          - How-to: integrations/faststream/how-to.md
+          - Reference: integrations/faststream/reference.md
   - Reference:
       - reference/index.md
       - API reference: reference/api.md
@@ -46,8 +72,6 @@ nav:
       - Compatibility: reference/compatibility.md
       - Upgrade guide: reference/upgrades.md
       - CLI: reference/cli.md
-      - FastMCP: reference/fastmcp.md
-      - FastStream: reference/faststream.md
   - Explanation:
       - explanation/index.md
       - Concepts: explanation/concepts.md
@@ -55,10 +79,11 @@ nav:
       - Managers: explanation/managers.md
       - Providers: explanation/providers.md
       - Migration strategies: explanation/migrations.md
+      - Migration authoring: explanation/migration-authoring.md
       - Execution flow: explanation/execution-flow.md
       - Scenarios: explanation/scenarios.md
-      - FastMCP: explanation/fastmcp.md
-      - FastStream: explanation/faststream.md
+      - Testing approach: explanation/testing.md
+      - Benchmarking approach: explanation/benchmarking.md
 
 plugins:
   - search

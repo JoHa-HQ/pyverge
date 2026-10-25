@@ -70,8 +70,8 @@ Avoid or postpone reconstruction when:
 - You want both sides reconstructed at once — they are mutually exclusive by
   design; pick one and register the other by hand.
 
-## Continue
+## See also
 
-- [Reconstruct missing models](../how-to/reconstruct-missing-models.md)
-- [Reconstruct missing migrations](../how-to/reconstruct-missing-migrations.md)
+- [Reconstruct missing models](../how-to/migrations/reconstruct-missing-models.md)
+- [Reconstruct missing migrations](../how-to/migrations/reconstruct-missing-migrations.md)
 - [Migration format reference](../reference/migration-formats.md)

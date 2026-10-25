@@ -121,7 +121,7 @@ hold both models but no migration, `on_missing="reconstruct_migration"` (via
 `propose_migration`) derives a starting patch. The two strategies are mutually
 exclusive. See [migrations](migrations.md).
 
-## Next steps
+## See also
 
 - [Execution flow](execution-flow.md) — how the engine discovers, plans, and runs migrations.
 - [Managers](managers.md) — registration and one complete version graph per manager.

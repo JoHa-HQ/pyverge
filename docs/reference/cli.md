@@ -32,6 +32,7 @@ inspects the already-built registry; it does not load schemas itself.
 | `export` | Legacy flat graph manifest |
 | `info` | Show registered models |
 | `managers` | List managers in a module |
+| `benchmark` | Measure plan/run latency for CI budgets |
 | `init` | Scaffold models and manager config |
 
 ## `doctor`
@@ -101,6 +102,47 @@ A migration declared backward compatible overrides the structural result.
 Exit `0` when compatible, `1` on error, `3` when `--fail-on-breaking` finds a
 breaking migration.
 
+## `benchmark`
+
+Measure payload planning or execution latency for CI performance gates.
+The command uses `timeit` for calibration and `statistics` for metrics.
+`--iterations` is the number of timed samples.
+
+```bash
+# Human-readable summary
+pyverge benchmark --manager myapp.models:UserManager --payload data.json
+
+# Machine-readable report for CI
+pyverge benchmark --manager myapp.models:UserManager --payload data.json \
+  --iterations 20 --warmup 3 --format json
+
+# Compare against a saved baseline
+pyverge benchmark --manager myapp.models:UserManager --payload data.json \
+  --baseline benchmark-baseline.json --max-regression 20
+```
+
+Options:
+
+```text
+--mode run|plan          Benchmark execution or planning only
+--iterations N           Timed samples
+--warmup N               Warmup calls
+--context JSON           Runtime context
+--context-file PATH      Runtime context file
+--output PATH            Write JSON report
+--baseline PATH          Compare mean/p95 against baseline
+--max-regression PERCENT Fail when regression exceeds threshold
+--format text|json       Output format
+```
+
+Exit codes:
+
+```text
+0 success
+1 config/data/execution failure
+3 performance regression above threshold
+```
+
 ## `manifest`
 
 ```bash
@@ -147,7 +189,7 @@ require `--manager module:object_path`.
 | `0` | Success |
 | `1` | Validation, migration, config, or registry failure |
 | `2` | Invalid CLI usage |
-| `3` | Breaking compatibility with `--fail-on-breaking` |
+| `3` | Breaking compatibility or performance regression |
 
 ## CI recipe
 

@@ -32,7 +32,7 @@ providers = [
 - A provider also hides **injected** parameters (wiring, not payload) from the
   reflected contract. The `tool`/`prompt`/`resource` decorators apply the same
   rule to a physical function's signature — see
-  [Injected parameters#injected-parameters.
+  [Injected parameters#injected-parameters
 
 ## Injected parameters
 
@@ -72,7 +72,7 @@ the same detector when reflecting.
 
 ## See also
 
-- [Managers](../explanation/managers.md) — the bounded-context invariant the adapter relies on.
-- [Migrations](../explanation/migrations.md) — reconstructing missing models and migrations.
-- [Execution Flow](../explanation/execution-flow.md) — discovery, ordering, and finalize.
-- [Telemetry & Hooks](../how-to/telemetry.md) — per-step spans and call-level tracing.
+- [Managers](../../explanation/managers.md) — the bounded-context invariant the adapter relies on.
+- [Migrations](../../explanation/migrations.md) — reconstructing missing models and migrations.
+- [Execution Flow](../../explanation/execution-flow.md) — discovery, ordering, and finalize.
+- [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) — per-step spans and call-level tracing.

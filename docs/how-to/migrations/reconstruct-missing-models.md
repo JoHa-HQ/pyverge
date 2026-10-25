@@ -1,5 +1,13 @@
 # Reconstruct missing models
 
+## Prerequisites
+
+- One anchor model.
+- One migration for the edge.
+- `on_missing="reconstruct_model"`.
+
+## Steps
+
 A version chain can be represented as declarative patches against a single
 latest model — for example, git-versioned JSON specs where only the latest
 schema is kept and older versions exist only as patch deltas. Register the
@@ -62,8 +70,20 @@ against, introspected, or served with a version-accurate schema. This strategy
 With the default `on_missing="raise"`, registering a migration with an
 unregistered endpoint raises `ModelNotFoundError`.
 
+## Verify
+
+```python
+manager = UserManager()
+assert manager.get("User", "1.0.0").model is not None
+```
+
+## Troubleshooting
+
+- `ModelNotFoundError`: neither endpoint is registered.
+- Wrong `on_missing` mode: model reconstruction is disabled.
+
 ## See also
 
 - [Reconstruct missing migrations](reconstruct-missing-migrations.md)
-- [Migration strategies](../explanation/migrations.md)
+- [Migration strategies](../../explanation/migrations.md)
 - [Author migrations](author-migrations.md)

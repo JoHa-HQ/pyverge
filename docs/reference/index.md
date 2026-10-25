@@ -11,5 +11,5 @@ Information-oriented API and format descriptions.
 - [Compatibility](compatibility.md)
 - [Upgrade guide](upgrades.md)
 - [CLI](cli.md)
-- [FastMCP](fastmcp.md)
-- [FastStream](faststream.md)
+- [FastMCP](../integrations/fastmcp/reference.md)
+- [FastStream](../integrations/faststream/reference.md)

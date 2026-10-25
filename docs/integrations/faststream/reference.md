@@ -152,7 +152,7 @@ Convergence keys off the payload's own `(kind, version)`.
 
 ## See also
 
-- [Managers](../explanation/managers.md) — the bounded-context invariant the adapter relies on.
-- [Migrations](../explanation/migrations.md) — reconstructing missing models and migrations.
-- [Target Policy](target-policy.md) — `latest`/`earliest`/pinned/per-kind.
-- [Telemetry & Hooks](../how-to/telemetry.md) — per-step spans and call-level tracing.
+- [Managers](../../explanation/managers.md) — the bounded-context invariant the adapter relies on.
+- [Migrations](../../explanation/migrations.md) — reconstructing missing models and migrations.
+- [Target Policy](../../reference/target-policy.md) — `latest`/`earliest`/pinned/per-kind.
+- [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) — per-step spans and call-level tracing.
