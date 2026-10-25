@@ -1837,6 +1837,22 @@ wheels = [
 ]
 
 [[package]]
+name = "openlineage-python"
+version = "1.54.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "httpx2" },
+    { name = "packaging" },
+    { name = "python-dateutil" },
+    { name = "pyyaml" },
+    { name = "requests" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/d2/6637b6a4bcce2a3d46be255279776e29fb2a0816864d2b724baf67122736/openlineage_python-1.54.0-py3-none-any.whl", hash = "sha256:d8df45da51e82131c0f804842c82df4dfbc5dbcf4d70cac7fdb0819c23236f29", size = 128273, upload-time = "2026-10-12T19:46:40.978Z" },
+]
+
+[[package]]
 name = "opentelemetry-api"
 version = "1.45.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2622,16 +2638,19 @@ wheels = [
 name = "pyverge"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "datamodel-code-generator" },
     { name = "jsonata-python" },
     { name = "jsonpatch" },
     { name = "jsonschema" },
+    { name = "openlineage-python" },
     { name = "opentelemetry-distro" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "pendulum" },
     { name = "pydantic", extra = ["email", "timezone"] },
     { name = "pydantic-extra-types", extra = ["phonenumbers"] },
     { name = "semver" },
+    { name = "tenacity" },
 ]
 
 [package.optional-dependencies]
@@ -2669,6 +2688,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.15.1" },
     { name = "datamodel-code-generator", specifier = ">=0.76.2" },
     { name = "dependency-injector", marker = "extra == 'fastmcp'", specifier = ">=4.49.1" },
     { name = "fastmcp", marker = "extra == 'fastmcp'", specifier = ">=4" },
@@ -2676,6 +2696,7 @@ requires-dist = [
     { name = "jsonata-python", specifier = ">=0.7.1" },
     { name = "jsonpatch", specifier = ">=1.33" },
     { name = "jsonschema", specifier = ">=4.26.0" },
+    { name = "openlineage-python", specifier = ">=1.54.0" },
     { name = "opentelemetry-distro", extras = ["telemetry"], specifier = ">=0.65b0" },
     { name = "opentelemetry-exporter-otlp", extras = ["telemetry"], specifier = ">=1.44.0" },
     { name = "pendulum", specifier = ">=3.2.0" },
@@ -2683,6 +2704,7 @@ requires-dist = [
     { name = "pydantic-extra-types", extras = ["phonenumbers"], specifier = ">=2.9" },
     { name = "rich", marker = "extra == 'cli'", specifier = ">=13" },
     { name = "semver", specifier = ">=3.0" },
+    { name = "tenacity", specifier = ">=9.2.1" },
     { name = "typer", marker = "extra == 'cli'", specifier = ">=0.21" },
 ]
 provides-extras = ["cli", "fastmcp", "faststream"]
@@ -3105,6 +3127,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/74/2c/8ffc1414d1951895d0d5b7dc83c0b079ebc48c3bf27ffbb0064646367500/syrupy-6.1.1.tar.gz", hash = "sha256:7e584a8df4ede6dd3c1c44a77f9edc46186b6767a73dea6f0083044946839a59", size = 109705, upload-time = "2026-09-13T20:25:21.599Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/b5/bf2a8a335a6a813869dd482cedbcde252f582b5afbfe50eb78ec09962800/syrupy-6.1.1-py3-none-any.whl", hash = "sha256:6ac9ac6a42d70ae44156f5f157a9563b9bb8cc96dcf9364327f330463bff889a", size = 63436, upload-time = "2026-09-13T20:25:20.294Z" },
+]
+
+[[package]]
+name = "tenacity"
+version = "9.2.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/82/9e/497c1c8ebe5a5b5d1d4a7511aea22c0bb1a97e3170d98abdef0e1b34265a/tenacity-9.2.1.tar.gz", hash = "sha256:a606b5c808d0cded4a359d5b9932d867ff2a6a6b64d37350260fd01bbdf83839", size = 58261, upload-time = "2026-10-07T12:13:01.633Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/26/1ff2b0721ac66a3ec5b1402b333110b352ab0a8724052ac279a7b82d40c4/tenacity-9.2.1-py3-none-any.whl", hash = "sha256:9e56f17539296baab7beabb08b92f6ee3d7be92d8be72d763360677c2ad6580e", size = 32310, upload-time = "2026-10-07T12:13:00.102Z" },
 ]
 
 [[package]]

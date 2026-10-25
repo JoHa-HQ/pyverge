@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 from collections.abc import Callable
 from typing import Any, TypeVar, assert_type, cast
 
@@ -16,7 +17,6 @@ from pyverge.core import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.context import MigrationContext
 from pyverge.execution import (
     AnyDirection,
-    BackendDeclaration,
     BackwardDirection,
     CompositeExtractor,
     ExecutionPlanner,
@@ -34,8 +34,9 @@ from pyverge.execution import (
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.execution.backends import PlainBackend, ProcessBackend
+from pyverge.execution.backends import AsyncBackend, ThreadedBackend
 from pyverge.execution.context import LayeredView, RunContext, StepContext
+from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
 from pyverge.migration import (
     Engine,
     JsonSchemaModelAdapter,
@@ -66,6 +67,15 @@ from tests.utils.engine import envelope_model
 V = TypeVar("V", semver.Version, pendulum.Date)
 
 
+def _sync(value: Any) -> dict[str, Any]:
+    assert not inspect.isawaitable(value)
+    return value
+
+
+def _run(runner: Runner, *args: Any, **kwargs: Any) -> dict[str, Any]:
+    return _sync(runner.run(*args, **kwargs))
+
+
 @st.composite
 def _user_v1_payloads(draw):
     return {
@@ -94,7 +104,9 @@ def _user_v1_payloads(draw):
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_runner_plans_and_executes(
     registry: Registry,
     runner: Runner,
@@ -102,7 +114,8 @@ def test_runner_plans_and_executes(
 ) -> None:
     payload = _payload()
 
-    result = runner.run(
+    result = _run(
+        runner,
         payload,
         latest_target_resolver(registry),
         container=None,
@@ -128,7 +141,9 @@ def test_runner_plans_and_executes(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 @settings(
     max_examples=25,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
@@ -139,7 +154,8 @@ def test_runner_preserves_generated_payload(
     runner: Runner,
     payload: dict,
 ) -> None:
-    result = runner.run(
+    result = _run(
+        runner,
         payload,
         latest_target_resolver(registry),
         container=None,
@@ -169,7 +185,9 @@ def test_runner_preserves_generated_payload(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_runner_migrates_with_target_container(
     registry: Registry,
     runner: Runner,
@@ -181,7 +199,7 @@ def test_runner_migrates_with_target_container(
         container=UserContainer,
         max_depth=-1,
     )
-    result = runner.execute(plan, context=None)
+    result = _sync(runner.execute(plan, context=None))
 
     assert plan.path.container is UserContainer
     assert result == snapshot
@@ -202,7 +220,9 @@ def test_runner_migrates_with_target_container(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_runner_noop_when_target_equals_source(
     registry: Registry,
     model_adapter: PydanticModelAdapter,
@@ -217,7 +237,7 @@ def test_runner_noop_when_target_equals_source(
         max_depth=-1,
     )
 
-    result = runner.execute(plan, context=None)
+    result = _sync(runner.execute(plan, context=None))
 
     assert result == _payload()
 
@@ -468,39 +488,16 @@ def test_execution_planner_builds_levels(
         container=None,
         target_fields=frozenset(),
     )
-    planner = ExecutionPlanner(
-        backend=BackendDeclaration(name="local", strategy="parallel", middleware=()),
-    )
+    planner = ExecutionPlanner()
 
     execution = planner.build(plan, {})
 
     assert execution.levels[0] == (child, sibling)
     assert execution.levels[1] == (parent,)
-    assert execution.backend.name == "local"
-    assert execution.backend.strategy == "parallel"
-
-
-def test_plain_backend_runs_sync_and_async() -> None:
-    backend = PlainBackend()
-
-    assert backend.run(lambda: 1) == 1
-    assert asyncio.run(backend.arun(_one)) == 1
-
-
-async def _one() -> int:
-    return 1
 
 
 def _plus_one(value: int) -> int:
     return value + 1
-
-
-def test_process_backend_runs_picklable_sync_work() -> None:
-    backend = ProcessBackend(max_workers=1)
-    try:
-        assert backend.run(_plus_one, 1) == 2  # noqa: PLR2004
-    finally:
-        backend.close()
 
 
 def _payload() -> dict:
@@ -790,14 +787,17 @@ def test_extractor_validation_mode_none_skips_validate(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_runner_migrates_to_latest(
     registry: Registry,
     runner: Runner,
     expected_version: str,
     expected_age: int | None,
 ) -> None:
-    result = runner.run(
+    result = _run(
+        runner,
         _payload(),
         latest_target_resolver(registry),
         container=None,
@@ -828,7 +828,9 @@ def test_runner_migrates_to_latest(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_runner_container_guided_migration(
     registry: Registry,
     runner: Runner,
@@ -839,7 +841,7 @@ def test_runner_container_guided_migration(
         container=UserContainer,
         max_depth=-1,
     )
-    result = runner.execute(plan, context=None)
+    result = _sync(runner.execute(plan, context=None))
 
     assert result["document"]["version"] == "3.0.0"
 
@@ -863,7 +865,9 @@ def test_runner_container_guided_migration(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_runner_explicit_target_versionable(
     registry: Registry,
     model_adapter: PydanticModelAdapter,
@@ -873,7 +877,9 @@ def test_runner_explicit_target_versionable(
     target_model = envelope_model(model_adapter, discovery_settings, UserV2)
     target = fixed_target_resolver(registry, target_model)
 
-    result = runner.run(_payload(), target, container=None, max_depth=-1, context=None)
+    result = _run(
+        runner, _payload(), target, container=None, max_depth=-1, context=None
+    )
 
     assert result["document"]["version"] == "2.0.0"
     assert result["document"]["age"] is None
@@ -915,14 +921,17 @@ def test_runner_explicit_target_versionable(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_runner_target_policy(
     registry: Registry,
     runner: Runner,
     resolver_factory: Callable[[Registry[semver.Version]], Any],
     expected_version: str,
 ) -> None:
-    result = runner.run(
+    result = _run(
+        runner,
         _payload(),
         resolver_factory(registry),
         container=None,
@@ -952,7 +961,9 @@ def test_runner_target_policy(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_runner_no_op_when_source_equals_target(
     registry: Registry,
     runner: Runner,
@@ -968,7 +979,8 @@ def test_runner_no_op_when_source_equals_target(
             "status": "active",
         }
     }
-    result = runner.run(
+    result = _run(
+        runner,
         payload,
         latest_target_resolver(registry),
         container=None,
@@ -995,7 +1007,9 @@ def test_runner_no_op_when_source_equals_target(
     ],
     indirect=["model_adapter", "registry"],
 )
-@pytest.mark.parametrize("runtime_backend", [(PlainBackend, {})], indirect=True)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
 def test_chrono_runner_migrates_to_latest(
     registry: Registry,
     runner: Runner,
@@ -1009,7 +1023,8 @@ def test_chrono_runner_migrates_to_latest(
             "role": "user",
         }
     }
-    result = runner.run(
+    result = _run(
+        runner,
         payload,
         latest_target_resolver(registry),
         container=None,
@@ -1126,3 +1141,266 @@ def test_plan_preserves_version_value(
 
     assert type(resolved.source.version[1]) is version_type
     assert type(resolved.target.version[1]) is version_type
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+@pytest.mark.parametrize(
+    "runtime_backend",
+    [(ThreadedBackend, {"max_workers": 0})],
+    indirect=True,
+)
+def test_runner_rejects_unknown_target_model(
+    registry: Registry,
+    runner: Runner,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(runner.adapter, "identify", lambda _handle: False)
+
+    with pytest.raises(UnknownModelError):
+        runner.plan(
+            _payload(),
+            latest_target_resolver(registry),
+            container=None,
+            max_depth=-1,
+        )
+
+
+async def _async_migrate(data, context):
+    data["age"] = None
+    return data
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+@pytest.mark.parametrize(
+    "runtime_backend",
+    [(AsyncBackend, {"backend": "asyncio", "backend_options": {}, "max_workers": 0})],
+    indirect=True,
+)
+@settings(
+    max_examples=25,
+    suppress_health_check=[HealthCheck.function_scoped_fixture],
+)
+@given(payload=_user_v1_payloads())
+def test_runner_async_backend_runs_sync_migration(
+    registry: Registry,
+    runner: Runner,
+    payload: dict,
+) -> None:
+    result = asyncio.run(
+        runner.run(
+            payload,
+            latest_target_resolver(registry),
+            container=None,
+            max_depth=-1,
+            context=None,
+        )
+    )
+
+    assert result["document"]["version"] == "2.0.0"
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), _async_migrate)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+@pytest.mark.parametrize(
+    "runtime_backend",
+    [(AsyncBackend, {"backend": "asyncio", "backend_options": {}, "max_workers": 0})],
+    indirect=True,
+)
+def test_runner_async_backend_runs_coroutine_migration(
+    registry: Registry,
+    runner: Runner,
+) -> None:
+    result = asyncio.run(
+        runner.run(
+            _payload(),
+            latest_target_resolver(registry),
+            container=None,
+            max_depth=-1,
+            context=None,
+        )
+    )
+
+    assert result["document"]["version"] == "2.0.0"
+    assert result["document"]["age"] is None
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), _async_migrate)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
+def test_runner_sync_backend_rejects_coroutine_migration(
+    registry: Registry,
+    runner: Runner,
+) -> None:
+    with pytest.raises(AsyncExecutionRequired):
+        runner.run(
+            _payload(),
+            latest_target_resolver(registry),
+            container=None,
+            max_depth=-1,
+            context=None,
+        )
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+@pytest.mark.parametrize(
+    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
+)
+def test_runner_calls_sync_hooks(
+    engine: Engine,
+    registry: Registry,
+    runner: Runner,
+) -> None:
+    calls: list[str] = []
+
+    class _Hook:
+        def before_migrate(self, name, from_version, to_version, data):
+            calls.append("before")
+
+        def after_migrate(
+            self, name, from_version, to_version, original_data, migrated_data
+        ):
+            calls.append("after")
+
+        def on_error(self, name, from_version, to_version, data, error):
+            calls.append("error")
+
+    source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
+    target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
+    engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _Hook()))
+
+    _run(
+        runner,
+        _payload(),
+        latest_target_resolver(registry),
+        container=None,
+        max_depth=-1,
+        context=None,
+    )
+
+    assert calls == ["before", "after"]
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+@pytest.mark.parametrize(
+    "runtime_backend",
+    [(AsyncBackend, {"backend": "asyncio", "backend_options": {}, "max_workers": 0})],
+    indirect=True,
+)
+def test_runner_awaits_async_hooks(
+    engine: Engine,
+    registry: Registry,
+    runner: Runner,
+) -> None:
+    calls: list[str] = []
+
+    class _AsyncHook:
+        async def before_migrate(self, name, from_version, to_version, data):
+            calls.append("before")
+
+        async def after_migrate(
+            self, name, from_version, to_version, original_data, migrated_data
+        ):
+            calls.append("after")
+
+        def on_error(self, name, from_version, to_version, data, error):
+            calls.append("error")
+
+    source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
+    target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
+    engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _AsyncHook()))
+
+    asyncio.run(
+        runner.run(
+            _payload(),
+            latest_target_resolver(registry),
+            container=None,
+            max_depth=-1,
+            context=None,
+        )
+    )
+
+    assert calls == ["before", "after"]

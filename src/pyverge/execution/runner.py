@@ -4,107 +4,94 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass
-from typing import Any, Generic
+from typing import Any, Generic, TypeAlias
 
 from pyverge.core.context import MigrationContext
-from pyverge.core.types import TargetResolver, VersionValue
+from pyverge.core.types import VersionValue
+from pyverge.execution.context import ExecutionEnvironment, RunContext
 from pyverge.execution.coordinator import ExecutionCoordinator
-from pyverge.execution.path import Path
-from pyverge.execution.plan import ExecutionPlan, ExtractedEntry
-from pyverge.execution.types import ConcurrencyBackend, RuntimeCapabilities
+from pyverge.execution.errors import UnknownModelError
+from pyverge.execution.middleware import BackendMiddleware
+from pyverge.execution.plan import ExecutionPlan
+from pyverge.execution.targets import TargetCompiler, TargetPolicy
+from pyverge.execution.types import BackendPort
 from pyverge.schemas.types import ModelAdapter
+
+RunResult: TypeAlias = Any
 
 
 @dataclass(frozen=True, slots=True)
 class Runner(Generic[VersionValue]):
-    """Execute a payload through a frozen graph and configured runtime policy."""
+    """Coordinate planning and backend execution."""
 
     coordinator: ExecutionCoordinator[VersionValue]
     adapter: ModelAdapter
-    capabilities: RuntimeCapabilities
-    concurrency: ConcurrencyBackend
-
-    def extract(
-        self,
-        payload: dict[str, Any],
-        *,
-        container: type[Any] | None,
-        max_depth: int,
-    ) -> list[ExtractedEntry[VersionValue]]:
-        """Extract versioned entries from a payload."""
-        return self.coordinator.extract(
-            payload,
-            container=container,
-            max_depth=max_depth,
-        )
+    target_compiler: TargetCompiler[VersionValue]
+    backend: BackendPort[VersionValue]
+    middleware: tuple[BackendMiddleware, ...]
+    environment: ExecutionEnvironment
 
     def plan(
         self,
         payload: dict[str, Any],
-        target_resolver: TargetResolver,
+        target: TargetPolicy,
         *,
         container: type[Any] | None,
         max_depth: int,
     ) -> ExecutionPlan[VersionValue]:
         """Build a runtime plan through the coordinator."""
-        return self.coordinator.plan(
+        resolver = self.target_compiler.compile(target)
+        plan = self.coordinator.plan(
             payload,
-            target_resolver,
+            resolver,
             container=container,
             max_depth=max_depth,
         )
+        for entry in plan.path.entries:
+            if not self.adapter.identify(entry.target_model):
+                raise UnknownModelError(
+                    f"Runner adapter cannot identify {entry.target_model!r}"
+                )
+        return plan
 
-    def run(
+    def run(  # noqa: PLR0913
         self,
         payload: dict[str, Any],
-        target_resolver: TargetResolver,
+        target: TargetPolicy,
         *,
         container: type[Any] | None,
         max_depth: int,
         context: MigrationContext | None,
-    ) -> dict[str, Any]:
-        """Plan and execute in one call."""
+        run_id: str | None = None,
+    ) -> RunResult:
+        """Plan and execute through the configured backend."""
         plan = self.plan(
             payload,
-            target_resolver,
+            target,
             container=container,
             max_depth=max_depth,
         )
-        return self.execute(plan, context=context)
+        return self.execute(plan, context=context, run_id=run_id)
 
     def execute(
         self,
         plan: ExecutionPlan[VersionValue],
         *,
         context: MigrationContext | None,
-    ) -> dict[str, Any]:
-        """Apply every planned migration to a copy of the payload."""
+        run_id: str | None = None,
+    ) -> RunResult:
+        """Execute the plan through backend and middleware."""
         data = copy.deepcopy(plan.payload)
-        for level in plan.levels:
-            for entry in level:
-                current = Path(*entry.path).get(data)
-                for index, (source, target) in enumerate(entry.steps):
-                    func = entry.migrations[index]
-                    hooks = entry.hooks[index]
-                    name = getattr(func, "__name__", f"{source}->{target}")
-                    for hook in hooks:
-                        hook.before_migrate(name, source, target, current)
-                    try:
-                        migrated = self.concurrency.run(func, current, context)
-                    except Exception as error:
-                        for hook in hooks:
-                            hook.on_error(name, source, target, current, error)
-                        raise
-                    for hook in hooks:
-                        hook.after_migrate(
-                            name,
-                            source,
-                            target,
-                            current,
-                            migrated,
-                        )
-                    if isinstance(migrated, dict):
-                        migrated[self.adapter.version_property] = str(target.version[1])
-                    current = migrated
-                Path(*entry.path).set(data, current)
-        return data
+        active_run_id = run_id or self.environment.id_factory.new("run_")
+        run = RunContext(
+            run_id=active_run_id,
+            environment=self.environment,
+            bindings=MigrationContext.create(context),
+        )
+        backend = self.backend
+        for layer in reversed(self.middleware):
+            backend = layer.wrap(backend)
+        return backend.execute(plan, data, run, self.adapter)
+
+
+__all__ = ["RunResult", "Runner"]

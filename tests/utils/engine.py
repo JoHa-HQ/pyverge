@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Any, cast
 
 from pyverge.core import MigrationFunc, VersionValue
-from pyverge.core.context import MigrationContext
 from pyverge.migration import (
     PydanticDiff,
     Registry,
@@ -133,15 +131,3 @@ def register_migrations(
                 migration=DefaultMigrationIdentityResolver().resolve(func),
             )
         )
-
-
-def run_engine(
-    engine: Any,
-    data: dict[str, Any],
-    target: Any,
-    *,
-    context: Mapping[str, Any] | MigrationContext | None = None,
-    **kwargs: Any,
-) -> dict[str, Any]:
-    """Placeholder until the execution runtime is rebuilt (task 7.11)."""
-    raise NotImplementedError("execution runtime removed; see task 7.11")

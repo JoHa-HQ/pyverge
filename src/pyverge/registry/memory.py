@@ -176,13 +176,18 @@ class InMemoryCatalog(Generic[VersionValue]):
         return idx < len(self._by_versions) and self._by_versions[idx] == key
 
     def missing_references(
-        self: Self, node: Comparable[VersionValue]
+        self: Self,
+        node: Comparable[VersionValue],
+        *,
+        require_registered: bool = True,
     ) -> frozenset[ModelVersionKey]:
-        """The ``(kind, version)`` pairs *node* declares but that are absent.
-
-        *node* must itself be registered.
-        """
-        registered = self.get_model(node)
+        """The ``(kind, version)`` pairs *node* declares but that are absent."""
+        registered = cast(
+            "VersionNode[VersionValue]",
+            self.get_model(node)
+            if require_registered
+            else self.find_model(node) or node,
+        )
         missing = []
         for kind, version in registered.references:
             key = VersionKey[VersionValue](_value=version, _kind=kind)

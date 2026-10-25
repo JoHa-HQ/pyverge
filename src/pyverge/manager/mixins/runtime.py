@@ -1,16 +1,32 @@
+"""Manager runtime facade."""
+
 from __future__ import annotations
 
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING, Generic, cast
+from typing import TYPE_CHECKING, Generic, Literal, cast
 
+from pyverge.core.clock import SystemClock
+from pyverge.core.ids import UuidIdFactory
 from pyverge.core.types import (
     ManagerMigrationKey,
+    MigrationDirectionStrategy,
     ModelData,
     ModelKey,
     ModelKind,
     ModelPair,
     VersionValue,
 )
+from pyverge.execution import (
+    AnyDirection,
+    BackwardDirection,
+    ForwardDirection,
+    Runner,
+    ThreadedBackend,
+)
+from pyverge.execution.context import ExecutionEnvironment
+from pyverge.execution.direction import DirectionPolicy
+from pyverge.execution.middleware import BackendMiddleware
+from pyverge.execution.types import BackendPort
 from pyverge.versioning import Diffable
 
 if TYPE_CHECKING:
@@ -18,8 +34,50 @@ if TYPE_CHECKING:
     from pyverge.migration.engine import Engine
 
 
-class MigrateMixin(Generic[VersionValue]):
-    """Migrate, validate and diff payloads through the instance engine."""
+def _direction(strategy: MigrationDirectionStrategy) -> DirectionPolicy:
+    policies: dict[MigrationDirectionStrategy, type[DirectionPolicy]] = {
+        "any": AnyDirection,
+        "forward": ForwardDirection,
+        "backward": BackwardDirection,
+    }
+    return policies[strategy]()
+
+
+class RuntimeMixin(Generic[VersionValue]):
+    """Manager runtime integration and primitive operations."""
+
+    def runner(  # noqa: PLR0913
+        self: Manager[VersionValue],
+        *,
+        backend: BackendPort | None = None,
+        middleware: tuple[BackendMiddleware, ...] = (),
+        environment: ExecutionEnvironment | None = None,
+        runtime: BackendPort | None = None,
+        direction: MigrationDirectionStrategy = "any",
+        on_direction_violation: str = "skip",
+        on_missing_path: str = "raise",
+        depth_limit: int = -1,
+        on_depth_violation: str = "skip",
+        validation_mode: Literal["strict", "lax", "none"] = "lax",
+    ) -> Runner[VersionValue]:
+        """Build a runtime runner for this manager."""
+        return self.engine.runner(
+            backend=backend or runtime or ThreadedBackend(max_workers=0),
+            middleware=middleware,
+            environment=environment
+            or ExecutionEnvironment(
+                clock=SystemClock(),
+                id_factory=UuidIdFactory(),
+                logger=None,
+                tracer=None,
+            ),
+            direction=_direction(direction),
+            on_direction_violation=on_direction_violation,
+            on_missing_path=on_missing_path,
+            depth_limit=depth_limit,
+            on_depth_violation=on_depth_violation,
+            validation_mode=validation_mode,
+        )
 
     def info(
         self: Manager[VersionValue],

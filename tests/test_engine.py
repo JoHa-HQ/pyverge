@@ -28,6 +28,7 @@ from pyverge.registry.errors import (
     CatalogError,
     MigrationAlreadyRegisteredError,
     MigrationNotFoundError,
+    MigrationPathError,
     MissingReferenceError,
     ModelConflictError,
     ModelNotFoundError,
@@ -60,7 +61,7 @@ from tests.examples.pydantic.semver_nested import (
     AddressV3,
     PersonV1,
 )
-from tests.utils import envelope_model, meta_versionable, run_engine
+from tests.utils import envelope_model, meta_versionable
 from tests.utils.settings import MigrationSettings
 
 
@@ -496,8 +497,6 @@ class TestMigrationManagement:
         with pytest.raises(CatalogError, match="across kinds"):
             engine.store_migration(versions, lambda d, _: d)  # ty: ignore[invalid-argument-type]
 
-    # xfail: Engine.prepare/executor gone; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     @pytest.mark.parametrize(
         "model_adapter, registry, migration_settings, models",
         [
@@ -514,6 +513,7 @@ class TestMigrationManagement:
     def test_unregistered_chain_reconstructs_to_latest(
         self,
         engine: Engine[types.VersionValue],
+        runner,
         models: list[ModelHandle],
     ) -> None:
         """Unregistered endpoints are reconstructed before the chain is stored."""
@@ -529,8 +529,7 @@ class TestMigrationManagement:
                 (src, dst), lambda d, to=target: {**d, "version": to}
             )
 
-        result = run_engine(
-            engine,
+        result = runner.run(
             {
                 "kind": "User",
                 "version": str(real.version[1]),
@@ -538,12 +537,13 @@ class TestMigrationManagement:
                 "email": "a@b.c",
                 "role": "user",
             },
-            target=latest_target_resolver(engine.registry),
+            latest_target_resolver(engine.registry),
+            container=None,
+            max_depth=-1,
+            context=None,
         )
         assert result["version"] == "1.0.0"
 
-    # xfail: Engine.prepare/executor gone; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     @pytest.mark.parametrize(
         "model_adapter, registry, migration_settings, models",
         [
@@ -560,6 +560,7 @@ class TestMigrationManagement:
     def test_unregistered_chain_missing_edge_raises(
         self,
         engine: Engine[types.VersionValue],
+        runner,
         models: list[ModelHandle],
     ) -> None:
         """A removed edge still breaks an otherwise materialized chain."""
@@ -578,9 +579,8 @@ class TestMigrationManagement:
         second = engine.get_model(keys[1])
         engine.remove_migration(EdgeKey.from_pair(first, second), force=True)
 
-        with pytest.raises(MigrationNotFoundError):
-            run_engine(
-                engine,
+        with pytest.raises(MigrationPathError):
+            runner.run(
                 {
                     "kind": "User",
                     "version": str(real.version[1]),
@@ -588,7 +588,10 @@ class TestMigrationManagement:
                     "email": "a@b.c",
                     "role": "user",
                 },
-                target=fixed_target_resolver(engine.registry, second),
+                fixed_target_resolver(engine.registry, second),
+                container=None,
+                max_depth=-1,
+                context=None,
             )
 
     @pytest.mark.parametrize(
@@ -876,7 +879,7 @@ class TestMigrationManagement:
 
         key = EdgeKey.from_pair(versions[0], versions[1])
         if scenario == "add_remove":
-            hook = MigrationHook()
+            hook = MagicMock(spec=MigrationHook)
             engine.add_hook(EdgeKey.from_pair(versions[0], versions[1]), hook)
             assert engine.registry.has_hooks(engine.registry.get_migration_by_edge(key))
 
@@ -886,7 +889,9 @@ class TestMigrationManagement:
             )
             return
 
-        engine.add_hook(EdgeKey.from_pair(versions[0], versions[1]), MigrationHook())
+        engine.add_hook(
+            EdgeKey.from_pair(versions[0], versions[1]), MagicMock(spec=MigrationHook)
+        )
         engine.clear_hooks()
         assert not engine.registry._hooks
 
@@ -1009,48 +1014,3 @@ class TestLookupTyped:
         versions = [envelope_model(engine.adapter, None, m) for m in models]
         key = EdgeKey.from_pair(versions[0], versions[1])
         assert engine[key].func is not None
-
-
-# xfail: entry runtime moved to execution; retarget with runtime (task 7.11).
-@pytest.mark.xfail(reason="entry runtime moved to execution; see task 7.11")
-class TestMigrationEntryIntegration:
-    """Engine delegates per-entry migration to an injected MigrationEntry strategy."""
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [
-                        ((UserV1, UserV2), lambda d, _: d),
-                    ],
-                ],
-                id="pydantic",
-            )
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_engine_uses_custom_entry_migration(
-        self,
-        engine: Engine[types.VersionValue],
-    ) -> None:
-
-        class _CustomTask:
-            def run(self) -> dict[str, Any]:
-                return {"custom": True}
-
-        custom_strategy = MagicMock()
-        custom_strategy.migrate.return_value = _CustomTask()
-        result = run_engine(
-            engine,
-            {"kind": "User", "version": "1.0.0", "name": "Alice"},
-            target=latest_target_resolver(engine.registry),
-            entry_migration=custom_strategy,
-        )
-
-        assert result == {"custom": True}
-        assert custom_strategy.migrate.call_count == 1

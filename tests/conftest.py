@@ -18,17 +18,17 @@ from pyverge.discovery.reflection import (
 )
 from pyverge.execution import (
     AnyDirection,
-    BackendDeclaration,
     CompositeExtractor,
-    ConcurrencyBackend,
     ExecutionCoordinator,
     ExecutionPlanner,
     PathResolver,
     PolicyEngine,
     Runner,
-    RuntimeCapabilities,
+    TargetCompiler,
 )
+from pyverge.execution.backends import ThreadedBackend
 from pyverge.execution.context import ExecutionEnvironment
+from pyverge.execution.types import BackendPort
 from pyverge.migration import (
     Engine,
     JsonSchemaModelAdapter,
@@ -175,21 +175,17 @@ def coordinator(
             depth_limit=-1,
             on_depth_violation="raise",
         ),
-        planner=ExecutionPlanner(
-            backend=BackendDeclaration(
-                name="local",
-                strategy="sequential",
-                middleware=(),
-            ),
-        ),
+        planner=ExecutionPlanner(),
     )
 
 
 @pytest.fixture
 def runtime_backend(
     request: pytest.FixtureRequest,
-) -> Iterator[ConcurrencyBackend]:
-    backend_cls, kwargs = request.param
+) -> Iterator[BackendPort]:
+    backend_cls, kwargs = getattr(
+        request, "param", (ThreadedBackend, {"max_workers": 0})
+    )
     backend = backend_cls(**kwargs)
     yield backend
     close = getattr(backend, "close", None)
@@ -198,16 +194,30 @@ def runtime_backend(
 
 
 @pytest.fixture
+def runtime_environment() -> ExecutionEnvironment:
+    return ExecutionEnvironment(
+        clock=SystemClock(),
+        id_factory=UuidIdFactory(),
+        logger=None,
+        tracer=None,
+    )
+
+
+@pytest.fixture
 def runner(
     coordinator: ExecutionCoordinator[VersionValue],
+    registry: Registry[VersionValue],
     model_adapter: ModelAdapter,
-    runtime_backend: ConcurrencyBackend,
+    runtime_backend: BackendPort,
+    runtime_environment: ExecutionEnvironment,
 ) -> Runner[VersionValue]:
     return Runner(
         coordinator=coordinator,
         adapter=model_adapter,
-        capabilities=RuntimeCapabilities(sync=True, async_=False, parallel=False),
-        concurrency=runtime_backend,
+        backend=runtime_backend,
+        middleware=(),
+        environment=runtime_environment,
+        target_compiler=TargetCompiler[VersionValue](registry, model_adapter),
     )
 
 

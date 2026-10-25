@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from typing import Any
+from unittest.mock import MagicMock
 
 import pendulum
 import pytest
@@ -836,7 +837,7 @@ class TestHooks:
             func=lambda d, _: d,
         )
         key = EdgeKey.from_version_edge(edge)
-        hook = MigrationHook()
+        hook = MagicMock(spec=MigrationHook)
         registry.add_hook(key, hook)
         assert registry.get_hooks(key) == [hook]
 
@@ -919,8 +920,8 @@ class TestHooks:
         registry: Registry[types.VersionValue],
         models: list[ModelHandle],
     ) -> None:
-        hook1 = MigrationHook()
-        hook2 = MigrationHook()
+        hook1 = MagicMock(spec=MigrationHook)
+        hook2 = MagicMock(spec=MigrationHook)
         edge = edge_from_models(
             model_adapter,
             versioning_settings,
@@ -977,8 +978,8 @@ class TestHooks:
             models[1],
             func=lambda d, _: d,
         )
-        registry.add_hook(edge, MigrationHook())
-        registry.add_hook(edge, MigrationHook())
+        registry.add_hook(edge, MagicMock(spec=MigrationHook))
+        registry.add_hook(edge, MagicMock(spec=MigrationHook))
         registry.remove_hook(edge)  # hook is None → remove all
         assert registry.get_hooks(edge) == []
 
@@ -1026,7 +1027,7 @@ class TestHooks:
         )
         key = EdgeKey.from_version_edge(edge)
         with pytest.raises(CatalogError):
-            registry.remove_hook(key, MigrationHook())
+            registry.remove_hook(key, MagicMock(spec=MigrationHook))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models, expected_amount",
@@ -1074,8 +1075,8 @@ class TestHooks:
             func=lambda d, _: d,
         )
         key = EdgeKey.from_version_edge(edge)
-        registry.add_hook(edge, MigrationHook())
-        registry.add_hook(edge, MigrationHook())
+        registry.add_hook(edge, MagicMock(spec=MigrationHook))
+        registry.add_hook(edge, MagicMock(spec=MigrationHook))
         assert len(registry.get_hooks(key)) == expected_amount
         registry.clear_hooks(key)
         assert registry.get_hooks(key) == []
@@ -1123,7 +1124,7 @@ class TestHooks:
             func=lambda d, _: d,
         )
         key = EdgeKey.from_version_edge(edge)
-        registry.add_hook(key, MigrationHook())
+        registry.add_hook(key, MagicMock(spec=MigrationHook))
         registry.clear_hooks(key)
         assert registry.get_hooks(key) == []
 
@@ -1996,7 +1997,7 @@ class TestMigrationHookGuard:
             func=lambda d, _: d,
         )
         registry.store_migration(edge)
-        registry.add_hook(edge, MigrationHook())
+        registry.add_hook(edge, MagicMock(spec=MigrationHook))
 
         key = EdgeKey.from_version_edge(edge)
         with pytest.raises(CatalogError, match="hooks"):
@@ -2048,7 +2049,7 @@ class TestMigrationHookGuard:
             func=lambda d, _: d,
         )
         key = EdgeKey.from_version_edge(edge)
-        registry.add_hook(key, MigrationHook())
+        registry.add_hook(key, MagicMock(spec=MigrationHook))
         registry.clear_hooks(key)
 
         registry.remove_migration(key)

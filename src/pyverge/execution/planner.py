@@ -8,7 +8,6 @@ from typing import Generic
 from pyverge.core.types import VersionValue
 from pyverge.execution.path import Path
 from pyverge.execution.plan import (
-    BackendDeclaration,
     ExecutionPlan,
     PathPlan,
     PathPlanEntry,
@@ -19,8 +18,6 @@ from pyverge.execution.plan import (
 class ExecutionPlanner(Generic[VersionValue]):
     """Turn a PathPlan into runtime-bound levels and execution options."""
 
-    backend: BackendDeclaration
-
     def build(
         self, path: PathPlan[VersionValue], payload: dict
     ) -> ExecutionPlan[VersionValue]:
@@ -29,7 +26,6 @@ class ExecutionPlanner(Generic[VersionValue]):
             path=path,
             payload=payload,
             levels=self._levels(path.entries),
-            backend=self.backend,
         )
 
     def _levels(

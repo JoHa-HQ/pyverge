@@ -23,7 +23,7 @@ from pyverge.adapters.faststream import (
     subscriber,
 )
 from pyverge.migration import MigrationContext, PydanticModelAdapter
-from pyverge.registry.errors import CatalogError
+from pyverge.registry.errors import MigrationPathError
 from tests.examples.pydantic.semver import (
     UserV1,
     UserV2,
@@ -83,8 +83,6 @@ V2_PAYLOAD = {**V1_PAYLOAD, "version": "2.0.0", "age": None}
     ],
     indirect=["broker"],
 )
-# xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-@pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
 async def test_converges_to_target(broker, payloads, payload, expected) -> None:
     async with TestKafkaBroker(broker) as br:
         await br.publish(payload, "users")
@@ -124,8 +122,6 @@ class TestReflection:
     indirect=True,
 )
 class TestProduce:
-    # xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     async def test_in_out_bridge(self, manager, broker) -> None:
         instance = manager()
         out: list[dict[str, Any]] = []
@@ -143,8 +139,6 @@ class TestProduce:
             await br.publish(V1_PAYLOAD, "in-topic")
         assert out == [V1_PAYLOAD]
 
-    # xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     async def test_out_passthrough(self, manager, broker) -> None:
         instance = manager()
         out: list[dict[str, Any]] = []
@@ -170,8 +164,6 @@ class TestProduce:
     indirect=True,
 )
 class TestNegotiation:
-    # xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     async def test_header_selects_version(self, manager) -> None:
         instance = manager()
         broker = KafkaBroker("localhost:9092")
@@ -189,8 +181,6 @@ class TestNegotiation:
             )
         assert seen == [V1_PAYLOAD]
 
-    # xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     async def test_per_topic_targets(self, manager) -> None:
         instance = manager()
         broker = KafkaBroker("localhost:9092")
@@ -211,8 +201,6 @@ class TestNegotiation:
             await br.publish(V2_PAYLOAD, "users-latest")
         assert seen == [V1_PAYLOAD, V2_PAYLOAD]
 
-    # xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     async def test_publish_to_converges_each_route(self, manager) -> None:
         instance = manager()
         broker = KafkaBroker("localhost:9092")
@@ -248,8 +236,12 @@ class TestNegotiation:
     indirect=True,
 )
 class TestFailures:
-    # xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     def test_no_migration_path_raises(self, manager) -> None:
-        with pytest.raises(CatalogError):
-            manager().migrate(V2_PAYLOAD, target="1.0.0")
+        with pytest.raises(MigrationPathError):
+            manager().runner().run(
+                V2_PAYLOAD,
+                "1.0.0",
+                container=None,
+                max_depth=-1,
+                context=None,
+            )

@@ -1,6 +1,6 @@
 """Execution package (runtime, entry extraction, backends)."""
 
-from .backends import PlainBackend, ProcessBackend
+from .backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from .coordinator import ExecutionCoordinator
 from .direction import (
     AnyDirection,
@@ -16,11 +16,16 @@ from .errors import (
     SyncExecutionRequired,
 )
 from .extractors import CompositeExtractor, ContainerExtractor, SchemaFieldsExtractor
-from .hooks import MigrationHook
+from .hooks import MigrationHook, OpenLineageHook, OTELHook
+from .middleware import (
+    BackendMiddleware,
+    OpenLineageMiddleware,
+    OtelMiddleware,
+    RetryMiddleware,
+)
 from .path import Path
 from .path_resolver import PathResolver
 from .plan import (
-    BackendDeclaration,
     ExecutionPlan,
     ExtractedEntry,
     PathPlan,
@@ -32,6 +37,7 @@ from .planner import ExecutionPlanner
 from .policy import PolicyEngine
 from .runner import Runner
 from .targets import (
+    TargetCompiler,
     earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,
@@ -39,20 +45,20 @@ from .targets import (
     skip_target_resolver,
 )
 from .types import (
-    ConcurrencyBackend,
+    BackendPort,
     Entry,
     EntryExtractor,
-    RuntimeCapabilities,
     RuntimePort,
 )
 
 __all__ = [
     "AnyDirection",
+    "AsyncBackend",
     "AsyncExecutionRequired",
-    "BackendDeclaration",
+    "BackendMiddleware",
+    "BackendPort",
     "BackwardDirection",
     "CompositeExtractor",
-    "ConcurrencyBackend",
     "ContainerExtractor",
     "DirectionPolicy",
     "Entry",
@@ -65,20 +71,25 @@ __all__ = [
     "ExtractedEntry",
     "ForwardDirection",
     "MigrationHook",
+    "OTELHook",
+    "OpenLineageHook",
+    "OpenLineageMiddleware",
+    "OtelMiddleware",
     "Path",
     "PathPlan",
     "PathPlanEntry",
     "PathResolver",
-    "PlainBackend",
     "PlanningOptions",
     "PolicyDecision",
     "PolicyEngine",
     "ProcessBackend",
+    "RetryMiddleware",
     "Runner",
-    "RuntimeCapabilities",
     "RuntimePort",
     "SchemaFieldsExtractor",
     "SyncExecutionRequired",
+    "TargetCompiler",
+    "ThreadedBackend",
     "direction_policy",
     "earliest_target_resolver",
     "fixed_target_resolver",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Generic, Literal
+from typing import Any, Generic
 
 from pyverge.core.types import (
     Attachable,
@@ -53,22 +53,12 @@ class PolicyDecision:
 
 
 @dataclass(frozen=True, slots=True)
-class BackendDeclaration:
-    """Backend selected for an execution plan."""
-
-    name: str
-    strategy: Literal["sequential", "parallel"]
-    middleware: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
 class ExecutionPlan(Generic[VersionValue]):
     """Runtime-bound execution plan produced from a PathPlan."""
 
     path: PathPlan[VersionValue]
     payload: dict[str, Any]
     levels: tuple[tuple[PathPlanEntry[VersionValue], ...], ...]
-    backend: BackendDeclaration
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +73,6 @@ class PlanningOptions:
 
 
 __all__ = [
-    "BackendDeclaration",
     "ExecutionPlan",
     "ExtractedEntry",
     "PathPlan",

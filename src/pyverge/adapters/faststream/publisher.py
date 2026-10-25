@@ -54,9 +54,15 @@ class ReturnConverger:
             result = await handler(*args, **kwargs)
             if result is None:
                 return None
-            return await self._manager.prepare(  # ty: ignore[unresolved-attribute]
-                self._dump(result), target=self._target
-            ).arun()
+            runner = self._manager.runner()
+            migrated = runner.run(
+                self._dump(result),
+                self._target,
+                container=None,
+                max_depth=-1,
+                context=None,
+            )
+            return await migrated if inspect.isawaitable(migrated) else migrated
 
         if out_model is not None:
             annotations = dict(getattr(converged, "__annotations__", {}))
@@ -125,7 +131,17 @@ def publish_to(
                 return
             payload = manager.dump(result)
             for topic, target in routes.items():
-                converged = await manager.prepare(payload, target=target).arun()  # ty: ignore[unresolved-attribute]
+                runner = manager.runner()
+                migrated = runner.run(
+                    payload,
+                    target,
+                    container=None,
+                    max_depth=-1,
+                    context=None,
+                )
+                converged = (
+                    await migrated if inspect.isawaitable(migrated) else migrated
+                )
                 version = converged.get("version")
                 headers: dict[str, Any] = {}
                 if version is not None:

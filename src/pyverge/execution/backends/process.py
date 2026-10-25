@@ -1,38 +1,96 @@
-"""Process concurrency backend for isolated sync work."""
+"""Process backend for isolated sync migration work."""
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+import copy
+import inspect
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any, TypeVar, cast
+from typing import Any
 
-T = TypeVar("T")
+from pyverge.core.context import MigrationContext
+from pyverge.core.types import VersionValue
+from pyverge.execution.context import RunContext, StepContext
+from pyverge.execution.errors import AsyncExecutionRequired
+from pyverge.execution.path import Path
+from pyverge.execution.plan import ExecutionPlan, PathPlanEntry
+from pyverge.schemas.types import ModelAdapter
+from pyverge.versioning import EdgeKey
 
 
-def _invoke(work: Callable[..., T], args: tuple[Any, ...]) -> T:
-    return work(*args)
+def _invoke(work: Any, data: Any, context: Any) -> Any:
+    return work(data, dict(context))
 
 
 class ProcessBackend:
-    """Run sync work in a process pool.
-
-    Callables and arguments must be picklable: module-level migration functions
-    work; lambdas and local closures do not.
-    """
+    """Run migration callables in a process pool; hooks stay in the parent."""
 
     def __init__(self, max_workers: int) -> None:
         self._executor = ProcessPoolExecutor(max_workers=max_workers)
 
-    def run(self, work: Callable[..., T], /, *args: Any) -> T:
-        return cast("T", self._executor.submit(_invoke, work, args).result())
-
-    async def arun(
+    def execute(
         self,
-        work: Callable[..., Awaitable[T]],
-        /,
-        *args: Any,
-    ) -> T:
-        raise NotImplementedError("ProcessBackend supports sync work only")
+        plan: ExecutionPlan[VersionValue],
+        payload: dict[str, Any],
+        run: RunContext,
+        adapter: ModelAdapter,
+    ) -> dict[str, Any]:
+        data = copy.deepcopy(payload)
+        for level in plan.levels:
+            for entry in level:
+                self._execute_entry(entry, data, run, adapter)
+        return data
+
+    def _execute_entry(
+        self,
+        entry: PathPlanEntry[VersionValue],
+        data: dict[str, Any],
+        run: RunContext,
+        adapter: ModelAdapter,
+    ) -> None:
+        current = Path(*entry.path).get(data)
+        for index, (source, target) in enumerate(entry.steps):
+            func = entry.migrations[index]
+            hooks = entry.hooks[index]
+            name = getattr(func, "__name__", f"{source}->{target}")
+            for hook in hooks:
+                result = hook.before_migrate(name, source, target, current)
+                if inspect.isawaitable(result):
+                    if inspect.iscoroutine(result):
+                        result.close()
+                    raise AsyncExecutionRequired("async hook requires async backend")
+            step = self._step(entry, index, source, target, run)
+            try:
+                migrated = self._executor.submit(
+                    _invoke, func, current, step.view
+                ).result()
+            except Exception as error:
+                for hook in hooks:
+                    hook.on_error(name, source, target, current, error)
+                raise
+            for hook in hooks:
+                hook.after_migrate(name, source, target, current, migrated)
+            if isinstance(migrated, dict):
+                migrated[adapter.version_property] = str(target.version[1])
+            current = migrated
+        Path(*entry.path).set(data, current)
+
+    def _step(
+        self,
+        entry: PathPlanEntry[VersionValue],
+        index: int,
+        source: Any,
+        target: Any,
+        run: RunContext,
+    ) -> StepContext:
+        return StepContext(
+            run=run,
+            path=entry.path,
+            index=index,
+            source=source,
+            target=target,
+            edge=EdgeKey.from_pair(source, target),
+            bindings=MigrationContext.empty(),
+        )
 
     def close(self) -> None:
         self._executor.shutdown()

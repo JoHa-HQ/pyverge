@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterator
-from dataclasses import dataclass
+from collections.abc import Awaitable, Iterator
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from pyverge.core.context import MigrationContext
 from pyverge.core.types import TargetResolver, VersionValue
-from pyverge.execution.plan import ExecutionPlan, ExtractedEntry
+from pyverge.execution.context import RunContext
+from pyverge.execution.plan import ExecutionPlan
+from pyverge.schemas.types import ModelAdapter
 
 if TYPE_CHECKING:
     from pyverge.registry import Registry
@@ -35,42 +36,21 @@ class EntryExtractor(Protocol[VersionValue]):
     ) -> Iterator[Entry]: ...
 
 
-@dataclass(frozen=True, slots=True)
-class RuntimeCapabilities:
-    """Declared runtime capabilities."""
+class BackendPort(Protocol[VersionValue]):
+    """Execution backend seam: plan + payload + run context."""
 
-    sync: bool
-    async_: bool
-    parallel: bool
-
-
-@runtime_checkable
-class ConcurrencyBackend(Protocol):
-    """Run sync or async work on a host-appropriate loop/thread."""
-
-    def run(self, work: Callable[..., T], /, *args: Any) -> T: ...
-    async def arun(
+    def execute(
         self,
-        work: Callable[..., Awaitable[T]],
-        /,
-        *args: Any,
-    ) -> T: ...
+        plan: ExecutionPlan[VersionValue],
+        payload: dict[str, Any],
+        run: RunContext,
+        adapter: ModelAdapter,
+    ) -> dict[str, Any] | Awaitable[dict[str, Any]]: ...
 
 
 @runtime_checkable
 class RuntimePort(Protocol[VersionValue]):
     """Runtime facade consumed by manager/adapters."""
-
-    @property
-    def capabilities(self) -> RuntimeCapabilities: ...
-
-    def extract(
-        self,
-        payload: dict[str, Any],
-        *,
-        container: type[Any] | None,
-        max_depth: int,
-    ) -> list[ExtractedEntry[VersionValue]]: ...
 
     def plan(
         self,
@@ -89,20 +69,19 @@ class RuntimePort(Protocol[VersionValue]):
         container: type[Any] | None,
         max_depth: int,
         context: MigrationContext | None,
-    ) -> dict[str, Any]: ...
+    ) -> Any: ...
 
     def execute(
         self,
         plan: ExecutionPlan,
         *,
         context: MigrationContext | None,
-    ) -> dict[str, Any]: ...
+    ) -> Any: ...
 
 
 __all__ = [
-    "ConcurrencyBackend",
+    "BackendPort",
     "Entry",
     "EntryExtractor",
-    "RuntimeCapabilities",
     "RuntimePort",
 ]

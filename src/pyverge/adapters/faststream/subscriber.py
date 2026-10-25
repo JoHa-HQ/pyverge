@@ -9,6 +9,7 @@ validates the converged payload against the version actually served.
 
 from __future__ import annotations
 
+import inspect
 import operator
 from collections.abc import Callable
 from functools import reduce
@@ -84,7 +85,15 @@ def subscriber(
             target = selector.select(
                 TargetContext(topic, getattr(msg, "headers", {}) or {})
             )
-            return await manager.prepare(payload, target=target).arun()  # ty: ignore[unresolved-attribute]
+            runner = manager.runner()
+            migrated = runner.run(
+                payload,
+                target,
+                container=None,
+                max_depth=-1,
+                context=None,
+            )
+            return await migrated if inspect.isawaitable(migrated) else migrated
 
         return converge_message
 

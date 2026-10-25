@@ -105,11 +105,6 @@ LEAN_CALLS = (
             ],
             rich_call,
             id=f"pydantic-{rich_call.id}",
-            marks=(
-                pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
-                if rich_call.call_version == "1.0.0"
-                else ()
-            ),
         )
         for rich_call in RICH_CALLS
     ]
@@ -124,11 +119,6 @@ LEAN_CALLS = (
             ],
             lean_call,
             id=f"json-{lean_call.id}",
-            marks=(
-                pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
-                if lean_call.call_version == "1.0.0"
-                else ()
-            ),
         )
         for lean_call in LEAN_CALLS
     ],

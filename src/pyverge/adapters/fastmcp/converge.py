@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
 from typing import Any
 
 from pyverge.core.types import (
     ModelData,
 )
+from pyverge.execution.errors import AsyncExecutionRequired
 from pyverge.manager import Manager
 from pyverge.manager.types import (
     TargetPolicy,
@@ -41,7 +43,18 @@ class Converger:
 
         def converge(**kwargs: Any) -> Any:
             payload: ModelData = {_KIND: kind, _VERSION: version, **kwargs}
-            converged = self._manager.prepare(payload, target=target).run()  # ty: ignore[unresolved-attribute]
+            result = self._manager.runner().run(
+                payload,
+                target,
+                container=None,
+                max_depth=-1,
+                context=None,
+            )
+            if inspect.isawaitable(result):
+                raise AsyncExecutionRequired(
+                    "Converger requires a sync runtime backend"
+                )
+            converged = result
             converged.pop(_KIND, None)
             converged.pop(_VERSION, None)
             return handler(**converged)

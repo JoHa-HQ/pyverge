@@ -4,7 +4,6 @@ from collections.abc import Callable
 from typing import (
     TYPE_CHECKING,
     ClassVar,
-    Literal,
     Protocol,
     Self,
     TypeAlias,
@@ -15,11 +14,18 @@ from pyverge.core.types import (
     ManagerMigrationKey,
     MigrationFunc,
     ModelHandle,
-    ModelKind,
     ModelPair,
     TargetResolver,
     VersionValue,
-    VersionValue_co,
+)
+from pyverge.execution.targets import (
+    TargetPolicy as TargetPolicy,  # noqa: PLC0414
+)
+from pyverge.execution.targets import (
+    TargetSpec as TargetSpec,  # noqa: PLC0414
+)
+from pyverge.execution.targets import (
+    TargetStrategy as TargetStrategy,  # noqa: PLC0414
 )
 from pyverge.schemas.types import (
     ModelAdapter,
@@ -45,16 +51,6 @@ if TYPE_CHECKING:
     from pyverge.sources import SourcePort
     from pyverge.versioning import ContentHasher, DiffMaterializer
 
-TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]
-
-TargetSpec: TypeAlias = (
-    Versionable[VersionValue_co] | type[ModelHandle] | TargetStrategy | str | None
-)
-TargetPolicy: TypeAlias = (
-    TargetSpec
-    | dict[ModelKind | Literal["*"], TargetSpec]
-    | TargetResolver[VersionValue_co]
-)
 
 #: A callable that binds a registry to a :data:`TargetResolver`; the shape of
 #: the ``*_target_resolver`` factories in :mod:`pyverge.execution.targets`.

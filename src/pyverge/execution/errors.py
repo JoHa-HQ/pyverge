@@ -28,9 +28,19 @@ class SyncExecutionRequired(ExecutionModeError):
     """Raised when an async entrypoint is used with sync execution."""
 
 
+class UnknownModelError(ExecutionError):
+    """A plan entry targets a model the runner cannot identify."""
+
+
+class AmbiguousModelError(ExecutionError):
+    """A model handle is claimed by more than one adapter."""
+
+
 __all__ = [
+    "AmbiguousModelError",
     "AsyncExecutionRequired",
     "ExecutionError",
     "ExecutionModeError",
     "SyncExecutionRequired",
+    "UnknownModelError",
 ]

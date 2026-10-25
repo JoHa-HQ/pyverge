@@ -339,8 +339,6 @@ class TestCommands:
         results = json.loads(result.stdout)["results"]
         assert [item["valid"] for item in results] == [True, False]
 
-    # xfail: runtime moved out of Engine; retarget with runtime (task 7.11).
-    @pytest.mark.xfail(reason="runtime moved out of Engine; see task 7.11")
     def test_migrate_writes_output(
         self,
         runner: CliRunner,

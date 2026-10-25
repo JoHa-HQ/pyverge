@@ -28,10 +28,10 @@ from .descriptors import ManagerMeta
 from .mixins import (
     EngineLifecycleMixin,
     LookupMixin,
-    MigrateMixin,
     MigrationStoreMixin,
     ModelStoreMixin,
     ReflectionMixin,
+    RuntimeMixin,
     TargetResolutionMixin,
 )
 
@@ -42,8 +42,8 @@ class Manager(
     ModelStoreMixin[VersionValue],
     MigrationStoreMixin[VersionValue],
     LookupMixin[VersionValue],
-    MigrateMixin[VersionValue],
     ReflectionMixin[VersionValue],
+    RuntimeMixin[VersionValue],
     metaclass=ManagerMeta,
 ):
     """Class factory scoping a migration ``Engine`` to a version strategy.

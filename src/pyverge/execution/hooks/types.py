@@ -1,13 +1,14 @@
-"""Execution hook defaults."""
+"""Execution hook protocols."""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 from pyverge.versioning import Comparable
 
 
-class MigrationHook:
+@runtime_checkable
+class MigrationHook(Protocol):
     """No-op migration hook; subclasses override either seam."""
 
     def before_migrate(
@@ -16,9 +17,7 @@ class MigrationHook:
         from_version: Comparable,
         to_version: Comparable,
         data: dict[str, Any],
-    ) -> None:
-        """Called before an edge runs."""
-        return None
+    ) -> None: ...
 
     def after_migrate(
         self,
@@ -27,9 +26,7 @@ class MigrationHook:
         to_version: Comparable,
         original_data: dict[str, Any],
         migrated_data: dict[str, Any],
-    ) -> None:
-        """Called after an edge runs."""
-        return None
+    ) -> None: ...
 
     def on_error(
         self,
@@ -38,9 +35,7 @@ class MigrationHook:
         to_version: Comparable,
         data: dict[str, Any],
         error: Exception,
-    ) -> None:
-        """Called when an edge fails."""
-        return None
+    ) -> None: ...
 
 
 __all__ = ["MigrationHook"]

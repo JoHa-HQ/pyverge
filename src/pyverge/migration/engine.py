@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Generic, Self, cast, overload
+from typing import Any, Generic, Literal, Self, cast, overload
 
 from pyverge.core.types import (
     Attachable,
@@ -12,6 +12,19 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.discovery.reflection import Reflector
+from pyverge.execution import (
+    CompositeExtractor,
+    ExecutionCoordinator,
+    ExecutionPlanner,
+    PathResolver,
+    PolicyEngine,
+    Runner,
+)
+from pyverge.execution.context import ExecutionEnvironment
+from pyverge.execution.direction import DirectionPolicy
+from pyverge.execution.middleware import BackendMiddleware
+from pyverge.execution.targets import TargetCompiler
+from pyverge.execution.types import BackendPort
 from pyverge.migration.registration import MigrationRegistrationService
 from pyverge.migrations.identity import MigrationIdentityResolver
 from pyverge.migrations.json_patch import JsonPatch
@@ -56,6 +69,48 @@ class Engine(Generic[VersionValue]):
             self.reflector,
         )
         self.explorer = GraphExplorer(registry)
+
+    def runner(
+        self,
+        *,
+        backend: BackendPort[VersionValue],
+        middleware: tuple[BackendMiddleware, ...],
+        environment: ExecutionEnvironment,
+        direction: DirectionPolicy,
+        on_direction_violation: str,
+        on_missing_path: str,
+        depth_limit: int,
+        on_depth_violation: str,
+        validation_mode: Literal["strict", "lax", "none"],
+    ) -> Runner[VersionValue]:
+        """Build a runtime facade over this engine's dependencies."""
+        coordinator = ExecutionCoordinator[VersionValue](
+            extractor=CompositeExtractor[VersionValue](
+                self.registry,
+                adapter=self.adapter,
+                validation_mode=validation_mode,
+            ),
+            paths=PathResolver[VersionValue](self.registry),
+            policy=PolicyEngine[VersionValue](
+                direction=direction,
+                on_direction_violation=on_direction_violation,
+                on_missing_path=on_missing_path,
+                depth_limit=depth_limit,
+                on_depth_violation=on_depth_violation,
+            ),
+            planner=ExecutionPlanner[VersionValue](),
+        )
+        return Runner[VersionValue](
+            coordinator=coordinator,
+            adapter=self.adapter,
+            target_compiler=TargetCompiler[VersionValue](
+                self.registry,
+                self.adapter,
+            ),
+            backend=backend,
+            middleware=middleware,
+            environment=environment,
+        )
 
     def copy(self) -> Engine[VersionValue]:
         """Return a build engine over a mutable copy of this registry."""
@@ -114,11 +169,14 @@ class Engine(Generic[VersionValue]):
         return self.registry.reconcile_model(version)
 
     def validate(self: Self, key: Comparable[VersionValue] | None = None) -> None:
-        versions = (
-            self.registry.versions if key is None else [self.registry.get_model(key)]
-        )
+        if key is None:
+            versions = self.registry.versions
+        elif isinstance(key, VersionNode):
+            versions = [key]
+        else:
+            versions = [self.registry.get_model(key)]
         for version in versions:
-            absent = self.registry.missing_references(version)
+            absent = self.registry.missing_references(version, require_registered=False)
             if absent:
                 raise MissingReferenceError(
                     self.registry.name,
