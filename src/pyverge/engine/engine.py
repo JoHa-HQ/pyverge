@@ -6,9 +6,12 @@ from typing import Any, Generic, Literal, Self, cast, overload
 
 from pyverge.core.types import (
     Attachable,
+    DepthViolationStrategy,
+    DirectionViolationStrategy,
     MigrationFunc,
     ModelHandle,
     ModelKind,
+    VersionMissingStrategy,
     VersionValue,
 )
 from pyverge.discovery import (
@@ -80,10 +83,10 @@ class Engine(Generic[VersionValue]):
         middleware: tuple[BackendMiddleware, ...] = (),
         environment: ExecutionEnvironment,
         direction: DirectionPolicy,
-        on_direction_violation: str,
-        on_missing_path: str,
+        on_direction_violation: DirectionViolationStrategy,
+        on_missing_path: VersionMissingStrategy,
         depth_limit: int,
-        on_depth_violation: str,
+        on_depth_violation: DepthViolationStrategy,
         validation_mode: Literal["strict", "lax", "none"],
     ) -> Runner[VersionValue]:
         """Build a runtime facade over this engine's dependencies."""

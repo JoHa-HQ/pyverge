@@ -17,6 +17,7 @@ from .lifecycle import LifecyclePort
 from .types import (
     MIGRATION_PAIR_LEN,
     Attachable,
+    DepthViolationStrategy,
     DirectionViolationStrategy,
     ManagerKey,
     ManagerMigrationKey,
@@ -43,6 +44,7 @@ __all__ = [
     "Attachable",
     "CatalogError",
     "Clock",
+    "DepthViolationStrategy",
     "DirectionViolationStrategy",
     "IdFactory",
     "LifecyclePort",

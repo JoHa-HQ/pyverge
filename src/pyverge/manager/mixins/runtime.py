@@ -8,12 +8,15 @@ from typing import TYPE_CHECKING, Generic, Literal, cast
 from pyverge.core.clock import SystemClock
 from pyverge.core.ids import UuidIdFactory
 from pyverge.core.types import (
+    DepthViolationStrategy,
+    DirectionViolationStrategy,
     ManagerMigrationKey,
     MigrationDirectionStrategy,
     ModelData,
     ModelKey,
     ModelKind,
     ModelPair,
+    VersionMissingStrategy,
     VersionValue,
 )
 from pyverge.execution import (
@@ -54,10 +57,10 @@ class RuntimeMixin(Generic[VersionValue]):
         environment: ExecutionEnvironment | None = None,
         runtime: BackendPort | None = None,
         direction: MigrationDirectionStrategy = "any",
-        on_direction_violation: str = "skip",
-        on_missing_path: str = "raise",
+        on_direction_violation: DirectionViolationStrategy = "skip",
+        on_missing_path: VersionMissingStrategy = "raise",
         depth_limit: int = -1,
-        on_depth_violation: str = "skip",
+        on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
     ) -> Runner[VersionValue]:
         """Build a runtime runner for this manager."""

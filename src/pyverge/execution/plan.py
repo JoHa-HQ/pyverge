@@ -7,8 +7,10 @@ from typing import Any, Generic
 
 from pyverge.core.types import (
     Attachable,
+    DirectionViolationStrategy,
     MigrationFunc,
     ModelHandle,
+    VersionMissingStrategy,
     VersionValue,
 )
 from pyverge.versioning import VersionNode
@@ -67,9 +69,9 @@ class PlanningOptions:
 
     depth_limit: int
     direction: Any
-    on_direction_violation: str
-    on_missing_path: str
-    on_missing_model: str
+    on_direction_violation: DirectionViolationStrategy
+    on_missing_path: VersionMissingStrategy
+    on_missing_model: VersionMissingStrategy
 
 
 __all__ = [

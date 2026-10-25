@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Generic
 
-from pyverge.core.types import VersionValue
+from pyverge.core.types import (
+    DepthViolationStrategy,
+    DirectionViolationStrategy,
+    VersionMissingStrategy,
+    VersionValue,
+)
 from pyverge.execution.direction import DirectionPolicy
 from pyverge.execution.plan import PathPlan, PathPlanEntry
 from pyverge.registry import GraphCatalog
@@ -22,10 +27,10 @@ class PolicyEngine(Generic[VersionValue]):
     """
 
     direction: DirectionPolicy
-    on_direction_violation: str
-    on_missing_path: str
+    on_direction_violation: DirectionViolationStrategy
+    on_missing_path: VersionMissingStrategy
     depth_limit: int
-    on_depth_violation: str
+    on_depth_violation: DepthViolationStrategy
 
     def apply(
         self, plan: PathPlan[VersionValue], *, graph: GraphCatalog[VersionValue]

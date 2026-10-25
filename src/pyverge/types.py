@@ -13,6 +13,7 @@ from __future__ import annotations
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
     Attachable,
+    DepthViolationStrategy,
     DirectionViolationStrategy,
     ExtraFieldStrategy,
     JsonPrimities,
@@ -73,6 +74,7 @@ __all__ = [
     "MIGRATION_PAIR_LEN",
     "Attachable",
     "Comparable",
+    "DepthViolationStrategy",
     "DirectionViolationStrategy",
     "EdgeKey",
     "Entry",

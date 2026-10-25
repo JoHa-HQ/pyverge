@@ -75,6 +75,7 @@ MigrationFunc: TypeAlias = Callable[[ModelData, MigrationContext | None], ModelD
 MigrationDirectionStrategy: TypeAlias = Literal["any", "forward", "backward"]
 DirectionViolationStrategy: TypeAlias = Literal["skip", "raise"]
 VersionMissingStrategy: TypeAlias = Literal["skip", "raise"]
+DepthViolationStrategy: TypeAlias = Literal["skip", "raise"]
 ValidationMode: TypeAlias = Literal["strict", "lax", "none"]
 MissingFieldStrategy: TypeAlias = Literal["raise", "skip"]
 ExtraFieldStrategy: TypeAlias = Literal["raise", "ignore"]
