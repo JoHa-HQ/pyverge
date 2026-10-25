@@ -24,6 +24,10 @@ from pyverge.versioning import (
     default_content_hasher,
     default_encoders,
 )
+from pyverge.versioning.errors import (
+    BackwardCompatibilityError,
+    MigrationApplicationError,
+)
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -44,6 +48,7 @@ from tests.examples.pydantic.chrono import (
 )
 from tests.examples.pydantic.semver import (
     UserV011Dev7,
+    UserV1,
     UserV2,
     UserV123,
     UserV200Beta1,
@@ -572,3 +577,42 @@ class TestJgfInterop:
         assert parsed.edges[0].target == target_node.jgf_id
         assert parsed.edges[0].metadata["migration_id"] == edge.migration.identity
         assert parsed.to_dict() == expected
+
+
+def test_migration_application_error_legacy_pair() -> None:
+    adapter = PydanticModelAdapter()
+    source = adapter.versionable(UserV1)
+    target = adapter.versionable(UserV2)
+    error = MigrationApplicationError((source, target))
+    assert error.kind == "unknown"
+    assert error.source is source
+    assert error.target is target
+    assert error.reason is None
+    assert str(error) == f"Migration failed: {source} → {target}"
+
+
+def test_migration_application_error_with_reason() -> None:
+    adapter = PydanticModelAdapter()
+    source = adapter.versionable(UserV1)
+    target = adapter.versionable(UserV2)
+    error = MigrationApplicationError("User", source, target, reason="boom")
+    assert error.kind == "User"
+    assert error.reason == "boom"
+    assert str(error).endswith(": boom")
+
+
+def test_backward_compatibility_error_details() -> None:
+    adapter = PydanticModelAdapter()
+    source = adapter.versionable(UserV1)
+    target = adapter.versionable(UserV2)
+    error = BackwardCompatibilityError(
+        "test",
+        (source, target),
+        removed=("name",),
+        modified=("email",),
+        required_additions=("age",),
+    )
+    message = str(error)
+    assert "removed=['name']" in message
+    assert "modified=['email']" in message
+    assert "required_additions=['age']" in message
