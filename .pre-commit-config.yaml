@@ -24,6 +24,18 @@ repos:
         language: system
         pass_filenames: false
         types: [python, pyi]
+      - id: pydocstyle
+        name: pydocstyle
+        entry: uv run pydocstyle src/pyverge
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+      - id: pydoclint
+        name: pydoclint
+        entry: uv run pydoclint --quiet --style=google src/pyverge
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
       - id: pytest
         name: pytest
         entry: uv run pytest -vv

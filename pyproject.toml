@@ -20,6 +20,8 @@ dev = [
   "pytest-benchmark>=4.0",
   "hypothesis>=6.130",
   "json-graph-lite>=0.8a0",
+  "pydocstyle>=6.3.0",
+  "pydoclint>=0.11.1",
 ]
 
 [project]
@@ -106,7 +108,7 @@ select = ["C90", "E", "F", "I", "PL", "RUF", "UP"]
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"src/pyverge/migration/engine.py" = ["PLR0913", "PLR0917", "C901"]
+"src/pyverge/engine/engine.py" = ["PLR0913", "PLR0917", "C901"]
 "src/pyverge/execution/extractors.py" = ["C901", "PLR0913", "PLR0917"]
 "src/pyverge/manager/types.py" = ["PLR0913"]
 "src/pyverge/discovery/reflection/discovery.py" = ["C901", "PLR0912"]
@@ -118,3 +120,13 @@ vcs = "git"
 style = "pep440"
 bump = true
 format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"
+
+[tool.pydocstyle]
+convention = "google"
+add-ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+
+[tool.pydoclint]
+style = "google"
+exclude = "\\.git|\\.tox|\\.venv"
+check-class-attributes = false
+arg-type-hints-in-docstring = false
