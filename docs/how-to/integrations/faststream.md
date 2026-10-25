@@ -1,5 +1,9 @@
 # Use FastStream with pyverge
 
+> Upgrading? The `Reflector(manager)` startup hook is removed. Register models
+> and migrations before constructing the runtime manager. See the
+> [upgrade guide](../../reference/upgrades.md).
+
 ## End-to-end example
 
 ```python

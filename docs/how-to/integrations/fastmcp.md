@@ -1,5 +1,9 @@
 # Use FastMCP with pyverge
 
+> Upgrading? `ToolDiscovery` is now `FastMCPDiscovery`, and registration is
+> `await discovery.register(server)`. See the
+> [upgrade guide](../../reference/upgrades.md).
+
 ## End-to-end example
 
 ```python

@@ -2,6 +2,10 @@
 
 pyverge is a runtime schema-evolution engine that lets independently deployed producers and consumers exchange versioned payloads without requiring synchronized releases.
 
+> Upgrading from an earlier API? See the
+> [upgrade guide](../reference/upgrades.md) for `manager.migrate`,
+> `MigrationSettings`, runner, and import-path replacements.
+
 ## Installation
 
 ```bash

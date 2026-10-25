@@ -29,6 +29,10 @@ pip install "pyverge[faststream]"   # messaging adapter
 
 Development: `uv sync --group dev`.
 
+> Upgrading from the previous Manager API? See the
+> [upgrade guide](docs/reference/upgrades.md) for `migrate`/`amigrate`,
+> `MigrationSettings`, runner, and import-path replacements.
+
 ## Quick start
 
 ```python
