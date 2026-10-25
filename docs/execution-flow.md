@@ -91,11 +91,9 @@ its versioned models, then migrate a nested payload:
 
 ```python
 from pyverge import Manager
-from pyverge.migration import (
-    MigrationSettings,
-    PydanticModelAdapter,
-    PydanticWalker,
-)
+from pyverge.settings import MigrationSettings
+from pyverge.providers import PydanticModelAdapter
+from pyverge.migration import PydanticWalker
 
 UserManager = Manager[semver.Version].configure(
     MigrationSettings(),
@@ -136,7 +134,8 @@ The engine selects an executor from `MigrationSettings`:
 
 ```python
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.settings import MigrationSettings
+from pyverge.providers import PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
     MigrationSettings(execution_mode="async", parallel_workers=4),

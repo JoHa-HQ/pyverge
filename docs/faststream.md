@@ -50,7 +50,8 @@ from pyverge.adapters.faststream import (
     publisher,
     subscriber,
 )
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.settings import MigrationSettings
+from pyverge.providers import PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 

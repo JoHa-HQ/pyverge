@@ -70,7 +70,7 @@ JSONata variables; callables receive the `MigrationContext` directly.
 ## Hooks
 
 ```python
-from pyverge.migration import MigrationHook
+from pyverge.execution import MigrationHook
 
 class AuditHook(MigrationHook):
     def after_migrate(self, name, from_version, to_version, original, migrated):

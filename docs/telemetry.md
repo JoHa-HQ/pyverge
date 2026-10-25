@@ -9,7 +9,7 @@ distributed tracing.
 Subclass `MigrationHook` and override only the callbacks you need:
 
 ```python
-from pyverge.migration import MigrationHook
+from pyverge.execution import MigrationHook
 
 
 class AuditHook(MigrationHook):

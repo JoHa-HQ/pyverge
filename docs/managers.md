@@ -27,10 +27,8 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import (
-    MigrationSettings,
-    PydanticModelAdapter,
-)
+from pyverge.settings import MigrationSettings
+from pyverge.providers import PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
     MigrationSettings(),

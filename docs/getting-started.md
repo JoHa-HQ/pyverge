@@ -25,10 +25,8 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import (
-    MigrationSettings,
-    PydanticModelAdapter,
-)
+from pyverge.settings import MigrationSettings
+from pyverge.providers import PydanticModelAdapter
 
 # A manager binds a version strategy to an adapter and settings.
 UserManager = Manager[semver.Version].configure(
@@ -80,10 +78,8 @@ same `ModelAdapter` contract:
 
 ```python
 from pyverge import Manager
-from pyverge.migration import (
-    JsonSchemaModelAdapter,
-    MigrationSettings,
-)
+from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.settings import MigrationSettings
 
 UserManager = Manager[semver.Version].configure(
     MigrationSettings(),
@@ -111,7 +107,7 @@ Python callable. `JsonPatchMigration` is a declarative spec whose `.transform`
 is the executable `JsonPatch` (`MigrationFunc`):
 
 ```python
-from pyverge.migration import JsonPatchMigration
+from pyverge.providers import JsonPatchMigration
 
 migration = JsonPatchMigration(
     {
@@ -139,7 +135,8 @@ import pendulum
 from typing import Literal
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.settings import MigrationSettings
+from pyverge.providers import PydanticModelAdapter
 
 UserManager = Manager[pendulum.Date].configure(
     MigrationSettings(),

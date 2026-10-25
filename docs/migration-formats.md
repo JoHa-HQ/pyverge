@@ -75,7 +75,7 @@ result = manager.migrate(payload, context={"tenant_id": "tenant_99"})
 `JsonataTransform`, mirroring `JsonPatchMigration` → `JsonPatch`:
 
 ```python
-from pyverge.migration import JsonataMigration
+from pyverge.providers import JsonataMigration
 
 migration = JsonataMigration.from_spec(
     {
