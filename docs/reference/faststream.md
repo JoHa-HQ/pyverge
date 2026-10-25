@@ -153,7 +153,7 @@ Convergence keys off the payload's own `(kind, version)`.
 ## Telemetry
 
 The adapter carries no tracing library and emits no spans. FastStream's own
-[OpenTelemetryhttps://faststream.airt.ai/latest/getting-started/integrations/
+[OpenTelemetry](https://faststream.airt.ai/latest/getting-started/integrations/)
 middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
 spans **as current**, so each step nests under the consume span:
 
@@ -171,7 +171,7 @@ See [Telemetry & Hooks](../how-to/telemetry.md) for the per-step `OTELHook`.
 
 Drive the adapter through FastStream's in-memory `TestKafkaBroker` — no broker
 container. See the worked
-[`showcases/faststream`https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream
+[`showcases/faststream`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream)
 project (broker selection across Kafka/RabbitMQ/NATS/Redis, Jaeger + OTLP).
 
 ## See also
@@ -180,8 +180,3 @@ project (broker selection across Kafka/RabbitMQ/NATS/Redis, Jaeger + OTLP).
 - [Migrations](../explanation/migrations.md) — reconstructing missing models and migrations.
 - [Target Policy](target-policy.md) — `latest`/`earliest`/pinned/per-kind.
 - [Telemetry & Hooks](../how-to/telemetry.md) — per-step spans and call-level tracing.
-
-## See also
-
-- [FastStream integration model](../explanation/faststream.md)
-- [Use FastStream with pyverge](../how-to/integrations/faststream.md)

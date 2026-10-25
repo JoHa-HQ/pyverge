@@ -247,7 +247,6 @@ Reserve unit-style tests for pure layers (the domain graph), and keep the
 end-to-end suite small: one convergence suite plus the topology round trip is
 usually enough.
 
-
 ## See also
 
 - [Execution Flow](../explanation/execution-flow.md) — discovery, ordering, and finalize.

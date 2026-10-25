@@ -92,7 +92,7 @@ the same detector when reflecting.
 
 The adapter is designed to be driven through the public server surface. See the
 [Testing](../how-to/testing.md) guide and the worked
-[`showcases/fastmcp`https://github.com/JoHa-HQ/pyverge/tree/main/showcases/fastmcp
+[`showcases/fastmcp`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/fastmcp)
 project (a layered FastMCP app with `dependency-injector` and OpenTelemetry).
 
 ## See also
@@ -101,8 +101,3 @@ project (a layered FastMCP app with `dependency-injector` and OpenTelemetry).
 - [Migrations](../explanation/migrations.md) — reconstructing missing models and migrations.
 - [Execution Flow](../explanation/execution-flow.md) — discovery, ordering, and finalize.
 - [Telemetry & Hooks](../how-to/telemetry.md) — per-step spans and call-level tracing.
-
-## See also
-
-- [FastMCP integration model](../explanation/fastmcp.md)
-- [Use FastMCP with pyverge](../how-to/integrations/fastmcp.md)

@@ -41,6 +41,7 @@ A single payload can contain entries at multiple versions simultaneously.
 ### Migration is not just transformation
 
 You need to:
+
 - **Discover** every versioned entry in a payload (including deeply nested
   ones).
 - **Resolve** what target version each entry should converge to (not always the

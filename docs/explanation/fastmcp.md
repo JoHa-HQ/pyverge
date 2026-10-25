@@ -1,6 +1,6 @@
 # FastMCP Integration
 
-pyverge plugs into a [FastMCPhttps://github.com/jlowin/fastmcp server as an
+pyverge plugs into a [FastMCP](https://github.com/jlowin/fastmcp) server as an
 adapter: your server keeps declaring FastMCP primitives (tools, prompts,
 resources), and pyverge reflects each versioned primitive into a version graph,
 then converges every call's arguments to the policy target before the handler

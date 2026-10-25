@@ -164,7 +164,6 @@ The FastMCP adapter follows this invariant directly: `FastMCPDiscovery` binds
 **one** manager, so there is no routing to do — the manager owns the whole graph
 and every tool kind resolves within it.
 
-
 ## See also
 
 - [Getting Started](../tutorials/getting-started.md) — a minimal end-to-end example.

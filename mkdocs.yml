@@ -19,8 +19,10 @@ nav:
   - Tutorials:
       - tutorials/index.md
       - Getting started: tutorials/getting-started.md
+      - Executable quickstart: examples/quickstart.md
   - How-to:
       - how-to/index.md
+      - Author migrations: how-to/author-migrations.md
       - Migrate missing models and migrations: how-to/migrations.md
       - Test migrations: how-to/testing.md
       - Telemetry and hooks: how-to/telemetry.md
@@ -30,17 +32,20 @@ nav:
           - FastStream: how-to/integrations/faststream.md
   - Reference:
       - reference/index.md
+      - API reference: reference/api.md
       - Manager: reference/manager.md
       - Runtime and execution: reference/runtime.md
       - Migration formats: reference/migration-formats.md
       - Target policy: reference/target-policy.md
       - Compatibility: reference/compatibility.md
+      - Upgrade guide: reference/upgrades.md
       - CLI: reference/cli.md
       - FastMCP: reference/fastmcp.md
       - FastStream: reference/faststream.md
   - Explanation:
       - explanation/index.md
       - Concepts: explanation/concepts.md
+      - Glossary: explanation/glossary.md
       - Managers: explanation/managers.md
       - Providers: explanation/providers.md
       - Migration strategies: explanation/migrations.md
@@ -48,6 +53,16 @@ nav:
       - Scenarios: explanation/scenarios.md
       - FastMCP: explanation/fastmcp.md
       - FastStream: explanation/faststream.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_root_heading: true
+            members_order: source
 
 markdown_extensions:
   - pymdownx.highlight

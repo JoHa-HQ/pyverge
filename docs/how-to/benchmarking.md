@@ -4,7 +4,7 @@ pyverge has correctness tests; this page covers measuring **cost** at the adapte
 layer — what a host adapter adds per message or call, and at startup — without
 reaching into engine internals.
 
-The harness lives in [`benchmarks/`https://github.com/JoHa-HQ/pyverge/tree/main/benchmarks;
+The harness lives in [`benchmarks/`](https://github.com/JoHa-HQ/pyverge/tree/main/benchmarks);
 its README is the reference. This page is the overview.
 
 ## What is measured

@@ -1,6 +1,6 @@
 # FastStream Integration
 
-pyverge plugs into [FastStreamhttps://faststream.airt.ai/ as an adapter: your
+pyverge plugs into [FastStream](https://faststream.airt.ai/) as an adapter: your
 subscribers keep declaring FastStream handlers, and pyverge converges each
 message body to the policy target before the handler runs — and can converge the
 handler's return again on publish.

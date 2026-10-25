@@ -10,8 +10,11 @@ logs or auditing history, every call must converge to a common version for
 analysis.
 
 **Existing approaches:**
+
 - Schema registry with backward-compatible changes only (Avro, Protobuf)
+
 - Manual version branching in tool handlers
+
 - Ad-hoc coercion in the LLM layer
 
 ## Message brokers
@@ -23,9 +26,13 @@ interpret them at the current schema. The broker holds a mixed population
 across partitions and retention windows.
 
 **Existing approaches:**
+
 - Schema Registry (Confluent) with compatibility rules
+
 - Event upcasting (Axon, EventStoreDB)
+
 - Consumer-side version branching
+
 - Dual-writing during migration windows
 
 ## Configuration management
@@ -36,9 +43,13 @@ configs persist in the database at various versions. On each deployment, old
 configs must converge to the current schema without losing data.
 
 **Existing approaches:**
+
 - Migration scripts per tenant (Flyway, Liquibase)
+
 - Default-value coercion at read time
+
 - Versioned config documents with manual reconciliation
+
 - Shadow configs during rollout
 
 ## ETL pipelines
@@ -49,9 +60,13 @@ a uniform schema. Each source record must normalize to the target version
 before loading.
 
 **Existing approaches:**
+
 - Source-specific transformers (dbt, Airbyte)
+
 - Staging tables with manual normalization
+
 - Schema-on-read (Delta Lake, Iceberg)
+
 - Custom ETL scripts per source
 
 ## IoT telemetry
@@ -63,7 +78,11 @@ field, `location` becomes a structured object. The ingestion pipeline must
 converge all readings to the current schema for dashboards and alerts.
 
 **Existing approaches:**
+
 - Gateway-side schema embedding (each payload carries its schema)
+
 - Time-windowed schema versions in the pipeline
+
 - Fallback defaults for missing fields
+
 - Replay-only pipelines for historical data

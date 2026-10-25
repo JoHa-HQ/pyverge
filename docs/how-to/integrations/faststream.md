@@ -97,7 +97,7 @@ asyncio.run(main())
 
 The `TypedDict`s are a documentation/IDE aid; migrations still receive and return
 plain dicts at runtime. See
-[Migrations → Type the payload shapes](../migrations.md#type-the-payload-shapes).
+[Migrations → Type the payload shapes](../author-migrations.md#type-the-payload-shapes).
 
 ## See also
 

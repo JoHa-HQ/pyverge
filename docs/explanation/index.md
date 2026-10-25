@@ -3,6 +3,7 @@
 Understanding-oriented discussion of how pyverge works.
 
 - [Concepts](concepts.md)
+- [Glossary](glossary.md)
 - [Managers](managers.md)
 - [Providers](providers.md)
 - [Migration strategies](migrations.md)

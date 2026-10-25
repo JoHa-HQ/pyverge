@@ -1,6 +1,6 @@
 # Getting Started
 
-Pyverge is a runtime schema-evolution engine that lets independently deployed producers and consumers exchange versioned payloads without requiring synchronized releases.
+pyverge is a runtime schema-evolution engine that lets independently deployed producers and consumers exchange versioned payloads without requiring synchronized releases.
 
 ## Installation
 
@@ -161,4 +161,4 @@ understands both formats.
 - [Telemetry & Hooks](../how-to/telemetry.md) — observability via hooks and OpenTelemetry.
 - [Testing](../how-to/testing.md) — the time-travel topology round trip and other patterns.
 - [Concepts](../explanation/concepts.md) — the problem and the approach.
-- [Showcaseshttps://github.com/JoHa-HQ/pyverge/tree/main/showcases — end-to-end examples.
+- [Showcases](https://github.com/JoHa-HQ/pyverge/tree/main/showcases) — end-to-end examples.
