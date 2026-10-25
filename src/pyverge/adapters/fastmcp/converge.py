@@ -13,9 +13,6 @@ from pyverge.manager.types import (
     TargetPolicy,
 )
 
-_KIND = "kind"
-_VERSION = "version"
-
 
 class Converger:
     """The contract between a virtual component and a version.
@@ -25,6 +22,8 @@ class Converger:
 
     def __init__(self, manager: Manager) -> None:
         self._manager = manager
+        self._kind = manager.adapter.kind_property
+        self._version = manager.adapter.version_property
 
     def delegate(
         self,
@@ -34,15 +33,9 @@ class Converger:
         target: TargetPolicy,
         handler: Callable[..., Any],
     ) -> Callable[..., Any]:
-        """The callable a virtual ``kind@version`` component runs.
-
-        Converges the call's arguments from *version* following *target* — the
-        full policy, so embedded kinds converge per their own target too — drops
-        the identity fields, and invokes *handler* with the converged payload.
-        """
 
         def converge(**kwargs: Any) -> Any:
-            payload: ModelData = {_KIND: kind, _VERSION: version, **kwargs}
+            payload: ModelData = {self._kind: kind, self._version: version, **kwargs}
             result = self._manager.runner().run(
                 payload,
                 target,
@@ -55,8 +48,8 @@ class Converger:
                     "Converger requires a sync runtime backend"
                 )
             converged = result
-            converged.pop(_KIND, None)
-            converged.pop(_VERSION, None)
+            converged.pop(self._kind, None)
+            converged.pop(self._version, None)
             return handler(**converged)
 
         return converge
