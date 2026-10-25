@@ -74,7 +74,7 @@ class Engine(Generic[VersionValue]):
         self,
         *,
         backend: BackendPort[VersionValue],
-        middleware: tuple[BackendMiddleware, ...],
+        middleware: tuple[BackendMiddleware, ...] = (),
         environment: ExecutionEnvironment,
         direction: DirectionPolicy,
         on_direction_violation: str,
