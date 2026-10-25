@@ -16,7 +16,7 @@ from pyverge.versioning import EdgeKey
 
 
 def _invoke(work: Any, data: Any, context: Any) -> Any:
-    return work(data, dict(context))
+    return work(data, context)
 
 
 class ProcessBackend:
@@ -59,7 +59,7 @@ class ProcessBackend:
             step = self._step(entry, index, source, target, run)
             try:
                 migrated = self._executor.submit(
-                    _invoke, func, current, step.view
+                    _invoke, func, current, dict(step.view)
                 ).result()
             except Exception as error:
                 for hook in hooks:
