@@ -579,40 +579,75 @@ class TestJgfInterop:
         assert parsed.to_dict() == expected
 
 
-def test_migration_application_error_legacy_pair() -> None:
-    adapter = PydanticModelAdapter()
-    source = adapter.versionable(UserV1)
-    target = adapter.versionable(UserV2)
-    error = MigrationApplicationError((source, target))
-    assert error.kind == "unknown"
-    assert error.source is source
-    assert error.target is target
-    assert error.reason is None
-    assert str(error) == f"Migration failed: {source} → {target}"
-
-
-def test_migration_application_error_with_reason() -> None:
-    adapter = PydanticModelAdapter()
-    source = adapter.versionable(UserV1)
-    target = adapter.versionable(UserV2)
-    error = MigrationApplicationError("User", source, target, reason="boom")
-    assert error.kind == "User"
-    assert error.reason == "boom"
-    assert str(error).endswith(": boom")
-
-
-def test_backward_compatibility_error_details() -> None:
-    adapter = PydanticModelAdapter()
-    source = adapter.versionable(UserV1)
-    target = adapter.versionable(UserV2)
-    error = BackwardCompatibilityError(
-        "test",
-        (source, target),
-        removed=("name",),
-        modified=("email",),
-        required_additions=("age",),
+class TestVersionErrors:
+    @pytest.mark.parametrize(
+        ("kind", "reason", "expected_kind", "expected_suffix"),
+        [
+            pytest.param(None, None, "unknown", None, id="legacy-pair"),
+            pytest.param("User", "boom", "User", ": boom", id="kind-and-reason"),
+        ],
     )
-    message = str(error)
-    assert "removed=['name']" in message
-    assert "modified=['email']" in message
-    assert "required_additions=['age']" in message
+    def test_migration_application_error(
+        self,
+        model_adapter: PydanticModelAdapter,
+        kind: str | None,
+        reason: str | None,
+        expected_kind: str,
+        expected_suffix: str | None,
+    ) -> None:
+        source = model_adapter.versionable(UserV1)
+        target = model_adapter.versionable(UserV2)
+        if kind is None:
+            error = MigrationApplicationError((source, target))
+        else:
+            error = MigrationApplicationError(kind, source, target, reason=reason)
+
+        assert error.kind == expected_kind
+        assert error.source is source
+        assert error.target is target
+        assert error.reason == reason
+        if expected_suffix is None:
+            assert str(error) == f"Migration failed: {source} → {target}"
+        else:
+            assert str(error).endswith(expected_suffix)
+
+    @pytest.mark.parametrize(
+        ("removed", "modified", "required", "expected"),
+        [
+            pytest.param(
+                ("name",),
+                ("email",),
+                ("age",),
+                (
+                    "removed=['name']",
+                    "modified=['email']",
+                    "required_additions=['age']",
+                ),
+                id="all-details",
+            ),
+            pytest.param((), (), (), (), id="no-details"),
+        ],
+    )
+    def test_backward_compatibility_error_details(
+        self,
+        model_adapter: PydanticModelAdapter,
+        removed: tuple[str, ...],
+        modified: tuple[str, ...],
+        required: tuple[str, ...],
+        expected: tuple[str, ...],
+    ) -> None:
+        error = BackwardCompatibilityError(
+            "test",
+            (
+                model_adapter.versionable(UserV1),
+                model_adapter.versionable(UserV2),
+            ),
+            removed=removed,
+            modified=modified,
+            required_additions=required,
+        )
+        message = str(error)
+        for fragment in expected:
+            assert fragment in message
+        if not expected:
+            assert "()" in message
