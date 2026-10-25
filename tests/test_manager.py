@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections.abc import Callable
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import pendulum
 import pytest
@@ -621,8 +621,82 @@ class TestSharedEngine:
         manager_instance.store_model(model)
 
         expected = f"User@{version}"
-        assert manager_instance.registry.versions == []
-        assert [str(v) for v in manager().registry.versions] == [expected]
+        assert [str(v) for v in manager_instance.registry.versions] == [expected]
+        assert manager().registry.versions == []
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                id="pydantic",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_instance_store_migration_updates_instance_engine(
+        self, manager: type[Manager]
+    ) -> None:
+        instance = manager()
+        key = ManagerMigrationKey("User", "1.0.0", "2.0.0")
+        instance.store_migration(key, migrate_v1_to_v2)
+
+        payload = {
+            "kind": "User",
+            "version": "1.0.0",
+            "name": "Alice",
+            "email": "alice@example.com",
+            "role": "user",
+        }
+        assert instance.runner().run(payload, "2.0.0")["version"] == "2.0.0"
+        assert manager._default_engine.registry.migrations("User") == []
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [UserV1, UserV2], []],
+                id="pydantic",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_instance_add_hook_updates_instance_engine(
+        self, manager: type[Manager]
+    ) -> None:
+        instance = manager()
+        key = ManagerMigrationKey("User", "1.0.0", "2.0.0")
+        instance.store_migration(key, migrate_v1_to_v2)
+        hook = cast("Any", object())
+        instance.add_hook(key, hook)
+
+        edge = instance.registry.migrations("User")[0]
+        assert instance.registry.get_hooks(edge) == [hook]
+        assert manager._default_engine.registry.hooks() == []
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "test", [], []],
+                id="pydantic",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_instance_lookup_sees_instance_only_model(
+        self, manager: type[Manager]
+    ) -> None:
+        instance = manager()
+        instance.store_model(UserV1)
+
+        assert instance.get_model(UserV1).version[1] == "1.0.0"
+        assert [str(v) for v in instance.list_versions("User")] == ["User@1.0.0"]
+        assert cast("Any", instance[UserV1]).version[1] == "1.0.0"
+        assert manager._default_engine.registry.versions == []
 
     @pytest.mark.parametrize(
         ("model_adapter", "registry", "model", "version"),

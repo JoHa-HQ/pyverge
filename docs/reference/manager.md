@@ -32,13 +32,23 @@ Manager.diff(key)
 
 ## Registration and lifecycle
 
+Registration methods work on the class or on an instance:
+
 ```python
 Manager.store_model(payload, *, engine=None)
 Manager.reconcile_model(payload, *, engine=None)
 Manager.store_migration(key, func, *, backward_compatible=False, migration_id=None)
 Manager.add_hook(key, hook)
-Manager.remove_hook(key, hook=None)
-Manager.clear_hooks(key=None)
+Manager.attach_hooks(hooks)
+```
+
+Class-level calls update the default engine copied by new instances. Instance
+calls update only that instance's engine. Existing instances are not affected by
+later class-level registration.
+
+```python
+UserManager.add_hook(key, hook)  # affects new instances
+manager.add_hook(key, hook)      # affects only this instance
 ```
 
 ## Runtime

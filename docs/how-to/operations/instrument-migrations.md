@@ -38,6 +38,9 @@ from pyverge.core import ManagerMigrationKey
 manager.add_hook(ManagerMigrationKey("User", "1.0.0", "2.0.0"), AuditHook())
 ```
 
+An instance hook applies only to that manager instance. Register on the manager
+class before instantiating if every instance should inherit the hook.
+
 ### Async hooks
 
 Async executors use async overrides when present:

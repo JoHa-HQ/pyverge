@@ -29,6 +29,8 @@ from pyverge.versioning import (
     VersionNode,
 )
 
+from ..descriptors import hybridmethod
+
 if TYPE_CHECKING:
     from pyverge.manager.manager import Manager
 
@@ -41,6 +43,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
     into resolvers, keeping the public facade focused on orchestration.
     """
 
+    @hybridmethod
     @singledispatchmethod
     @classmethod
     def compile_target_spec(
@@ -176,6 +179,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
             return cast(TargetResolver, target)
         return cls.compile_target_spec(cast(TargetSpec, target), engine=engine)
 
+    @hybridmethod
     @classmethod
     def resolve_target_model(
         cls: type[Manager[VersionValue]],

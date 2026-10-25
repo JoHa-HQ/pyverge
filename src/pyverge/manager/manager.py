@@ -48,7 +48,8 @@ class Manager(
 
     Use :meth:`configure` to build a configured class; register models,
     migrations and hooks with the ``model`` / ``migration`` / ``hook``
-    decorators at class level; then instantiate for the runtime facade.
+    decorators at class level or with the registration methods at class or
+    instance level; then instantiate for the runtime facade.
     """
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
