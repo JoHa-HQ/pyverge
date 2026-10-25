@@ -1,5 +1,3 @@
-"""CLI entrypoint: assemble commands into the Typer app."""
-
 from __future__ import annotations
 
 import typer

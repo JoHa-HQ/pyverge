@@ -15,7 +15,10 @@ from pyverge.cli.main import app
 from pyverge.core.types import (
     VersionValue,
 )
-from pyverge.migration import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.providers import (
+    JsonSchemaModelAdapter,
+    PydanticModelAdapter,
+)
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.semver import (
     UserV1,
@@ -404,6 +407,34 @@ class TestCommands:
         assert graph["edges"][0]["metadata"]["strategy"] == "callable"
         assert graph["metadata"]["manifest_version"] == "1.0"
         assert all(c in "0123456789abcdef" for c in graph["metadata"]["content_hash"])
+
+    def test_manifest_options_override_identity(
+        self,
+        runner: CliRunner,
+        manager: type[Manager[VersionValue]],
+        manager_name: str,
+    ) -> None:
+        with ManagerContext(manager_name, manager()):
+            result = runner.invoke(
+                app,
+                [
+                    "manifest",
+                    "-m",
+                    f"{manager_name}:manager",
+                    "--graph-id",
+                    "custom-graph",
+                    "--label",
+                    "custom label",
+                    "--manifest-version",
+                    "1.0",
+                ],
+            )
+
+        assert result.exit_code == 0
+        graph = json.loads(result.stdout)["graph"]
+        assert graph["id"] == "custom-graph"
+        assert graph["label"] == "custom label"
+        assert graph["metadata"]["manifest_version"] == "1.0"
 
     def test_manifest_compares_baseline(
         self,

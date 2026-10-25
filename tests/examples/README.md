@@ -25,7 +25,7 @@ tests/examples/
   matching default, following the idiomatic Pydantic pattern:
   ``version: Literal["1.0.0"] = "1.0.0"``.
 - Container models wrap discriminated unions and are used by the
-  ``PydanticWalker`` during discovery.
+  ``CompositeExtractor`` during discovery.
 
 Higher-level registration patterns (lazy registration and coordination across
 multiple model families) are documented in the user documentation under

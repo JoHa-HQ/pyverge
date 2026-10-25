@@ -1,37 +1,37 @@
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
-from pyverge.core.settings import MigrationSettings
-from pyverge.core.types import (
-    VersionValue,
+from pyverge.core.types import VersionValue
+from pyverge.discovery.reflection import (
+    CompositeDiffDiscovery,
+    Reflection,
+    Reflector,
 )
-from pyverge.executor import (
-    AsyncExecutor,
-    DefaultEntryPlanner,
-    Executor,
-    MigrationEntry,
+from pyverge.engine import Engine
+from pyverge.migrations.backend import MigrationMaterializer
+from pyverge.migrations.identity import (
+    DefaultMigrationIdentityResolver,
 )
-from pyverge.migration.engine import Engine
-from pyverge.migration.graph import GraphBuilder
-from pyverge.migration.registry import Registry
-from pyverge.migration.types import (
-    Walker,
-)
-from pyverge.migration.walker import CompoundKeyWalker
-from pyverge.providers.types import (
+from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
+from pyverge.registry import Registry
+from pyverge.schemas.backend import ModelMaterializer
+from pyverge.schemas.types import (
     ModelAdapter,
 )
+from pyverge.versioning import default_content_hasher
 
 from .descriptors import ManagerMeta
 from .mixins import (
     EngineLifecycleMixin,
     LookupMixin,
-    MigrateMixin,
     MigrationStoreMixin,
     ModelStoreMixin,
+    ReflectionMixin,
+    RuntimeMixin,
     TargetResolutionMixin,
 )
+from .types import ManagerConfig
 
 
 class Manager(
@@ -40,7 +40,8 @@ class Manager(
     ModelStoreMixin[VersionValue],
     MigrationStoreMixin[VersionValue],
     LookupMixin[VersionValue],
-    MigrateMixin[VersionValue],
+    ReflectionMixin[VersionValue],
+    RuntimeMixin[VersionValue],
     metaclass=ManagerMeta,
 ):
     """Class factory scoping a migration ``Engine`` to a version strategy.
@@ -51,9 +52,9 @@ class Manager(
     """
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
-    _default_settings: ClassVar[MigrationSettings]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+    _reflection_locked: ClassVar[bool] = False
 
     def __class_getitem__(
         cls, strategy: type[VersionValue]
@@ -63,9 +64,9 @@ class Manager(
             (cls,),
             {
                 "_strategy": strategy,
-                "_default_settings": None,
                 "_default_adapter": None,
                 "_default_engine": None,
+                "_reflection_locked": False,
                 "__module__": cls.__module__,
                 "__qualname__": cls.__name__,
             },
@@ -75,71 +76,48 @@ class Manager(
 
     @property
     def adapter(self) -> ModelAdapter:
-        """Return the instance adapter."""
         return self.engine.adapter
 
     @property
-    def settings(self) -> MigrationSettings | None:
-        """Return the instance settings."""
-        return self.engine.settings
-
-    @property
     def registry(self) -> Registry[VersionValue]:
-        """Return the instance registry."""
         return self.engine.registry
 
     @classmethod
-    def configure(  # noqa: PLR0913
+    def configure(
         cls,
-        settings: MigrationSettings,
         adapter: ModelAdapter,
         *,
-        engine: Engine[VersionValue] | None = None,
-        walker: Walker | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
+        config: ManagerConfig[VersionValue] | None = None,
+        **options: Any,
     ) -> type[Manager[VersionValue]]:
-        """Build a configured ``Manager`` subclass.
-
-        Args:
-            settings: Migration configuration.
-            adapter: Model adapter used to read version/kind from models.
-            engine: Optional pre-built engine.  The caller is responsible for
-                aligning it with the strategy, *adapter* and *settings*.
-            walker: Optional preconfigured payload walker.  When a walker
-                instance is given, its ``registry`` becomes the manager's
-                registry.  Defaults to the containerless
-                :class:`~pyverge.migration.CompoundKeyWalker`; supply a
-                schema-driven walker (e.g.
-                :class:`~pyverge.migration.PydanticWalker`) to enable
-                container-guided discovery.
-            executor: Optional execution strategy override. When omitted, the
-                settings-driven :class:`ExecutionPolicy` selects sequential or
-                level-parallel, sync or async.
-            entry_migration: Optional per-entry migration defaults.  Defaults
-                to :class:`~pyverge.migration.DefaultEntryPlanner`.
-        """
-        if walker is None:
-            registry = Registry[VersionValue]()
-            active_walker = CompoundKeyWalker(
-                registry, settings=settings, adapter=adapter
+        if config is not None and options:
+            raise TypeError("configure accepts either config or keyword options")
+        settings = config or ManagerConfig(**options)
+        if settings.walker is None:
+            registry = Registry[VersionValue](
+                hasher=settings.hasher or default_content_hasher()
             )
         else:
-            active_walker = walker
-            registry = walker.registry
-        engine = engine or Engine[VersionValue](
-            registry=registry,
-            settings=settings,
-            default_executor=executor,
-            graph_builder=GraphBuilder(
-                registry,
-                settings,
-                active_walker,
+            registry = settings.walker.registry
+        reflector = Reflector[VersionValue](
+            adapter,
+            settings.diff_provider or Reflection(adapter, CompositeDiffDiscovery()),
+            model_materializer=settings.model_materializer
+            or ModelMaterializer(adapter),
+            migration_materializer=(
+                settings.migration_materializer
+                or MigrationMaterializer(JsonPatchMigrationBackend())
             ),
+            on_missing=settings.on_missing,
+        )
+        engine = settings.engine or Engine[VersionValue](
+            registry=registry,
             adapter=adapter,
-            entry_migration=entry_migration or DefaultEntryPlanner(),
+            identity_resolver=(
+                settings.identity_resolver or DefaultMigrationIdentityResolver()
+            ),
+            reflector=reflector,
         )
         cls._default_engine = engine
         cls._default_adapter = adapter
-        cls._default_settings = settings
         return cls

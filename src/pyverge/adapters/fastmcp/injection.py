@@ -6,12 +6,10 @@ from typing import TypeAlias
 
 
 def never_injected(parameter: inspect.Parameter) -> bool:
-    """No parameter is injected — the fallback when no DI library is present."""
     return False
 
 
 def marker_detector(*marker_types: type) -> Callable[[inspect.Parameter], bool]:
-    """Detect a parameter whose default is an instance of a marker type."""
 
     def detect(parameter: inspect.Parameter) -> bool:
         default = parameter.default
@@ -23,11 +21,6 @@ def marker_detector(*marker_types: type) -> Callable[[inspect.Parameter], bool]:
 
 
 def default_injection_detector() -> Callable[[inspect.Parameter], bool]:
-    """Detect markers of the DI libraries pyverge sees in practice.
-
-    Probes lazily so neither library is a hard dependency:
-    ``dependency_injector.wiring.Provide`` and FastMCP's ``Depends``.
-    """
     markers: list[type] = []
     try:  # pragma: no cover - import guard
         from dependency_injector.wiring import Provide  # noqa: PLC0415
@@ -54,7 +47,6 @@ InjectionDetector: TypeAlias = Callable[[inspect.Parameter], bool]
 def injected_names(
     func: Callable[..., object], detector: InjectionDetector | None = None
 ) -> set[str]:
-    """Return the names of *func*'s injected parameters (empty when unknown)."""
     detect = detector or default_injection_detector()
     try:
         parameters = inspect.signature(func).parameters

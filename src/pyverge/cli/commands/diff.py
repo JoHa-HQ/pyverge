@@ -1,5 +1,3 @@
-"""Diff two schema versions."""
-
 from __future__ import annotations
 
 import json
@@ -8,6 +6,7 @@ from typing import Annotated
 import typer
 
 from pyverge.core.types import ManagerMigrationKey
+from pyverge.discovery.reflection import JsonPatchRenderer
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption
@@ -24,13 +23,16 @@ def diff(
         str, typer.Option(..., "--format", help="Output format (json)")
     ] = "json",
 ) -> None:
-    """Show differences between schema versions."""
     try:
         mgr = resolve_manager(manager)
         diff_result = mgr.diff(ManagerMigrationKey(schema, from_version, to_version))
 
         if format == "json":
-            typer.echo(json.dumps(diff_result.render(), indent=2, default=str))
+            typer.echo(
+                json.dumps(
+                    diff_result.render(JsonPatchRenderer()), indent=2, default=str
+                )
+            )
         else:
             typer.secho(f"Unknown format: {format}", fg=typer.colors.RED)
             raise typer.Exit(1)

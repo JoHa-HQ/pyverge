@@ -17,13 +17,12 @@ from conftest import Case
 from fastmcp import FastMCP
 
 from pyverge.adapters.fastmcp import (
+    FastMCPDiscovery,
     PromptReflection,
     ResourceReflection,
-    ToolDiscovery,
     ToolReflection,
 )
-from pyverge.migration import PydanticModelAdapter
-from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.providers import JsonSchemaModelAdapter, PydanticModelAdapter
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.semver import (
     UserV1,
@@ -172,7 +171,7 @@ async def test_owned_kind_without_policy_fails_fast(manager: type) -> None:
     There is no silent default: every exposed kind needs an explicit policy.
     """
     instance = manager()
-    discovery = ToolDiscovery(instance, [ToolReflection(instance.adapter)])
+    discovery = FastMCPDiscovery(instance, [ToolReflection(instance.adapter)])
     server = FastMCP("TestServer")
     server.tool(_rich_handler, name="User", version="2.0.0")
 
@@ -195,12 +194,12 @@ async def test_owned_kind_without_policy_fails_fast(manager: type) -> None:
 async def test_policy_declared_in_meta(manager: type) -> None:
     """A primitive declares its policy via ``meta['policy']`` — no map needed."""
     instance = manager()
-    discovery = ToolDiscovery(instance, [ToolReflection(instance.adapter)])
+    discovery = FastMCPDiscovery(instance, [ToolReflection(instance.adapter)])
     server = FastMCP("TestServer")
     server.tool(_rich_handler, name="User", version="2.0.0", meta={"policy": "latest"})
 
     await discovery.search(server)
-    discovery.register()
+    await discovery.register(server)
     await discovery.enrich(server)
 
     names = {t.name for t in await server.list_tools()}
@@ -222,7 +221,7 @@ async def test_policy_declared_in_meta(manager: type) -> None:
 async def test_conflicting_meta_policies_fail(manager: type) -> None:
     """Versions of one kind must agree on their declared policy."""
     instance = manager()
-    discovery = ToolDiscovery(instance, [ToolReflection(instance.adapter)])
+    discovery = FastMCPDiscovery(instance, [ToolReflection(instance.adapter)])
     server = FastMCP("TestServer")
     server.tool(_rich_handler, name="User", version="1.0.0", meta={"policy": "latest"})
     server.tool(
@@ -261,7 +260,7 @@ async def test_meta_policy_on_prompt_and_resource(manager: type) -> None:
         return name
 
     # Each provider alone passes search because its meta declares a policy.
-    prompts = ToolDiscovery(instance, [PromptReflection(instance.adapter)])
-    resources = ToolDiscovery(instance, [ResourceReflection(instance.adapter)])
+    prompts = FastMCPDiscovery(instance, [PromptReflection(instance.adapter)])
+    resources = FastMCPDiscovery(instance, [ResourceReflection(instance.adapter)])
     await prompts.search(server)
     await resources.search(server)

@@ -6,7 +6,6 @@ from .engine import (
     envelope_model,
     meta_versionable,
     register_models,
-    run_engine,
 )
 
 __all__ = [
@@ -15,5 +14,4 @@ __all__ = [
     "envelope_model",
     "meta_versionable",
     "register_models",
-    "run_engine",
 ]

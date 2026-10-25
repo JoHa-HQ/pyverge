@@ -3,23 +3,24 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Any, Generic
 
-from pyverge.core.exceptions import (
-    MigrationError,
-    ModelNotFoundError,
-    RegistryError,
-)
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
-    Comparable,
-    Migratable,
-    Transitional,
     VersionValue,
 )
-from pyverge.core.versioning import (
+from pyverge.registry.errors import (
+    CatalogError,
+    MigrationPathError,
+    ModelNotFoundError,
+)
+from pyverge.versioning import (
+    Comparable,
     EdgeKey,
+    Migratable,
+    Transitional,
     VersionKey,
     VersionNode,
 )
+from pyverge.versioning.errors import MigrationApplicationError
 
 if TYPE_CHECKING:
     from pyverge.manager.manager import Manager
@@ -40,11 +41,6 @@ class LookupMixin(Generic[VersionValue]):
         cls: type[Manager[VersionValue]],
         key: Any,
     ) -> VersionKey[VersionValue]:
-        """Normalize a model key to a search key.
-
-        Fallback: any comparable exposing ``kind`` and ``version`` is reduced
-        to its ``(kind, version)`` key.
-        """
         return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
 
     @_resolve_model_key.register(tuple)
@@ -70,7 +66,6 @@ class LookupMixin(Generic[VersionValue]):
         cls: type[Manager[VersionValue]],
         key: type,
     ) -> VersionKey[VersionValue]:
-        """Resolve a bare model class through the adapter and a neutral lookup."""
         engine = cls._default_engine
         if not engine.adapter.identify(key):
             raise ModelNotFoundError(engine.registry.name, key)
@@ -86,10 +81,9 @@ class LookupMixin(Generic[VersionValue]):
         cls: type[Manager[VersionValue]],
         index: Any,
     ) -> Any:
-        """Map a fluent lookup key to a typed registry key."""
         if isinstance(index, (Comparable, Transitional, EdgeKey)):
             return index
-        raise RegistryError(
+        raise CatalogError(
             cls._default_engine.registry.name,
             f"Unsupported index type: {type(index)}",
         )
@@ -113,7 +107,6 @@ class LookupMixin(Generic[VersionValue]):
         return cls._resolve_model_key(index)
 
     def __contains__(self: Manager[VersionValue], index: Any) -> bool:
-        """Fluent membership: version key, edge pair, model class, or slice."""
         engine = self.engine
         if isinstance(index, slice):
             try:
@@ -121,18 +114,29 @@ class LookupMixin(Generic[VersionValue]):
                 to_v = engine.get_model(type(self)._resolve_model_key(index.stop))
                 engine.find_migration_path(from_v, to_v)
                 return True
-            except (MigrationError, ModelNotFoundError, RegistryError, TypeError):
+            except (
+                CatalogError,
+                MigrationApplicationError,
+                MigrationPathError,
+                ModelNotFoundError,
+                TypeError,
+            ):
                 return False
 
         try:
             return type(self)._normalize_index(index) in engine.registry
-        except (MigrationError, ModelNotFoundError, RegistryError, TypeError):
+        except (
+            CatalogError,
+            MigrationApplicationError,
+            MigrationPathError,
+            ModelNotFoundError,
+            TypeError,
+        ):
             return False
 
     def __getitem__(
         self: Manager[VersionValue], index: Any
     ) -> VersionNode[VersionValue] | Migratable | list[Migratable]:
-        """Fluent selection: a version, an edge, or a migration path (slice)."""
         engine = self.engine
         if isinstance(index, slice):
             from_v = engine.get_model(type(self)._resolve_model_key(index.start))
@@ -149,7 +153,6 @@ class LookupMixin(Generic[VersionValue]):
         from_version: Any,
         to_version: Any,
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
-        """Return the migration chain between two fluent keys."""
         engine = self.engine
         return engine.find_migration_path(
             engine.get_model(type(self)._resolve_model_key(from_version)),

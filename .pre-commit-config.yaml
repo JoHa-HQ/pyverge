@@ -24,12 +24,46 @@ repos:
         language: system
         pass_filenames: false
         types: [python, pyi]
+      - id: pydocstyle
+        name: pydocstyle
+        entry: uv run pydocstyle src/pyverge
+        language: system
+        pass_filenames: false
+        types_or: [python, pyi]
+      - id: docs-examples
+        name: docs examples
+        entry: uv run pytest --codeblocks docs/examples -q -o addopts=
+        language: system
+        pass_filenames: false
+        files: ^docs/examples/.*\.md$
+      - id: mkdocs-build
+        name: mkdocs build
+        entry: uv run mkdocs build --strict
+        language: system
+        pass_filenames: false
+        files: ^(docs/|mkdocs\.yml$)
       - id: pytest
         name: pytest
         entry: uv run pytest -vv
         language: system
         pass_filenames: false
         stages: [pre-push]
+  - repo: https://github.com/jsh9/pydoclint
+    rev: 0.11.1
+    hooks:
+      - id: pydoclint
+        args: ["--quiet", "--style=google"]
+        files: ^src/pyverge/
+  - repo: https://github.com/errata-ai/vale
+    rev: v3.25.1
+    hooks:
+      - id: vale
+        files: ^docs/.*\.md$
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.24.0
+    hooks:
+      - id: markdownlint-cli2
+        files: ^docs/.*\.md$
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.4.1
     hooks:

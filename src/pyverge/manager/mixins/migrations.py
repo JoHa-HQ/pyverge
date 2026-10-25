@@ -6,22 +6,20 @@ from typing import TYPE_CHECKING, Generic, cast
 from pyverge.core.types import (
     Attachable,
     ManagerMigrationKey,
-    Migratable,
     MigrationFunc,
     MigrationKeyInput,
     ModelPair,
     VersionValue,
 )
-from pyverge.core.versioning import (
-    EdgeKey,
-)
+from pyverge.discovery import MigrationSpec, RegisterMigration
 from pyverge.providers import JsonataMigration, JsonPatchMigration
+from pyverge.versioning import EdgeKey, Migratable
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from pyverge.engine import Engine
     from pyverge.manager.manager import Manager
-    from pyverge.migration.engine import Engine
 
 
 class MigrationStoreMixin(Generic[VersionValue]):
@@ -60,6 +58,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
+        migration_id: str | None = None,
     ) -> MigrationFunc:
         raise TypeError(f"Unsupported migration key: {key!r}")
 
@@ -72,14 +71,25 @@ class MigrationStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
+        migration_id: str | None = None,
     ) -> MigrationFunc:
         engine = engine or cls._default_engine
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
-        return engine.store_migration(
-            pair,
-            cls._resolve_migration(func),
-            backward_compatible=backward_compatible,
+        func = cls._resolve_migration(func)
+        if migration_id is not None:
+            setattr(func, "__migration_id__", migration_id)
+        return cast(
+            MigrationFunc,
+            engine.register(
+                RegisterMigration(
+                    MigrationSpec(
+                        pair,
+                        func,
+                        backward_compatible,
+                    )
+                )
+            ),
         )
 
     @store_migration.register(ManagerMigrationKey)
@@ -91,6 +101,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
+        migration_id: str | None = None,
     ) -> MigrationFunc:
         engine = engine or cls._default_engine
         adapter = engine.adapter
@@ -98,10 +109,20 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.version_key(kind=key.kind, version=key.source_version),
             adapter.version_key(kind=key.kind, version=key.target_version),
         )
-        return engine.store_migration(
-            pair,
-            cls._resolve_migration(func),
-            backward_compatible=backward_compatible,
+        func = cls._resolve_migration(func)
+        if migration_id is not None:
+            setattr(func, "__migration_id__", migration_id)
+        return cast(
+            MigrationFunc,
+            engine.register(
+                RegisterMigration(
+                    MigrationSpec(
+                        pair,
+                        func,
+                        backward_compatible,
+                    )
+                )
+            ),
         )
 
     @singledispatchmethod
@@ -231,12 +252,6 @@ class MigrationStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> None:
-        """Attach *hooks* to every registered migration edge.
-
-        The bulk form of :meth:`add_hook`, for observers that watch the whole
-        graph (e.g. tracing every step). Callable from the class or an instance;
-        pass *engine* to target a specific engine explicitly.
-        """
         engine = engine or cls._default_engine
         registry = engine.registry
         for kind in registry.kinds:

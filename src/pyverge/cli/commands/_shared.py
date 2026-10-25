@@ -1,5 +1,3 @@
-"""Shared CLI options and output helpers."""
-
 from __future__ import annotations
 
 import json
@@ -30,5 +28,4 @@ VersionOption = Annotated[
 
 
 def dump_json(value: Any) -> None:
-    """Print deterministic JSON to stdout."""
     typer.echo(json.dumps(value, indent=2, default=str))

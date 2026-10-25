@@ -1,9 +1,3 @@
-"""Concrete FastStream wrappers.
-
-FastStream object access stays here. Reflection and decorators consume the
-ports from :mod:`.ports`, not FastStream internals.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -13,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from pyverge.providers.types import ModelHandle
+from pyverge.schemas.types import ModelHandle
 
 
 def _original_call(handler: Any) -> Any:
@@ -21,7 +15,6 @@ def _original_call(handler: Any) -> Any:
 
 
 def _first_model(annotation: Any) -> ModelHandle | None:
-    """Return the first concrete model in *annotation*, unwrapping unions."""
     if isinstance(annotation, type):
         return annotation
     if typing.get_origin(annotation) in (typing.Union, types.UnionType):
@@ -95,20 +88,7 @@ class FastStreamSubscriber:
         return HandlerView(handler).input_model if handler is not None else None
 
 
-@dataclass(frozen=True)
-class PublisherView:
-    """A publisher handler plus the topics it publishes to."""
-
-    handler: Callable[..., Any]
-    topics: tuple[str, ...]
-
-    @property
-    def return_model(self) -> ModelHandle | None:
-        return HandlerView(self.handler).return_model
-
-
 __all__ = [
     "FastStreamSubscriber",
     "HandlerView",
-    "PublisherView",
 ]

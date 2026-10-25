@@ -1,25 +1,47 @@
-from .json_patch import (
+from pyverge.migrations import (
     CoerceOperation,
+    DefaultMigrationIdentityResolver,
+    JsonataMigration,
+    JsonataTransform,
     JsonPatch,
     JsonPatchMigration,
+    JsonPatchMigrationBackend,
     MapOperation,
+    MigrationIdentityResolver,
     Pointer,
     SetDefaultOperation,
     SplitOperation,
 )
-from .json_schema import JsonSchemaModelAdapter
-from .jsonata import JsonataMigration, JsonataTransform
-from .pydantic import PydanticDiff, PydanticModelAdapter
+from pyverge.schemas import (
+    AbstractModelAdapter,
+    DataclassModelAdapter,
+    JsonSchemaModelAdapter,
+    ModelAdapter,
+    ModelIdentity,
+    ModelMaterializer,
+    ProviderCapabilityError,
+    PydanticDiff,
+    PydanticModelAdapter,
+)
 
 __all__ = [
+    "AbstractModelAdapter",
     "CoerceOperation",
+    "DataclassModelAdapter",
+    "DefaultMigrationIdentityResolver",
     "JsonPatch",
     "JsonPatchMigration",
+    "JsonPatchMigrationBackend",
     "JsonSchemaModelAdapter",
     "JsonataMigration",
     "JsonataTransform",
     "MapOperation",
+    "MigrationIdentityResolver",
+    "ModelAdapter",
+    "ModelIdentity",
+    "ModelMaterializer",
     "Pointer",
+    "ProviderCapabilityError",
     "PydanticDiff",
     "PydanticModelAdapter",
     "SetDefaultOperation",

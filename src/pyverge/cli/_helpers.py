@@ -6,7 +6,6 @@ import typer
 
 
 def load_json_file(path: Path) -> Any:
-    """Load JSON file."""
     try:
         with open(path) as f:
             return json.load(f)
@@ -17,7 +16,6 @@ def load_json_file(path: Path) -> Any:
 
 
 def write_json_file(path: Path, data: dict[str, Any]) -> None:
-    """Write JSON file."""
     try:
         with open(path, "w") as f:
             json.dump(data, f, indent=2)
@@ -29,7 +27,6 @@ def write_json_file(path: Path, data: dict[str, Any]) -> None:
 
 
 def create_example_models_file(path: Path) -> None:
-    """Create example models.py file."""
     if path.exists():
         typer.secho(f"Skipping: {path} already exists", fg=typer.colors.YELLOW)
         return
@@ -43,14 +40,10 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import (
-    MigrationSettings,
-    PydanticModelAdapter,
-)
+from pyverge.schemas.pydantic import PydanticModelAdapter
 
 # Create a configured manager class
 UserManager = Manager[semver.Version].configure(
-    MigrationSettings(),
     PydanticModelAdapter(),
 )
 
@@ -101,7 +94,6 @@ __manager__ = UserManager()
 
 
 def create_single_manager_config(project_dir: Path, use_pyproject: bool) -> None:
-    """Create single manager configuration."""
     try:
         if use_pyproject:
             config_file = project_dir / "pyproject.toml"
@@ -139,7 +131,6 @@ manager = "models"
 
 
 def create_multi_manager_config(project_dir: Path, use_pyproject: bool) -> None:
-    """Create multi-manager configuration."""
     try:
         if use_pyproject:
             config_content = """[tool.pyverge.managers]
@@ -187,7 +178,6 @@ version = "0.1.0"
 
 
 def print_next_steps(multiple: bool) -> None:
-    """Print next steps after initialization."""
     if multiple:
         typer.echo("\nMultiple managers configured:")
         typer.echo("  • default (models)")

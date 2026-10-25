@@ -1,11 +1,3 @@
-"""Port and type definitions for the FastStream adapter.
-
-Kept apart from the implementations so the seams depend on these abstractions
-(and so the concrete adapters — e.g. ``SignatureBinder``, ``ReturnConverger`` —
-are imported only where they are wired). Wire parsing is FastStream's; it is not
-a port here.
-"""
-
 from __future__ import annotations
 
 import json
@@ -14,7 +6,7 @@ from dataclasses import dataclass
 from functools import singledispatch, singledispatchmethod
 from typing import Any, Protocol, TypeVar, cast
 
-from pyverge.core.types import ModelData
+from pyverge.core.types import ModelData, ModelHandle
 from pyverge.manager.types import TargetPolicy
 
 Fn = TypeVar("Fn", bound=Callable[..., Any])
@@ -50,7 +42,6 @@ class TopicTargets(Mapping[str, TargetPolicy]):
         targets: TargetPolicy | TopicTargets,
         topics: tuple[str, ...],
     ) -> TopicTargets:
-        """Return *targets* as a per-topic mapping."""
         return _as_topic_targets(targets, topics)
 
 
@@ -161,35 +152,71 @@ class TargetSelector(Protocol):
 class HandlerBinder(Protocol):
     """Binds a handler's typed payload parameter to a model or union."""
 
-    def bind(self, handler: Any, model: Any) -> None:
-        """Re-annotate *handler*'s payload parameter with *model*."""
-        ...
+    def bind(self, handler: Any, model: Any) -> None: ...
 
 
 class ResultConverger(Protocol):
     """Wraps a handler so its return value is converged before publish."""
 
-    def wrap(self, handler: Fn) -> Fn:
-        """Return a handler whose return is transformed for the publish seam."""
-        ...
+    def wrap(self, handler: Fn) -> Fn: ...
 
 
 class PayloadDumper(Protocol):
     """Dumps a handler return value into a payload mapping."""
 
-    def __call__(self, value: object) -> ModelData:
-        """Return *value* as a payload dict."""
-        ...
+    def __call__(self, value: object) -> ModelData: ...
+
+
+class HandlerPort(Protocol):
+    """One callable with its declared payload and return models."""
+
+    @property
+    def handler(self) -> Callable[..., Any]: ...
+
+    @property
+    def input_model(self) -> ModelHandle | None: ...
+
+    @property
+    def return_model(self) -> ModelHandle | None: ...
+
+
+class SubscriberPort(Protocol):
+    """One FastStream subscriber exposed as reflected properties."""
+
+    @property
+    def topics(self) -> tuple[str, ...]: ...
+
+    @property
+    def handler(self) -> Callable[..., Any] | None: ...
+
+    @property
+    def input_model(self) -> ModelHandle | None: ...
+
+
+class PublisherPort(Protocol):
+    """One FastStream publisher exposed as reflected properties."""
+
+    @property
+    def topics(self) -> tuple[str, ...]: ...
+
+    @property
+    def handler(self) -> Callable[..., Any] | None: ...
+
+    @property
+    def return_model(self) -> ModelHandle | None: ...
 
 
 __all__ = [
     "Fn",
     "HandlerBinder",
+    "HandlerPort",
     "HeaderParser",
     "MessageHeaders",
     "NegotiationError",
     "PayloadDumper",
+    "PublisherPort",
     "ResultConverger",
+    "SubscriberPort",
     "TargetContext",
     "TargetSelector",
     "TopicTargets",

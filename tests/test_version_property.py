@@ -1,16 +1,28 @@
 from __future__ import annotations
 
+import copy
 import operator
-from typing import Any
+from dataclasses import replace
+from typing import Any, cast
 
 import pytest
+from json_graph_lite.jgf import Graph as LiteGraph
 
-from pyverge.core import (
-    VersioningSettings,
-)
-from pyverge.migration import (
+from pyverge.providers import (
     JsonSchemaModelAdapter,
     PydanticModelAdapter,
+)
+from pyverge.settings import VersioningSettings
+from pyverge.versioning import (
+    Canonicalizer,
+    Diff,
+    FieldChange,
+    FieldStatus,
+    JgfGraph,
+    MigrationIdentity,
+    default_canonicalizer,
+    default_content_hasher,
+    default_encoders,
 )
 from tests.examples.json import (
     ADDRESS_V1_0_0,
@@ -37,7 +49,9 @@ from tests.examples.pydantic.semver import (
     UserV200Beta1,
 )
 from tests.examples.pydantic.semver_nested import AddressV1, AddressV2
-from tests.utils import envelope_model
+from tests.utils import edge_from_models, envelope_model
+
+SHA256_HEX_LENGTH = 64
 
 
 class TestOperations:
@@ -281,3 +295,280 @@ class TestOperations:
     ) -> None:
         s = {envelope_model(model_adapter, versioning_settings, m) for m in models}
         assert len(s) == expected
+
+
+class TestCanonicalization:
+    def test_sorted_and_compact(self) -> None:
+        assert (
+            default_canonicalizer().dumps({"b": 1, "a": [2, 3]}) == '{"a":[2,3],"b":1}'
+        )
+
+    def test_deterministic_hash(self) -> None:
+        left = default_content_hasher().digest({"a": 1, "b": [2, 3]})
+        right = default_content_hasher().digest({"b": [2, 3], "a": 1})
+        assert left == right
+        assert len(left) == SHA256_HEX_LENGTH
+
+    @pytest.mark.parametrize("value", [float("nan"), float("inf")])
+    def test_rejects_non_finite_float(self, value: float) -> None:
+        with pytest.raises(ValueError):
+            default_canonicalizer().dumps({"value": value})
+
+    def test_rejects_non_string_keys(self) -> None:
+        with pytest.raises(TypeError):
+            default_canonicalizer().dumps({1: "value"})
+
+    def test_rejects_untyped_objects(self) -> None:
+        with pytest.raises(TypeError):
+            default_canonicalizer().dumps(object())
+
+    def test_composes_a_custom_encoder(self) -> None:
+        class Token:
+            def __init__(self, value: str) -> None:
+                self.value = value
+
+        class TokenEncoder:
+            def supports(self, value: object) -> bool:
+                return isinstance(value, Token)
+
+            def encode(self, value: Token, canonicalizer: Canonicalizer) -> str:
+                return f"token:{value.value}"
+
+        canonicalizer = Canonicalizer((TokenEncoder(), *default_encoders()))
+        assert canonicalizer.dumps({"token": Token("abc")}) == '{"token":"token:abc"}'
+
+
+class TestGraphIdentity:
+    @pytest.mark.parametrize(
+        ("model_adapter", "model", "expected"),
+        [
+            (PydanticModelAdapter, UserV123, "User@1.2.3"),
+            (JsonSchemaModelAdapter, USER_V1_2_3, "User@1.2.3"),
+        ],
+        ids=["pydantic", "json"],
+        indirect=["model_adapter"],
+    )
+    def test_node_jgf_id(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        model: Any,
+        expected: str,
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, model)
+        assert node.jgf_id == expected
+        assert str(node) == expected
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "source", "target"),
+        [
+            (PydanticModelAdapter, UserV011Dev7, UserV123),
+            (JsonSchemaModelAdapter, USER_V0_1_1_DEV_7, USER_V1_2_3),
+        ],
+        ids=["pydantic", "json"],
+        indirect=["model_adapter"],
+    )
+    def test_edge_jgf_id(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        source: Any,
+        target: Any,
+    ) -> None:
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source,
+            target,
+            func=_noop_migration,
+        )
+        assert edge.jgf_id == f"{edge.source.jgf_id}->{edge.target.jgf_id}"
+
+
+class TestContentAddress:
+    @pytest.mark.parametrize(
+        ("model_adapter", "model"),
+        [
+            (PydanticModelAdapter, UserV123),
+            (JsonSchemaModelAdapter, USER_V1_2_3),
+        ],
+        ids=["pydantic", "json"],
+        indirect=["model_adapter"],
+    )
+    def test_node_content_hash(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        model: Any,
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, model)
+        payload = node.content_payload()
+        assert payload["id"] == node.jgf_id
+        assert payload["model"] == node.model_id
+        assert node.content_hash(
+            default_content_hasher()
+        ) == default_content_hasher().digest(payload)
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "source", "target"),
+        [
+            (PydanticModelAdapter, UserV011Dev7, UserV123),
+            (JsonSchemaModelAdapter, USER_V0_1_1_DEV_7, USER_V1_2_3),
+        ],
+        ids=["pydantic", "json"],
+        indirect=["model_adapter"],
+    )
+    def test_edge_content_hash_is_deterministic(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        source: Any,
+        target: Any,
+    ) -> None:
+        left = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source,
+            target,
+            func=_noop_migration,
+        )
+        right = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source,
+            target,
+            func=_noop_migration,
+        )
+        assert left.migration.identity == right.migration.identity
+        assert left.content_hash(default_content_hasher()) == right.content_hash(
+            default_content_hasher()
+        )
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "source", "target"),
+        [
+            (PydanticModelAdapter, UserV011Dev7, UserV123),
+            (JsonSchemaModelAdapter, USER_V0_1_1_DEV_7, USER_V1_2_3),
+        ],
+        ids=["pydantic", "json"],
+        indirect=["model_adapter"],
+    )
+    def test_migration_identity_changes_hash(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        source: Any,
+        target: Any,
+    ) -> None:
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source,
+            target,
+            func=_noop_migration,
+        )
+        other = replace(
+            edge, migration=MigrationIdentity("callable", "migration:other")
+        )
+        assert edge.content_hash(default_content_hasher()) != other.content_hash(
+            default_content_hasher()
+        )
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "source", "target"),
+        [
+            (PydanticModelAdapter, UserV011Dev7, UserV123),
+            (JsonSchemaModelAdapter, USER_V0_1_1_DEV_7, USER_V1_2_3),
+        ],
+        ids=["pydantic", "json"],
+        indirect=["model_adapter"],
+    )
+    def test_diff_fingerprint_changes_hash(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        source: Any,
+        target: Any,
+    ) -> None:
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source,
+            target,
+            func=_noop_migration,
+        )
+        diff = cast(Diff, edge.diff)
+        other = replace(
+            edge,
+            diff=replace(
+                diff,
+                fields={
+                    **diff.fields,
+                    "extra": FieldChange(FieldStatus.ADDED, {}),
+                },
+            ),
+        )
+        assert edge.content_hash(default_content_hasher()) != other.content_hash(
+            default_content_hasher()
+        )
+
+
+def _noop_migration(data: dict, context: Any = None) -> dict:
+    return data
+
+
+class TestJgfInterop:
+    @pytest.mark.parametrize(
+        ("model_adapter", "source", "target"),
+        [
+            (PydanticModelAdapter, UserV011Dev7, UserV123),
+            (JsonSchemaModelAdapter, USER_V0_1_1_DEV_7, USER_V1_2_3),
+        ],
+        ids=["pydantic", "json"],
+        indirect=["model_adapter"],
+    )
+    def test_graph_loads_in_established_implementation(
+        self,
+        model_adapter: PydanticModelAdapter,
+        versioning_settings: VersioningSettings,
+        source: Any,
+        target: Any,
+    ) -> None:
+        source_node = envelope_model(model_adapter, versioning_settings, source)
+        target_node = envelope_model(model_adapter, versioning_settings, target)
+        edge = edge_from_models(
+            model_adapter,
+            versioning_settings,
+            source,
+            target,
+            func=_noop_migration,
+        )
+        graph = JgfGraph.from_versions(
+            [source_node, target_node],
+            [edge],
+            hasher=default_content_hasher(),
+            id="pyverge-test",
+            directed=True,
+            metadata={"manifest_version": "v1"},
+        )
+        document = graph.to_dict()
+
+        expected = {"graph": dict(document["graph"])}
+        expected["graph"].pop("id")
+        parsed = LiteGraph.from_dict(copy.deepcopy(document))
+
+        # json-graph-lite does not preserve the graph-level id; it still
+        # validates nodes/edges/metadata and round-trips them.
+        assert parsed.directed is True
+        assert {node.id for node in parsed.nodes} == {
+            source_node.jgf_id,
+            target_node.jgf_id,
+        }
+        assert {node.metadata["model"] for node in parsed.nodes} == {
+            source_node.model_id,
+            target_node.model_id,
+        }
+        assert parsed.edges[0].source == source_node.jgf_id
+        assert parsed.edges[0].target == target_node.jgf_id
+        assert parsed.edges[0].metadata["migration_id"] == edge.migration.identity
+        assert parsed.to_dict() == expected

@@ -4,24 +4,21 @@ from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, cast
 
 from pyverge.core.types import (
-    Comparable,
     ModelData,
     ModelKey,
     ModelKind,
     ModelVersionKey,
-    Versionable,
     VersionValue,
 )
-from pyverge.core.versioning import (
-    VersionNode,
-)
-from pyverge.providers.types import (
+from pyverge.discovery import ModelRegistrationMode, RegisterModel
+from pyverge.schemas.types import (
     ModelHandle,
 )
+from pyverge.versioning import Comparable, Versionable, VersionNode
 
 if TYPE_CHECKING:
+    from pyverge.engine import Engine
     from pyverge.manager.manager import Manager
-    from pyverge.migration.engine import Engine
 
 
 class ModelStoreMixin(Generic[VersionValue]):
@@ -35,9 +32,11 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
-        """Register a model version through the engine."""
         engine = engine or cls._default_engine
-        return engine.store_model(engine.adapter.versionable(key))
+        return cast(
+            Versionable[VersionValue],
+            engine.register(RegisterModel(key, ModelRegistrationMode.STRICT)),
+        )
 
     @store_model.register(VersionNode)
     @classmethod
@@ -47,9 +46,11 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
-        """Register an already-built versionable (strict; duplicates fail)."""
         engine = engine or cls._default_engine
-        return engine.store_model(version)
+        return cast(
+            Versionable[VersionValue],
+            engine.register(RegisterModel(version, ModelRegistrationMode.STRICT)),
+        )
 
     @singledispatchmethod
     @classmethod
@@ -59,13 +60,11 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
-        """Register a model, reconciling an identical re-registration.
-
-        The idempotent fallback to :meth:`store_model`: an identical surface is
-        a no-op, a differing one raises :class:`ModelConflictError`.
-        """
         engine = engine or cls._default_engine
-        return engine.reconcile_model(engine.adapter.versionable(key))
+        return cast(
+            Versionable[VersionValue],
+            engine.register(RegisterModel(key, ModelRegistrationMode.RECONCILE)),
+        )
 
     @reconcile_model.register(VersionNode)
     @classmethod
@@ -76,25 +75,21 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return engine.reconcile_model(version)
+        return cast(
+            Versionable[VersionValue],
+            engine.register(RegisterModel(version, ModelRegistrationMode.RECONCILE)),
+        )
 
     def missing_references(
         self: Manager[VersionValue],
         version: Versionable[VersionValue],
     ) -> frozenset[ModelVersionKey]:
-        """Return the versioned ``(kind, version)`` pairs *version* declares
-        but that are not registered."""
         return self.engine.registry.missing_references(version)
 
     def validate_graph(
         self: Manager[VersionValue],
         version: Versionable[VersionValue] | None = None,
     ) -> None:
-        """Validate registered models' declared references are registered.
-
-        Raises :class:`~pyverge.core.MissingReferenceError` on the first model
-        that references an unregistered versioned kind.
-        """
         self.engine.validate(version)
 
     @classmethod
@@ -104,7 +99,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> list[VersionNode[VersionValue]]:
-        """Return registered versions, optionally filtered by *kind*."""
         engine = engine or cls._default_engine
         if kind is None:
             return engine.registry.versions
@@ -116,7 +110,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> list[ModelKind]:
-        """Return the kinds that have at least one registered version."""
         engine = engine or cls._default_engine
         return engine.get_entities()
 
@@ -127,7 +120,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> bool:
-        """Return whether *key* is a versionable model this manager can handle."""
         engine = engine or cls._default_engine
         return engine.adapter.identify(key)
 
@@ -138,12 +130,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> ModelData:
-        """Return *value* as a payload mapping.
-
-        A mapping passes through; a provider model is serialized by the adapter
-        (the inverse of ``instantiate``). The façade used by the publish seam to
-        turn a handler's returned model back into a payload.
-        """
         if isinstance(value, dict):
             return cast("ModelData", value)
         engine = engine or cls._default_engine
@@ -156,7 +142,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionNode[VersionValue]:
-        """Return a registered model version by class or by key."""
         engine = engine or cls._default_engine
         if isinstance(key, ModelKey):
             return engine.get_model(
@@ -171,7 +156,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionNode[VersionValue]:
-        """Return the latest version for a kind or the given version identity."""
         engine = engine or cls._default_engine
         if isinstance(key, str):
             return engine.get_latest_model(key)
@@ -184,7 +168,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionNode[VersionValue]:
-        """Return the earliest version for a kind or the given version identity."""
         engine = engine or cls._default_engine
         if isinstance(key, str):
             return engine.get_earliest_model(key)
@@ -198,7 +181,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionNode[VersionValue]:
-        """Return the registered versionable for ``kind``@``version``."""
         engine = engine or cls._default_engine
         key = ModelKey(kind, cast(VersionValue, engine.adapter.of(version)))
         return cls.get_model(key, engine=engine)

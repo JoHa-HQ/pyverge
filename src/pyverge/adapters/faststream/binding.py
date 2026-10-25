@@ -1,21 +1,12 @@
-"""Default handler binding.
-
-``HandlerBinder`` (the port) lives in :mod:`.types`; ``SignatureBinder`` is its
-default adapter. The port lets the mechanism change (a generated shim, or a
-wrapper around FastStream's registration) without touching the subscriber
-decorator.
-"""
-
 from __future__ import annotations
 
 import inspect
 from typing import Any
 
-from pyverge.providers.types import ModelHandle
+from pyverge.schemas.types import ModelHandle
 
 
 def first_param_name(handler: Any) -> str | None:
-    """Return the name of the handler's first positional parameter."""
     for name, param in inspect.signature(handler).parameters.items():
         if param.kind in (
             inspect.Parameter.POSITIONAL_ONLY,

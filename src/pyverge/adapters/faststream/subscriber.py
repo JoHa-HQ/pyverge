@@ -1,24 +1,17 @@
-"""The endpoint decorator: bind a convergence policy to a subscriber.
-
-One decorator at the endpoint, pyverge config as keyword arguments. It resolves
-the handler's typed parameter (the kind) to the *target* version's model — a
-reconstructed class when the target is not the anchor — binds the parameter to
-it, and registers the subscriber with a convergence ``decoder``. The handler thus
-validates the converged payload against the version actually served.
-"""
-
 from __future__ import annotations
 
+import inspect
 import operator
 from collections.abc import Callable
 from functools import reduce
 from typing import Any, TypeVar
 
 from pyverge import Manager
+from pyverge.execution import Runner
 from pyverge.manager.types import TargetPolicy
 
 from .binding import SignatureBinder
-from .targets import DEFAULT_TARGET, FirstMatch
+from .targets import FirstMatch
 from .types import HandlerBinder, TargetContext, TopicTargets
 from .views import HandlerView
 
@@ -26,7 +19,6 @@ Fn = TypeVar("Fn", bound=Callable[..., Any])
 
 
 def _model_union(models: list[Any]) -> Any:
-    """Return one model or the union of all candidate models."""
     unique = list(dict.fromkeys(models))
     if not unique:
         return None
@@ -57,26 +49,24 @@ def _candidate_models(
     return [model] if model is not None else []
 
 
-def subscriber(
+def subscriber(  # noqa: PLR0913
     broker: Any,
     *topics: str,
     manager: Manager,
-    targets: TargetPolicy | TopicTargets = DEFAULT_TARGET,
+    targets: TargetPolicy | TopicTargets = "latest",
     header: str | None = None,
     binder: HandlerBinder | None = None,
+    runner: Runner | None = None,
     **options: Any,
 ) -> Callable[[Fn], Fn]:
-    """Register one converging subscriber per topic.
-
-    ``targets`` is either one policy for every topic or a :class:`TopicTargets`
-    mapping. ``header`` enables per-message negotiation, overriding both.
-    Extra *options* pass through to ``broker.subscriber``.
-    """
     if "decoder" in options:
         raise TypeError("subscriber() owns the decoder; drop the decoder option")
 
-    selector = FirstMatch.for_topics(topics, targets, header)
+    selector = FirstMatch.for_topics(
+        topics, targets, default_target="latest", header=header
+    )
     binder = binder or SignatureBinder()
+    active_runner = runner or manager.runner()
 
     def decode(topic: str) -> Callable[[Any, Any], Any]:
         async def converge_message(msg: Any, next_decoder: Any) -> dict[str, Any]:
@@ -84,7 +74,14 @@ def subscriber(
             target = selector.select(
                 TargetContext(topic, getattr(msg, "headers", {}) or {})
             )
-            return manager.migrate(payload, target=target)
+            migrated = active_runner.run(
+                payload,
+                target,
+                container=None,
+                max_depth=-1,
+                context=None,
+            )
+            return await migrated if inspect.isawaitable(migrated) else migrated
 
         return converge_message
 
