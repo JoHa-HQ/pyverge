@@ -30,12 +30,6 @@ repos:
         language: system
         pass_filenames: false
         types_or: [python, pyi]
-      - id: pydoclint
-        name: pydoclint
-        entry: uv run pydoclint --quiet --style=google src/pyverge
-        language: system
-        pass_filenames: false
-        types_or: [python, pyi]
       - id: docs-examples
         name: docs examples
         entry: uv run pytest --codeblocks docs/examples -q -o addopts=
@@ -54,6 +48,12 @@ repos:
         language: system
         pass_filenames: false
         stages: [pre-push]
+  - repo: https://github.com/jsh9/pydoclint
+    rev: 0.11.1
+    hooks:
+      - id: pydoclint
+        args: ["--quiet", "--style=google"]
+        files: ^src/pyverge/
   - repo: https://github.com/errata-ai/vale
     rev: v3.25.1
     hooks:
