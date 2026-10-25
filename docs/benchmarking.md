@@ -44,15 +44,6 @@ The `-o addopts=...` override drops the suite's coverage and doctest flags, whic
 would otherwise perturb and fail a benchmark run. `benchmarks/` is out of the
 default `testpaths`, so a plain `pytest` never runs benchmarks.
 
-For sustained throughput, use the load script (`uv run python -m
-benchmarks.load_faststream`) rather than pytest-benchmark, which is sync-only and
-single-threaded.
-
-## Profiling
-
-Sampling (`py-spy`), deterministic (`cProfile`), and allocation (`memray`)
-recipes are in the benchmarks README.
-
 ## See also
 
 - [Testing](testing.md) — the correctness suite and its guards.

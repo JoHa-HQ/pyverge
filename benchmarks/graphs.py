@@ -33,6 +33,13 @@ def _drop_status(data: dict, context: MigrationContext | None = None) -> dict:
     return data
 
 
+def _to_v3(data: dict, context: MigrationContext | None = None) -> dict:
+    data = migrate_v2_to_v3(data, context)
+    if data.get("age") is None:
+        data["age"] = 0
+    return data
+
+
 def user_manager() -> Manager[semver.Version]:
     """A linear ``User`` chain, both directions: v1 ↔ v2 ↔ v3.
 
@@ -40,19 +47,22 @@ def user_manager() -> Manager[semver.Version]:
     down to a pinned older target.
     """
     user_manager_cls = Manager[semver.Version].configure(PydanticModelAdapter())
-    manager = user_manager_cls()
-    manager.store_model(UserV1)
-    manager.store_model(UserV2)
-    manager.store_model(UserV3)
-    manager.store_migration(
+    user_manager_cls.store_model(UserV1)
+    user_manager_cls.store_model(UserV2)
+    user_manager_cls.store_model(UserV3)
+    user_manager_cls.store_migration(
         ManagerMigrationKey("User", "1.0.0", "2.0.0"), migrate_v1_to_v2
     )
-    manager.store_migration(
-        ManagerMigrationKey("User", "2.0.0", "3.0.0"), migrate_v2_to_v3
+    user_manager_cls.store_migration(
+        ManagerMigrationKey("User", "2.0.0", "3.0.0"), _to_v3
     )
-    manager.store_migration(ManagerMigrationKey("User", "2.0.0", "1.0.0"), _drop_age)
-    manager.store_migration(ManagerMigrationKey("User", "3.0.0", "2.0.0"), _drop_status)
-    return manager
+    user_manager_cls.store_migration(
+        ManagerMigrationKey("User", "2.0.0", "1.0.0"), _drop_age
+    )
+    user_manager_cls.store_migration(
+        ManagerMigrationKey("User", "3.0.0", "2.0.0"), _drop_status
+    )
+    return user_manager_cls()
 
 
 __all__ = ["user_manager"]
