@@ -23,6 +23,12 @@ dev = [
   "pydocstyle>=6.3.0",
   "pydoclint>=0.11.1",
   "mkdocs-material>=9.8.0",
+  "fastmcp>=4",
+  "typer>=0.21",
+  "rich>=13",
+  "dependency-injector>=4.49.1",
+  "mkdocstrings[python]>=1.0.8",
+  "pytest-codeblocks>=0.18.0",
 ]
 
 [project]
@@ -51,7 +57,7 @@ dependencies = [
   "jsonata-python>=0.7.1",
   "anyio>=4.15.1",
   "openlineage-python>=1.54.0",
-  "tenacity>=9.2.1",
+  "tenacity>=9.2.1"
 ]
 
 [project.optional-dependencies]
@@ -92,6 +98,16 @@ packages = ["src/pyverge"]
 [tool.hatch.version]
 source = "uv-dynamic-versioning"
 
+[tool.pydoclint]
+style = "google"
+exclude = "\\.git|\\.tox|\\.venv"
+check-class-attributes = false
+arg-type-hints-in-docstring = false
+
+[tool.pydocstyle]
+convention = "google"
+add-ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "benchmarks/tests"]
 python_files = ["test_*.py", "bench_*.py"]
@@ -109,25 +125,13 @@ select = ["C90", "E", "F", "I", "PL", "RUF", "UP"]
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
-"src/pyverge/engine/engine.py" = ["PLR0913", "PLR0917", "C901"]
-"src/pyverge/execution/extractors.py" = ["C901", "PLR0913", "PLR0917"]
-"src/pyverge/manager/types.py" = ["PLR0913"]
-"src/pyverge/discovery/reflection/discovery.py" = ["C901", "PLR0912"]
-"src/pyverge/cli/commands/*.py" = ["C901", "PLR0912", "PLR0913", "PLR0917"]
-"src/pyverge/providers/json_schema/adapter.py" = ["PLR0911"]
+"src/pyverge/cli/commands/compat.py" = ["PLR0913", "PLR0917"]
+"src/pyverge/cli/commands/manifest.py" = ["PLR0913", "PLR0917"]
+"src/pyverge/cli/commands/migrate.py" = ["C901", "PLR0913", "PLR0917"]
+"src/pyverge/cli/commands/validate.py" = ["C901", "PLR0912", "PLR0913", "PLR0917"]
 
 [tool.uv-dynamic-versioning]
 vcs = "git"
 style = "pep440"
 bump = true
 format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"
-
-[tool.pydocstyle]
-convention = "google"
-add-ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
-
-[tool.pydoclint]
-style = "google"
-exclude = "\\.git|\\.tox|\\.venv"
-check-class-attributes = false
-arg-type-hints-in-docstring = false

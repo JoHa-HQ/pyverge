@@ -237,3 +237,10 @@ site/
 
 # CI showcase build output
 showcases/ci/target/
+
+# Vale: generated styles, keep project vocabulary
+.vale/styles/*
+!.vale/styles/config/
+!.vale/styles/config/vocabularies/
+!.vale/styles/config/vocabularies/Project/
+!.vale/styles/config/vocabularies/Project/accept.txt
