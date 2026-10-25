@@ -29,12 +29,10 @@ from typing import Literal
 import semver
 from pydantic import BaseModel
 
-from pyverge import Manager, MigrationSettings, PydanticModelAdapter
+from pyverge import Manager
+from pyverge.schemas import PydanticModelAdapter
 
-UserManager = Manager[semver.Version].configure(
-    MigrationSettings(),
-    PydanticModelAdapter(),
-)
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
 
 @UserManager.model()
@@ -59,27 +57,45 @@ def add_age(data: dict, context=None) -> dict:
     return {**data, "age": None}
 
 
-migrated = UserManager().migrate(
-    {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"}
+manager = UserManager()
+migrated = manager.runner().run(
+    {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"},
+    "latest",
 )
 # {"kind": "User", "version": "2.0.0", "name": "Alice", "email": "a@b.com", "age": None}
 ```
 
-### Async and prepared runs
+### Async execution
 
 ```python
-result = await manager.amigrate(payload)
+from pyverge.execution import AsyncBackend
 
-run = manager.delegate(payload)
-first = run.run(context={"tenant_id": "tenant_a"})
-second = run.run(context={"tenant_id": "tenant_b"})
+runner = manager.runner(
+    runtime=AsyncBackend(
+        backend="asyncio",
+        backend_options={},
+        max_workers=4,
+    )
+)
+result = await runner.run(payload, "latest")
 ```
 
-`migrate`/`amigrate` execute immediately. `delegate` and `prepare` return a
-reusable `MigrationRun`. Execution policy comes from settings:
+`Runner.run()` defaults:
+
+```text
+container=None
+max_depth=-1
+context=None
+```
+
+Use `context=` for runtime bindings:
 
 ```python
-MigrationSettings(execution_mode="async", parallel_workers=4)
+result = manager.runner().run(
+    payload,
+    "latest",
+    context={"tenant_id": "tenant_99"},
+)
 ```
 
 ## Migration formats
@@ -123,7 +139,7 @@ See [CLI Reference](docs/reference/cli.md).
 - **Convergent engine** — graph-driven migration of nested versioned entries
 - **Declarative migrations** — JSON Patch, JSONata expressions, or Python callables
 - **Runtime context** — shared read-only bindings across every step
-- **Sync/async executors** — sequential or level-parallel; prepared runs
+- **Sync/async backends** — threaded, async, or process execution
 - **Reflection** — reconstruct missing models or propose migrations from diffs
 - **Compatibility** — `CompatibilityReport`, breaking-change checks, JSON Patch rendering
 - **Graph manifest** — JGF v2 snapshot with stable hashes for CI divergence checks
@@ -139,14 +155,16 @@ timeline.
 
 ## Documentation
 
-- [Getting Started](docs/tutorials/getting-started.md)
+- [Getting started](docs/tutorials/getting-started.md)
 - [Managers](docs/explanation/managers.md) · [Concepts](docs/explanation/concepts.md)
 - [Providers](docs/explanation/providers.md)
-- [Migrations](docs/explanation/migrations.md) · [Migration Formats](docs/reference/migration-formats.md)
-- [Runtime & Execution](docs/reference/runtime.md) · [Execution Flow](docs/explanation/execution-flow.md)
-- [Target Policy](docs/reference/target-policy.md) · [Compatibility](docs/reference/compatibility.md)
-- [CLI Reference](docs/reference/cli.md) · [Telemetry & Hooks](docs/how-to/telemetry.md)
+- [Migrations](docs/explanation/migrations.md) · [Migration formats](docs/reference/migration-formats.md)
+- [Runtime and execution](docs/reference/runtime.md) · [Execution flow](docs/explanation/execution-flow.md)
+- [Target policy](docs/reference/target-policy.md) · [Compatibility](docs/reference/compatibility.md)
+- [API reference](docs/reference/api.md) · [Glossary](docs/explanation/glossary.md)
+- [Upgrade guide](docs/reference/upgrades.md)
+- [CLI reference](docs/reference/cli.md) · [Telemetry and hooks](docs/how-to/telemetry.md)
 - [FastMCP](docs/explanation/fastmcp.md) · [FastStream](docs/explanation/faststream.md)
 - [Testing](docs/how-to/testing.md) · [Benchmarking](docs/how-to/benchmarking.md)
-- [Usage Patterns](docs/reference/manager.md) · [Scenarios](docs/explanation/scenarios.md)
+- [Manager reference](docs/reference/manager.md) · [Scenarios](docs/explanation/scenarios.md)
 - [Showcases](showcases/README.md)
