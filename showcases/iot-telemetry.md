@@ -35,10 +35,7 @@ Some devices cannot be upgraded immediately. A per-kind target policy pins those
 fleets to an intermediate version while the rest converge to `latest`:
 
 ```python
-manager.migrate(
-    payload,
-    target={"LegacySensor": "1.5.0", "*": "latest"},
-)
+runner.run(payload, {"LegacySensor": "1.5.0", "*": "latest"})
 ```
 
 Pinned kinds must be registered with the manager.
@@ -52,15 +49,9 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
-TempSensorManager = Manager[semver.Version].configure(
-    MigrationSettings(
-        direction="forward",
-        on_direction_violation="skip",
-    ),
-    PydanticModelAdapter(),
-)
+TempSensorManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
 
 @TempSensorManager.model()
@@ -90,9 +81,10 @@ def rename_temp(data: dict, context=None) -> dict:
 
 
 manager = TempSensorManager()
+runner = manager.runner(direction="forward", on_direction_violation="skip")
 
 payload = {"kind": "TempSensor", "version": "1.0.0", "device_id": "abc", "temp": 22.5}
-migrated = manager.migrate(payload)
+migrated = runner.run(payload, "latest")
 assert migrated["version"] == "2.0.0"
 assert migrated["temperature_c"] == 22.5
 ```

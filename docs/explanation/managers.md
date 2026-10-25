@@ -2,7 +2,7 @@
 
 A `Manager` is a **bounded context** — one version graph, one registry, one
 adapter. This page explains the bounded-context invariant and how it shapes manager
-organization. See [Register models and migrations](../how-to/register-models.md)
+organization. See [Register models and migrations](../how-to/models/register-models.md)
 for the task.
 
 ## The invariant

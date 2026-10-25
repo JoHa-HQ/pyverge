@@ -126,6 +126,7 @@ select = ["C90", "E", "F", "I", "PL", "RUF", "UP"]
 max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
+"src/pyverge/cli/commands/benchmark.py" = ["C901", "PLR0912", "PLR0913", "PLR0915", "PLR0917"]
 "src/pyverge/cli/commands/compat.py" = ["PLR0913", "PLR0917"]
 "src/pyverge/cli/commands/manifest.py" = ["PLR0913", "PLR0917"]
 "src/pyverge/cli/commands/migrate.py" = ["C901", "PLR0913", "PLR0917"]

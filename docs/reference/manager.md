@@ -1,67 +1,72 @@
-# Manager reference
+# Manager API
 
-The manager exposes a small surface for inspecting, validating, and diffing
-registered models.
+High-level signatures for the public manager surface. See the
+[API reference](api.md) for generated details.
 
-## Lookup
+## Configuration
 
 ```python
-manager.get("User", "1.0.0")        # the registered versionable
-manager.get_latest("User")          # highest registered version for the kind
-manager.list_versions("User")        # all registered versions for the kind
-manager.list_versions()              # all registered versions across kinds
-manager.get_entities()               # all kinds with registered versions
+Manager.configure(adapter, *, config=None, **options)
 ```
 
-## Validation
+`ManagerConfig` groups optional engine, walker, hasher, identity resolver,
+materializer, diff provider, and `on_missing` settings.
+
+## Registration decorators
 
 ```python
-manager.validate(data, "User", "1.0.0")   # raises ValidationError on mismatch
+@Manager.model()
+@Manager.migration(key, ..., backward_compatible=False, migration_id=None)
+@Manager.hook(key, hook)
 ```
 
-## Diffing two versions
+## Graph lookup
 
 ```python
-diff = manager.diff("User", "1.0.0", "2.0.0")
-diff.has_additions                  # True if fields were added
-diff.added_fields                   # ["age"]
-diff.has_removals                   # True if fields were removed
-diff.has_modifications              # True if fields changed type/required
-diff.render()                       # RFC 6902 JSON Patch ops
+Manager.get(kind, version)
+Manager.get_latest_model(kind)
+Manager.list_versions(kind=None)
+Manager.get_entities()
+Manager.diff(key)
 ```
 
-The diff reports added, removed, and modified fields between two versions of a
-kind, and can render the change as an RFC 6902 JSON Patch.
+## Registration and lifecycle
 
-## Migration registration
-
-Register on the configured manager class before constructing the runtime
-instance.
+Registration methods work on the class or on an instance:
 
 ```python
-# Python callable
-manager.store_migration(
-    ManagerMigrationKey("User", "1.0.0", "2.0.0"), add_age
+Manager.store_model(payload, *, engine=None)
+Manager.reconcile_model(payload, *, engine=None)
+Manager.store_migration(key, func, *, backward_compatible=False, migration_id=None)
+Manager.add_hook(key, hook)
+Manager.attach_hooks(hooks)
+```
+
+Class-level calls update the default engine copied by new instances. Instance
+calls update only that instance's engine. Existing instances are not affected by
+later class-level registration.
+
+```python
+UserManager.add_hook(key, hook)  # affects new instances
+manager.add_hook(key, hook)      # affects only this instance
+```
+
+## Runtime
+
+```python
+manager = Manager()
+manager.validate(data, kind, version)
+runner = manager.runner(
+    *,
+    runtime=None,
+    direction="any",
+    on_direction_violation="skip",
+    on_missing_path="raise",
+    depth_limit=-1,
+    on_depth_violation="skip",
+    validation_mode="lax",
 )
-
-# Declarative JSON Patch spec
-manager.store_migration(
-    ("User", "1.0.0", "2.0.0"),
-    JsonPatchMigration(
-        {
-            "from": "1.0.0",
-            "to": "2.0.0",
-            "ops": [{"op": "add", "path": "/age", "value": None}],
-        }
-    ),
-)
+result = runner.run(payload, target, *, container=None, max_depth=-1, context=None)
 ```
 
-## Hooks
-
-```python
-manager.add_hook(("User", "1.0.0", "2.0.0"), MyHook())
-```
-
-Hooks observe migrations before, after, and on error — for logging, metrics,
-auditing, or OpenTelemetry tracing. See [Telemetry & Hooks](../how-to/telemetry.md).
+See [Use the manager](../how-to/models/use-manager.md) for task examples.

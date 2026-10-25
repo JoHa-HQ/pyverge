@@ -21,7 +21,7 @@ Compatibility notes for the execution/registration architecture change.
 | `manager.delegate()` / `manager.prepare()` | removed; build a `Runner` and reuse it |
 | `MigrationSettings(execution_mode=...)` | choose `ThreadedBackend`, `AsyncBackend`, or `ProcessBackend` |
 | `MigrationSettings(parallel_workers=...)` | backend `max_workers` |
-| `pyverge.migration.*` | `pyverge.engine`, `pyverge.registry`, `pyverge.providers`, `pyverge.versioning` |
+| `pyverge.migration.*` | `pyverge.engine`, `pyverge.registry`, `pyverge.schemas`, `pyverge.migrations`, `pyverge.versioning` |
 | `ToolDiscovery` | `FastMCPDiscovery` |
 | `discovery.register()` | `await discovery.register(server)` |
 | `Reflector(manager)` FastStream startup hook | explicit model/migration registration before runtime |
@@ -162,6 +162,8 @@ The old `Reflector(manager)` startup hook is gone. Register models and
 migrations before constructing the runtime manager:
 
 ```python
+from pyverge.types import ManagerMigrationKey
+
 OrderManager = Manager[semver.Version].configure(PydanticModelAdapter())
 OrderManager.store_model(Order)
 OrderManager.store_migration(

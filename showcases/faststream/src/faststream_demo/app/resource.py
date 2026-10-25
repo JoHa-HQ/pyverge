@@ -7,7 +7,6 @@ from faststream import FastStream
 from opentelemetry.trace import TracerProvider
 
 from pyverge import Manager
-from pyverge.adapters.faststream import Reflector
 
 from .infra.resource import make_migration_hooks
 from .types import Broker
@@ -21,13 +20,9 @@ def build_faststream(
     features: Iterable[object] = (),
 ) -> FastStream:
     manager = manager_cls()
-    brokers = (broker,)
 
     @asynccontextmanager
     async def lifespan() -> AsyncIterator[None]:
-        # Wiring is complete by now: reflect, then attach to every edge.
-        for item in brokers:
-            Reflector(manager).reflect(item)
         manager.attach_hooks(make_migration_hooks(tracer, service_name))
         yield
 

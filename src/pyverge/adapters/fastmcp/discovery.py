@@ -82,7 +82,7 @@ class FastMCPDiscovery:
         await self.source(server).accept(collector)
         for command in collector.commands:
             try:
-                type(self._manager)._default_engine.register(command)
+                self._manager.engine.register(command)
             except ModelConflictError as error:
                 if not isinstance(command, RegisterModel):
                     raise

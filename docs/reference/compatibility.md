@@ -6,7 +6,9 @@ domain report over that diff.
 ## Diff
 
 ```python
-diff = manager.diff("User", "1.0.0", "2.0.0")
+from pyverge.types import ManagerMigrationKey
+
+diff = UserManager.diff(ManagerMigrationKey("User", "1.0.0", "2.0.0"))
 diff.added_fields
 diff.removed_fields
 diff.modified_fields
@@ -15,37 +17,39 @@ diff.render()  # RFC 6902 ops
 
 ## Compatibility report
 
-`pyverge.reflection.CompatibilityReport` excludes identity fields (`kind`,
-`version`) and classifies structural change:
+`CompatibilityReport` excludes identity fields (`kind`, `version`) and
+classifies structural change:
 
 ```python
-from pyverge.reflection import CompatibilityReport
+from pyverge.versioning import CompatibilityReport
 
 report = CompatibilityReport.from_diff(
     diff,
     identity_fields=frozenset({"kind", "version"}),
 )
 report.structural_breaking
-report.declared_backward_compatible
-report.breaking
+report.removed_fields
+report.modified_fields
 ```
 
-Breaking when any of these is true and the migration was not declared backward
-compatible:
+## Guard
 
-- field removed
-- field type changed
-- required constraint changed
-- required field added
+`BackwardCompatibilityGuard` evaluates a diff with a fixed identity-field set:
 
-Optional additions and identity-only changes are not breaking.
+```python
+from pyverge.versioning import BackwardCompatibilityGuard
+
+guard = BackwardCompatibilityGuard(frozenset({"kind", "version"}))
+guard.evaluate(diff)
+guard.required_additions(diff, report)
+```
 
 ## CLI
 
+Compatibility checks are also available from the CLI:
+
 ```bash
-pyverge compat --manager myapp.models:UserManager
 pyverge compat --manager myapp.models:UserManager --fail-on-breaking
 ```
 
-`--fail-on-breaking` exits `3` when a breaking migration is found. See
-[CLI Reference](cli.md#compat).
+See [CLI reference](cli.md#compat).

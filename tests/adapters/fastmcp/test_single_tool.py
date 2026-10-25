@@ -9,7 +9,7 @@ runs the discovery lifecycle (the server's lifespan).
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import semver
@@ -204,6 +204,77 @@ async def test_policy_declared_in_meta(manager: type) -> None:
 
     names = {t.name for t in await server.list_tools()}
     assert names == {"User"}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "user_test", [], []],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+async def test_register_updates_instance_engine(manager: type) -> None:
+    """Discovery registration must target the manager instance engine."""
+    instance = manager()
+    instance.store_model(UserV1)
+    discovery = FastMCPDiscovery(
+        instance,
+        [ToolReflection(instance.adapter)],
+        policies={"User": "latest"},
+    )
+    server = FastMCP("TestServer")
+    server.tool(_rich_handler, name="User", version="2.0.0", meta={"policy": "latest"})
+
+    await discovery.search(server)
+    await discovery.register(server)
+
+    assert {str(v) for v in instance.registry.versions} == {"User@1.0.0", "User@2.0.0"}
+    assert cast("Any", manager)._default_engine.registry.versions == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "user_test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+async def test_hooks_attach_to_instance_engine(manager: type) -> None:
+    """Discovery hooks must target the instance engine, not the class engine."""
+    instance = manager()
+    hook = cast("Any", object())
+    discovery = FastMCPDiscovery(
+        instance,
+        [ToolReflection(instance.adapter)],
+        policies={"User": "latest"},
+        hooks=(hook,),
+    )
+    server = FastMCP("TestServer")
+    server.tool(_rich_handler, name="User", version="2.0.0", meta={"policy": "latest"})
+
+    await discovery.search(server)
+    await discovery.register(server)
+    await discovery.enrich(server)
+
+    edges = instance.registry.migrations("User")
+    assert edges
+    assert all(instance.registry.get_hooks(edge) == [hook] for edge in edges)
+    assert cast("Any", manager)._default_engine.registry.hooks() == []
 
 
 @pytest.mark.anyio

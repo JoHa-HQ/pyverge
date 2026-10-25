@@ -31,6 +31,8 @@ from pyverge.execution.middleware import BackendMiddleware
 from pyverge.execution.types import BackendPort
 from pyverge.versioning import Diffable
 
+from ..descriptors import hybridmethod
+
 if TYPE_CHECKING:
     from pyverge.engine import Engine
     from pyverge.manager.manager import Manager
@@ -104,6 +106,7 @@ class RuntimeMixin(Generic[VersionValue]):
         versionable = self.get(kind, version, engine=self.engine)
         self.engine.adapter.validate(data, versionable.model)
 
+    @hybridmethod
     @singledispatchmethod
     @classmethod
     def diff(

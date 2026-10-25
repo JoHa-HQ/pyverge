@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import wraps
 from typing import TYPE_CHECKING, Any, Literal, Protocol, overload
 
 from pyverge.core.types import (
@@ -24,6 +25,31 @@ if TYPE_CHECKING:
 
 
 MigrationSyntax = Literal["jsonata"]
+
+
+class hybridmethod:
+    """Bind class access to the class and instance access to its engine."""
+
+    def __init__(self, method: Any) -> None:
+        self.method = method
+        self.__doc__ = getattr(method, "__doc__", None)
+
+    @property
+    def register(self) -> Any:
+        return self.method.register
+
+    def __get__(self, obj: Any, cls: type | None = None) -> Any:
+        bound = self.method.__get__(None, cls)
+        if obj is None:
+            return bound
+
+        @wraps(bound)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            if kwargs.get("engine") is None:
+                kwargs["engine"] = obj.engine
+            return bound(*args, **kwargs)
+
+        return wrapper
 
 
 class MigrationDecorator(Protocol):

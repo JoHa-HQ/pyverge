@@ -15,6 +15,8 @@ from pyverge.discovery import MigrationSpec, RegisterMigration
 from pyverge.providers import JsonataMigration, JsonPatchMigration
 from pyverge.versioning import EdgeKey, Migratable
 
+from ..descriptors import hybridmethod
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -49,6 +51,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     ) -> MigrationFunc:
         return func.migration
 
+    @hybridmethod
     @singledispatchmethod
     @classmethod
     def store_migration(
@@ -125,6 +128,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             ),
         )
 
+    @hybridmethod
     @singledispatchmethod
     @classmethod
     def remove_migration(
@@ -164,6 +168,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         )
         engine.remove_migration(EdgeKey.from_pair(*pair))
 
+    @hybridmethod
     @singledispatchmethod
     @classmethod
     def get_migration(
@@ -203,6 +208,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         )
         return engine.get_migration(EdgeKey.from_pair(*pair))
 
+    @hybridmethod
     @singledispatchmethod
     @classmethod
     def add_hook(
@@ -245,6 +251,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         )
         engine.add_hook(EdgeKey.from_pair(*pair), hook)
 
+    @hybridmethod
     @classmethod
     def attach_hooks(
         cls: type[Manager[VersionValue]],

@@ -33,12 +33,9 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
-OrderManager = Manager[semver.Version].configure(
-    MigrationSettings(direction="forward", on_missing_path="raise"),
-    PydanticModelAdapter(),
-)
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
 
 @OrderManager.model()
@@ -74,12 +71,14 @@ class DocumentStore:
 
     def __init__(self, collection: AsyncIOMotorCollection, manager, target="latest"):
         self._collection = collection
-        self._manager = manager
+        self._runner = manager.runner(
+            direction="forward", on_missing_path="raise"
+        )
         self._target = target
 
     async def get(self, doc_id: str) -> dict:
         doc = await self._collection.find_one({"_id": doc_id})
-        return self._manager.migrate(doc, target=self._target)
+        return self._runner.run(doc, self._target)
 
     async def get_and_rewrite(self, doc_id: str) -> dict:
         migrated = await self.get(doc_id)
@@ -94,7 +93,7 @@ async def main():
 
 ## Abstractions used
 
-- **Manager** — high-level facade; `manager.migrate(doc, target=...)`
+- **Runner** — high-level execution facade; `runner.run(doc, target)`
   converges the document.
 - **DocumentStore** — thin adapter hiding the migration step from callers.
 - **Per-kind target** — `{"Order": "latest"}` pins convergence to the app's

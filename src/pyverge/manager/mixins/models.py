@@ -16,6 +16,8 @@ from pyverge.schemas.types import (
 )
 from pyverge.versioning import Comparable, Versionable, VersionNode
 
+from ..descriptors import hybridmethod
+
 if TYPE_CHECKING:
     from pyverge.engine import Engine
     from pyverge.manager.manager import Manager
@@ -24,6 +26,7 @@ if TYPE_CHECKING:
 class ModelStoreMixin(Generic[VersionValue]):
     """Store and look up registered model versions."""
 
+    @hybridmethod
     @singledispatchmethod
     @classmethod
     def store_model(
@@ -52,6 +55,7 @@ class ModelStoreMixin(Generic[VersionValue]):
             engine.register(RegisterModel(version, ModelRegistrationMode.STRICT)),
         )
 
+    @hybridmethod
     @singledispatchmethod
     @classmethod
     def reconcile_model(
@@ -92,6 +96,7 @@ class ModelStoreMixin(Generic[VersionValue]):
     ) -> None:
         self.engine.validate(version)
 
+    @hybridmethod
     @classmethod
     def list_versions(
         cls: type[Manager[VersionValue]],
@@ -104,6 +109,7 @@ class ModelStoreMixin(Generic[VersionValue]):
             return engine.registry.versions
         return engine.registry.kind_versions(kind)
 
+    @hybridmethod
     @classmethod
     def get_entities(
         cls: type[Manager[VersionValue]],
@@ -113,6 +119,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         return engine.get_entities()
 
+    @hybridmethod
     @classmethod
     def identifies(
         cls: type[Manager[VersionValue]],
@@ -123,6 +130,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         return engine.adapter.identify(key)
 
+    @hybridmethod
     @classmethod
     def dump(
         cls: type[Manager[VersionValue]],
@@ -135,6 +143,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         return engine.adapter.dump(value)
 
+    @hybridmethod
     @classmethod
     def get_model(
         cls: type[Manager[VersionValue]],
@@ -149,6 +158,7 @@ class ModelStoreMixin(Generic[VersionValue]):
             )
         return engine.get_model_by_class(key)
 
+    @hybridmethod
     @classmethod
     def get_latest_model(
         cls: type[Manager[VersionValue]],
@@ -161,6 +171,7 @@ class ModelStoreMixin(Generic[VersionValue]):
             return engine.get_latest_model(key)
         return engine.get_model(key)
 
+    @hybridmethod
     @classmethod
     def get_earliest_model(
         cls: type[Manager[VersionValue]],
@@ -173,6 +184,7 @@ class ModelStoreMixin(Generic[VersionValue]):
             return engine.get_earliest_model(key)
         return engine.get_model(key)
 
+    @hybridmethod
     @classmethod
     def get(
         cls: type[Manager[VersionValue]],

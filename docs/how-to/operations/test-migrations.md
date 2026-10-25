@@ -1,9 +1,16 @@
-# Testing
+# Test migrations
 
 A version graph has failure modes that per-migration unit tests miss: a missing
 reverse edge, a forward migration that is not idempotent, or a finalize step
 that silently drops a field. This page covers the testing patterns that catch
 them.
+
+## Prerequisites
+
+- A test manager fixture.
+- Registered models and migrations for the topology under test.
+
+## Steps
 
 ## Time-travel topology test
 
@@ -81,7 +88,7 @@ def test_forward_only_chain_cannot_travel_back(manager):
         walk_down_to_oldest(manager)
 ```
 
-## Registering the graph in tests
+### Registering the graph in tests
 
 Build the manager through the same factory the application uses, so the test
 mirrors production wiring:
@@ -103,7 +110,7 @@ def test_older_models_were_reconstructed(manager):
     assert "wind" not in v1.model.model_fields
 ```
 
-## Testing callable migrations
+### Testing callable migrations
 
 A Python-callable migration is executed as-is, but the engine also reconstructs
 missing models by **parsing its source AST**. That parser only recognizes a
@@ -136,7 +143,7 @@ def test_callable_is_ast_discoverable(func, effect):
 Write removals as ``del data["field"]`` (not ``del some_copy["field"]``) so the
 parser sees them; additions as ``{**data, "field": value}``.
 
-## Property-based payloads
+### Property-based payloads
 
 Generate valid payloads for the **latest** model with Hypothesis, then assert
 the container validates. This guards the model contract independently of
@@ -152,7 +159,7 @@ Compose strategies per nested model and combine them (see joha's
 `tests/strategies/` for a worked example). Keep generators aligned with the
 model fields — a drifted generator is a false failure, not a real one.
 
-## Snapshotting a version chain
+### Snapshotting a version chain
 
 Snapshot every version's validated dump in one parametrized test, so a schema
 change is a visible diff rather than a silent break:
@@ -189,7 +196,7 @@ def test_version_field_surface_matches_snapshot(manager, version, snapshot):
 
 `pytest --snapshot-update` then rewrites only the version whose schema changed.
 
-## Asserting on hooks and tracing
+### Asserting on hooks and tracing
 
 Hooks are observable, so assert them directly. Swap the OTLP exporter for an
 in-memory one and check the spans a migration emits:
@@ -202,53 +209,19 @@ def test_one_span_per_step(manager, span_exporter):
     assert span_exporter.get_finished_spans()[0].attributes["migration.kind"] == kind
 ```
 
-## Layering for testability
+See [testing approach](../../explanation/testing.md) for layering and end-to-end test strategy.
 
-Keep the version graph (domain) free of framework imports. Then tests build the
-graph **without** a server, an adapter, or a collector:
+## Verify
 
-```python
-manager = build_manager(settings)   # no FastMCP, no OpenTelemetry
-for hop in walk_topology(manager, kind, versions):
-    ...
-```
+Run the topology and round-trip assertions in the examples above.
 
-Define the round-trip helper **locally in the test module** — it is a few lines
-and has a single caller, so a separate module would be over-abstraction.
+## Troubleshooting
 
-Framework wiring (servers, tracing) lives behind adapters and is exercised by
-its own thin suite. Dependency injection keeps the graph construction testable:
-wire the version graph as a provider and override it in tests. See
-`showcases/fastmcp/` in the repository for a worked layered example with
-`dependency-injector`.
-
-### Prefer end-to-end over internal reassembly
-
-Build the application through its **composition root** and drive it through
-public interfaces only — the server (`server.call_tool`) and the manager
-(`manager.runner().run`). A test that reassembles internal wiring couples itself to
-the implementation and breaks on every refactor; a test that calls the public
-surface survives it.
-
-```python
-@pytest.fixture
-async def app(container):
-    return await resolve_prepared(container)   # the real lifecycle, once
-
-async def test_call_any_version_converges(app):
-    for version in ALL_VERSIONS:               # public call surface
-        result = await app.server.call_tool(
-            kind, {"city": "Berlin", "version": version}
-        )
-        assert result.structured_content == expected_anchor_shape
-```
-
-Reserve unit-style tests for pure layers (the domain graph), and keep the
-end-to-end suite small: one convergence suite plus the topology round trip is
-usually enough.
+- Version mismatch: target model differs from the asserted model.
+- Nested entry missing: register the child kind in the same manager.
 
 ## See also
 
-- [Execution Flow](../explanation/execution-flow.md) — discovery, ordering, and finalize.
-- [Migrations](../explanation/migrations.md) — reconstruct missing models or migrations.
-- [Telemetry & Hooks](telemetry.md) — observability for assertions.
+- [Execution Flow](../../explanation/execution-flow.md) — discovery, ordering, and finalize.
+- [Migrations](../../explanation/migrations.md) — reconstruct missing models or migrations.
+- [Telemetry & Hooks](instrument-migrations.md) — observability for assertions.

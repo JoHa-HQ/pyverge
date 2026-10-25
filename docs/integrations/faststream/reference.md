@@ -150,33 +150,9 @@ Convergence keys off the payload's own `(kind, version)`.
 - **Unparsable body** — the decoder raises, rather than passing the raw body to
   the handler.
 
-## Telemetry
-
-The adapter carries no tracing library and emits no spans. FastStream's own
-[OpenTelemetry](https://faststream.airt.ai/latest/getting-started/integrations/)
-middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
-spans **as current**, so each step nests under the consume span:
-
-```python
-from faststream.kafka.opentelemetry import KafkaTelemetryMiddleware
-from pyverge.adapters.otel import OTELHook
-
-broker.add_middleware(KafkaTelemetryMiddleware(tracer_provider=provider))
-manager.attach_hooks((OTELHook(tracer=provider.get_tracer("my-service")),))
-```
-
-See [Telemetry & Hooks](../how-to/telemetry.md) for the per-step `OTELHook`.
-
-## Testing
-
-Drive the adapter through FastStream's in-memory `TestKafkaBroker` — no broker
-container. See the worked
-[`showcases/faststream`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream)
-project (broker selection across Kafka/RabbitMQ/NATS/Redis, Jaeger + OTLP).
-
 ## See also
 
-- [Managers](../explanation/managers.md) — the bounded-context invariant the adapter relies on.
-- [Migrations](../explanation/migrations.md) — reconstructing missing models and migrations.
-- [Target Policy](target-policy.md) — `latest`/`earliest`/pinned/per-kind.
-- [Telemetry & Hooks](../how-to/telemetry.md) — per-step spans and call-level tracing.
+- [Managers](../../explanation/managers.md) — the bounded-context invariant the adapter relies on.
+- [Migrations](../../explanation/migrations.md) — reconstructing missing models and migrations.
+- [Target Policy](../../reference/target-policy.md) — `latest`/`earliest`/pinned/per-kind.
+- [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) — per-step spans and call-level tracing.

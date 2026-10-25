@@ -7,7 +7,8 @@ is assembled **last**, instantiating the manager and wiring the features.
 from __future__ import annotations
 
 from dependency_injector import containers, providers
-from pyverge.migration import MigrationSettings
+
+from pyverge.settings import MigrationSettings
 
 from .infra.resource import broker_resource, tracer_resource
 from .orders import OrdersFeature

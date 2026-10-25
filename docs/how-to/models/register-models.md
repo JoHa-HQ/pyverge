@@ -19,7 +19,7 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
     PydanticModelAdapter(),
@@ -130,7 +130,13 @@ assert manager.get("User", "1.0.0") is not None
 assert manager.get("User", "2.0.0") is not None
 ```
 
+## Troubleshooting
+
+- Duplicate model registration: use `reconcile_model` or register once.
+- Runtime instance missing models: register on the class before instantiating.
+- Conflicting class/instance graphs: pass `engine=manager.engine` for instance-local registration.
+
 ## See also
 
-- [Managers](../explanation/managers.md) — bounded-context ownership.
-- [Author migrations](author-migrations.md) — migration totality and reverse edges.
+- [Managers](../../explanation/managers.md) — bounded-context ownership.
+- [Author migrations](../migrations/author-migrations.md) — migration totality and reverse edges.

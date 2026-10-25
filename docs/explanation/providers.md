@@ -20,18 +20,18 @@ satisfy the aggregate `ModelAdapter`.
 
 ## Container checks
 
-Container handling has two separate predicates:
+Container handling has two modes:
 
 ```python
 adapter.can_handle(container)
-adapter.supports_fields(container, fields=frozenset({"name", "age"}))
+adapter.can_handle(container, fields=frozenset({"name", "age"}))
 ```
 
-- `can_handle` answers: is this a container type this provider understands?
-- `supports_fields` answers: can this container represent every migrated field?
+- `can_handle(container)` answers: is this a container type this provider understands?
+- `can_handle(container, fields=...)` asks whether the container can represent every migrated field.
 
-The walker uses `can_handle`. The execution compatibility gate uses
-`supports_fields`.
+The extractor uses the first form. The execution compatibility gate uses the
+field-aware form.
 
 ## Field surface
 
@@ -58,7 +58,7 @@ shared base supplies version parsing, property handling, `fields`, and the
 default `can_handle -> identify` relationship.
 
 ```python
-from pyverge.providers.base import AbstractModelAdapter
+from pyverge.schemas.base import AbstractModelAdapter
 
 
 class MyModelAdapter(AbstractModelAdapter):
@@ -71,13 +71,39 @@ class MyModelAdapter(AbstractModelAdapter):
     def kind(self, model_cls):
         ...
 
-    def can_handle(self, container):
-        ...
-
-    def supports_fields(self, container, *, fields):
+    def can_handle(self, container, *, fields=None):
         ...
 ```
 
 Provider adapters must not import the engine, registry, or manager. The
 manager resolves a `MigrationSpec` to a `MigrationFunc`; the adapter never
 registers migrations itself.
+
+## Date versioning
+
+Versions can also be ISO calendar dates instead of semver. Use
+`pendulum.Date` as the version strategy:
+
+```python
+import pendulum
+from typing import Literal
+
+from pyverge import Manager
+from pyverge.schemas import PydanticModelAdapter
+
+UserManager = Manager[pendulum.Date].configure(
+    PydanticModelAdapter(),
+)
+
+
+@UserManager.model()
+class UserV20250310(BaseModel):
+    kind: Literal["User"] = "User"
+    version: Literal["2025-03-10"] = "2025-03-10"
+    name: str
+    email: str
+```
+
+The engine orders date versions chronologically and migrates across them the
+same way as semver. Version strings are parsed by the adapter, which
+understands both formats.

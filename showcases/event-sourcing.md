@@ -33,8 +33,8 @@ event-sourcing literature.
 ## Per-consumer / per-topic policies
 
 The same event kind may be consumed by different services at different target
-versions. Each consumer holds its own `target` policy and passes it to the
-shared manager through `migrate(..., target=...)`.
+versions. Each consumer holds its own `target` policy and passes it to its
+`runner.run(event, target)`.
 
 ## All-or-nothing per entry
 
@@ -51,16 +51,9 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
-OrderManager = Manager[semver.Version].configure(
-    MigrationSettings(
-        direction="forward",
-        on_missing_path="raise",
-        on_direction_violation="raise",
-    ),
-    PydanticModelAdapter(),
-)
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter())
 
 
 @OrderManager.model()
@@ -102,11 +95,15 @@ def add_items(data: dict, context=None) -> dict:
 
 class OrderConsumer:
     def __init__(self, manager, target_version: str) -> None:
-        self._manager = manager
+        self._runner = manager.runner(
+            direction="forward",
+            on_missing_path="raise",
+            on_direction_violation="raise",
+        )
         self._target = {"Order": target_version}
 
     def handle(self, event: dict) -> dict:
-        return self._manager.migrate(event, target=self._target)
+        return self._runner.run(event, self._target)
 
 
 consumer = OrderConsumer(OrderManager(), "3.0.0")
@@ -120,8 +117,8 @@ assert migrated["items"] == []
 
 ### Abstractions used
 
-- **Manager** — high-level facade; registers models and migrations with
-  decorators, and converges events with `migrate(event, target=...)`.
+- **Manager and runner** — the manager registers models and migrations with
+  decorators; the runner converges events with `run(event, target)`.
 - **`@OrderManager.model()` / `@OrderManager.migration(...)`** — declarative
   registration at class level.
 - **Per-consumer target** — `{"Order": "3.0.0"}` pins a consumer to a specific

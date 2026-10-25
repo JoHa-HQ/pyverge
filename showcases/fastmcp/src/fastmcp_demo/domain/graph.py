@@ -19,9 +19,9 @@ kind the tool embeds::
 from __future__ import annotations
 
 import semver
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 from pyverge import Manager
+from pyverge.schemas import PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 from ..settings import GraphSettings
@@ -66,11 +66,11 @@ def build_manager(graph: GraphSettings) -> Manager[semver.Version]:
     anchor as the forward edge is registered.
     """
     ToolManager = Manager[semver.Version].configure(
-        MigrationSettings(direction="any", on_missing="reconstruct_model"),
         PydanticModelAdapter(
             version_property=graph.version_property,
             kind_property=graph.kind_property,
         ),
+        on_missing="reconstruct_model",
     )
     manager = ToolManager()  # ty: ignore[invalid-argument-type]
     for anchor in ANCHOR_MODELS:

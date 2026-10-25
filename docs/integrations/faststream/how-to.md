@@ -4,6 +4,13 @@
 > and migrations before constructing the runtime manager. See the
 > [upgrade guide](../../reference/upgrades.md).
 
+## Prerequisites
+
+- Installed FastStream adapter.
+- Registered models and migrations on the manager class.
+
+## Steps
+
 ## End-to-end example
 
 ```python
@@ -21,7 +28,7 @@ from pyverge.adapters.faststream import (
     publisher,
     subscriber,
 )
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 
@@ -101,9 +108,42 @@ asyncio.run(main())
 
 The `TypedDict`s are a documentation/IDE aid; migrations still receive and return
 plain dicts at runtime. See
-[Migrations → Type the payload shapes](../author-migrations.md#type-the-payload-shapes).
+[Migrations → Type the payload shapes](../../explanation/migration-authoring.md#type-the-payload-shapes).
+
+### Telemetry
+
+The adapter carries no tracing library and emits no spans. FastStream's own
+[OpenTelemetryhttps://faststream.airt.ai/latest/getting-started/integrations/
+middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
+spans **as current**, so each step nests under the consume span:
+
+```python
+from faststream.kafka.opentelemetry import KafkaTelemetryMiddleware
+from pyverge.execution import OTELHook
+
+broker.add_middleware(KafkaTelemetryMiddleware(tracer_provider=provider))
+manager.attach_hooks((OTELHook(tracer=provider.get_tracer("my-service")),))
+```
+
+See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the per-step `OTELHook`.
+
+### Testing
+
+Drive the adapter through FastStream's in-memory `TestKafkaBroker` — no broker
+container. See the worked
+[`showcases/faststream`https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream
+project (broker selection across Kafka/RabbitMQ/NATS/Redis, Jaeger + OTLP).
+
+## Verify
+
+Publish through `TestKafkaBroker` and assert the handler received the target shape.
+
+## Troubleshooting
+
+- Handler receives old version: runtime manager copy predates registration.
+- Import error: install `pyverge[faststream]`.
 
 ## See also
 
-- [FastStream integration model](../../explanation/faststream.md)
-- [FastStream reference](../../reference/faststream.md)
+- [FastStream integration model](index.md)
+- [FastStream reference](reference.md)

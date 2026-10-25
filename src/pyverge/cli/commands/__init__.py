@@ -1,3 +1,4 @@
+from .benchmark import benchmark
 from .check import check
 from .compat import compat
 from .diff import diff
@@ -11,6 +12,7 @@ from .migrate import migrate
 from .validate import validate
 
 __all__ = [
+    "benchmark",
     "check",
     "compat",
     "diff",

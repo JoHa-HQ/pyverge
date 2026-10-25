@@ -4,10 +4,11 @@ from typing import Literal, TypedDict, cast
 
 import semver
 from pydantic import BaseModel, Field
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 from pyverge import Manager
 from pyverge.core.context import MigrationContext
+from pyverge.schemas import PydanticModelAdapter
+from pyverge.settings import MigrationSettings, manager_kwargs
 
 
 class OrderData(TypedDict):
@@ -64,11 +65,11 @@ def configure_manager(
 ) -> type[Manager[semver.Version]]:
     """Return the configured manager class; assembly instantiates it."""
     return Manager[semver.Version].configure(
-        settings,
         PydanticModelAdapter(
             version_property=settings.version_property,
             kind_property=settings.kind_property,
         ),
+        **manager_kwargs(settings),
     )
 
 

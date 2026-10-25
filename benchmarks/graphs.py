@@ -10,7 +10,7 @@ import semver
 
 from pyverge import Manager
 from pyverge.core import MigrationContext
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 from tests.examples.pydantic.semver import (
     UserV1,

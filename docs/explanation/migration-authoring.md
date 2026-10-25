@@ -1,8 +1,6 @@
-# Author migrations
+# Migration authoring
 
-## Authoring guidelines
-
-### Migrations must be total
+## Migrations must be total
 
 A migration for an edge **must map every valid source instance to a valid target
 instance**. The engine validates the migrated payload against the target model
@@ -30,7 +28,7 @@ def migrate_v2_to_v3(data: dict, context=None) -> dict:
 A `ValidationError` from the **target** model during `migrate` is a symptom of a
 non-total edge — fix the migration or the source model, don't widen the target.
 
-### Type the payload shapes
+## Type the payload shapes
 
 Migrations receive and return plain dicts, but each version has a precise shape.
 Document it with `TypedDict`: static-only, no runtime cost, and it keeps the
@@ -68,7 +66,7 @@ def add_age(data: UserV1Data, context=None) -> UserV2Data:
   `TypedDict` (for example, when the `Literal` version changes); add a narrow
   `cast` or a targeted ignore where the transform is exact.
 
-### Guard totality with a property test
+## Guard totality with a property test
 
 Generate source instances and assert the edge succeeds. This catches tightened
 constraints, required fields the migration forgot, and value remaps that miss a
@@ -81,28 +79,3 @@ from hypothesis import given, strategies as st
 def test_v2_to_v3_is_total(v2):
     manager.runner().run(v2.model_dump(), target="3.0.0")
 ```
-
-## Backward migration
-
-Backward migration across a chain works by registering a reverse edge with
-`from`/`to` swapped and its own ops:
-
-```python
-# Forward edge: 0.1.0 -> 0.2.0
-UserManager.store_migration(
-    ManagerMigrationKey("User", "0.1.0", "0.2.0"), forward_ops
-)
-
-# Reverse edge: 0.2.0 -> 0.1.0 (swapped spec, own ops)
-UserManager.store_migration(
-    ManagerMigrationKey("User", "0.2.0", "0.1.0"), reverse_ops
-)
-```
-
-Without a registered reverse edge, a backward migration raises.
-
-## See also
-
-- [Migrate missing models and migrations](migrations.md)
-- [Migration strategies](../explanation/migrations.md)
-- [Migration format reference](../reference/migration-formats.md)
