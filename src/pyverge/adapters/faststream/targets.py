@@ -1,9 +1,3 @@
-"""FastStream target selectors: headers, topics, and defaults.
-
-Transport logic lives with the FastStream adapter. A selector returns ``None``
-when it does not apply; ``FirstMatch`` composes selectors in precedence order.
-"""
-
 from __future__ import annotations
 
 from pyverge.manager.types import TargetPolicy
@@ -16,14 +10,11 @@ from .types import (
     TopicTargets,
 )
 
-DEFAULT_TARGET = "latest"
-DEFAULT_VERSION_HEADER = "accept-version"
-
 
 class HeaderTarget:
     """Select the target from a message header, when present."""
 
-    def __init__(self, header: str = DEFAULT_VERSION_HEADER) -> None:
+    def __init__(self, header: str) -> None:
         self._header = header
         self._parser = HeaderParser()
 
@@ -47,7 +38,7 @@ class TopicTarget:
 class DefaultTarget:
     """Always select the fallback target."""
 
-    def __init__(self, target: TargetPolicy = DEFAULT_TARGET) -> None:
+    def __init__(self, target: TargetPolicy) -> None:
         self._target = target
 
     def select(self, context: TargetContext) -> TargetPolicy | None:
@@ -65,14 +56,15 @@ class FirstMatch:
         cls,
         topics: tuple[str, ...],
         targets: TargetPolicy | TopicTargets,
+        *,
+        default_target: TargetPolicy,
         header: str | None = None,
     ) -> FirstMatch:
-        """Build the standard chain: header -> topic -> latest."""
         head = (HeaderTarget(header),) if header is not None else ()
         return cls(
             *head,
             TopicTarget(TopicTargets.coerce(targets, topics)),
-            DefaultTarget(),
+            DefaultTarget(default_target),
         )
 
     def select(self, context: TargetContext) -> TargetPolicy | None:
@@ -84,8 +76,6 @@ class FirstMatch:
 
 
 __all__ = [
-    "DEFAULT_TARGET",
-    "DEFAULT_VERSION_HEADER",
     "DefaultTarget",
     "FirstMatch",
     "HeaderTarget",

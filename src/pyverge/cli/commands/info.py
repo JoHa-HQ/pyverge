@@ -1,5 +1,3 @@
-"""Show registered models for a manager."""
-
 from __future__ import annotations
 
 from typing import Annotated
@@ -14,7 +12,6 @@ def info(
         str, typer.Argument(..., help="Manager import path (module:object_path)")
     ],
 ) -> None:
-    """Show information about a specific manager."""
     try:
         mgr = resolve_manager(manager)
 

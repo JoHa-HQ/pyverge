@@ -1,0 +1,104 @@
+# serializer version: 1
+# name: test_manifest_uses_explicit_spec_and_injected_hasher[json_chrono]
+  dict({
+    'graph': dict({
+      'directed': True,
+      'edges': list([
+      ]),
+      'id': 'custom-id',
+      'label': 'custom label',
+      'metadata': dict({
+        'content_hash': 'fixed-hash',
+        'generated_at': '2024-01-02T03:04:05+00:00',
+        'manager': 'tests',
+        'manifest_version': '1.0',
+        'pyverge_version': '0.0-test',
+      }),
+      'nodes': dict({
+        'User@2025-01-01': dict({
+          'label': 'User@2025-01-01',
+          'metadata': dict({
+            'fields': list([
+              'name',
+            ]),
+            'kind': 'User',
+            'model': 'builtins.Model',
+            'references': list([
+            ]),
+            'schema_hash': 'fixed-hash',
+            'version': '2025-01-01',
+          }),
+        }),
+        'User@2025-03-10': dict({
+          'label': 'User@2025-03-10',
+          'metadata': dict({
+            'fields': list([
+              'name',
+            ]),
+            'kind': 'User',
+            'model': 'builtins.Model',
+            'references': list([
+            ]),
+            'schema_hash': 'fixed-hash',
+            'version': '2025-03-10',
+          }),
+        }),
+      }),
+      'type': 'directed',
+    }),
+  })
+# ---
+# name: test_manifest_uses_explicit_spec_and_injected_hasher[semver]
+  dict({
+    'graph': dict({
+      'directed': True,
+      'edges': list([
+      ]),
+      'id': 'custom-id',
+      'label': 'custom label',
+      'metadata': dict({
+        'content_hash': 'fixed-hash',
+        'generated_at': '2024-01-02T03:04:05+00:00',
+        'manager': 'tests',
+        'manifest_version': '1.0',
+        'pyverge_version': '0.0-test',
+      }),
+      'nodes': dict({
+        'User@1.0.0': dict({
+          'label': 'User@1.0.0',
+          'metadata': dict({
+            'fields': list([
+              'email',
+              'name',
+              'role',
+            ]),
+            'kind': 'User',
+            'model': 'tests.examples.pydantic.semver.UserV1',
+            'references': list([
+            ]),
+            'schema_hash': 'fixed-hash',
+            'version': '1.0.0',
+          }),
+        }),
+        'User@2.0.0': dict({
+          'label': 'User@2.0.0',
+          'metadata': dict({
+            'fields': list([
+              'age',
+              'email',
+              'name',
+              'role',
+            ]),
+            'kind': 'User',
+            'model': 'tests.examples.pydantic.semver.UserV2',
+            'references': list([
+            ]),
+            'schema_hash': 'fixed-hash',
+            'version': '2.0.0',
+          }),
+        }),
+      }),
+      'type': 'directed',
+    }),
+  })
+# ---

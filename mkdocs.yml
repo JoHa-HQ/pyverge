@@ -10,27 +10,60 @@ theme:
   features:
     - navigation.sections
     - navigation.expand
+    - navigation.indexes
+    - navigation.top
     - search.highlight
 
 nav:
-  - Home: getting-started.md
-  - Concepts: concepts.md
-  - Managers: managers.md
-  - Providers: providers.md
-  - Migrations: migration.md
-  - Migration Formats: migration-formats.md
-  - Runtime & Execution: runtime.md
-  - Execution Flow: execution-flow.md
-  - Target Policy: target-policy.md
-  - Compatibility: compatibility.md
-  - Telemetry & Hooks: telemetry.md
-  - CLI Reference: cli.md
-  - FastMCP Integration: fastmcp.md
-  - FastStream Integration: faststream.md
-  - Testing: testing.md
-  - Benchmarking: benchmarking.md
-  - Common Usage Patterns: usage.md
-  - Scenarios: scenarios.md
+  - Home: index.md
+  - Tutorials:
+      - tutorials/index.md
+      - Getting started: tutorials/getting-started.md
+      - Executable quickstart: examples/quickstart.md
+  - How-to:
+      - how-to/index.md
+      - Register models and migrations: how-to/register-models.md
+      - Author migrations: how-to/author-migrations.md
+      - Migrate missing models and migrations: how-to/migrations.md
+      - Test migrations: how-to/testing.md
+      - Telemetry and hooks: how-to/telemetry.md
+      - Benchmark adapters: how-to/benchmarking.md
+      - Integrations:
+          - FastMCP: how-to/integrations/fastmcp.md
+          - FastStream: how-to/integrations/faststream.md
+  - Reference:
+      - reference/index.md
+      - API reference: reference/api.md
+      - Manager: reference/manager.md
+      - Runtime and execution: reference/runtime.md
+      - Migration formats: reference/migration-formats.md
+      - Target policy: reference/target-policy.md
+      - Compatibility: reference/compatibility.md
+      - Upgrade guide: reference/upgrades.md
+      - CLI: reference/cli.md
+      - FastMCP: reference/fastmcp.md
+      - FastStream: reference/faststream.md
+  - Explanation:
+      - explanation/index.md
+      - Concepts: explanation/concepts.md
+      - Glossary: explanation/glossary.md
+      - Managers: explanation/managers.md
+      - Providers: explanation/providers.md
+      - Migration strategies: explanation/migrations.md
+      - Execution flow: explanation/execution-flow.md
+      - Scenarios: explanation/scenarios.md
+      - FastMCP: explanation/fastmcp.md
+      - FastStream: explanation/faststream.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: false
+            show_root_heading: true
+            members_order: source
 
 markdown_extensions:
   - pymdownx.highlight

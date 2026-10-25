@@ -15,9 +15,10 @@ from fastmcp import Client, FastMCP
 from pydantic import create_model
 
 from pyverge import Manager
-from pyverge.adapters.fastmcp import ToolDiscovery, ToolReflection
-from pyverge.core import MissingReferenceError, ModelConflictError
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
+from pyverge.adapters.fastmcp import FastMCPDiscovery, ToolReflection
+from pyverge.providers import PydanticModelAdapter
+from pyverge.registry.errors import MissingReferenceError, ModelConflictError
+from pyverge.settings import MigrationSettings, manager_kwargs
 from tests.examples.pydantic.semver_nested import (
     AddressV1,
     AddressV2,
@@ -33,9 +34,9 @@ from tests.examples.pydantic.semver_nested import (
 )
 
 
-async def _run_lifecycle(discovery: ToolDiscovery, server: FastMCP) -> None:
+async def _run_lifecycle(discovery: FastMCPDiscovery, server: FastMCP) -> None:
     await discovery.search(server)
-    discovery.register()
+    await discovery.register(server)
     await discovery.enrich(server)
 
 
@@ -51,7 +52,8 @@ class TestUnregisteredReference:
         the discovery lifecycle instead of silently serving stale children.
         """
         manager = Manager[semver.Version].configure(
-            MigrationSettings(on_missing="reconstruct_model"), pydantic_model_adapter
+            pydantic_model_adapter,
+            **manager_kwargs(MigrationSettings(on_missing="reconstruct_model")),
         )()
         location = create_model(
             "Location", kind=(str, "location"), version=(str, "1.0.0"), city=(str, ...)
@@ -70,7 +72,7 @@ class TestUnregisteredReference:
         def search_weather(location: dict) -> dict:
             return {"location": location}
 
-        discovery = ToolDiscovery(
+        discovery = FastMCPDiscovery(
             manager,
             [ToolReflection(manager.adapter)],
             policies={"search_weather": "latest"},
@@ -91,7 +93,8 @@ class TestSchemaConflict:
         primitive so the operator can see which entity drifted.
         """
         manager = Manager[semver.Version].configure(
-            MigrationSettings(), pydantic_model_adapter
+            pydantic_model_adapter,
+            **manager_kwargs(MigrationSettings()),
         )()
         registered = create_model(
             "SearchWeather",
@@ -107,7 +110,7 @@ class TestSchemaConflict:
         def search_weather(city: str, units: str = "celsius") -> dict:
             return {"city": city, "units": units}
 
-        discovery = ToolDiscovery(
+        discovery = FastMCPDiscovery(
             manager,
             [ToolReflection(manager.adapter)],
             policies={"search_weather": "latest"},
@@ -155,12 +158,12 @@ async def test_per_kind_policy_drives_nested_convergence(manager) -> None:
     downgrades while the outer payload converges forward.
     """
     instance = manager()
-    discovery = ToolDiscovery(instance, [ToolReflection(instance.adapter)])
+    discovery = FastMCPDiscovery(instance, [ToolReflection(instance.adapter)])
 
     @asynccontextmanager
     async def app_lifespan(server: FastMCP):
         await discovery.search(server)
-        discovery.register()
+        await discovery.register(server)
         await discovery.enrich(server)
         yield {}
 

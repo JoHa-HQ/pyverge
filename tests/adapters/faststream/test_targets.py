@@ -41,6 +41,7 @@ def test_header_overrides_topic_and_default() -> None:
     selector = FirstMatch.for_topics(
         ("users",),
         TopicTargets({"users": "2.0.0"}),
+        default_target="latest",
         header="Accept-Version",
     )
     context = TargetContext("users", {"accept-version": "1.0.0"})
@@ -51,6 +52,7 @@ def test_topic_overrides_default() -> None:
     selector = FirstMatch.for_topics(
         ("users",),
         TopicTargets({"users": "2.0.0"}),
+        default_target="latest",
     )
     assert selector.select(TargetContext("users", {})) == "2.0.0"
     assert selector.select(TargetContext("other", {})) == "latest"
@@ -65,4 +67,4 @@ def test_first_match_skips_missing_values() -> None:
 
 
 def test_header_target_ignores_absent_header() -> None:
-    assert HeaderTarget().select(TargetContext("users", {})) is None
+    assert HeaderTarget("Accept-Version").select(TargetContext("users", {})) is None

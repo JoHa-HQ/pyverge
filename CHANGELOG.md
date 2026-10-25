@@ -1,3 +1,9 @@
+## v0.14.0 (2026-10-25)
+
+### Feat
+
+- **#89**: decouple runtime from engine. unify execution and registration architecture. (#94)
+
 ## v0.13.0 (2026-10-22)
 
 ### Feat

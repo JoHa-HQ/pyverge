@@ -14,7 +14,6 @@ Fn = Callable[..., Any]
 
 
 def hide_injected(fn: Any, detector: InjectionDetector | None = None) -> set[str]:
-    """Strip injected (wired) parameters from *fn*'s reflected signature."""
     names = injected_names(fn, detector)
     if not names:
         return names
@@ -28,11 +27,6 @@ def hide_injected(fn: Any, detector: InjectionDetector | None = None) -> set[str
             name: ann for name, ann in annotations.items() if name not in names
         }
     return names
-
-
-def _build(fn: Fn, detector: InjectionDetector | None, factory: Fn, **kwargs: Any):
-    hide_injected(fn, detector)
-    return factory(fn, **kwargs)
 
 
 @overload
@@ -61,7 +55,6 @@ def tool(
     detector: InjectionDetector | None = None,
     **kwargs: Any,
 ) -> FunctionTool | Callable[[Fn], FunctionTool]:
-    """Build a ``FunctionTool`` with injected parameters hidden."""
     return _decorator(
         fn, FunctionTool.from_function, detector, name=name, version=version, **kwargs
     )
@@ -93,7 +86,6 @@ def prompt(
     detector: InjectionDetector | None = None,
     **kwargs: Any,
 ) -> FunctionPrompt | Callable[[Fn], FunctionPrompt]:
-    """Build a ``FunctionPrompt`` with injected parameters hidden."""
     return _decorator(
         fn, FunctionPrompt.from_function, detector, name=name, version=version, **kwargs
     )
@@ -128,7 +120,6 @@ def resource(
     detector: InjectionDetector | None = None,
     **kwargs: Any,
 ) -> FunctionResourceTemplate | Callable[[Fn], FunctionResourceTemplate]:
-    """Build a ``FunctionResourceTemplate`` with injected parameters hidden."""
     return _decorator(
         fn,
         FunctionResourceTemplate.from_function,
@@ -143,10 +134,10 @@ def resource(
 def _decorator(
     fn: Fn | None, factory: Fn, detector: InjectionDetector | None, **kwargs: Any
 ):
-    """Return the built component for *fn*, or the decorator when *fn* is ``None``."""
 
     def decorate(func: Fn):
-        return _build(func, detector, factory, **kwargs)
+        hide_injected(func, detector)
+        return factory(func, **kwargs)
 
     return decorate if fn is None else decorate(fn)
 

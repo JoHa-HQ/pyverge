@@ -1,19 +1,22 @@
-"""Migrate a payload file."""
-
 from __future__ import annotations
 
+import asyncio
 import json
+from functools import wraps
 from pathlib import Path
 from typing import Annotated
 
 import typer
+
+from pyverge.execution.backends import AsyncBackend
 
 from .._helpers import load_json_file, write_json_file
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption, dump_json
 
 
-def migrate(
+@lambda f: wraps(f)(lambda *a, **kw: asyncio.run(f(*a, **kw)))
+async def migrate(
     data: Annotated[Path, typer.Argument(help="Payload JSON file")],
     manager: ManagerOption,
     target: Annotated[
@@ -35,7 +38,6 @@ def migrate(
         bool, typer.Option("--check", help="Fail if migration does not converge")
     ] = False,
 ) -> None:
-    """Migrate a payload and optionally write the result."""
     if output is not None and in_place:
         typer.secho(
             "--output and --in-place are mutually exclusive", fg=typer.colors.RED
@@ -50,7 +52,15 @@ def migrate(
         elif context is not None:
             runtime_context = json.loads(context)
 
-        result = mgr.migrate(payload, target=target, context=runtime_context)
+        async with AsyncBackend(backend="asyncio", backend_options={}) as runtime:
+            runner = mgr.runner(runtime=runtime)
+            result = await runner.run(
+                payload,
+                target,
+                container=None,
+                max_depth=-1,
+                context=runtime_context,
+            )
 
         if check:
             raise typer.Exit(0)

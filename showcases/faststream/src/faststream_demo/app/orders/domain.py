@@ -4,10 +4,10 @@ from typing import Literal, TypedDict, cast
 
 import semver
 from pydantic import BaseModel, Field
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 from pyverge import Manager
 from pyverge.core.context import MigrationContext
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 
 class OrderData(TypedDict):

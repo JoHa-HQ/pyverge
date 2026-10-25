@@ -1,5 +1,3 @@
-"""Validate one or more payloads."""
-
 from __future__ import annotations
 
 import json
@@ -31,7 +29,6 @@ def validate(
         bool, typer.Option("--fail-fast", help="Stop on first failure")
     ] = False,
 ) -> None:
-    """Validate one or more payloads against a schema version."""
     try:
         mgr = resolve_manager(manager)
         paths: list[Path] = []

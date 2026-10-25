@@ -1,19 +1,2 @@
-from .migration import JsonPatchMigration
-from .patch import (
-    CoerceOperation,
-    JsonPatch,
-    MapOperation,
-    SetDefaultOperation,
-    SplitOperation,
-)
-from .pointer import Pointer
-
-__all__ = [
-    "CoerceOperation",
-    "JsonPatch",
-    "JsonPatchMigration",
-    "MapOperation",
-    "Pointer",
-    "SetDefaultOperation",
-    "SplitOperation",
-]
+from pyverge.migrations.json_patch import *  # noqa: F403
+from pyverge.migrations.json_patch import __all__ as __all__

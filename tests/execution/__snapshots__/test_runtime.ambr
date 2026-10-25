@@ -1,0 +1,25 @@
+# serializer version: 1
+# name: test_runner_migrates_with_target_container[runtime_backend0-PydanticModelAdapter-registry0]
+  dict({
+    'document': dict({
+      'age': None,
+      'email': 'a@b.c',
+      'kind': 'User',
+      'name': 'Alice',
+      'role': 'user',
+      'version': '2.0.0',
+    }),
+  })
+# ---
+# name: test_runner_plans_and_executes[runtime_backend0-PydanticModelAdapter-registry0]
+  dict({
+    'document': dict({
+      'age': None,
+      'email': 'a@b.c',
+      'kind': 'User',
+      'name': 'Alice',
+      'role': 'user',
+      'version': '2.0.0',
+    }),
+  })
+# ---

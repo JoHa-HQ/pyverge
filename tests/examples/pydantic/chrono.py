@@ -11,15 +11,13 @@ Benefits:
 - Defers instantiation until needed
 """
 
+from __future__ import annotations
+
 from enum import StrEnum
 from typing import Annotated, Literal
 
 from pyverge.core.context import MigrationContext
 from tests.examples.pydantic.base import BaseModel, Field, UserBaseModel
-
-# from pyverge.migration import MigrationSettings, ModelManager
-
-# ChronoManager = ModelManager[Date, MigrationSettings()]
 
 
 class Role(StrEnum):

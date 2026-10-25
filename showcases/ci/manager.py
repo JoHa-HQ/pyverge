@@ -5,9 +5,9 @@ from __future__ import annotations
 import semver
 from migrations import migrate_address, migrate_person
 from models import AddressV1, AddressV2, PersonV1, PersonV2
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 PersonManager = Manager[semver.Version].configure(
     MigrationSettings(),

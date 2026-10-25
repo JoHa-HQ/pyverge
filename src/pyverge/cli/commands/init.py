@@ -1,5 +1,3 @@
-"""Scaffold a project."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,7 +22,6 @@ def init(
         bool, typer.Option("--multiple", help="Scaffold multi-manager config")
     ] = False,
 ) -> None:
-    """Scaffold models and manager configuration."""
     try:
         path.mkdir(parents=True, exist_ok=True)
         create_example_models_file(path / "models.py")

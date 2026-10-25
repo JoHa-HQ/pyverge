@@ -1,63 +1,75 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, ClassVar, Literal, Protocol, Self, TypeAlias
+from dataclasses import dataclass
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Generic,
+    Protocol,
+    Self,
+    TypeAlias,
+    runtime_checkable,
+)
 
 from pyverge.core.types import (
-    DirectionViolationStrategy,
     ManagerMigrationKey,
-    MigrationDirectionStrategy,
     MigrationFunc,
-    ModelData,
     ModelHandle,
-    ModelKind,
     ModelPair,
     TargetResolver,
-    Versionable,
-    VersionMissingStrategy,
     VersionValue,
-    VersionValue_co,
 )
-from pyverge.providers.types import (
+from pyverge.execution.targets import (
+    TargetPolicy as TargetPolicy,  # noqa: PLC0414
+)
+from pyverge.execution.targets import (
+    TargetSpec as TargetSpec,  # noqa: PLC0414
+)
+from pyverge.execution.targets import (
+    TargetStrategy as TargetStrategy,  # noqa: PLC0414
+)
+from pyverge.schemas.types import (
     ModelAdapter,
-    TContainer,
 )
+from pyverge.versioning import Versionable
 
 if TYPE_CHECKING:
-    from pyverge.core.settings import MigrationSettings
     from pyverge.core.types import (
         Attachable,
     )
-    from pyverge.executor import (
-        AsyncExecutor,
-        Executor,
-        MigrationEntry,
-        MigrationRun,
+    from pyverge.discovery import SourcePort
+    from pyverge.discovery.reflection import DiffProvider
+    from pyverge.discovery.types import (
+        ReflectionReport,
+        RegistrationContext,
     )
-    from pyverge.migration.engine import Engine
-    from pyverge.migration.registry import Registry
-    from pyverge.migration.types import (
-        Walker,
-    )
-    from pyverge.providers.json_patch import JsonPatchMigration
-    from pyverge.providers.jsonata import JsonataMigration
+    from pyverge.engine import Engine
+    from pyverge.execution.types import EntryExtractor
+    from pyverge.migrations.identity import MigrationIdentityResolver
+    from pyverge.migrations.json_patch import JsonPatchMigration
+    from pyverge.migrations.jsonata import JsonataMigration
+    from pyverge.registry import Registry
+    from pyverge.versioning import ContentHasher, DiffMaterializer
 
-TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]
-
-TargetSpec: TypeAlias = (
-    Versionable[VersionValue_co] | type[ModelHandle] | TargetStrategy | str | None
-)
-TargetPolicy: TypeAlias = (
-    TargetSpec
-    | dict[ModelKind | Literal["*"], TargetSpec]
-    | TargetResolver[VersionValue_co]
-)
 
 #: A callable that binds a registry to a :data:`TargetResolver`; the shape of
-#: the ``*_target_resolver`` factories in :mod:`pyverge.migration.policy`.
+#: the ``*_target_resolver`` factories in :mod:`pyverge.execution.targets`.
 ResolverFactory: TypeAlias = Callable[
     ["Registry[VersionValue]"], TargetResolver[VersionValue]
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class ManagerConfig(Generic[VersionValue]):
+    engine: Engine[VersionValue] | None = None
+    walker: EntryExtractor | None = None
+    hasher: ContentHasher | None = None
+    identity_resolver: MigrationIdentityResolver | None = None
+    model_materializer: DiffMaterializer[object] | None = None
+    migration_materializer: DiffMaterializer[object] | None = None
+    diff_provider: DiffProvider[VersionValue] | None = None
+    on_missing: str = "raise"
 
 
 class ManagerClassState(Protocol[VersionValue]):
@@ -68,20 +80,17 @@ class ManagerClassState(Protocol[VersionValue]):
     """
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
-    _default_settings: ClassVar[MigrationSettings]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+    _reflection_locked: ClassVar[bool]
 
     @classmethod
     def configure(
         cls,
-        settings: MigrationSettings,
         adapter: ModelAdapter,
         *,
-        engine: Engine[VersionValue] | None = None,
-        walker: Walker | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
+        config: ManagerConfig[VersionValue] | None = None,
+        **options: object,
     ) -> type[Self]: ...
 
     @classmethod
@@ -100,6 +109,7 @@ class ManagerClassState(Protocol[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
+        migration_id: str | None = None,
     ) -> MigrationFunc: ...
 
     @classmethod
@@ -121,37 +131,17 @@ class ManagerInstanceState(Protocol[VersionValue]):
     def registry(self) -> Registry[VersionValue]: ...
 
     @property
-    def settings(self) -> MigrationSettings | None: ...
-
-    @property
     def adapter(self) -> ModelAdapter: ...
 
-    def delegate(
-        self,
-        data: ModelData,
-        target: TargetPolicy = "latest",
-        *,
-        container: type[TContainer] | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-    ) -> MigrationRun[VersionValue]: ...
 
-    def prepare(
-        self,
-        data: ModelData,
-        target: TargetPolicy = "latest",
+@runtime_checkable
+class Reflectable(Protocol):
+    """Build-time source reflection surface."""
+
+    @classmethod
+    def reflect(
+        cls,
+        source: SourcePort,
         *,
-        container: type[TContainer] | None = None,
-        version_property: str | None = None,
-        depth_limit: int | None = None,
-        direction: MigrationDirectionStrategy | None = None,
-        on_direction_violation: DirectionViolationStrategy | None = None,
-        on_version_not_found: VersionMissingStrategy | None = None,
-        executor: Executor | AsyncExecutor | None = None,
-        entry_migration: MigrationEntry[VersionValue] | None = None,
-    ) -> MigrationRun[VersionValue]: ...
+        context: RegistrationContext | None = None,
+    ) -> ReflectionReport: ...

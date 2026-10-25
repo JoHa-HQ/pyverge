@@ -21,17 +21,3 @@ uv run pytest benchmarks/ -o addopts="--benchmark-only --benchmark-compare"
 Each adapter suite pairs with a **baseline** (plain framework, no pyverge):
 `test_consume_with_pyverge` vs `test_consume_baseline`. The delta isolates the
 adapter from FastStream's own overhead.
-
-## Load
-
-```bash
-uv run python -m benchmarks.load_faststream
-```
-
-## Profiling
-
-```bash
-uv run py-spy record -o profile.svg -- python -m benchmarks.load_faststream
-uv run python -m cProfile -s cumtime benchmarks/load_faststream.py
-uv run memray run benchmarks/load_faststream.py && memray flamegraph memray-*.bin
-```
