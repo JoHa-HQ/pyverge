@@ -23,7 +23,7 @@ from pyverge.adapters.fastmcp import (
     ToolReflection,
     tool,
 )
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 

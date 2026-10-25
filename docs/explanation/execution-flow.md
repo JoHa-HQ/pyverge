@@ -84,51 +84,9 @@ The walker discovers every versioned entry at any depth. The graph builder
 orders them so children migrate before their parents: `Address` and `Contact`
 entries converge first, then the enclosing `Person`.
 
-## Migrating a nested payload
+## Execution
 
-A container model drives schema-guided discovery. Register the container and
-its versioned models, then migrate a nested payload:
-
-```python
-from pyverge import Manager
-from pyverge.providers import PydanticModelAdapter
-
-UserManager = Manager[semver.Version].configure(PydanticModelAdapter())
-
-# Register Person/Address models and migrations on UserManager before
-# constructing the runtime instance.
-manager = UserManager()
-
-migrated = manager.runner().run(
-    {
-        "document": {
-            "kind": "Person",
-            "version": "1.0.0",
-            "name": "Alice",
-            "address": {"kind": "Address", "version": "1.0.0", "street": "Main"},
-        }
-    },
-    "latest",
-    container=PersonContainer,
-)
-```
-
-The walker discovers `Address 1.0.0` and `Person 1.0.0`, converges the address
-first, then the person — so the parent migration never sees stale children.
-
-## Execution backends
-
-```python
-from pyverge.execution import AsyncBackend, ThreadedBackend
-
-runner = manager.runner(runtime=ThreadedBackend(max_workers=4))
-result = runner.run(payload, "latest")
-
-async_runner = manager.runner(
-    runtime=AsyncBackend(backend="asyncio", backend_options={}, max_workers=4)
-)
-result = await async_runner.run(payload, "latest")
-```
-
-The backend owns execution; the runner owns planning and materialization. Hooks
-wrap each migration step, and middleware wraps the backend execution seam.
+The backend owns execution; the runner owns planning and materialization.
+Hooks wrap each migration step, and middleware wraps the backend execution seam.
+See [Runtime reference](../reference/runtime.md) and
+[Run payloads](../how-to/run-payloads.md).

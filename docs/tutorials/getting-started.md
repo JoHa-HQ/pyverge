@@ -10,10 +10,10 @@ pyverge is a runtime schema-evolution engine that lets independently deployed pr
 
 ```bash
 # Core library
-pip install git+https://github.com/JoHa-HQ/pyverge.git
+pip install pyverge
 
 # With CLI
-pip install "git+https://github.com/JoHa-HQ/pyverge.git#egg=pyverge[cli]"
+pip install "pyverge[cli]"
 ```
 
 The engine is provider-agnostic and works on plain dicts. The examples below
@@ -29,9 +29,9 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
-# A manager binds a version strategy to an adapter and settings.
+# A manager binds a version strategy to an adapter.
 UserManager = Manager[semver.Version].configure(
     PydanticModelAdapter(),
 )
@@ -81,7 +81,7 @@ same `ModelAdapter` contract:
 
 ```python
 from pyverge import Manager
-from pyverge.providers import JsonSchemaModelAdapter
+from pyverge.schemas import JsonSchemaModelAdapter
 
 UserManager = Manager[semver.Version].configure(
     JsonSchemaModelAdapter(),
@@ -108,7 +108,7 @@ Python callable. `JsonPatchMigration` is a declarative spec whose `.transform`
 is the executable `JsonPatch` (`MigrationFunc`):
 
 ```python
-from pyverge.providers import JsonPatchMigration
+from pyverge.migrations import JsonPatchMigration
 
 migration = JsonPatchMigration(
     {
@@ -136,7 +136,7 @@ import pendulum
 from typing import Literal
 
 from pyverge import Manager
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
 UserManager = Manager[pendulum.Date].configure(
     PydanticModelAdapter(),
@@ -158,7 +158,7 @@ understands both formats.
 ## Next steps
 
 - [Managers](../explanation/managers.md) — registration (decorator vs. lazy) and one complete version graph per manager.
-- [Common usage patterns](../reference/manager.md) — lookup, validation, diffing, hooks.
+- [Use the manager](../how-to/use-manager.md) — lookup, validation, diffing, hooks.
 - [Migrations](../explanation/migrations.md) — reconstruct missing models or migrations, and the mutually exclusive `on_missing` strategies.
 - [Target policy](../reference/target-policy.md) — declarative convergence rules.
 - [Execution flow](../explanation/execution-flow.md) — how the engine discovers, plans, and runs migrations.

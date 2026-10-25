@@ -22,6 +22,9 @@ nav:
       - Executable quickstart: examples/quickstart.md
   - How-to:
       - how-to/index.md
+      - Use the manager: how-to/use-manager.md
+      - Run payloads: how-to/run-payloads.md
+      - Migrate nested payloads: how-to/migrate-nested-payloads.md
       - Register models and migrations: how-to/register-models.md
       - Author migrations: how-to/author-migrations.md
       - Migrate missing models and migrations: how-to/migrations.md
@@ -34,7 +37,7 @@ nav:
   - Reference:
       - reference/index.md
       - API reference: reference/api.md
-      - Manager: reference/manager.md
+      - Manager API: reference/manager.md
       - Runtime and execution: reference/runtime.md
       - Migration formats: reference/migration-formats.md
       - Target policy: reference/target-policy.md

@@ -19,7 +19,7 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
     PydanticModelAdapter(),

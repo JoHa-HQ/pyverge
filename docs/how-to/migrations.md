@@ -12,7 +12,7 @@ Enable the strategy in settings:
 
 ```python
 from pyverge import Manager
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(
     PydanticModelAdapter(),
@@ -106,7 +106,7 @@ strategies, so reconstruction works the same way regardless of format:
 
 ```python
 from pyverge.core import ManagerMigrationKey
-from pyverge.providers import JsonPatchMigration
+from pyverge.migrations import JsonPatchMigration
 
 # Declarative JSON Patch spec — preferred when no context is needed
 UserManager.store_migration(

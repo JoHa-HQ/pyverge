@@ -178,5 +178,7 @@ timeline.
 - [CLI reference](docs/reference/cli.md) · [Telemetry and hooks](docs/how-to/telemetry.md)
 - [FastMCP](docs/explanation/fastmcp.md) · [FastStream](docs/explanation/faststream.md)
 - [Testing](docs/how-to/testing.md) · [Benchmarking](docs/how-to/benchmarking.md)
-- [Manager reference](docs/reference/manager.md) · [Scenarios](docs/explanation/scenarios.md)
+- [Manager API](docs/reference/manager.md) · [Use the manager](docs/how-to/use-manager.md)
+- [Run payloads](docs/how-to/run-payloads.md) · [Migrate nested payloads](docs/how-to/migrate-nested-payloads.md)
+- [Scenarios](docs/explanation/scenarios.md)
 - [Showcases](showcases/README.md)

@@ -21,7 +21,7 @@ from pyverge.adapters.faststream import (
     publisher,
     subscriber,
 )
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 
