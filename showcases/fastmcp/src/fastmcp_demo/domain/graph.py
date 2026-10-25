@@ -19,9 +19,9 @@ kind the tool embeds::
 from __future__ import annotations
 
 import semver
+from pyverge.migration import MigrationSettings, PydanticModelAdapter
 
 from pyverge import Manager
-from pyverge.migration import MigrationSettings, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 from ..settings import GraphSettings
