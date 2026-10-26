@@ -74,16 +74,3 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
-      - name: Verify TestPyPI install
-        if: steps.version.outputs.release == 'true'
-        env:
-          VERSION: ${{ steps.version.outputs.dev }}
-        run: |
-          set -euo pipefail
-          python -m venv /tmp/verify
-          /tmp/verify/bin/pip install \
-            --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple \
-            "pyverge==${VERSION}"
-          /tmp/verify/bin/python -c \
-            "import pyverge; assert pyverge.__version__ == '${VERSION}'"

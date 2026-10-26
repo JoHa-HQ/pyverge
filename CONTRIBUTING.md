@@ -191,8 +191,7 @@ With the issue scope, the form is `type(#issue)!: description`, for example
 4. After approval, the workflow checks whether the commit is release-worthy.
    If it is not, the workflow stops without creating a tag or publishing.
 5. For a release-worthy commit, the workflow computes `X.Y.Z.devN`, pushes an
-   annotated dev tag, builds the artifact, publishes it to TestPyPI, verifies
-   the install, and updates the deployment record.
+   annotated dev tag, builds the artifact, and publishes it to TestPyPI.
 6. Dev releases do not modify `CHANGELOG.md`.
 7. If publishing fails, rerun the same workflow run. The dev tag is reused and
    TestPyPI publishing is idempotent.
