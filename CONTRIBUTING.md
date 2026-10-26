@@ -186,7 +186,7 @@ With the issue scope, the form is `type(#issue)!: description`, for example
 
 1. Merge a reviewed PR to `main`.
 2. CI must pass.
-3. The TestPyPI workflow requests approval from the `testpypi` environment.
+3. The `Publish Dev (TestPyPI)` workflow requests approval from the `testpypi` environment.
 4. After approval, the workflow computes the next dev version
    (`X.Y.Z.devN`), builds the artifact, publishes it to TestPyPI, updates the
    deployment record, verifies the install, and creates the dev tag.
@@ -195,10 +195,10 @@ With the issue scope, the form is `type(#issue)!: description`, for example
 ### Stable release promotion
 
 1. Choose a TestPyPI-validated dev tag.
-2. Run the promotion workflow with that dev tag.
+2. Run the `Promote Release` workflow with that dev tag.
 3. The promotion verifies the tag points to `main`, CI passed, and the matching
    TestPyPI version exists.
-4. The PyPI workflow requests approval from the `pypi` environment.
+4. `Promote Release` requests approval from the `pypi` environment.
 5. After approval, the workflow computes the stable version, prepares the
    release commit and changelog, builds the artifact, publishes it to PyPI,
    updates the deployment record, verifies the install, pushes the stable tag,
