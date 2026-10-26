@@ -35,7 +35,7 @@ from pyverge.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.settings import MigrationSettings
-from pyverge.versioning import EdgeKey, FieldDescriptor, VersionKey
+from pyverge.versioning import EdgeKey, FieldDescriptor, TypeRef, VersionKey
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -117,7 +117,7 @@ class TestModelManagement:
                 [semver.Version, "test", [UserV1], []],
                 lambda engine: engine.reconcile_model(
                     envelope_model(engine.adapter, None, UserV1).with_fields(
-                        FieldDescriptor(name="conflict")
+                        FieldDescriptor(name="conflict", type_ref=TypeRef.any())
                     )
                 ),
                 ModelConflictError,
@@ -128,7 +128,7 @@ class TestModelManagement:
                 [pendulum.Date, "test", [UserV20250310], []],
                 lambda engine: engine.reconcile_model(
                     envelope_model(engine.adapter, None, UserV20250310).with_fields(
-                        FieldDescriptor(name="conflict")
+                        FieldDescriptor(name="conflict", type_ref=TypeRef.any())
                     )
                 ),
                 ModelConflictError,
@@ -139,7 +139,7 @@ class TestModelManagement:
                 [semver.Version, "test", [USER_V0_1_1_DEV_7], []],
                 lambda engine: engine.reconcile_model(
                     envelope_model(engine.adapter, None, USER_V0_1_1_DEV_7).with_fields(
-                        FieldDescriptor(name="conflict")
+                        FieldDescriptor(name="conflict", type_ref=TypeRef.any())
                     )
                 ),
                 ModelConflictError,
@@ -184,7 +184,9 @@ class TestModelManagement:
     ) -> None:
         """A conflict exposes the diff and a resolution hint."""
         registered = envelope_model(model_adapter, migration_settings, model)
-        incoming = registered.with_fields(FieldDescriptor(name="extra_field"))
+        incoming = registered.with_fields(
+            FieldDescriptor(name="extra_field", type_ref=TypeRef.any())
+        )
         with pytest.raises(ModelConflictError) as raised:
             engine.reconcile_model(incoming)
         error = raised.value

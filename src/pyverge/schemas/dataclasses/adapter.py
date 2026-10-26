@@ -23,6 +23,7 @@ from pyverge.versioning import (
     Versionable,
     VersionKey,
     VersionNode,
+    default_canonicalizer,
 )
 
 _MAPPING_ARG_COUNT = 2
@@ -282,15 +283,16 @@ class DataclassModelAdapter(AbstractModelAdapter):
         descriptors = {
             field.name: FieldDescriptor(
                 name=field.name,
+                type_ref=self.type_ref(hints.get(field.name, field.type)),
                 annotation=hints.get(field.name, field.type),
                 required=(
                     field.default is dataclasses.MISSING
                     and field.default_factory is dataclasses.MISSING
                 ),
                 default=(
-                    field.default
+                    default_canonicalizer().encode(field.default)
                     if field.default is not dataclasses.MISSING
-                    else field.default_factory()
+                    else default_canonicalizer().encode(field.default_factory())
                     if field.default_factory is not dataclasses.MISSING
                     else NO_DEFAULT
                 ),
@@ -331,10 +333,12 @@ class DataclassModelAdapter(AbstractModelAdapter):
         version: str | None = None,
     ) -> VersionNode[VersionValue]:
         return VersionNode[VersionValue](
-            _model=model_cls,
-            _value=self.of(version or self.version(model_cls)),
-            _kind=kind or self.kind(model_cls),
+            key=VersionKey[VersionValue](
+                _value=self.of(version or self.version(model_cls)),
+                _kind=kind or self.kind(model_cls),
+            ),
             descriptor=self.model_descriptor(model_cls),
+            _model=model_cls,
         )
 
     def version_key(

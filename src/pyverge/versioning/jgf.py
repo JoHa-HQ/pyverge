@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .canonical import Addressable, ContentHasher
-from .graph import VersionEdge, VersionNode
+from .graph import VersionEdge, VersionKey, VersionNode
+from .schema import ModelDescriptor
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,18 +27,34 @@ class JgfNode:
 
     @classmethod
     def from_version(cls, node: VersionNode[Any], hasher: ContentHasher) -> JgfNode:
+        return cls.from_descriptor(node.key, node.descriptor, hasher)
+
+    @classmethod
+    def from_descriptor(
+        cls,
+        key: VersionKey[Any],
+        descriptor: ModelDescriptor,
+        hasher: ContentHasher,
+    ) -> JgfNode:
+        references = sorted(
+            f"{kind}@{version}" for kind, version in descriptor.references
+        )
+        content = {
+            "id": key.jgf_id,
+            "model": descriptor.ref.model_id,
+            "fields": sorted(descriptor.fields),
+            "references": references,
+        }
         return cls(
-            id=node.jgf_id,
-            label=node.jgf_id,
+            id=key.jgf_id,
+            label=key.jgf_id,
             metadata={
-                "kind": node.kind,
-                "version": str(node.version[1]),
-                "model": node.model_id,
-                "fields": sorted(node.fields),
-                "references": sorted(
-                    f"{kind}@{version}" for kind, version in node.references
-                ),
-                "schema_hash": node.content_hash(hasher),
+                "kind": key.kind,
+                "version": str(key.version[1]),
+                "model": descriptor.ref.model_id,
+                "fields": sorted(descriptor.fields),
+                "references": references,
+                "schema_hash": hasher.digest(content),
             },
         )
 

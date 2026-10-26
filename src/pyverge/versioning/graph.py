@@ -102,15 +102,32 @@ class VersionKey(Generic[VersionValue]):
 
 
 @dataclass(frozen=True, slots=True, eq=False)
-class VersionNode(VersionKey[VersionValue]):
+class VersionNode(Generic[VersionValue]):
     """A materialized model version that binds a serializable descriptor.
 
     The graph-facing surface lives in :class:`ModelDescriptor`; ``_model`` is
     an optional runtime handle kept only for in-process operations.
     """
 
+    key: VersionKey[VersionValue]
     descriptor: ModelDescriptor
     _model: ModelHandle | None = field(default=None, compare=False, repr=False)
+
+    @property
+    def strategy(self) -> type[VersionValue]:
+        return self.key.strategy
+
+    @property
+    def version(self) -> ModelVersionKey:
+        return self.key.version
+
+    @property
+    def kind(self) -> ModelKind:
+        return self.key.kind
+
+    @property
+    def jgf_id(self) -> str:
+        return self.key.jgf_id
 
     @property
     def model(self) -> ModelHandle:
@@ -131,12 +148,7 @@ class VersionNode(VersionKey[VersionValue]):
         return frozenset(self.descriptor.fields)
 
     def with_descriptor(self, descriptor: ModelDescriptor) -> Self:
-        return type(self)(
-            _value=self._value,
-            _kind=self._kind,
-            descriptor=descriptor,
-            _model=self._model,
-        )
+        return type(self)(key=self.key, descriptor=descriptor, _model=self._model)
 
     def with_fields(self, *fields: FieldDescriptor) -> Self:
         return self.with_descriptor(self.descriptor.with_fields(*fields))
@@ -174,12 +186,26 @@ class VersionNode(VersionKey[VersionValue]):
 
         return JgfNode.from_version(self, hasher)
 
+    def __lt__(self, other: object) -> bool:
+        return self.key < other
+
+    def __gt__(self, other: object) -> bool:
+        return self.key > other
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, VersionNode):
+            return self.key == other.key
+        return self.key == other
+
+    def __hash__(self) -> int:
+        return hash(self.key)
+
+    def __str__(self) -> str:
+        return self.jgf_id
+
     def __repr__(self) -> str:
         model = getattr(self._model, "__name__", "model")
-        return (
-            f"VersionNode[{self.strategy.__name__}, {model}]"
-            f"({self._value}, {self._kind})"
-        )
+        return f"VersionNode[{self.strategy.__name__}, {model}]({self.version})"
 
 
 @total_ordering
@@ -244,7 +270,7 @@ class MigrationIdentity:
 
 
 @dataclass(frozen=True, slots=True, eq=False)
-class VersionEdge(EdgeKey[VersionValue]):
+class VersionEdge(Generic[VersionValue]):
     """A directed migration edge connecting two materialized versions."""
 
     source: VersionNode[VersionValue]
@@ -252,6 +278,22 @@ class VersionEdge(EdgeKey[VersionValue]):
     diff: Diffable[VersionValue]
     func: MigrationFunc
     migration: MigrationIdentity
+
+    @property
+    def kind(self) -> ModelKind:
+        return self.source.kind
+
+    @property
+    def key(self) -> MigrationKey:
+        return (self.source, self.target)
+
+    @property
+    def edge(self) -> MigrationKey:
+        return (self.source, self.target)
+
+    @property
+    def jgf_id(self) -> str:
+        return f"{self.source.jgf_id}->{self.target.jgf_id}"
 
     def content_payload(self, hasher: ContentHasher) -> dict[str, object]:
         return {
@@ -287,6 +329,30 @@ class VersionEdge(EdgeKey[VersionValue]):
                 self.target,
                 f"Failed to apply migration {self}: {e}",
             ) from e
+
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, VersionEdge):
+            return self.edge < other.edge
+        if isinstance(other, EdgeKey):
+            return self.edge < other.edge
+        return NotImplemented
+
+    def __gt__(self, other: object) -> bool:
+        if isinstance(other, VersionEdge):
+            return self.edge > other.edge
+        if isinstance(other, EdgeKey):
+            return self.edge > other.edge
+        return NotImplemented
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, VersionEdge):
+            return self.edge == other.edge
+        if isinstance(other, EdgeKey):
+            return self.edge == other.edge
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.edge)
 
     def __str__(self) -> str:
         return self.jgf_id

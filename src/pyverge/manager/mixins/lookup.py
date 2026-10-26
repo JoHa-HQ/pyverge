@@ -17,6 +17,7 @@ from pyverge.versioning import (
     EdgeKey,
     Migratable,
     Transitional,
+    VersionEdge,
     VersionKey,
     VersionNode,
 )
@@ -92,7 +93,7 @@ class LookupMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> Any:
-        if isinstance(index, (Comparable, Transitional, EdgeKey)):
+        if isinstance(index, (Comparable, Transitional, EdgeKey, VersionEdge)):
             return index
         engine = engine or cls._default_engine
         raise CatalogError(

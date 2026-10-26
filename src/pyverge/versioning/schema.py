@@ -7,7 +7,6 @@ from typing import Any, Self, TypeAlias
 
 from pyverge.core.types import JsonValue, ModelVersionKey
 
-from .canonical import default_canonicalizer
 from .frozen import FrozenMap
 
 
@@ -23,6 +22,7 @@ class TypeKind(StrEnum):
     BYTES = "bytes"
     ARRAY = "array"
     OBJECT = "object"
+    MAP = "map"
     UNION = "union"
     LITERAL = "literal"
     MODEL = "model"
@@ -87,6 +87,10 @@ class TypeRef:
         return cls(TypeKind.OBJECT, fields=FrozenMap(fields))
 
     @classmethod
+    def mapping(cls, key: TypeRef, value: TypeRef) -> TypeRef:
+        return cls(TypeKind.MAP, args=(key, value))
+
+    @classmethod
     def union(cls, *args: TypeRef) -> TypeRef:
         return cls(TypeKind.UNION, args=tuple(args))
 
@@ -128,26 +132,25 @@ class FieldDescriptor:
     """Provider-neutral description of one model field."""
 
     name: str
-    annotation: Any = field(default=None, compare=False, repr=False)
+    type_ref: TypeRef
     required: bool = False
     default: DefaultValue = NO_DEFAULT
-    type_ref: TypeRef | None = None
     references: tuple[ModelVersionKey, ...] = ()
+    annotation: Any = field(default=None, compare=False, repr=False)
 
     def to_canonical(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "name": self.name,
             "required": self.required,
+            "type_ref": self.type_ref.to_canonical(),
         }
-        if self.type_ref is not None:
-            payload["type_ref"] = self.type_ref.to_canonical()
         if self.references:
             payload["references"] = [
                 {"kind": kind, "version": str(version)}
                 for kind, version in self.references
             ]
         if not isinstance(self.default, NoDefault):
-            payload["default"] = default_canonicalizer().encode(self.default)
+            payload["default"] = self.default
         return payload
 
 

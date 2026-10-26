@@ -1,8 +1,18 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
-from typing import Any, ClassVar, cast
+import types
+from collections.abc import Iterable, Mapping, Sequence
+from typing import (
+    Annotated,
+    Any,
+    ClassVar,
+    Literal,
+    Union,
+    cast,
+    get_args,
+    get_origin,
+)
 
 import pendulum
 from semver import Version
@@ -14,7 +24,23 @@ from pyverge.core.types import (
 )
 from pyverge.schemas.diff import FieldDescriptor
 from pyverge.schemas.errors import ProviderCapabilityError
-from pyverge.versioning import FrozenMap, ModelDescriptor, ModelRef
+from pyverge.versioning import (
+    FrozenMap,
+    ModelDescriptor,
+    ModelRef,
+    TypeKind,
+    TypeRef,
+)
+
+_TUPLE_ELLIPSIS_ARGS = 2
+
+_SIMPLE_TYPES: dict[Any, TypeKind] = {
+    bool: TypeKind.BOOLEAN,
+    int: TypeKind.INTEGER,
+    float: TypeKind.NUMBER,
+    str: TypeKind.STRING,
+    bytes: TypeKind.BYTES,
+}
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +80,45 @@ class AbstractModelAdapter:
             return f"{module}.{type(handle).__qualname__}"
         return f"{module}.{qualname}"
 
+    def type_ref(self, annotation: Any) -> TypeRef:  # noqa: C901, PLR0911
+        if annotation is None or annotation is type(None):
+            return TypeRef.null()
+        if annotation is Any:
+            return TypeRef.any()
+        simple = _SIMPLE_TYPES.get(annotation)
+        if simple is not None:
+            return TypeRef.primitive(simple)
+
+        origin = get_origin(annotation)
+        args = get_args(annotation)
+
+        if origin is Annotated:
+            return self.type_ref(args[0])
+        if origin is Literal:
+            return TypeRef.literal(*args)
+        if origin is Union or origin is types.UnionType:
+            return TypeRef.union(*(self.type_ref(arg) for arg in args))
+        if origin is tuple:
+            if len(args) == _TUPLE_ELLIPSIS_ARGS and args[1] is Ellipsis:
+                return TypeRef.array(self.type_ref(args[0]))
+            return TypeRef.array(TypeRef.union(*(self.type_ref(arg) for arg in args)))
+        if origin in (list, set, frozenset, Sequence, Iterable):
+            return TypeRef.array(self.type_ref(args[0]))
+        if origin in (dict, Mapping):
+            return TypeRef.mapping(self.type_ref(args[0]), self.type_ref(args[1]))
+
+        resolved = self.resolve_model(annotation)
+        if resolved is not None:
+            version = self.version(resolved)
+            return TypeRef.model(
+                ModelRef(provider=self.provider, model_id=self.model_id(resolved)),
+                version=version or None,
+            )
+
+        if isinstance(annotation, type):
+            return TypeRef.unknown(f"{annotation.__module__}.{annotation.__qualname__}")
+        return TypeRef.unknown(str(annotation))
+
     def model_descriptor(self, handle: ModelHandle) -> ModelDescriptor:
         identity = {self._version_property, self._kind_property}
         fields: dict[str, FieldDescriptor] = {
@@ -76,6 +141,9 @@ class AbstractModelAdapter:
         raise NotImplementedError
 
     def describe_fields(self, model_cls: ModelHandle) -> Mapping[str, FieldDescriptor]:
+        raise NotImplementedError
+
+    def resolve_model(self, annotation: Any) -> ModelHandle | None:
         raise NotImplementedError
 
     def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:

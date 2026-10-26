@@ -50,6 +50,7 @@ from pyverge.versioning import (
     EdgeKey,
     FieldDescriptor,
     JgfNode,
+    TypeRef,
     VersionKey,
     VersionNode,
     default_content_hasher,
@@ -2443,7 +2444,9 @@ class TestNeutralGraphOps:
         model: ModelHandle,
     ) -> None:
         registered = envelope_model(model_adapter, versioning_settings, model)
-        incoming = registered.with_fields(FieldDescriptor(name="extra"))
+        incoming = registered.with_fields(
+            FieldDescriptor(name="extra", type_ref=TypeRef.any())
+        )
         with pytest.raises(ModelConflictError):
             registry.reconcile_model(incoming)
 

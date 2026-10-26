@@ -16,7 +16,14 @@ from pyverge.providers import (
 from pyverge.schemas import DataclassModelAdapter
 from pyverge.schemas.backend import ModelMaterializer
 from pyverge.settings import MigrationSettings, VersioningSettings
-from pyverge.versioning import Diff, DiffOrigin, EdgeKey, FieldChange, FieldStatus
+from pyverge.versioning import (
+    Diff,
+    DiffOrigin,
+    EdgeKey,
+    FieldChange,
+    FieldStatus,
+    TypeRef,
+)
 from tests.examples.dataclasses import (
     AddressV1,
     ContactV1,
@@ -312,9 +319,14 @@ def test_dataclass_describe_fields_and_materialize(
     dataclass_adapter: DataclassModelAdapter,
 ) -> None:
     described = dataclass_adapter.describe_fields(PersonV1)
+    assert described["name"].type_ref == TypeRef.primitive("string")
     assert not described["name"].required
     assert not described["address"].required
-    assert described["address"].default == AddressV1()
+    assert described["address"].default == {
+        "kind": "Address",
+        "version": "1.0.0",
+        "street": "",
+    }
     assert dataclass_adapter.describe_fields(RequiredValue)["value"].required
 
     source = dataclass_adapter.versionable(PersonV1)

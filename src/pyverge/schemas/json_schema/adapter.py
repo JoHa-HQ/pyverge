@@ -134,10 +134,12 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
     ) -> VersionNode[VersionValue]:
         resolved = self._model(model_cls)
         return VersionNode[VersionValue](
-            _model=resolved,
-            _value=self.of(version or self.version(resolved)),
-            _kind=kind or self.kind(resolved),
+            key=VersionKey[VersionValue](
+                _value=self.of(version or self.version(resolved)),
+                _kind=kind or self.kind(resolved),
+            ),
             descriptor=self.model_descriptor(resolved),
+            _model=resolved,
         )
 
     def version_key(

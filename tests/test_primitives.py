@@ -29,6 +29,7 @@ from pyverge.versioning import (
     ModelDescriptor,
     ModelRef,
     TypeRef,
+    VersionKey,
     VersionNode,
     default_canonicalizer,
     default_content_hasher,
@@ -561,9 +562,17 @@ class TestPrimitives:
         }
 
     def test_field_default_projects_presence(self) -> None:
-        missing = FieldDescriptor(name="missing")
-        explicit = FieldDescriptor(name="explicit", default=None)
-        mapping = FieldDescriptor(name="mapping", default={"b": 2, "a": 1})
+        missing = FieldDescriptor(name="missing", type_ref=TypeRef.any())
+        explicit = FieldDescriptor(
+            name="explicit", type_ref=TypeRef.any(), default=None
+        )
+        mapping = FieldDescriptor(
+            name="mapping",
+            type_ref=TypeRef.mapping(
+                TypeRef.primitive("string"), TypeRef.primitive("integer")
+            ),
+            default={"b": 2, "a": 1},
+        )
 
         assert missing.default is NO_DEFAULT
         assert "default" not in missing.to_canonical()
@@ -575,6 +584,7 @@ class TestPrimitives:
         extended = descriptor.with_fields(
             FieldDescriptor(
                 name="address",
+                type_ref=TypeRef.any(),
                 references=(("Address", semver.Version.parse("2.0.0")),),
             )
         )
@@ -604,11 +614,15 @@ class TestPrimitives:
     def test_node_projects_and_extends_descriptor(self) -> None:
         descriptor = self._descriptor()
         node = VersionNode[semver.Version](
-            _value=semver.Version.parse("2.0.0"),
-            _kind="Person",
+            key=VersionKey[semver.Version](
+                _value=semver.Version.parse("2.0.0"),
+                _kind="Person",
+            ),
             descriptor=descriptor,
         )
-        extended = node.with_fields(FieldDescriptor(name="email"))
+        extended = node.with_fields(
+            FieldDescriptor(name="email", type_ref=TypeRef.any())
+        )
 
         assert node.model_id == "demo.Person"
         assert node.fields == frozenset({"name", "age"})

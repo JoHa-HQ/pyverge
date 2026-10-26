@@ -571,14 +571,16 @@ class TestCompatibilityReport:
         modified: dict[str, dict[str, Any]] | None = None,
         added_info: dict[str, dict[str, Any]] | None = None,
     ) -> CompatibilityReport:
-        source = VersionNode(
-            _model=type("Model", (), {}),
-            _value=semver.Version.parse("1.0.0"),
-            _kind="User",
+        source = VersionNode[semver.Version](
+            key=VersionKey(
+                _value=semver.Version.parse("1.0.0"),
+                _kind="User",
+            ),
             descriptor=ModelDescriptor(
                 ref=ModelRef(provider="test", model_id="tests.Model"),
                 fields=FrozenMap(),
             ),
+            _model=type("Model", (), {}),
         )
         target = VersionKey(
             _value=semver.Version.parse("2.0.0"),

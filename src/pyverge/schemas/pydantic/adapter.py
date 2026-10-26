@@ -22,9 +22,11 @@ from pyverge.versioning import (
     Diff,
     Diffable,
     DiffOrigin,
+    TypeRef,
     Versionable,
     VersionKey,
     VersionNode,
+    default_canonicalizer,
 )
 
 logger = logging.getLogger(__name__)
@@ -193,8 +195,11 @@ class PydanticModelAdapter(AbstractModelAdapter):
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
         descriptors = _describe_fields(model_cls)
         for name, field_info in model_cls.model_fields.items():
-            references = self._field_references(model_cls, field_info.annotation)
-            descriptors[name] = replace(descriptors[name], references=references)
+            descriptors[name] = replace(
+                descriptors[name],
+                type_ref=self.type_ref(field_info.annotation),
+                references=self._field_references(model_cls, field_info.annotation),
+            )
         return descriptors
 
     def _field_references(
@@ -222,10 +227,12 @@ class PydanticModelAdapter(AbstractModelAdapter):
         version: str | None = None,
     ) -> VersionNode[VersionValue]:
         return VersionNode[VersionValue](
-            _model=model_cls,
-            _value=self.of(version or self.version(model_cls)),
-            _kind=kind or self.kind(model_cls),
+            key=VersionKey[VersionValue](
+                _value=self.of(version or self.version(model_cls)),
+                _kind=kind or self.kind(model_cls),
+            ),
             descriptor=self.model_descriptor(model_cls),
+            _model=model_cls,
         )
 
     def version_key(
@@ -366,10 +373,13 @@ def _describe_fields(model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
     return {
         name: FieldDescriptor(
             name=name,
+            type_ref=TypeRef.any(),
             annotation=field.annotation,
             required=field.is_required(),
             default=(
-                NO_DEFAULT if field.default is PydanticUndefined else field.default
+                NO_DEFAULT
+                if field.default is PydanticUndefined
+                else default_canonicalizer().encode(field.default)
             ),
         )
         for name, field in model_cls.model_fields.items()
