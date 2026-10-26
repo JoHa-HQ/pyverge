@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic, Self
+from typing import Any, Generic, Self, TypeVar
 
 from pyverge.core.types import VersionValue
 
-from .graph import ChangeSet
+from .frozen import FrozenMap
+from .schema import ModelDescriptor, NoDefault
 from .types import (
     Comparable,
     Diffable,
@@ -52,8 +53,12 @@ class Diff(Generic[VersionValue]):
 
     source: Versionable[VersionValue]
     target: Comparable[VersionValue]
-    fields: Mapping[str, FieldChange]
+    fields: FrozenMap[str, FieldChange] | Mapping[str, FieldChange]
     origin: DiffOrigin
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.fields, FrozenMap):
+            object.__setattr__(self, "fields", FrozenMap(self.fields))
 
     def render(self, renderer: DiffRenderer[Any]) -> Any:
         return renderer.render(self)
@@ -212,13 +217,124 @@ class Diff(Generic[VersionValue]):
         )
 
 
+T = TypeVar("T")
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeSet(Generic[T]):
+    """Added, removed, and modified identities in one delta."""
+
+    added: frozenset[T] = frozenset()
+    removed: frozenset[T] = frozenset()
+    modified: frozenset[T] = frozenset()
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.added or self.removed or self.modified)
+
+    def summary(self, label: str) -> list[str]:
+        lines: list[str] = []
+        for verb, values in (
+            ("added", self.added),
+            ("removed", self.removed),
+            ("changed", self.modified),
+        ):
+            if values:
+                rendered = ", ".join(str(value) for value in sorted(values, key=str))
+                lines.append(f"{label} {verb}: {rendered}")
+        return lines
+
+
+class SchemaDiffer:
+    """Build a schema diff from two model descriptors."""
+
+    def diff(
+        self,
+        source: Versionable[VersionValue],
+        target: Comparable[VersionValue],
+    ) -> Diff[VersionValue]:
+        source_descriptor = getattr(source, "descriptor", None)
+        target_descriptor = getattr(target, "descriptor", None)
+        fields = {}
+        if source_descriptor is not None and target_descriptor is not None:
+            if source.strategy != target.strategy:
+                raise ValueError(
+                    f"Cannot create diff across strategies: "
+                    f"{source.strategy.__name__} != {target.strategy.__name__}"
+                )
+            if source.kind != target.kind:
+                raise ValueError(
+                    f"Cannot create diff across kinds: {source.kind} != {target.kind}"
+                )
+            fields = self.fields(source_descriptor, target_descriptor)
+        return Diff(
+            source=source,
+            target=target,
+            fields=fields,
+            origin=DiffOrigin.SCHEMA,
+        )
+
+    def fields(
+        self,
+        source: ModelDescriptor,
+        target: ModelDescriptor,
+    ) -> Mapping[str, FieldChange]:
+        source_fields = source.fields
+        target_fields = target.fields
+        source_keys = set(source_fields)
+        target_keys = set(target_fields)
+
+        fields: dict[str, FieldChange] = {}
+        for name in sorted(target_keys - source_keys):
+            field = target_fields[name]
+            fields[name] = FieldChange(
+                FieldStatus.ADDED,
+                {
+                    "type": field.annotation,
+                    "type_ref": field.type_ref.to_canonical(),
+                    "required": field.required,
+                    "default": None
+                    if isinstance(field.default, NoDefault)
+                    else field.default,
+                },
+            )
+        for name in sorted(source_keys - target_keys):
+            fields[name] = FieldChange(FieldStatus.REMOVED, {})
+        for name in sorted(source_keys & target_keys):
+            source_field = source_fields[name]
+            target_field = target_fields[name]
+            changes: dict[str, Any] = {}
+            if source_field.type_ref != target_field.type_ref:
+                changes["type_changed"] = {
+                    "from": source_field.type_ref.to_canonical(),
+                    "to": target_field.type_ref.to_canonical(),
+                }
+            if source_field.required != target_field.required:
+                changes["required_changed"] = {
+                    "from": source_field.required,
+                    "to": target_field.required,
+                }
+            if source_field.default != target_field.default:
+                changes["default_changed"] = {
+                    "from": source_field.default,
+                    "to": target_field.default,
+                }
+            fields[name] = FieldChange(
+                FieldStatus.MODIFIED if changes else FieldStatus.UNCHANGED,
+                changes,
+            )
+        return fields
+
+
 __all__ = [
     "BackwardCompatibilityGuard",
+    "ChangeSet",
     "CompatibilityReport",
     "Diff",
     "DiffOrigin",
     "FieldChange",
     "FieldStatus",
+    "SchemaDiffer",
 ]
 
 

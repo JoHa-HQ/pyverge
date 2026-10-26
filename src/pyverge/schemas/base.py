@@ -6,7 +6,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     Annotated,
     Any,
-    ClassVar,
     Literal,
     Union,
     cast,
@@ -22,14 +21,16 @@ from pyverge.core.types import (
     ModelVersionKey,
     VersionValue,
 )
-from pyverge.schemas.diff import FieldDescriptor
 from pyverge.schemas.errors import ProviderCapabilityError
 from pyverge.versioning import (
+    Diffable,
+    FieldDescriptor,
     FrozenMap,
     ModelDescriptor,
     ModelRef,
     TypeKind,
     TypeRef,
+    VersionNode,
 )
 
 _TUPLE_ELLIPSIS_ARGS = 2
@@ -53,7 +54,7 @@ class AbstractModelAdapter:
     lives in each concrete adapter.
     """
 
-    provider: ClassVar[str] = "custom"
+    provider: str = "custom"
 
     def __init__(
         self,
@@ -119,8 +120,13 @@ class AbstractModelAdapter:
             return TypeRef.unknown(f"{annotation.__module__}.{annotation.__qualname__}")
         return TypeRef.unknown(str(annotation))
 
+    def materialize(self, diff: Diffable) -> VersionNode:
+        if diff.source.version > diff.target.version:
+            diff = diff.inverted()
+        return self.versionable(self.materialize_model(diff))
+
     def model_descriptor(self, handle: ModelHandle) -> ModelDescriptor:
-        identity = {self._version_property, self._kind_property}
+        identity = {self.version_property, self.kind_property}
         fields: dict[str, FieldDescriptor] = {
             name: descriptor
             for name, descriptor in self.describe_fields(handle).items()
@@ -144,6 +150,18 @@ class AbstractModelAdapter:
         raise NotImplementedError
 
     def resolve_model(self, annotation: Any) -> ModelHandle | None:
+        raise NotImplementedError
+
+    def versionable(
+        self,
+        model_cls: ModelHandle,
+        *,
+        kind: str | None = None,
+        version: str | None = None,
+    ) -> VersionNode:
+        raise NotImplementedError
+
+    def materialize_model(self, diff: Diffable) -> ModelHandle:
         raise NotImplementedError
 
     def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
@@ -205,7 +223,7 @@ class AbstractModelAdapter:
             )
 
     def fields(self, model_cls: type[Any]) -> frozenset[str]:
-        identity = {self._version_property, self._kind_property}
+        identity = {self.version_property, self.kind_property}
         fields = getattr(model_cls, "model_fields", None)
         if fields is None:
             return frozenset()

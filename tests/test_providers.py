@@ -14,7 +14,6 @@ from pyverge.providers import (
     PydanticModelAdapter,
 )
 from pyverge.schemas import DataclassModelAdapter
-from pyverge.schemas.backend import ModelMaterializer
 from pyverge.settings import MigrationSettings, VersioningSettings
 from pyverge.versioning import (
     Diff,
@@ -123,7 +122,7 @@ def test_adapter_diff_and_migration_materialization(
 def test_model_materializer(adapter, source_model, target_model, payload):
     source = adapter.versionable(source_model)
     target = adapter.versionable(target_model)
-    node = ModelMaterializer(adapter).materialize(adapter.diff(source, target))
+    node = adapter.materialize(adapter.diff(source, target))
     assert node.version == target.version
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import total_ordering
-from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Self
 
 from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
@@ -358,36 +358,7 @@ class VersionEdge(Generic[VersionValue]):
         return self.jgf_id
 
 
-T = TypeVar("T")
-
-
-@dataclass(frozen=True, slots=True)
-class ChangeSet(Generic[T]):
-    """Added, removed, and modified identities in one delta."""
-
-    added: frozenset[T] = frozenset()
-    removed: frozenset[T] = frozenset()
-    modified: frozenset[T] = frozenset()
-
-    @property
-    def changed(self) -> bool:
-        return bool(self.added or self.removed or self.modified)
-
-    def summary(self, label: str) -> list[str]:
-        lines: list[str] = []
-        for verb, values in (
-            ("added", self.added),
-            ("removed", self.removed),
-            ("changed", self.modified),
-        ):
-            if values:
-                rendered = ", ".join(str(value) for value in sorted(values, key=str))
-                lines.append(f"{label} {verb}: {rendered}")
-        return lines
-
-
 __all__ = [
-    "ChangeSet",
     "EdgeKey",
     "MigrationIdentity",
     "Transitional",
@@ -398,7 +369,6 @@ __all__ = [
 
 
 __all__ = [
-    "ChangeSet",
     "EdgeKey",
     "MigrationIdentity",
     "Transitional",

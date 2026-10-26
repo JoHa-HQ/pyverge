@@ -13,13 +13,14 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.schemas.base import AbstractModelAdapter
-from pyverge.schemas.diff import FieldDescriptor, SchemaDiffer
 from pyverge.versioning import (
     NO_DEFAULT,
     Comparable,
     Diff,
     Diffable,
     DiffOrigin,
+    FieldDescriptor,
+    SchemaDiffer,
     Versionable,
     VersionKey,
     VersionNode,
@@ -362,7 +363,7 @@ class DataclassModelAdapter(AbstractModelAdapter):
                 origin=DiffOrigin.SCHEMA,
             )
 
-        return SchemaDiffer().diff(source, target, self.describe_fields)
+        return SchemaDiffer().diff(source, target)
 
     def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
         anchor = diff.source.model

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, replace
-from typing import Any, Self, cast
+from typing import Any, Self
 
 from pydantic import BaseModel, create_model
 from pydantic.fields import FieldInfo
@@ -15,13 +15,14 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.schemas.base import AbstractModelAdapter
-from pyverge.schemas.diff import FieldDescriptor, SchemaDiffer
 from pyverge.versioning import (
     NO_DEFAULT,
     Comparable,
     Diff,
     Diffable,
     DiffOrigin,
+    FieldDescriptor,
+    SchemaDiffer,
     TypeRef,
     Versionable,
     VersionKey,
@@ -32,8 +33,16 @@ from pyverge.versioning import (
 logger = logging.getLogger(__name__)
 
 
-class PydanticModelAdapter(AbstractModelAdapter):
-    provider = "pydantic"
+class PydanticCodec(AbstractModelAdapter):
+    def __init__(
+        self,
+        version_property: str = "version",
+        kind_property: str = "kind",
+        *,
+        provider: str = "pydantic",
+    ) -> None:
+        super().__init__(version_property, kind_property)
+        self.provider = provider
 
     def _field_default(self, model_cls: ModelHandle, name: str) -> str:
         field_info: FieldInfo | None = model_cls.model_fields.get(name)
@@ -248,17 +257,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
         source: Versionable[VersionValue],
         target: Comparable[VersionValue],
     ) -> Diff[VersionValue]:
-        if getattr(target, "model", None) is None:
-            return Diff(
-                source=source,
-                target=target,
-                fields={},
-                origin=DiffOrigin.SCHEMA,
-            )
-        return PydanticDiff.from_pair(
-            source,
-            cast("Versionable[VersionValue]", target),
-        )
+        return SchemaDiffer().diff(source, target)
 
     @staticmethod
     def _is_optional(annotation: Any) -> bool:
@@ -300,6 +299,10 @@ class PydanticModelAdapter(AbstractModelAdapter):
             f"{anchor.__name__}V{str(version).replace('.', '_')}",
             **fields,
         )
+
+
+class PydanticModelAdapter(PydanticCodec):
+    """Pydantic provider adapter backed by :class:`PydanticCodec`."""
 
 
 @dataclass(frozen=True)
@@ -357,14 +360,11 @@ class PydanticDiff(Diff[VersionValue]):
                 f"Cannot create diff across kinds: {source.kind} != {target.kind}"
             )
 
+        diff = SchemaDiffer().diff(source, target)
         return cls(
             source=source,
             target=target,
-            fields=SchemaDiffer().fields(
-                source.model,
-                target.model,
-                _describe_fields,
-            ),
+            fields=diff.fields,
             origin=DiffOrigin.SCHEMA,
         )
 

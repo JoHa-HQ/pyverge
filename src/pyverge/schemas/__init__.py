@@ -1,4 +1,3 @@
-from .backend import ModelMaterializer
 from .base import AbstractModelAdapter
 from .dataclasses import DataclassModelAdapter
 from .errors import ProviderCapabilityError
@@ -19,7 +18,6 @@ __all__ = [
     "JsonSchemaModelAdapter",
     "ModelAdapter",
     "ModelIdentity",
-    "ModelMaterializer",
     "ProviderCapabilityError",
     "PydanticDiff",
     "PydanticModelAdapter",

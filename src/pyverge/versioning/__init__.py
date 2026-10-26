@@ -9,14 +9,15 @@ from .canonical import (
 )
 from .diff import (
     BackwardCompatibilityGuard,
+    ChangeSet,
     CompatibilityReport,
     Diff,
     FieldChange,
     FieldStatus,
+    SchemaDiffer,
 )
 from .frozen import FrozenMap
 from .graph import (
-    ChangeSet,
     EdgeKey,
     MigrationIdentity,
     VersionEdge,
@@ -91,6 +92,7 @@ __all__ = [
     "ModelRef",
     "NoDefault",
     "Orderable",
+    "SchemaDiffer",
     "Transitional",
     "TypeKind",
     "TypeRef",

@@ -41,7 +41,6 @@ from pyverge.providers.types import (
     ModelAdapter,
 )
 from pyverge.registry import Registry
-from pyverge.schemas.backend import ModelMaterializer
 from pyverge.settings import (
     DiscoverySettings,
     MigrationSettings,
@@ -222,8 +221,8 @@ def runner(
 
 
 @pytest.fixture
-def model_materializer(model_adapter: ModelAdapter) -> ModelMaterializer:
-    return ModelMaterializer(model_adapter)
+def model_materializer(model_adapter: ModelAdapter) -> ModelAdapter:
+    return model_adapter
 
 
 @pytest.fixture
@@ -235,7 +234,7 @@ def migration_materializer(request: pytest.FixtureRequest) -> MigrationMateriali
 @pytest.fixture
 def reflector(
     model_adapter: ModelAdapter,
-    model_materializer: ModelMaterializer,
+    model_materializer: ModelAdapter,
     migration_materializer: DiffMaterializer[object],
     migration_settings: MigrationSettings,
 ) -> Reflector[VersionValue]:

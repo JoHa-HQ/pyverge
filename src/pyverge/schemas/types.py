@@ -9,9 +9,7 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
-from pyverge.versioning import Comparable, Diffable, Versionable
-
-from .diff import FieldDescriptor
+from pyverge.versioning import Comparable, Diffable, FieldDescriptor, Versionable
 
 if TYPE_CHECKING:
     from pyverge.versioning import Diff, VersionNode
@@ -101,11 +99,6 @@ class SchemaDiffProvider(Protocol):
         target: Comparable[VersionValue_co],
     ) -> Diff[VersionValue_co]: ...
 
-
-@runtime_checkable
-class ModelMaterializerPort(Protocol):
-    """Model materialization surface."""
-
     def materialize_model(self, diff: Diffable[VersionValue_co]) -> ModelHandle: ...
 
 
@@ -191,3 +184,5 @@ class ModelAdapter(ModelIdentity, Protocol):
         self,
         diff: Diffable[VersionValue_co],
     ) -> ModelHandle: ...
+
+    def materialize(self, diff: Diffable[VersionValue_co]) -> VersionNode: ...
