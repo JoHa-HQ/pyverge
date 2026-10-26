@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, cast, get_args, get_origin, get_type_hints
+import types
+from typing import Any, Union, cast, get_args, get_origin, get_type_hints
+
+from pydantic import TypeAdapter
 
 from pyverge.core.types import (
     ModelData,
@@ -12,6 +15,7 @@ from pyverge.core.types import (
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.diff import FieldDescriptor, SchemaDiffer
 from pyverge.versioning import (
+    NO_DEFAULT,
     Comparable,
     Diff,
     Diffable,
@@ -21,9 +25,34 @@ from pyverge.versioning import (
     VersionNode,
 )
 
+_MAPPING_ARG_COUNT = 2
+
 
 class DataclassModelAdapter(AbstractModelAdapter):
-    """Model adapter for ordinary :mod:`dataclasses` classes."""
+    """Model adapter for ordinary :mod:`dataclasses` classes.
+
+    Dataclasses are the runtime container, but payload validation and
+    coercion are delegated to Pydantic.  This keeps the richer validation
+    surface (nested coercion, defaults, constraints, strict mode) available
+    while the graph keeps an opaque stdlib handle.
+    """
+
+    provider = "dataclass"
+
+    def __init__(
+        self,
+        version_property: str = "version",
+        kind_property: str = "kind",
+    ) -> None:
+        super().__init__(version_property, kind_property)
+        self._adapters: dict[type[Any], TypeAdapter[Any]] = {}
+
+    def _adapter(self, container: ModelHandle) -> TypeAdapter[Any]:
+        adapter = self._adapters.get(container)
+        if adapter is None:
+            adapter = TypeAdapter(container)
+            self._adapters[container] = adapter
+        return adapter
 
     def _field_default(self, model_cls: ModelHandle, name: str) -> str:
         for field in dataclasses.fields(model_cls):
@@ -155,47 +184,75 @@ class DataclassModelAdapter(AbstractModelAdapter):
                 found.add((kind, version))
                 self._collect_references(nested, found, seen)
 
-    def _coerce(self, annotation: Any, value: Any) -> Any:
-        if value is None:
-            return None
+    def _strict_validate(self, annotation: Any, value: Any) -> None:
         if isinstance(annotation, type) and dataclasses.is_dataclass(annotation):
-            if isinstance(value, annotation):
-                return value
-            return self.instantiate(annotation, cast(ModelData, value))
+            self._strict_dataclass(annotation, value)
+            return
+
         origin = get_origin(annotation)
         args = get_args(annotation)
-        if origin is list and args and isinstance(value, list):
-            return [self._coerce(args[0], item) for item in value]
-        if origin is not None and type(None) in args:
-            for arg in args:
-                if arg is type(None):
-                    continue
-                try:
-                    return self._coerce(arg, value)
-                except (TypeError, ValueError):
-                    continue
-        return value
 
-    def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        values: dict[str, Any] = {}
+        if origin is Union or origin is types.UnionType:
+            self._strict_union(args, value)
+            return
+        if origin is list and args and isinstance(value, list):
+            for item in value:
+                self._strict_validate(args[0], item)
+            return
+        if (
+            origin is dict
+            and len(args) == _MAPPING_ARG_COUNT
+            and isinstance(value, dict)
+        ):
+            for key, item in value.items():
+                self._strict_validate(args[0], key)
+                self._strict_validate(args[1], item)
+            return
+
+        self._adapter(annotation).validate_python(value, strict=True)
+
+    def _strict_dataclass(self, container: ModelHandle, value: Any) -> None:
+        if isinstance(value, container):
+            value = dataclasses.asdict(value)
+        if not isinstance(value, dict):
+            self._adapter(container).validate_python(value, strict=True)
+            return
+
         hints = self._hints(container)
         for field in dataclasses.fields(container):
             if not field.init:
                 continue
-            if field.name in data:
-                values[field.name] = self._coerce(
-                    hints.get(field.name, field.type), data[field.name]
+            if field.name in value:
+                self._strict_validate(
+                    hints.get(field.name, field.type), value[field.name]
                 )
-            elif field.default is not dataclasses.MISSING:
-                values[field.name] = field.default
-            elif field.default_factory is not dataclasses.MISSING:
-                values[field.name] = field.default_factory()
-            else:
+            elif (
+                field.default is dataclasses.MISSING
+                and field.default_factory is dataclasses.MISSING
+            ):
                 raise TypeError(
                     f"Missing required dataclass field '{field.name}' "
                     f"for {container.__name__}"
                 )
-        return container(**values)
+
+    def _strict_union(self, args: tuple[Any, ...], value: Any) -> None:
+        if value is None and type(None) in args:
+            return
+        errors: list[Exception] = []
+        for arg in args:
+            if arg is type(None):
+                continue
+            try:
+                self._strict_validate(arg, value)
+                return
+            except Exception as exc:
+                errors.append(exc)
+        if errors:
+            raise errors[-1]
+        raise TypeError(f"Value {value!r} does not match {args!r}")
+
+    def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
+        return self._adapter(container).validate_python(data)
 
     def dump(self, model: object) -> ModelData:
         if not dataclasses.is_dataclass(model):
@@ -216,11 +273,13 @@ class DataclassModelAdapter(AbstractModelAdapter):
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
+        if strict:
+            self._strict_validate(container, data)
         return self.dump(self.instantiate(container, data))
 
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
         hints = self._hints(model_cls)
-        return {
+        descriptors = {
             field.name: FieldDescriptor(
                 name=field.name,
                 annotation=hints.get(field.name, field.type),
@@ -233,11 +292,36 @@ class DataclassModelAdapter(AbstractModelAdapter):
                     if field.default is not dataclasses.MISSING
                     else field.default_factory()
                     if field.default_factory is not dataclasses.MISSING
-                    else None
+                    else NO_DEFAULT
                 ),
             )
             for field in dataclasses.fields(model_cls)
         }
+        for field in dataclasses.fields(model_cls):
+            references = self._field_references(
+                model_cls, hints.get(field.name, field.type)
+            )
+            descriptors[field.name] = dataclasses.replace(
+                descriptors[field.name], references=references
+            )
+        return descriptors
+
+    def _field_references(
+        self, model_cls: ModelHandle, annotation: Any
+    ) -> tuple[ModelVersionKey, ...]:
+        found: set[ModelVersionKey] = set()
+        for nested in self._iter_models(annotation):
+            if nested is model_cls:
+                continue
+            kind = self.kind(nested)
+            if not kind:
+                continue
+            try:
+                found.add((kind, self.of(self.version(nested))))
+            except (TypeError, ValueError):
+                continue
+            found.update(self.references(nested))
+        return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
 
     def versionable(
         self,
@@ -250,9 +334,7 @@ class DataclassModelAdapter(AbstractModelAdapter):
             _model=model_cls,
             _value=self.of(version or self.version(model_cls)),
             _kind=kind or self.kind(model_cls),
-            references=self.references(model_cls),
-            fields=self.fields(model_cls),
-            model_id=self.model_id(model_cls),
+            descriptor=self.model_descriptor(model_cls),
         )
 
     def version_key(

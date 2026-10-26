@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import copy
 import operator
+import pickle
 from dataclasses import replace
 from typing import Any, cast
 
 import pytest
+import semver
 from json_graph_lite.jgf import Graph as LiteGraph
 
 from pyverge.providers import (
@@ -14,12 +16,20 @@ from pyverge.providers import (
 )
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
+    NO_DEFAULT,
     Canonicalizer,
     Diff,
     FieldChange,
+    FieldDescriptor,
     FieldStatus,
+    FrozenMap,
     JgfGraph,
+    JgfNode,
     MigrationIdentity,
+    ModelDescriptor,
+    ModelRef,
+    TypeRef,
+    VersionNode,
     default_canonicalizer,
     default_content_hasher,
     default_encoders,
@@ -511,6 +521,116 @@ class TestContentAddress:
         assert edge.content_hash(default_content_hasher()) != other.content_hash(
             default_content_hasher()
         )
+
+
+class TestPrimitives:
+    def _descriptor(self) -> ModelDescriptor:
+        return ModelDescriptor(
+            ref=ModelRef(provider="dataclass", model_id="demo.Person"),
+            fields=FrozenMap(
+                {
+                    "name": FieldDescriptor(
+                        name="name",
+                        type_ref=TypeRef.primitive("string"),
+                        references=(("Address", semver.Version.parse("1.0.0")),),
+                    ),
+                    "age": FieldDescriptor(
+                        name="age",
+                        default=None,
+                        type_ref=TypeRef.primitive("integer"),
+                    ),
+                }
+            ),
+        )
+
+    def test_type_refs_project_nested_types(self) -> None:
+        union = TypeRef.union(TypeRef.primitive("string"), TypeRef.null())
+        model = TypeRef.model(
+            ModelRef(provider="pydantic", model_id="demo.Address"),
+            version="1.0.0",
+        )
+
+        assert union.to_canonical() == {
+            "kind": "union",
+            "args": [{"kind": "string"}, {"kind": "null"}],
+        }
+        assert model.to_canonical() == {
+            "kind": "model",
+            "ref": {"model_id": "demo.Address", "provider": "pydantic"},
+            "version": "1.0.0",
+        }
+
+    def test_field_default_projects_presence(self) -> None:
+        missing = FieldDescriptor(name="missing")
+        explicit = FieldDescriptor(name="explicit", default=None)
+        mapping = FieldDescriptor(name="mapping", default={"b": 2, "a": 1})
+
+        assert missing.default is NO_DEFAULT
+        assert "default" not in missing.to_canonical()
+        assert explicit.to_canonical()["default"] is None
+        assert mapping.to_canonical()["default"] == {"a": 1, "b": 2}
+
+    def test_descriptor_derives_references_and_extends_immutably(self) -> None:
+        descriptor = self._descriptor()
+        extended = descriptor.with_fields(
+            FieldDescriptor(
+                name="address",
+                references=(("Address", semver.Version.parse("2.0.0")),),
+            )
+        )
+
+        assert descriptor.references == frozenset(
+            {("Address", semver.Version.parse("1.0.0"))}
+        )
+        assert extended.references == frozenset(
+            {
+                ("Address", semver.Version.parse("1.0.0")),
+                ("Address", semver.Version.parse("2.0.0")),
+            }
+        )
+        assert descriptor.fields.keys() == {"name", "age"}
+        assert extended.fields.keys() == {"name", "age", "address"}
+        assert extended.without_fields("age").fields.keys() == {
+            "name",
+            "address",
+        }
+        assert (
+            extended.with_ref(
+                ModelRef(provider="dataclass", model_id="demo.Other")
+            ).ref.model_id
+            == "demo.Other"
+        )
+
+    def test_node_projects_and_extends_descriptor(self) -> None:
+        descriptor = self._descriptor()
+        node = VersionNode[semver.Version](
+            _value=semver.Version.parse("2.0.0"),
+            _kind="Person",
+            descriptor=descriptor,
+        )
+        extended = node.with_fields(FieldDescriptor(name="email"))
+
+        assert node.model_id == "demo.Person"
+        assert node.fields == frozenset({"name", "age"})
+        assert extended.fields == frozenset({"name", "age", "email"})
+        assert extended.without_fields("age").fields == frozenset({"name", "email"})
+        assert node.to_canonical() == {
+            "id": "Person@2.0.0",
+            "kind": "Person",
+            "version": "2.0.0",
+            "model": descriptor.to_canonical(),
+        }
+
+        restored = pickle.loads(pickle.dumps(node))
+        assert restored.to_canonical() == node.to_canonical()
+
+        hasher = default_content_hasher()
+        projected = JgfNode.from_addressable(node, hasher)
+        assert projected.id == node.jgf_id
+        assert projected.metadata["content_hash"] == node.content_hash(hasher)
+        assert projected.metadata["model"] == descriptor.to_canonical()
+        with pytest.raises(ValueError, match="no runtime model handle"):
+            _ = node.model
 
 
 def _noop_migration(data: dict, context: Any = None) -> dict:

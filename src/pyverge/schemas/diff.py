@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from typing import Any
 
 from pyverge.core.types import ModelHandle, VersionValue
@@ -10,19 +9,11 @@ from pyverge.versioning import (
     Diff,
     DiffOrigin,
     FieldChange,
+    FieldDescriptor,
     FieldStatus,
+    NoDefault,
     Versionable,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class FieldDescriptor:
-    """Provider-neutral description of one model field."""
-
-    name: str
-    annotation: Any
-    required: bool
-    default: Any
 
 
 class SchemaDiffer:
@@ -64,7 +55,9 @@ class SchemaDiffer:
                 {
                     "type": field.annotation,
                     "required": field.required,
-                    "default": field.default,
+                    "default": None
+                    if isinstance(field.default, NoDefault)
+                    else field.default,
                 },
             )
         for name in sorted(source_keys - target_keys):

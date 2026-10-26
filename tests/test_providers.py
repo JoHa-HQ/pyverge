@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from pyverge.discovery.reflection import CompositeDiffDiscovery, Reflection
 from pyverge.engine import Engine
@@ -303,7 +304,7 @@ def test_dataclass_instantiate_nested_lists_defaults_and_errors(
     assert person.contacts[0].phone == "123"
     assert dataclass_adapter.finalize(PersonV1, {"name": "Bob"})["name"] == "Bob"
     assert dataclass_adapter.validate({"name": "Cara"}, PersonV1)["name"] == "Cara"
-    with pytest.raises(TypeError, match="Missing required dataclass field"):
+    with pytest.raises(ValidationError, match="Field required"):
         dataclass_adapter.instantiate(RequiredValue, {})
 
 

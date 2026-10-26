@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, cast
+from collections.abc import Mapping
+from typing import Any, ClassVar, cast
 
 import pendulum
 from semver import Version
 
 from pyverge.core.types import (
     ModelHandle,
+    ModelVersionKey,
     VersionValue,
 )
+from pyverge.schemas.diff import FieldDescriptor
 from pyverge.schemas.errors import ProviderCapabilityError
+from pyverge.versioning import FrozenMap, ModelDescriptor, ModelRef
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,8 @@ class AbstractModelAdapter:
     parsing.  Field-walking (``references`` etc.) is provider-specific and
     lives in each concrete adapter.
     """
+
+    provider: ClassVar[str] = "custom"
 
     def __init__(
         self,
@@ -48,10 +54,31 @@ class AbstractModelAdapter:
             return f"{module}.{type(handle).__qualname__}"
         return f"{module}.{qualname}"
 
+    def model_descriptor(self, handle: ModelHandle) -> ModelDescriptor:
+        identity = {self._version_property, self._kind_property}
+        fields: dict[str, FieldDescriptor] = {
+            name: descriptor
+            for name, descriptor in self.describe_fields(handle).items()
+            if name not in identity
+        }
+        return ModelDescriptor(
+            ref=ModelRef(
+                provider=self.provider,
+                model_id=self.model_id(handle),
+            ),
+            fields=FrozenMap(fields),
+        )
+
     def version(self, model_cls: type[Any]) -> str:
         raise NotImplementedError
 
     def kind(self, model_cls: type[Any]) -> str:
+        raise NotImplementedError
+
+    def describe_fields(self, model_cls: ModelHandle) -> Mapping[str, FieldDescriptor]:
+        raise NotImplementedError
+
+    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
         raise NotImplementedError
 
     @classmethod

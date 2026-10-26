@@ -30,7 +30,10 @@ from pyverge.versioning import (
     DiffOrigin,
     FieldChange,
     FieldStatus,
+    FrozenMap,
     MigrationIdentity,
+    ModelDescriptor,
+    ModelRef,
     VersionEdge,
     VersionKey,
     VersionNode,
@@ -572,9 +575,10 @@ class TestCompatibilityReport:
             _model=type("Model", (), {}),
             _value=semver.Version.parse("1.0.0"),
             _kind="User",
-            references=frozenset(),
-            fields=frozenset(),
-            model_id="tests.Model",
+            descriptor=ModelDescriptor(
+                ref=ModelRef(provider="test", model_id="tests.Model"),
+                fields=FrozenMap(),
+            ),
         )
         target = VersionKey(
             _value=semver.Version.parse("2.0.0"),

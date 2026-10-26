@@ -1,23 +1,38 @@
 from .canonical import (
+    Addressable,
     Canonicalizable,
     Canonicalizer,
     ContentHasher,
-)
-from .compatibility import BackwardCompatibilityGuard, CompatibilityReport
-from .defaults import (
     default_canonicalizer,
     default_content_hasher,
     default_encoders,
 )
-from .diff import Diff, FieldChange, FieldStatus
-from .jgf import JgfEdge, JgfGraph, JgfNode
-from .primitives import (
+from .diff import (
+    BackwardCompatibilityGuard,
+    CompatibilityReport,
+    Diff,
+    FieldChange,
+    FieldStatus,
+)
+from .frozen import FrozenMap
+from .graph import (
     ChangeSet,
     EdgeKey,
     MigrationIdentity,
     VersionEdge,
     VersionKey,
     VersionNode,
+)
+from .jgf import JgfEdge, JgfGraph, JgfNode
+from .schema import (
+    NO_DEFAULT,
+    DefaultValue,
+    FieldDescriptor,
+    ModelDescriptor,
+    ModelRef,
+    NoDefault,
+    TypeKind,
+    TypeRef,
 )
 from .types import (
     Comparable,
@@ -40,6 +55,8 @@ from .types import (
 )
 
 __all__ = [
+    "NO_DEFAULT",
+    "Addressable",
     "BackwardCompatibilityGuard",
     "Canonicalizable",
     "Canonicalizer",
@@ -48,6 +65,7 @@ __all__ = [
     "CompatibilityReport",
     "ContentAddressable",
     "ContentHasher",
+    "DefaultValue",
     "Delta",
     "Diff",
     "DiffMaterializer",
@@ -56,8 +74,10 @@ __all__ = [
     "Diffable",
     "EdgeKey",
     "FieldChange",
+    "FieldDescriptor",
     "FieldStatus",
     "Fingerprintable",
+    "FrozenMap",
     "JgfEdge",
     "JgfGraph",
     "JgfIdentifiable",
@@ -67,8 +87,13 @@ __all__ = [
     "MigrationHookMap",
     "MigrationIdentity",
     "MigrationKey",
+    "ModelDescriptor",
+    "ModelRef",
+    "NoDefault",
     "Orderable",
     "Transitional",
+    "TypeKind",
+    "TypeRef",
     "VersionEdge",
     "VersionKey",
     "VersionNode",

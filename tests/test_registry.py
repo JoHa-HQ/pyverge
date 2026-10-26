@@ -6,7 +6,6 @@ Most behaviors are exercised for both the semver (pydantic) and chrono/JSON
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -16,7 +15,11 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import types
-from pyverge.core import MaxDepthExceededError, MigrationContext, PayloadValidationError
+from pyverge.core import (
+    MaxDepthExceededError,
+    MigrationContext,
+    PayloadValidationError,
+)
 from pyverge.engine import Engine
 from pyverge.execution import MigrationHook
 from pyverge.execution.extractors import (
@@ -45,6 +48,7 @@ from pyverge.registry.types import PathCatalog
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     EdgeKey,
+    FieldDescriptor,
     JgfNode,
     VersionKey,
     VersionNode,
@@ -2439,7 +2443,7 @@ class TestNeutralGraphOps:
         model: ModelHandle,
     ) -> None:
         registered = envelope_model(model_adapter, versioning_settings, model)
-        incoming = replace(registered, fields=registered.fields | {"extra"})
+        incoming = registered.with_fields(FieldDescriptor(name="extra"))
         with pytest.raises(ModelConflictError):
             registry.reconcile_model(incoming)
 

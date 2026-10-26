@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import total_ordering
-from typing import TYPE_CHECKING, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Self, TypeVar
 
 from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
@@ -16,6 +16,7 @@ from pyverge.core.types import (
 
 from .canonical import ContentHasher
 from .errors import MigrationApplicationError
+from .schema import FieldDescriptor, ModelDescriptor
 from .types import (
     Comparable,
     Diffable,
@@ -102,21 +103,46 @@ class VersionKey(Generic[VersionValue]):
 
 @dataclass(frozen=True, slots=True, eq=False)
 class VersionNode(VersionKey[VersionValue]):
-    """A materialized model version that always binds a model handle.
+    """A materialized model version that binds a serializable descriptor.
 
-    ``references`` is the set of versioned kinds the model's fields declare.
-    ``fields`` is the model's field names minus identity fields. Neither
-    participates in equality or ordering.
+    The graph-facing surface lives in :class:`ModelDescriptor`; ``_model`` is
+    an optional runtime handle kept only for in-process operations.
     """
 
-    _model: ModelHandle
-    references: frozenset[ModelVersionKey]
-    fields: frozenset[str]
-    model_id: str
+    descriptor: ModelDescriptor
+    _model: ModelHandle | None = field(default=None, compare=False, repr=False)
 
     @property
     def model(self) -> ModelHandle:
+        if self._model is None:
+            raise ValueError(f"VersionNode {self.jgf_id} has no runtime model handle")
         return self._model
+
+    @property
+    def model_id(self) -> str:
+        return self.descriptor.ref.model_id
+
+    @property
+    def references(self) -> frozenset[ModelVersionKey]:
+        return self.descriptor.references
+
+    @property
+    def fields(self) -> frozenset[str]:
+        return frozenset(self.descriptor.fields)
+
+    def with_descriptor(self, descriptor: ModelDescriptor) -> Self:
+        return type(self)(
+            _value=self._value,
+            _kind=self._kind,
+            descriptor=descriptor,
+            _model=self._model,
+        )
+
+    def with_fields(self, *fields: FieldDescriptor) -> Self:
+        return self.with_descriptor(self.descriptor.with_fields(*fields))
+
+    def without_fields(self, *names: str) -> Self:
+        return self.with_descriptor(self.descriptor.without_fields(*names))
 
     def content_payload(self) -> dict[str, object]:
         if not self.model_id:
@@ -132,6 +158,14 @@ class VersionNode(VersionKey[VersionValue]):
             ),
         }
 
+    def to_canonical(self) -> dict[str, Any]:
+        return {
+            "id": self.jgf_id,
+            "kind": self.kind,
+            "version": str(self.version[1]),
+            "model": self.descriptor.to_canonical(),
+        }
+
     def content_hash(self, hasher: ContentHasher) -> str:
         return hasher.digest(self.content_payload())
 
@@ -141,7 +175,7 @@ class VersionNode(VersionKey[VersionValue]):
         return JgfNode.from_version(self, hasher)
 
     def __repr__(self) -> str:
-        model = getattr(self.model, "__name__", "model")
+        model = getattr(self._model, "__name__", "model")
         return (
             f"VersionNode[{self.strategy.__name__}, {model}]"
             f"({self._value}, {self._kind})"
@@ -284,6 +318,17 @@ class ChangeSet(Generic[T]):
                 rendered = ", ".join(str(value) for value in sorted(values, key=str))
                 lines.append(f"{label} {verb}: {rendered}")
         return lines
+
+
+__all__ = [
+    "ChangeSet",
+    "EdgeKey",
+    "MigrationIdentity",
+    "Transitional",
+    "VersionEdge",
+    "VersionKey",
+    "VersionNode",
+]
 
 
 __all__ = [

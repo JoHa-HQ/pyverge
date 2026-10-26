@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Self, cast
 
 from pydantic import BaseModel, create_model
@@ -17,6 +17,7 @@ from pyverge.core.types import (
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.diff import FieldDescriptor, SchemaDiffer
 from pyverge.versioning import (
+    NO_DEFAULT,
     Comparable,
     Diff,
     Diffable,
@@ -30,6 +31,8 @@ logger = logging.getLogger(__name__)
 
 
 class PydanticModelAdapter(AbstractModelAdapter):
+    provider = "pydantic"
+
     def _field_default(self, model_cls: ModelHandle, name: str) -> str:
         field_info: FieldInfo | None = model_cls.model_fields.get(name)
         if field_info is None:
@@ -188,7 +191,28 @@ class PydanticModelAdapter(AbstractModelAdapter):
         return models
 
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
-        return _describe_fields(model_cls)
+        descriptors = _describe_fields(model_cls)
+        for name, field_info in model_cls.model_fields.items():
+            references = self._field_references(model_cls, field_info.annotation)
+            descriptors[name] = replace(descriptors[name], references=references)
+        return descriptors
+
+    def _field_references(
+        self, model_cls: ModelHandle, annotation: Any
+    ) -> tuple[ModelVersionKey, ...]:
+        found: set[ModelVersionKey] = set()
+        for nested in self._iter_models(annotation):
+            if nested is model_cls:
+                continue
+            kind = self.kind(nested)
+            if not kind:
+                continue
+            try:
+                found.add((kind, self.of(self.version(nested))))
+            except (TypeError, ValueError):
+                continue
+            found.update(self.references(nested))
+        return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
 
     def versionable(
         self,
@@ -199,11 +223,9 @@ class PydanticModelAdapter(AbstractModelAdapter):
     ) -> VersionNode[VersionValue]:
         return VersionNode[VersionValue](
             _model=model_cls,
-            _value=self.of(self.version(model_cls)),
-            _kind=self.kind(model_cls),
-            references=self.references(model_cls),
-            fields=self.fields(model_cls),
-            model_id=self.model_id(model_cls),
+            _value=self.of(version or self.version(model_cls)),
+            _kind=kind or self.kind(model_cls),
+            descriptor=self.model_descriptor(model_cls),
         )
 
     def version_key(
@@ -346,7 +368,9 @@ def _describe_fields(model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
             name=name,
             annotation=field.annotation,
             required=field.is_required(),
-            default=None if field.default is PydanticUndefined else field.default,
+            default=(
+                NO_DEFAULT if field.default is PydanticUndefined else field.default
+            ),
         )
         for name, field in model_cls.model_fields.items()
     }

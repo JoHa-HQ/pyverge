@@ -4,6 +4,8 @@ import json
 from typing import Any
 
 from datamodel_code_generator import InputFileType, generate
+from datamodel_code_generator.enums import DataModelType
+from datamodel_code_generator.format import Formatter
 from pydantic import BaseModel
 
 from pyverge.core.types import (
@@ -28,6 +30,8 @@ from pyverge.versioning import (
 class JsonSchemaModelAdapter(AbstractModelAdapter):
     """Adapter for JSON Schema documents, delegated through Pydantic."""
 
+    provider = "json_schema"
+
     def __init__(
         self,
         version_property: str = "version",
@@ -46,6 +50,8 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
                 json.dumps(document),
                 input_file_type=InputFileType.JsonSchema,
                 class_name=class_name,
+                output_model_type=DataModelType.PydanticV2BaseModel,
+                formatters=[Formatter.BUILTIN],
             )
             namespace: dict[str, Any] = {}
             exec(str(source), namespace)
@@ -126,8 +132,12 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         kind: str | None = None,
         version: str | None = None,
     ) -> VersionNode[VersionValue]:
-        return self._pydantic.versionable(
-            self._model(model_cls), kind=kind, version=version
+        resolved = self._model(model_cls)
+        return VersionNode[VersionValue](
+            _model=resolved,
+            _value=self.of(version or self.version(resolved)),
+            _kind=kind or self.kind(resolved),
+            descriptor=self.model_descriptor(resolved),
         )
 
     def version_key(

@@ -4,8 +4,8 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from .canonical import ContentHasher
-from .primitives import VersionEdge, VersionNode
+from .canonical import Addressable, ContentHasher
+from .graph import VersionEdge, VersionNode
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +40,15 @@ class JgfNode:
                 "schema_hash": node.content_hash(hasher),
             },
         )
+
+    @classmethod
+    def from_addressable(cls, value: Addressable, hasher: ContentHasher) -> JgfNode:
+        payload = value.to_canonical()
+        metadata = (
+            dict(payload) if isinstance(payload, Mapping) else {"canonical": payload}
+        )
+        metadata["content_hash"] = value.content_hash(hasher)
+        return cls(id=value.jgf_id, label=value.jgf_id, metadata=metadata)
 
     def to_dict(self) -> dict[str, Any]:
         return {

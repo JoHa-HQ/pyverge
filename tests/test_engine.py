@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import replace
 from itertools import pairwise
 from typing import Any
 from unittest.mock import MagicMock
@@ -36,7 +35,7 @@ from pyverge.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.settings import MigrationSettings
-from pyverge.versioning import EdgeKey, VersionKey
+from pyverge.versioning import EdgeKey, FieldDescriptor, VersionKey
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -117,9 +116,8 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV1], []],
                 lambda engine: engine.reconcile_model(
-                    replace(
-                        envelope_model(engine.adapter, None, UserV1),
-                        fields=frozenset({"conflict"}),
+                    envelope_model(engine.adapter, None, UserV1).with_fields(
+                        FieldDescriptor(name="conflict")
                     )
                 ),
                 ModelConflictError,
@@ -129,9 +127,8 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [pendulum.Date, "test", [UserV20250310], []],
                 lambda engine: engine.reconcile_model(
-                    replace(
-                        envelope_model(engine.adapter, None, UserV20250310),
-                        fields=frozenset({"conflict"}),
+                    envelope_model(engine.adapter, None, UserV20250310).with_fields(
+                        FieldDescriptor(name="conflict")
                     )
                 ),
                 ModelConflictError,
@@ -141,9 +138,8 @@ class TestModelManagement:
                 JsonSchemaModelAdapter,
                 [semver.Version, "test", [USER_V0_1_1_DEV_7], []],
                 lambda engine: engine.reconcile_model(
-                    replace(
-                        envelope_model(engine.adapter, None, USER_V0_1_1_DEV_7),
-                        fields=frozenset({"conflict"}),
+                    envelope_model(engine.adapter, None, USER_V0_1_1_DEV_7).with_fields(
+                        FieldDescriptor(name="conflict")
                     )
                 ),
                 ModelConflictError,
@@ -188,7 +184,7 @@ class TestModelManagement:
     ) -> None:
         """A conflict exposes the diff and a resolution hint."""
         registered = envelope_model(model_adapter, migration_settings, model)
-        incoming = replace(registered, fields=registered.fields | {"extra_field"})
+        incoming = registered.with_fields(FieldDescriptor(name="extra_field"))
         with pytest.raises(ModelConflictError) as raised:
             engine.reconcile_model(incoming)
         error = raised.value
