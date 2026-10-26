@@ -55,10 +55,12 @@ jobs:
               git push origin "$TAG"
             fi
 
-            echo "release=true" >> "$GITHUB_OUTPUT"
-            echo "dev=$DEV" >> "$GITHUB_OUTPUT"
-            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-            echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+            {
+              echo "release=true"
+              echo "dev=$DEV"
+              echo "tag=$TAG"
+              echo "sha=$SHA"
+            } >> "$GITHUB_OUTPUT"
           else
             echo "release=false" >> "$GITHUB_OUTPUT"
             echo "No release-worthy commits; skipping TestPyPI."
