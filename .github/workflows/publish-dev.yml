@@ -1,37 +1,77 @@
 name: Publish Dev (TestPyPI)
 
 on:
-  push:
-    tags: ["v*-*"]
-  pull_request:
-    types: [labeled]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: publish-dev-${{ github.ref }}
-  cancel-in-progress: true
+  group: publish-dev
+  cancel-in-progress: false
 
 jobs:
   publish:
     if: >
-      github.event_name != 'pull_request' ||
-      (github.event.label.name == 'test-pypi' &&
-       github.event.pull_request.head.repo.full_name == github.repository)
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
-    environment: testpypi
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/pyverge/
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
+          token: ${{ secrets.PUBLISHING_PAT }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: "3.11"
-      - name: Build package
-        run: uv build --no-sources
+      - run: uv sync --group dev --all-extras
+      - name: Prepare dev release
+        id: version
+        run: |
+          set -euo pipefail
+          git fetch --tags --force origin
+
+          if NEXT=$(uv run --no-sync cz bump --get-next 2>/dev/null); then
+            DEV="${NEXT}.dev${GITHUB_RUN_ID}"
+            TAG="v${DEV}"
+            SHA=$(git rev-parse HEAD)
+
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            if git rev-parse "$TAG" >/dev/null 2>&1; then
+              echo "Tag $TAG already exists"
+            else
+              git tag -a "$TAG" \
+                -m "TestPyPI ${DEV} source ${SHA} run ${GITHUB_RUN_ID}"
+              git push origin "$TAG"
+            fi
+
+            {
+              echo "release=true"
+              echo "dev=$DEV"
+              echo "tag=$TAG"
+              echo "sha=$SHA"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "No release-worthy commits; skipping TestPyPI."
+          fi
+      - name: Build distribution
+        if: steps.version.outputs.release == 'true'
+        env:
+          UV_DYNAMIC_VERSIONING_BYPASS: ${{ steps.version.outputs.dev }}
+        run: uv build
       - name: Publish to TestPyPI
+        if: steps.version.outputs.release == 'true'
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           repository-url: https://test.pypi.org/legacy/
