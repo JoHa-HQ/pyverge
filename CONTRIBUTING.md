@@ -206,11 +206,7 @@ With the issue scope, the form is `type(#issue)!: description`, for example
    known.
 5. The workflow sets the release commit message, runs Commitizen to push the
    release commit and stable tag, builds the artifact, publishes it to PyPI,
-   verifies the install, creates the GitHub Release, and updates the deployment
-   record.
-6. If PyPI publication fails after the stable tag is pushed, run
-   `Publish Existing Release` with that tag. Recovery never creates another
-   release commit or tag.
+   creates the GitHub Release, and updates the deployment record.
 
 ### Release invariants
 
@@ -218,7 +214,6 @@ With the issue scope, the form is `type(#issue)!: description`, for example
 - No release-worthy dev commit means no dev tag and no TestPyPI release.
 - A dev tag without a TestPyPI package does not permit promotion.
 - A stable tag means the release is prepared, not necessarily published.
-- Recovery is idempotent and never bumps the version again.
 - One stable release runs at a time.
 
 

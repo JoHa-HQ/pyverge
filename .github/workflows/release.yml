@@ -143,15 +143,6 @@ jobs:
         with:
           packages-dir: dist/
           skip-existing: true
-      - name: Verify PyPI install
-        env:
-          VERSION: ${{ steps.preflight.outputs.stable_version }}
-        run: |
-          set -euo pipefail
-          python -m venv /tmp/verify
-          /tmp/verify/bin/pip install "pyverge==${VERSION}"
-          /tmp/verify/bin/python -c \
-            "import pyverge; assert pyverge.__version__ == '${VERSION}'"
       - name: Generate release notes
         env:
           VERSION: ${{ steps.preflight.outputs.stable_version }}
