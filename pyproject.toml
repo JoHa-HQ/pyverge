@@ -83,12 +83,17 @@ Changelog = "https://github.com/JoHa-HQ/pyverge/blob/main/CHANGELOG.md"
 Issues = "https://github.com/JoHa-HQ/pyverge/issues"
 
 [tool.commitizen]
-name = "cz_conventional_commits"
+name = "cz_customize"
 version_provider = "scm"
 tag_format = "v$version"
-version_schema = "semver"
+version_scheme = "pep440"
 major_version_zero = true
-update_changelog_on_bump = true
+update_changelog_on_bump = false
+
+[tool.commitizen.customize]
+message_template = "{{change_type}}({{scope}}): {{message}}"
+schema_pattern = "(?s)^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(#\\d+\\))!?: .+$"
+schema = "type(#ticket)[!]: message"
 
 [tool.hatch.build.hooks.version]
 path = "src/pyverge/_version.py"

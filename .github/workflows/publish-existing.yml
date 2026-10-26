@@ -1,0 +1,91 @@
+name: Publish Existing Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Stable tag to publish (for example v0.14.1)
+        required: true
+        type: string
+
+concurrency:
+  group: publish-existing-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pyverge/
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          fetch-depth: 0
+          token: ${{ secrets.PUBLISHING_PAT }}
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Preflight existing release
+        id: preflight
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Expected a stable tag like v0.14.1" >&2
+            exit 1
+          fi
+
+          VERSION=${TAG#v}
+          if ! grep -q "^## v${VERSION} " CHANGELOG.md; then
+            echo "CHANGELOG does not contain v${VERSION}" >&2
+            exit 1
+          fi
+
+          {
+            echo "source_sha=$(git rev-parse HEAD)"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+      - name: Build distribution
+        run: uv build
+      - name: Upload distribution
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
+        with:
+          packages-dir: dist/
+          skip-existing: true
+      - name: Verify PyPI install
+        env:
+          VERSION: ${{ steps.preflight.outputs.version }}
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/verify
+          /tmp/verify/bin/pip install "pyverge==${VERSION}"
+          /tmp/verify/bin/python -c \
+            "import pyverge; assert pyverge.__version__ == '${VERSION}'"
+      - name: Generate release notes
+        env:
+          VERSION: ${{ steps.preflight.outputs.version }}
+        run: uv run --no-sync cz changelog "v${VERSION}" > RELEASE_NOTES.md
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: v${{ steps.preflight.outputs.version }}
+          name: Release v${{ steps.preflight.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*
+          fail_on_unmatched_files: true
+          make_latest: true
+          token: ${{ secrets.PUBLISHING_PAT }}

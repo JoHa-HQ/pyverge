@@ -1,104 +1,135 @@
-name: Release
+name: Promote Release
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dev_tag:
+        description: TestPyPI-validated dev tag (for example v0.14.1.dev40239661343)
+        required: true
+        type: string
 
 concurrency:
-  group: release
+  group: promote-release
   cancel-in-progress: false
 
 jobs:
-  plan:
+  publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      should_release: ${{ steps.plan.outputs.should_release }}
-      version: ${{ steps.plan.outputs.version }}
-      ticket: ${{ steps.plan.outputs.ticket }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        with:
-          python-version: "3.11"
-      - run: uv sync --group dev --all-extras
-      - name: Plan next release
-        id: plan
-        run: |
-          CURRENT=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
-          NEXT=$(uv run cz bump --get-next --yes 2>/dev/null || true)
-          NEXT=${NEXT#v}
-
-          TICKET_ID=$(git log -1 --pretty=format:"%s" | grep -oE "#[0-9]+" | head -1 || true)
-
-          if [ -z "$NEXT" ] || [ "$NEXT" = "$CURRENT" ]; then
-            echo "No release-worthy changes."
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [ -z "$TICKET_ID" ]; then
-            echo "No ticket ID found in latest commit." >&2
-            exit 1
-          fi
-
-          {
-            echo "should_release=true"
-            echo "version=$NEXT"
-            echo "ticket=$TICKET_ID"
-          } >> "$GITHUB_OUTPUT"
-
-          {
-            echo "## Release plan"
-            echo
-            echo "- Current: ${CURRENT:-none}"
-            echo "- Next: $NEXT"
-            echo "- Commit: $GITHUB_SHA"
-            echo "- Ticket: $TICKET_ID"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  release:
-    needs: plan
-    if: needs.plan.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
-    environment: release
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pyverge/
     permissions:
       contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: main
           fetch-depth: 0
-          ref: ${{ github.sha }}
           token: ${{ secrets.PUBLISHING_PAT }}
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: "3.11"
       - run: uv sync --group dev --all-extras
-      - name: Tag planned release
+      - name: Preflight promotion
+        id: preflight
+        env:
+          DEV_TAG: ${{ inputs.dev_tag }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          set -euo pipefail
+          git fetch --tags --force origin
 
-          uv run cz bump "${{ needs.plan.outputs.version }}" \
-            --yes \
-            --changelog \
-            --bump-message "chore(${{ needs.plan.outputs.ticket }}): release \$new_version [skip ci]"
-
-          VERSION=$(git describe --tags --abbrev=0)
-          if [ "$VERSION" != "v${{ needs.plan.outputs.version }}" ]; then
-            echo "Planned version v${{ needs.plan.outputs.version }} != created tag $VERSION" >&2
-            exit 1
-          fi
-          if git ls-remote --tags origin "$VERSION" | grep -q "$VERSION"; then
-            echo "Tag $VERSION already exists on origin" >&2
+          if ! [[ "$DEV_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\.dev[0-9]+$ ]]; then
+            echo "Expected a dev tag like v0.14.1.dev40239661343" >&2
             exit 1
           fi
 
-          git push origin HEAD:main
-          git push origin "$VERSION"
+          TAG_SHA=$(git rev-list -n1 "$DEV_TAG")
+          MAIN_SHA=$(git rev-parse origin/main)
+          if [ "$TAG_SHA" != "$MAIN_SHA" ]; then
+            echo "Dev tag $DEV_TAG is not the current main commit" >&2
+            exit 1
+          fi
+
+          DEV_VERSION=${DEV_TAG#v}
+          STABLE_VERSION=${DEV_VERSION%\.dev*}
+          curl -fsS "https://test.pypi.org/pypi/pyverge/${DEV_VERSION}/json" >/dev/null
+
+          LATEST_STABLE=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1)
+          if [ -z "$LATEST_STABLE" ]; then
+            echo "No stable tag found" >&2
+            exit 1
+          fi
+
+          CHANGELOG_VERSION=$(grep -m1 '^## v' CHANGELOG.md \
+            | sed -E 's/^## v([^ ]+).*/\1/')
+          if [ "$CHANGELOG_VERSION" != "${LATEST_STABLE#v}" ]; then
+            echo "CHANGELOG top ${CHANGELOG_VERSION} != latest stable tag ${LATEST_STABLE#v}" >&2
+            exit 1
+          fi
+
+          PYPI_VERSION=$(curl -fsS https://pypi.org/pypi/pyverge/json \
+            | python -c 'import json,sys; print(json.load(sys.stdin)["info"]["version"])')
+          if [ "$PYPI_VERSION" != "${LATEST_STABLE#v}" ]; then
+            echo "PyPI ${PYPI_VERSION} != latest stable tag ${LATEST_STABLE#v}" >&2
+            exit 1
+          fi
+
+          TICKET=$(git log --pretty=format:%s "${LATEST_STABLE}..${TAG_SHA}" \
+            | grep -oE '#[0-9]+' | head -n1 || true)
+          if [ -z "$TICKET" ]; then
+            echo "No ticket id found in commits since ${LATEST_STABLE}" >&2
+            exit 1
+          fi
+
+          {
+            echo "source_sha=$TAG_SHA"
+            echo "dev_version=$DEV_VERSION"
+            echo "stable_version=$STABLE_VERSION"
+            echo "ticket=$TICKET"
+          } >> "$GITHUB_OUTPUT"
+      - name: Ensure main is unchanged
+        env:
+          SOURCE_SHA: ${{ steps.preflight.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if [ "$(git rev-parse origin/main)" != "$SOURCE_SHA" ]; then
+            echo "main moved during promotion; rerun on a newer dev tag" >&2
+            exit 1
+          fi
+      - name: Set release commit message
+        env:
+          TICKET: ${{ steps.preflight.outputs.ticket }}
+        run: |
+          set -euo pipefail
+          uv run --no-sync python - <<'PY'
+          import os
+          from pathlib import Path
+
+          import tomlkit
+
+          path = Path("pyproject.toml")
+          document = tomlkit.parse(path.read_text())
+          commitizen = document["tool"]["commitizen"]
+          commitizen["bump_message"] = (
+              f"chore({os.environ['TICKET']}): release $new_version [skip ci]"
+          )
+          path.write_text(tomlkit.dumps(document))
+          PY
+      - name: Create release commit and tag
+        uses: commitizen-tools/commitizen-action@338bbd841b75aaee6bf5340e1fa12f6ab58ff9ff # 0.27.1
+        with:
+          github_token: ${{ secrets.PUBLISHING_PAT }}
+          push: true
+          commit: true
+          changelog: true
+          manual_version: ${{ steps.preflight.outputs.stable_version }}
+          git_name: github-actions[bot]
+          git_email: github-actions[bot]@users.noreply.github.com
+      - name: Restore pyproject
+        run: git checkout -- pyproject.toml
       - name: Build distribution
         run: uv build
       - name: Upload distribution
@@ -107,53 +138,31 @@ jobs:
           name: dist
           path: dist/
           if-no-files-found: error
-
-  publish:
-    needs: [plan, release]
-    runs-on: ubuntu-latest
-    environment: pypi
-    permissions:
-      contents: read
-      id-token: write
-      actions: read
-    steps:
-      - name: Download distribution
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: dist
-          path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: dist/
-
-  github-release:
-    needs: [plan, publish]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      actions: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          ref: v${{ needs.plan.outputs.version }}
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        with:
-          python-version: "3.11"
-      - run: uv sync --group dev --all-extras
-      - name: Download distribution
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: dist
-          path: dist/
-      - name: Generate release notes
-        run: uv run cz changelog "v${{ needs.plan.outputs.version }}" > RELEASE_NOTES.md
-      - name: Create GitHub Release
+          skip-existing: true
+      - name: Verify PyPI install
         env:
-          GH_TOKEN: ${{ secrets.PUBLISHING_PAT }}
+          VERSION: ${{ steps.preflight.outputs.stable_version }}
         run: |
-          gh release create "v${{ needs.plan.outputs.version }}" \
-            --title "Release v${{ needs.plan.outputs.version }}" \
-            --notes-file RELEASE_NOTES.md \
-            dist/*
+          set -euo pipefail
+          python -m venv /tmp/verify
+          /tmp/verify/bin/pip install "pyverge==${VERSION}"
+          /tmp/verify/bin/python -c \
+            "import pyverge; assert pyverge.__version__ == '${VERSION}'"
+      - name: Generate release notes
+        env:
+          VERSION: ${{ steps.preflight.outputs.stable_version }}
+        run: uv run --no-sync cz changelog "v${VERSION}" > RELEASE_NOTES.md
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          tag_name: v${{ steps.preflight.outputs.stable_version }}
+          name: Release v${{ steps.preflight.outputs.stable_version }}
+          body_path: RELEASE_NOTES.md
+          files: dist/*
+          fail_on_unmatched_files: true
+          make_latest: true
+          token: ${{ secrets.PUBLISHING_PAT }}

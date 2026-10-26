@@ -186,31 +186,40 @@ With the issue scope, the form is `type(#issue)!: description`, for example
 
 1. Merge a reviewed PR to `main`.
 2. CI must pass.
-3. The `Publish Dev (TestPyPI)` workflow requests approval from the `testpypi` environment.
-4. After approval, the workflow computes the next dev version
-   (`X.Y.Z.devN`), builds the artifact, publishes it to TestPyPI, updates the
-   deployment record, verifies the install, and creates the dev tag.
-5. Dev releases do not modify `CHANGELOG.md`.
+3. The `Publish Dev (TestPyPI)` workflow requests approval from the
+   `testpypi` environment.
+4. After approval, the workflow checks whether the commit is release-worthy.
+   If it is not, the workflow stops without creating a tag or publishing.
+5. For a release-worthy commit, the workflow computes `X.Y.Z.devN`, pushes an
+   annotated dev tag, builds the artifact, publishes it to TestPyPI, verifies
+   the install, and updates the deployment record.
+6. Dev releases do not modify `CHANGELOG.md`.
+7. If publishing fails, rerun the same workflow run. The dev tag is reused and
+   TestPyPI publishing is idempotent.
 
 ### Stable release promotion
 
 1. Choose a TestPyPI-validated dev tag.
 2. Run the `Promote Release` workflow with that dev tag.
-3. The promotion verifies the tag points to `main`, CI passed, and the matching
-   TestPyPI version exists.
-4. `Promote Release` requests approval from the `pypi` environment.
-5. After approval, the workflow computes the stable version, prepares the
-   release commit and changelog, builds the artifact, publishes it to PyPI,
-   updates the deployment record, verifies the install, pushes the stable tag,
-   and creates the GitHub Release.
-6. The stable tag is created only after PyPI verification succeeds.
+3. `Promote Release` requests approval from the `pypi` environment.
+4. After approval, preflight verifies the tag points to `main`, the matching
+   TestPyPI version exists, release state is consistent, and the ticket is
+   known.
+5. The workflow sets the release commit message, runs Commitizen to push the
+   release commit and stable tag, builds the artifact, publishes it to PyPI,
+   verifies the install, creates the GitHub Release, and updates the deployment
+   record.
+6. If PyPI publication fails after the stable tag is pushed, run
+   `Publish Existing Release` with that tag. Recovery never creates another
+   release commit or tag.
 
 ### Release invariants
 
-- TestPyPI dev releases run independently and never trigger PyPI automatically.
-- PyPI promotion is an explicit human decision followed by `pypi` approval.
-- No tag is created before environment approval and successful publication.
-- No stable changelog entry reaches `main` before the PyPI release succeeds.
+- Approval precedes preflight for both registries.
+- No release-worthy dev commit means no dev tag and no TestPyPI release.
+- A dev tag without a TestPyPI package does not permit promotion.
+- A stable tag means the release is prepared, not necessarily published.
+- Recovery is idempotent and never bumps the version again.
 - One stable release runs at a time.
 
 
