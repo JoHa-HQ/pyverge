@@ -22,7 +22,7 @@
               'name',
             ]),
             'kind': 'User',
-            'model': 'builtins.Model',
+            'model': 'Model@736405de6f63',
             'references': list([
             ]),
             'schema_hash': 'fixed-hash',
@@ -36,7 +36,7 @@
               'name',
             ]),
             'kind': 'User',
-            'model': 'builtins.Model',
+            'model': 'Model@9b875e1eb7bd',
             'references': list([
             ]),
             'schema_hash': 'fixed-hash',

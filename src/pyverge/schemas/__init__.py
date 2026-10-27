@@ -4,6 +4,7 @@ from .dataclasses import DataclassModelAdapter
 from .errors import ProviderCapabilityError
 from .json_schema import JsonSchemaModelAdapter
 from .pydantic import PydanticModelAdapter
+from .runtime import ModelRuntime, PythonModelRuntime
 from .types import (
     ModelAdapter,
     ModelIdentity,
@@ -20,8 +21,10 @@ __all__ = [
     "ModelAdapter",
     "ModelCodec",
     "ModelIdentity",
+    "ModelRuntime",
     "ProviderCapabilityError",
     "PydanticModelAdapter",
+    "PythonModelRuntime",
     "TContainer",
     "VModel",
     "VSource_co",

@@ -7,6 +7,10 @@ import typer
 from ..config import ConfigError, resolve_manager
 
 
+def _display_model(model_id: str) -> str:
+    return model_id.split("@", 1)[0].rsplit(".", 1)[-1]
+
+
 def info(
     manager: Annotated[
         str, typer.Argument(..., help="Manager import path (module:object_path)")
@@ -19,7 +23,7 @@ def info(
         typer.echo("")
 
         versions = mgr.list_versions()
-        models = sorted({v.model_id.rsplit(".", 1)[-1] for v in versions})
+        models = sorted({_display_model(v.model_id) for v in versions})
 
         if not models:
             typer.secho("No models registered", fg=typer.colors.YELLOW)
@@ -31,7 +35,7 @@ def info(
         for model_name in models:
             typer.secho(f"  {model_name}", bold=True)
             for v in versions:
-                if v.model_id.rsplit(".", 1)[-1] == model_name:
+                if _display_model(v.model_id) == model_name:
                     typer.echo(f"    • v{v.version[1]}")
 
         typer.echo(f"\nTotal: {len(models)} models")

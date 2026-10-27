@@ -44,7 +44,7 @@ class InMemoryCatalog(Generic[VersionValue]):
     >>> from pydantic import BaseModel
     >>> from pyverge.registry import Registry
     >>> from pyverge.schemas import ModelCodec
-    >>> from pyverge.providers import PydanticModelAdapter
+    >>> from pyverge.schemas import PydanticModelAdapter
     >>> from pyverge.versioning import default_content_hasher
     >>> adapter = PydanticModelAdapter(codec=ModelCodec())
     >>> class UserV1(BaseModel):

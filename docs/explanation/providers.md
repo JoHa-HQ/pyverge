@@ -65,7 +65,7 @@ Pydantic models at registration time. Both consume `ModelCodec` directly.
 container. Identity and payload behavior come from `ModelCodec`; dataclass
 reflection stays adapter-local.
 
-`pyverge.providers` contains migration backends only. Import schema adapters
+Migration backends live in `pyverge.migrations`. Import schema adapters
 from `pyverge.schemas`.
 
 ## Planned adapters

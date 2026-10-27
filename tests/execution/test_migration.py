@@ -12,12 +12,12 @@ import semver
 from pyverge import types
 from pyverge.core import MigrationContext
 from pyverge.discovery.reflection import JsonPatchRenderer
-from pyverge.providers import JsonataMigration, JsonPatchMigration
-from pyverge.providers.types import (
-    ModelHandle,
-)
+from pyverge.migrations import JsonataMigration, JsonPatchMigration
 from pyverge.registry import Registry
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
+from pyverge.schemas.types import (
+    ModelHandle,
+)
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     CompatibilityReport,

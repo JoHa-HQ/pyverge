@@ -16,7 +16,7 @@ from pyverge.core.types import (
 )
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.codec import ModelCodec
-from pyverge.schemas.type_projection import annotation_type_ref
+from pyverge.schemas.runtime import ModelRuntime, annotation_type_ref
 from pyverge.versioning import (
     NO_DEFAULT,
     Diffable,
@@ -40,8 +40,9 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
     def __init__(
         self,
         codec: ModelCodec,
+        runtime: ModelRuntime | None = None,
     ) -> None:
-        super().__init__(codec)
+        super().__init__(codec, runtime)
 
     def identify(self, model_cls: ModelHandle) -> bool:
         return isinstance(model_cls, type) and dataclasses.is_dataclass(model_cls)
@@ -145,19 +146,19 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
                 self._collect_references(nested, found, seen)
 
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        return self.model_codec.materialize(container, data)
+        return self.runtime.materialize(container, data)
 
     def dump(self, model: object) -> ModelData:
         if not dataclasses.is_dataclass(model):
             raise TypeError(
                 f"Cannot serialize {type(model).__name__}: expected a dataclass"
             )
-        return self.model_codec.dump(model)
+        return self.runtime.serialize(model)
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
     ) -> dict[str, Any]:
-        return self.model_codec.finalize(target_model, data)
+        return self.runtime.validate(target_model, data)
 
     def validate(
         self,
@@ -166,7 +167,7 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
-        return self.model_codec.validate(container, data, strict=strict)
+        return self.runtime.validate(container, data, strict=strict)
 
     def type_ref(self, annotation: Any) -> TypeRef:
         return annotation_type_ref(
@@ -224,7 +225,7 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
         return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
 
     def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        anchor = self.model_codec.resolve(diff.source.descriptor.ref)
+        anchor = self.runtime.resolve(diff.source.descriptor.ref)
         version = diff.target.version[1]
         version_field = (
             self.version_property,

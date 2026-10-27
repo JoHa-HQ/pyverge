@@ -10,6 +10,7 @@ from pyverge.core.types import (
 )
 from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.errors import ProviderCapabilityError
+from pyverge.schemas.runtime import ModelRuntime, PythonModelRuntime
 from pyverge.versioning import (
     Comparable,
     Diff,
@@ -35,8 +36,13 @@ class AbstractModelAdapter(Generic[VersionValue]):
 
     provider: str = "custom"
 
-    def __init__(self, codec: ModelCodec) -> None:
+    def __init__(
+        self,
+        codec: ModelCodec,
+        runtime: ModelRuntime | None = None,
+    ) -> None:
         self.model_codec = codec
+        self.runtime = runtime or PythonModelRuntime()
 
     @property
     def version_property(self) -> str:
@@ -47,13 +53,17 @@ class AbstractModelAdapter(Generic[VersionValue]):
         return self.model_codec.kind_property
 
     def model_id(self, handle: ModelHandle) -> str:
-        return self.model_codec.model_id(handle)
+        return self.runtime.model_id(handle)
 
     def ref(self, handle: ModelHandle) -> ModelRef:
-        return self.model_codec.ref(handle, provider=self.provider)
+        return self.runtime.remember(
+            handle,
+            provider=self.provider,
+            model_id=self.model_id(handle),
+        )
 
     def resolve(self, ref: ModelRef) -> ModelHandle:
-        return self.model_codec.resolve(ref)
+        return self.runtime.resolve(ref)
 
     def materialize(self, diff: Diffable[VersionValue]) -> VersionNode[VersionValue]:
         if diff.source.version > diff.target.version:

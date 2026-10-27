@@ -29,9 +29,6 @@ from pyverge.execution.extractors import (
 )
 from pyverge.export import ManifestDiff
 from pyverge.jgf import JgfExporter, JgfImporter
-from pyverge.providers.types import (
-    ModelHandle,
-)
 from pyverge.registry import InMemoryCatalog, Registry
 from pyverge.registry.errors import (
     CatalogError,
@@ -45,6 +42,9 @@ from pyverge.registry.errors import (
 )
 from pyverge.registry.types import PathCatalog
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
+from pyverge.schemas.types import (
+    ModelHandle,
+)
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     EdgeKey,

@@ -15,7 +15,7 @@ from pyverge.core.types import (
 from pyverge.manager.types import (
     ManagerClassState,
 )
-from pyverge.providers import JsonataMigration, JsonPatchMigration
+from pyverge.migrations import JsonataMigration, JsonPatchMigration
 from pyverge.schemas.types import (
     ModelHandle,
 )

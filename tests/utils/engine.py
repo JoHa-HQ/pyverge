@@ -6,11 +6,11 @@ from typing import Any, cast
 
 from pyverge.core import MigrationFunc, VersionValue
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
-from pyverge.providers.types import (
+from pyverge.registry import Registry
+from pyverge.schemas.types import (
     ModelAdapter,
     ModelHandle,
 )
-from pyverge.registry import Registry
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import Diff, VersionEdge, VersionKey, VersionNode
 

@@ -24,15 +24,15 @@ from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
 )
-from pyverge.providers.types import (
-    ModelAdapter,
-    ModelHandle,
-)
 from pyverge.registry.errors import (
     CatalogError,
     ModelNotFoundError,
 )
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.schemas.types import (
+    ModelAdapter,
+    ModelHandle,
+)
 from pyverge.settings import MigrationSettings, VersioningSettings, manager_kwargs
 from pyverge.versioning import Migratable, Versionable
 from tests.examples.json import (

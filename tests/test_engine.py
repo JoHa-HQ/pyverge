@@ -17,10 +17,7 @@ from pyverge.execution import (
     fixed_target_resolver,
     latest_target_resolver,
 )
-from pyverge.providers import JsonPatchMigration
-from pyverge.providers.types import (
-    ModelHandle,
-)
+from pyverge.migrations import JsonPatchMigration
 from pyverge.registry.errors import (
     CatalogError,
     MigrationAlreadyRegisteredError,
@@ -31,6 +28,9 @@ from pyverge.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.schemas.types import (
+    ModelHandle,
+)
 from pyverge.settings import MigrationSettings
 from pyverge.versioning import EdgeKey, FieldDescriptor, TypeRef, VersionKey
 from tests.examples.json import (

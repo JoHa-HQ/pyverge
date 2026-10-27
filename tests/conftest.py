@@ -33,12 +33,12 @@ from pyverge.execution.types import BackendPort
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.providers.types import (
-    ModelAdapter,
-)
 from pyverge.registry import Registry
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.codec import ModelCodec
+from pyverge.schemas.types import (
+    ModelAdapter,
+)
 from pyverge.settings import (
     DiscoverySettings,
     MigrationSettings,
