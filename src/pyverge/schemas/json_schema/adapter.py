@@ -53,8 +53,10 @@ class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
             exec(str(source), namespace)
             self._rebuild(namespace)
             digest = hashlib.sha256(document_json.encode()).hexdigest()[:12]
+            generated_module = f"pyverge.generated.{digest}"
             for obj in namespace.values():
                 if isinstance(obj, type) and issubclass(obj, BaseModel):
+                    obj.__module__ = generated_module
                     self._model_ids[obj] = f"{obj.__name__}@{digest}"
             self._cache[key] = self._root_model(namespace, class_name)
         return self._cache[key]

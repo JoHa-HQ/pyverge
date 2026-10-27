@@ -214,10 +214,7 @@ class PythonModelRuntime:
             provider=provider,
             model_id=model_id or self.model_id(handle),
         )
-        existing = self._handles.get(ref)
-        if existing is not None and existing is not handle:
-            raise ValueError(f"ModelRef collision for {ref}")
-        self._handles[ref] = handle
+        self._handles.setdefault(ref, handle)
         return ref
 
     def resolve(self, ref: ModelRef) -> ModelHandle:
