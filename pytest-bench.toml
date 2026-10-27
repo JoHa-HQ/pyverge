@@ -1,0 +1,4 @@
+[tool.pytest.ini_options]
+testpaths = ["tests/benchmarks"]
+python_files = ["bench_*.py"]
+addopts = "-m benchmark --benchmark-only --benchmark-json=reports/benchmarks.json"

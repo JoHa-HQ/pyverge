@@ -18,6 +18,8 @@ from pyverge.adapters.fastmcp import (
 from pyverge.discovery import RegistrationCollector
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
+pytestmark = pytest.mark.benchmark
+
 
 @pytest.fixture(scope="module")
 def loop() -> Any:

@@ -115,9 +115,10 @@ convention = "google"
 add-ignore = ["D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "benchmarks/tests"]
+testpaths = ["tests"]
 python_files = ["test_*.py", "bench_*.py"]
-addopts = "--cov=pyverge --cov-report=term-missing --cov-fail-under=80 --doctest-modules"
+addopts = "-m 'not benchmark' --cov=pyverge --cov-report=term-missing --cov-fail-under=80 --doctest-modules"
+markers = ["benchmark: performance benchmarks"]
 
 [tool.ruff]
 target-version = "py311"

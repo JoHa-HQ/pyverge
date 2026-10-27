@@ -7,11 +7,13 @@ from typing import Any
 import pytest
 from faststream.kafka import KafkaBroker, TestKafkaBroker
 
-from benchmarks.adapters.faststream._support import new_loop, run
-from benchmarks.graphs import user_manager
-from benchmarks.synthesis import payloads
 from pyverge.adapters.faststream import publisher, subscriber
+from tests.benchmarks.adapters.faststream._support import new_loop, run
+from tests.benchmarks.factories import payloads
+from tests.benchmarks.graphs import user_manager
 from tests.examples.pydantic.semver import UserV3
+
+pytestmark = pytest.mark.benchmark
 
 IN_TOPIC = "in"
 OUT_TOPIC = "out"

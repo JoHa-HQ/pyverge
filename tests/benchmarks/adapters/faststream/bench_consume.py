@@ -6,7 +6,7 @@ Two benchmarks share the same broker and payload:
 * ``test_consume_baseline`` — a plain FastStream subscriber (no pyverge).
 
 The delta isolates the adapter's per-message cost from FastStream's own overhead.
-Payloads are synthesized from the model and validated (see ``benchmarks.synthesis``).
+Payloads are synthesized and validated via ``tests.benchmarks.factories``.
 """
 
 from __future__ import annotations
@@ -17,11 +17,13 @@ from typing import Any
 import pytest
 from faststream.kafka import KafkaBroker, TestKafkaBroker
 
-from benchmarks.adapters.faststream._support import new_loop, run
-from benchmarks.graphs import user_manager
-from benchmarks.synthesis import payloads
 from pyverge.adapters.faststream import subscriber
+from tests.benchmarks.adapters.faststream._support import new_loop, run
+from tests.benchmarks.factories import payloads
+from tests.benchmarks.graphs import user_manager
 from tests.examples.pydantic.semver import UserV3
+
+pytestmark = pytest.mark.benchmark
 
 TOPIC = "bench"
 

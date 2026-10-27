@@ -1,0 +1,41 @@
+name: Benchmarks
+
+on:
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark:
+    if: github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.11"
+      - run: uv sync --group dev --all-extras
+      - name: Run benchmarks
+        run: uv run pytest tests/benchmarks -c pytest-bench.toml
+      - name: Upload benchmark reports
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: benchmark-reports
+          path: reports/
+          if-no-files-found: error
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@4322e5726e6334590d251fc4f92bec0efafc45dc # v1.22.2
+        with:
+          tool: pytest
+          output-file-path: reports/benchmarks.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: false
+          comment-on-alert: ${{ github.event_name == 'pull_request_review' }}
+          alert-threshold: "150%"
+          fail-on-alert: false
+          summary-always: true
