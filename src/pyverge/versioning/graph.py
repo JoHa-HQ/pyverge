@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import total_ordering
 from typing import TYPE_CHECKING, Any, Generic, Self
@@ -161,6 +162,23 @@ class VersionNode(Generic[VersionValue]):
                 f"{kind}@{version}" for kind, version in self.references
             ),
         }
+
+    @classmethod
+    def from_canonical(
+        cls,
+        value: Mapping[str, Any],
+        *,
+        parse_version: Callable[[str], Any],
+    ) -> VersionNode[VersionValue]:
+        return cls(
+            key=VersionKey[VersionValue](
+                _value=parse_version(str(value["version"])),
+                _kind=str(value["kind"]),
+            ),
+            descriptor=ModelDescriptor.from_canonical(
+                value["model"], parse_version=parse_version
+            ),
+        )
 
     def to_canonical(self) -> dict[str, Any]:
         return {

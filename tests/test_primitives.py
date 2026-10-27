@@ -34,6 +34,7 @@ from pyverge.versioning import (
     ModelRef,
     TypeRef,
     VersionKey,
+    VersionNode,
     default_canonicalizer,
     default_content_hasher,
     default_encoders,
@@ -902,6 +903,18 @@ class TestPrimitives:
             ).ref.model_id
             == "demo.Other"
         )
+
+    @pytest.mark.parametrize(
+        "node",
+        [[DataclassModelAdapter[semver.Version], DataclassPersonV1]],
+        indirect=True,
+    )
+    def test_node_canonical_round_trip(self, node) -> None:
+        payload = node.to_canonical()
+        restored = VersionNode.from_canonical(payload, parse_version=ModelCodec().of)
+
+        assert restored.to_canonical() == payload
+        assert restored.descriptor == node.descriptor
 
     @pytest.mark.parametrize(
         "node",

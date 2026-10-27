@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Self, TypeAlias
@@ -38,6 +38,10 @@ class ModelRef:
 
     def to_canonical(self) -> dict[str, str]:
         return {"model_id": self.model_id, "provider": self.provider}
+
+    @classmethod
+    def from_canonical(cls, value: Mapping[str, Any]) -> ModelRef:
+        return cls(provider=str(value["provider"]), model_id=str(value["model_id"]))
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,6 +110,32 @@ class TypeRef:
     def unknown(cls, name: str) -> TypeRef:
         return cls(TypeKind.UNKNOWN, name=name)
 
+    @classmethod
+    def from_canonical(cls, value: Mapping[str, Any]) -> TypeRef:
+        fields = value.get("fields")
+        return cls(
+            kind=TypeKind(value["kind"]),
+            name=None if value.get("name") is None else str(value["name"]),
+            item=(
+                None if value.get("item") is None else cls.from_canonical(value["item"])
+            ),
+            args=tuple(cls.from_canonical(arg) for arg in value.get("args", ())),
+            fields=(
+                None
+                if fields is None
+                else FrozenMap(
+                    {str(key): cls.from_canonical(item) for key, item in fields.items()}
+                )
+            ),
+            ref=(
+                None
+                if value.get("ref") is None
+                else ModelRef.from_canonical(value["ref"])
+            ),
+            version=(None if value.get("version") is None else str(value["version"])),
+            values=tuple(value.get("values", ())),
+        )
+
     def to_canonical(self) -> dict[str, Any]:
         payload: dict[str, Any] = {"kind": self.kind.value}
         if self.name is not None:
@@ -137,6 +167,28 @@ class FieldDescriptor:
     default: DefaultValue = NO_DEFAULT
     references: tuple[ModelVersionKey, ...] = ()
     annotation: Any = field(default=None, compare=False, repr=False)
+
+    @classmethod
+    def from_canonical(
+        cls,
+        value: Mapping[str, Any],
+        *,
+        parse_version: Callable[[str], Any],
+    ) -> FieldDescriptor:
+        references = tuple(
+            (str(item["kind"]), parse_version(str(item["version"])))
+            for item in value.get("references", ())
+        )
+        default: DefaultValue = (
+            NO_DEFAULT if "default" not in value else value["default"]
+        )
+        return cls(
+            name=str(value["name"]),
+            type_ref=TypeRef.from_canonical(value["type_ref"]),
+            required=bool(value.get("required", False)),
+            default=default,
+            references=references,
+        )
 
     def to_canonical(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -182,6 +234,25 @@ class ModelDescriptor:
 
     def without_fields(self, *names: str) -> Self:
         return type(self)(ref=self.ref, fields=self.fields.removed(names))
+
+    @classmethod
+    def from_canonical(
+        cls,
+        value: Mapping[str, Any],
+        *,
+        parse_version: Callable[[str], Any],
+    ) -> ModelDescriptor:
+        return cls(
+            ref=ModelRef.from_canonical(value["ref"]),
+            fields=FrozenMap(
+                {
+                    str(name): FieldDescriptor.from_canonical(
+                        item, parse_version=parse_version
+                    )
+                    for name, item in value.get("fields", {}).items()
+                }
+            ),
+        )
 
     def to_canonical(self) -> dict[str, Any]:
         return {
