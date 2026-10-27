@@ -29,6 +29,13 @@ pip install "pyverge[faststream]"   # messaging adapter
 
 Development: `uv sync --group dev`.
 
+## Licensing
+
+This project is licensed under the Apache License 2.0, except for files in the
+`tests/` directory, which are licensed separately under the GNU General Public
+License v3.0 or later (GPL-3.0-or-later). The root `LICENSE` file applies to
+library and runtime code, while `tests/LICENSE` governs the validation suite.
+
 > Upgrading from the previous Manager API? See the
 > [upgrade guide](docs/reference/upgrades.md) for `migrate`/`amigrate`,
 > `MigrationSettings`, runner, and import-path replacements.
