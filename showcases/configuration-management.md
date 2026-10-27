@@ -46,7 +46,9 @@ from pydantic import BaseModel
 from pyverge import Manager
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-FeatureFlagsManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+FeatureFlagsManager = Manager[semver.Version].configure(
+    PydanticModelAdapter(codec=ModelCodec())
+)
 
 
 @FeatureFlagsManager.model()

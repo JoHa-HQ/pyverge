@@ -35,7 +35,9 @@ from pydantic import BaseModel
 from pyverge import Manager
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+OrderManager = Manager[semver.Version].configure(
+    PydanticModelAdapter(codec=ModelCodec())
+)
 
 
 @OrderManager.model()
@@ -71,9 +73,7 @@ class TelemetryGateway:
 
     def __init__(self, client: mqtt.Client, manager, target=None):
         self._client = client
-        self._runner = manager.runner(
-            direction="forward", on_missing_path="raise"
-        )
+        self._runner = manager.runner(direction="forward", on_missing_path="raise")
         self._target = target or {"*": "latest"}
 
     def on_telemetry(self, _client, _userdata, msg: mqtt.MQTTMessage) -> None:

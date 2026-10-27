@@ -35,7 +35,9 @@ from pydantic import BaseModel
 from pyverge import Manager
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+OrderManager = Manager[semver.Version].configure(
+    PydanticModelAdapter(codec=ModelCodec())
+)
 
 
 @OrderManager.model()
@@ -71,9 +73,7 @@ class DocumentStore:
 
     def __init__(self, collection: AsyncIOMotorCollection, manager, target="latest"):
         self._collection = collection
-        self._runner = manager.runner(
-            direction="forward", on_missing_path="raise"
-        )
+        self._runner = manager.runner(direction="forward", on_missing_path="raise")
         self._target = target
 
     async def get(self, doc_id: str) -> dict:

@@ -51,7 +51,9 @@ from pydantic import BaseModel
 from pyverge import Manager
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-TempSensorManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+TempSensorManager = Manager[semver.Version].configure(
+    PydanticModelAdapter(codec=ModelCodec())
+)
 
 
 @TempSensorManager.model()
