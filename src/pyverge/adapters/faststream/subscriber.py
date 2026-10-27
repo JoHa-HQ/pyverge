@@ -34,7 +34,10 @@ def _candidate_models(
 ) -> list[Any]:
     kind = manager.get_model(declared).kind
     if header is not None:
-        return [version.model for version in manager.list_versions(kind)]
+        return [
+            manager.engine.adapter.resolve(version.descriptor.ref)
+            for version in manager.list_versions(kind)
+        ]
     if isinstance(targets, TopicTargets):
         found: list[Any] = []
         for topic in topics:

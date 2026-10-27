@@ -16,8 +16,8 @@ from pydantic import create_model
 
 from pyverge import Manager
 from pyverge.adapters.fastmcp import FastMCPDiscovery, ToolReflection
-from pyverge.providers import PydanticModelAdapter
 from pyverge.registry.errors import MissingReferenceError, ModelConflictError
+from pyverge.schemas import PydanticModelAdapter
 from pyverge.settings import MigrationSettings, manager_kwargs
 from tests.examples.pydantic.semver_nested import (
     AddressV1,

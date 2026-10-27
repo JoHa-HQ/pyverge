@@ -7,7 +7,7 @@ from pyverge.core.errors import CatalogError, PyvergeError
 from pyverge.core.types import MIGRATION_PAIR_LEN, ModelHandle, ModelVersionKey
 
 if TYPE_CHECKING:
-    from pyverge.versioning import MigrationKey
+    from pyverge.versioning import MigrationKey, ModelRef
 
 
 class GraphLockedError(CatalogError):
@@ -25,7 +25,9 @@ class ModelNotFoundError(CatalogError):
     """Raised when a model or version cannot be found in the catalog."""
 
     def __init__(
-        self: Self, catalog_name: str, key: ModelVersionKey | ModelHandle
+        self: Self,
+        catalog_name: str,
+        key: ModelVersionKey | ModelHandle | ModelRef,
     ) -> None:
         self.key = key
         super().__init__(catalog_name, f"Model not found: {key}")

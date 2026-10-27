@@ -1,3 +1,3 @@
-from .adapter import PydanticDiff, PydanticModelAdapter
+from .adapter import PydanticModelAdapter
 
-__all__ = ["PydanticDiff", "PydanticModelAdapter"]
+__all__ = ["PydanticModelAdapter"]

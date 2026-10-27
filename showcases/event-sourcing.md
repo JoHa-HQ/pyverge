@@ -51,9 +51,11 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter())
+OrderManager = Manager[semver.Version].configure(
+    PydanticModelAdapter(codec=ModelCodec())
+)
 
 
 @OrderManager.model()

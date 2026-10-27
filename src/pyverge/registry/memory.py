@@ -6,7 +6,6 @@ from typing import Generic, Self, cast
 from pyverge.core.types import (
     Attachable,
     MigrationFunc,
-    ModelHandle,
     ModelKind,
     ModelVersionKey,
     VersionValue,
@@ -26,6 +25,7 @@ from pyverge.versioning import (
     ContentHasher,
     EdgeKey,
     Migratable,
+    ModelRef,
     Transitional,
     VersionKey,
     VersionNode,
@@ -43,9 +43,10 @@ class InMemoryCatalog(Generic[VersionValue]):
     >>> import semver
     >>> from pydantic import BaseModel
     >>> from pyverge.registry import Registry
-    >>> from pyverge.providers import PydanticModelAdapter
+    >>> from pyverge.schemas import ModelCodec
+    >>> from pyverge.schemas import PydanticModelAdapter
     >>> from pyverge.versioning import default_content_hasher
-    >>> adapter = PydanticModelAdapter()
+    >>> adapter = PydanticModelAdapter(codec=ModelCodec())
     >>> class UserV1(BaseModel):
     ...     kind: Literal["User"] = "User"
     ...     version: Literal["1.0.0"] = "1.0.0"
@@ -60,9 +61,9 @@ class InMemoryCatalog(Generic[VersionValue]):
     >>> v2 = adapter.versionable(UserV2)
     >>> _ = registry.store_model(v1)
     >>> _ = registry.store_model(v2)
-    >>> registry.get_model(v1).model is UserV1
+    >>> registry.get_model(v1).model_id == "tests.UserV1"
     True
-    >>> registry.latest("User").model is UserV2
+    >>> registry.latest("User").model_id == "tests.UserV2"
     True
     """
 
@@ -84,7 +85,7 @@ class InMemoryCatalog(Generic[VersionValue]):
         self._by_kinds: dict[ModelKind, list[VersionNode[VersionValue]]] = defaultdict(
             list
         )
-        self._by_models: dict[ModelHandle, VersionNode[VersionValue]] = {}
+        self._by_models: dict[ModelRef, VersionNode[VersionValue]] = {}
         self._migrations: dict[ModelKind, list[Migratable[VersionValue]]] = defaultdict(
             list
         )
@@ -142,10 +143,10 @@ class InMemoryCatalog(Generic[VersionValue]):
         to_idx = bisect.bisect_left(kind_versions, key.target)
         return abs(from_idx - to_idx) == 1
 
-    def models(self: Self, kind: ModelKind | None) -> frozenset[ModelHandle]:
+    def models(self: Self, kind: ModelKind | None) -> frozenset[ModelRef]:
         if kind is None:
-            return frozenset(v.model for v in self._by_models.values())
-        return frozenset(v.model for v in self._by_kinds.get(kind, []))
+            return frozenset(self._by_models)
+        return frozenset(v.descriptor.ref for v in self._by_kinds.get(kind, []))
 
     def migrations(self: Self, kind: ModelKind) -> list[Migratable[VersionValue]]:
         return self._migrations.get(kind, [])
@@ -285,7 +286,7 @@ class InMemoryCatalog(Generic[VersionValue]):
                 catalog_name=self._name,
                 version=version.version,
             )
-        self._by_models[version.model] = version
+        self._by_models[version.descriptor.ref] = version
         bisect.insort_left(self._by_versions, version)
         bisect.insort_left(self._by_kinds[version.version[0]], version)
         return version
@@ -323,12 +324,10 @@ class InMemoryCatalog(Generic[VersionValue]):
             return model
         return None
 
-    def get_model_by_handle(
-        self: Self, handle: ModelHandle
-    ) -> VersionNode[VersionValue]:
-        if target := self._by_models.get(handle):
+    def get_model_by_ref(self: Self, ref: ModelRef) -> VersionNode[VersionValue]:
+        if target := self._by_models.get(ref):
             return target
-        raise ModelNotFoundError(self._name, handle)
+        raise ModelNotFoundError(self._name, ref)
 
     def remove_model(self: Self, key: Comparable) -> None:
         self._ensure_mutable("remove_model")
@@ -352,14 +351,14 @@ class InMemoryCatalog(Generic[VersionValue]):
         version = self._by_versions[version_idx]
 
         del self._by_kinds[key.kind][kind_idx]
-        del self._by_models[version.model]
+        del self._by_models[version.descriptor.ref]
         del self._by_versions[version_idx]
 
-    def remove_model_by_handle(self: Self, handle: ModelHandle) -> None:
-        self._ensure_mutable("remove_model_by_handle")
-        if handle not in self._by_models:
-            raise ModelNotFoundError(self._name, handle)
-        self.remove_model(self._by_models[handle])
+    def remove_model_by_ref(self: Self, ref: ModelRef) -> None:
+        self._ensure_mutable("remove_model_by_ref")
+        if ref not in self._by_models:
+            raise ModelNotFoundError(self._name, ref)
+        self.remove_model(self._by_models[ref])
 
     def clear_models(self: Self) -> None:
         self._ensure_mutable("clear_models")

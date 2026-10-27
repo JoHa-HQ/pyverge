@@ -267,10 +267,10 @@ class Engine(Generic[VersionValue]):
         return self.registry.get_model(key)
 
     def get_model_by_class(self: Self, cls: ModelHandle) -> VersionNode[VersionValue]:
-        return self.registry.get_model_by_handle(cls)
+        return self.registry.get_model_by_ref(self.adapter.ref(cls))
 
     def remove_model_by_class(self: Self, cls: ModelHandle) -> None:
-        self.registry.remove_model_by_handle(cls)
+        self.registry.remove_model_by_ref(self.adapter.ref(cls))
 
     def remove_model(self: Self, key: Comparable[VersionValue]) -> None:
         self.registry.remove_model(key)

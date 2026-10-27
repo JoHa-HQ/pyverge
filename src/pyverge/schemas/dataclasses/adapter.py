@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, cast, get_args, get_origin, get_type_hints
+from typing import (
+    Any,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from pyverge.core.types import (
     ModelData,
@@ -10,52 +15,37 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.schemas.base import AbstractModelAdapter
-from pyverge.schemas.diff import FieldDescriptor, SchemaDiffer
+from pyverge.schemas.codec import ModelCodec
+from pyverge.schemas.runtime import ModelRuntime, annotation_type_ref
 from pyverge.versioning import (
-    Comparable,
-    Diff,
+    NO_DEFAULT,
     Diffable,
-    DiffOrigin,
-    Versionable,
-    VersionKey,
-    VersionNode,
+    FieldDescriptor,
+    TypeRef,
+    default_canonicalizer,
 )
 
 
-class DataclassModelAdapter(AbstractModelAdapter):
-    """Model adapter for ordinary :mod:`dataclasses` classes."""
+class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
+    """Model adapter for ordinary :mod:`dataclasses` classes.
 
-    def _field_default(self, model_cls: ModelHandle, name: str) -> str:
-        for field in dataclasses.fields(model_cls):
-            if field.name != name:
-                continue
-            if field.default is not dataclasses.MISSING:
-                return (
-                    field.default
-                    if isinstance(field.default, str)
-                    else str(field.default)
-                )
-            if field.default_factory is not dataclasses.MISSING:
-                return str(field.default_factory())
-            return ""
-        return ""
+    Dataclasses are the runtime container, but payload validation and
+    coercion are delegated to Pydantic.  This keeps the richer validation
+    surface (nested coercion, defaults, constraints, strict mode) available
+    while the graph keeps an opaque stdlib handle.
+    """
 
-    def version(self, model_cls: ModelHandle) -> str:
-        return self._field_default(model_cls, self._version_property)
+    provider = "dataclass"
 
-    def kind(self, model_cls: ModelHandle) -> str:
-        return self._field_default(model_cls, self._kind_property)
+    def __init__(
+        self,
+        codec: ModelCodec,
+        runtime: ModelRuntime | None = None,
+    ) -> None:
+        super().__init__(codec, runtime)
 
     def identify(self, model_cls: ModelHandle) -> bool:
         return isinstance(model_cls, type) and dataclasses.is_dataclass(model_cls)
-
-    def fields(self, model_cls: ModelHandle) -> frozenset[str]:
-        identity = {self._version_property, self._kind_property}
-        return frozenset(
-            field.name
-            for field in dataclasses.fields(model_cls)
-            if field.name not in identity
-        )
 
     def _hints(self, model_cls: ModelHandle) -> dict[str, Any]:
         try:
@@ -155,59 +145,20 @@ class DataclassModelAdapter(AbstractModelAdapter):
                 found.add((kind, version))
                 self._collect_references(nested, found, seen)
 
-    def _coerce(self, annotation: Any, value: Any) -> Any:
-        if value is None:
-            return None
-        if isinstance(annotation, type) and dataclasses.is_dataclass(annotation):
-            if isinstance(value, annotation):
-                return value
-            return self.instantiate(annotation, cast(ModelData, value))
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-        if origin is list and args and isinstance(value, list):
-            return [self._coerce(args[0], item) for item in value]
-        if origin is not None and type(None) in args:
-            for arg in args:
-                if arg is type(None):
-                    continue
-                try:
-                    return self._coerce(arg, value)
-                except (TypeError, ValueError):
-                    continue
-        return value
-
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        values: dict[str, Any] = {}
-        hints = self._hints(container)
-        for field in dataclasses.fields(container):
-            if not field.init:
-                continue
-            if field.name in data:
-                values[field.name] = self._coerce(
-                    hints.get(field.name, field.type), data[field.name]
-                )
-            elif field.default is not dataclasses.MISSING:
-                values[field.name] = field.default
-            elif field.default_factory is not dataclasses.MISSING:
-                values[field.name] = field.default_factory()
-            else:
-                raise TypeError(
-                    f"Missing required dataclass field '{field.name}' "
-                    f"for {container.__name__}"
-                )
-        return container(**values)
+        return self.runtime.materialize(container, data)
 
     def dump(self, model: object) -> ModelData:
         if not dataclasses.is_dataclass(model):
             raise TypeError(
                 f"Cannot serialize {type(model).__name__}: expected a dataclass"
             )
-        return dataclasses.asdict(cast(Any, model))
+        return self.runtime.serialize(model)
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
     ) -> dict[str, Any]:
-        return self.dump(self.instantiate(target_model, data))
+        return self.runtime.validate(target_model, data)
 
     def validate(
         self,
@@ -216,79 +167,74 @@ class DataclassModelAdapter(AbstractModelAdapter):
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
-        return self.dump(self.instantiate(container, data))
+        return self.runtime.validate(container, data, strict=strict)
+
+    def type_ref(self, annotation: Any) -> TypeRef:
+        return annotation_type_ref(
+            annotation,
+            resolve_model=self.resolve_model,
+            model_ref=self.ref,
+            version=self.version,
+        )
 
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
         hints = self._hints(model_cls)
-        return {
+        descriptors = {
             field.name: FieldDescriptor(
                 name=field.name,
+                type_ref=self.type_ref(hints.get(field.name, field.type)),
                 annotation=hints.get(field.name, field.type),
                 required=(
                     field.default is dataclasses.MISSING
                     and field.default_factory is dataclasses.MISSING
                 ),
                 default=(
-                    field.default
+                    default_canonicalizer().encode(field.default)
                     if field.default is not dataclasses.MISSING
-                    else field.default_factory()
+                    else default_canonicalizer().encode(field.default_factory())
                     if field.default_factory is not dataclasses.MISSING
-                    else None
+                    else NO_DEFAULT
                 ),
             )
             for field in dataclasses.fields(model_cls)
         }
-
-    def versionable(
-        self,
-        model_cls: ModelHandle,
-        *,
-        kind: str | None = None,
-        version: str | None = None,
-    ) -> VersionNode[VersionValue]:
-        return VersionNode[VersionValue](
-            _model=model_cls,
-            _value=self.of(version or self.version(model_cls)),
-            _kind=kind or self.kind(model_cls),
-            references=self.references(model_cls),
-            fields=self.fields(model_cls),
-            model_id=self.model_id(model_cls),
-        )
-
-    def version_key(
-        self,
-        *,
-        kind: str,
-        version: str,
-    ) -> Comparable[VersionValue]:
-        return VersionKey[VersionValue](_value=self.of(version), _kind=kind)
-
-    def diff(
-        self,
-        source: Versionable[VersionValue],
-        target: Comparable[VersionValue],
-    ) -> Diff[VersionValue]:
-        if getattr(target, "model", None) is None:
-            return Diff(
-                source=source,
-                target=target,
-                fields={},
-                origin=DiffOrigin.SCHEMA,
+        for field in dataclasses.fields(model_cls):
+            references = self._field_references(
+                model_cls, hints.get(field.name, field.type)
             )
+            descriptors[field.name] = dataclasses.replace(
+                descriptors[field.name], references=references
+            )
+        return descriptors
 
-        return SchemaDiffer().diff(source, target, self.describe_fields)
+    def _field_references(
+        self, model_cls: ModelHandle, annotation: Any
+    ) -> tuple[ModelVersionKey, ...]:
+        found: set[ModelVersionKey] = set()
+        for nested in self._iter_models(annotation):
+            if nested is model_cls:
+                continue
+            kind = self.kind(nested)
+            if not kind:
+                continue
+            try:
+                found.add((kind, self.of(self.version(nested))))
+            except (TypeError, ValueError):
+                continue
+            found.update(self.references(nested))
+        return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
 
     def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        anchor = diff.source.model
+        anchor = self.runtime.resolve(diff.source.descriptor.ref)
         version = diff.target.version[1]
         version_field = (
-            self._version_property,
+            self.version_property,
             str,
             dataclasses.field(default=str(version)),
         )
         fields: list[Any] = [version_field]
         for field in dataclasses.fields(anchor):
-            if field.name in {self._version_property, *diff.removed_fields}:
+            if field.name in {self.version_property, *diff.removed_fields}:
                 continue
             if field.default is not dataclasses.MISSING:
                 fields.append(

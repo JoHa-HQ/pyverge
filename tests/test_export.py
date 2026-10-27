@@ -17,12 +17,9 @@ from pyverge.export import (
     ManifestVersion,
 )
 from pyverge.jgf import JgfExporter
-from pyverge.providers import (
-    JsonSchemaModelAdapter,
-    PydanticModelAdapter,
-)
-from pyverge.providers.types import ModelHandle
 from pyverge.registry import Registry
+from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.schemas.types import ModelHandle
 from pyverge.versioning import (
     ChangeSet,
     ContentHasher,
@@ -30,6 +27,7 @@ from pyverge.versioning import (
     DiffOrigin,
     FieldChange,
     FieldStatus,
+    FrozenMap,
     default_canonicalizer,
 )
 from tests.examples.json import USER_V2025_01_01, USER_V2025_03_10
@@ -126,11 +124,13 @@ def test_diff_exposes_field_changes(
     diff = Diff(
         source=registry.versions[0],
         target=registry.versions[1],
-        fields={
-            "age": FieldChange(FieldStatus.ADDED, {}),
-            "legacy": FieldChange(FieldStatus.REMOVED, {}),
-            "name": FieldChange(FieldStatus.MODIFIED, {"type_changed": True}),
-        },
+        fields=FrozenMap(
+            {
+                "age": FieldChange(FieldStatus.ADDED, {}),
+                "legacy": FieldChange(FieldStatus.REMOVED, {}),
+                "name": FieldChange(FieldStatus.MODIFIED, {"type_changed": True}),
+            }
+        ),
         origin=DiffOrigin.SCHEMA,
     )
 

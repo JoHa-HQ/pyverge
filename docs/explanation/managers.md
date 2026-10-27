@@ -40,8 +40,10 @@ an MCP tool server, a tenant track — not by kind, file, or team ownership.
 
 ```python
 # One bounded context: the Weather service, its own complete graph.
+from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec
+
 WeatherManager = Manager[semver.Version].configure(
-    JsonSchemaModelAdapter(),
+    JsonSchemaModelAdapter(codec=ModelCodec()),
 )
 
 # Everything Weather can reach lives here: the tool kind AND its nested kinds.

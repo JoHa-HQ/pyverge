@@ -7,9 +7,11 @@ from migrations import migrate_address, migrate_person
 from models import AddressV1, AddressV2, PersonV1, PersonV2
 
 from pyverge import Manager
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-PersonManager = Manager[semver.Version].configure(PydanticModelAdapter())
+PersonManager = Manager[semver.Version].configure(
+    PydanticModelAdapter(codec=ModelCodec())
+)
 
 PersonManager.model(AddressV1)
 PersonManager.model(AddressV2)

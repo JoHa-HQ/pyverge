@@ -9,12 +9,10 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
-from pyverge.versioning import Comparable, Diffable, Versionable
-
-from .diff import FieldDescriptor
+from pyverge.versioning import Comparable, Diffable, FieldDescriptor, Versionable
 
 if TYPE_CHECKING:
-    from pyverge.versioning import Diff, VersionNode
+    from pyverge.versioning import Diff, ModelRef, VersionNode
 
 #: Provider model TypeVars.  These live outside core on purpose: core operates
 #: on opaque :data:`ModelHandle` values, so no provider model base appears in a
@@ -38,79 +36,8 @@ class ModelIdentity(Protocol):
 
 
 @runtime_checkable
-class ModelIdentityPort(ModelIdentity, Protocol):
-    """Identity surface for version registration."""
-
-    def version(self, model_cls: ModelHandle) -> str: ...
-    def kind(self, model_cls: ModelHandle) -> str: ...
-    @property
-    def version_property(self) -> str: ...
-    @property
-    def kind_property(self) -> str: ...
-    def of(self, value: str | VersionValue) -> VersionValue: ...
-
-
 @runtime_checkable
-class SchemaInspector(Protocol):
-    """Read-only schema surface."""
-
-    def fields(self, model_cls: ModelHandle) -> frozenset[str]: ...
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]: ...
-    def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]: ...
-    def resolve_model(self, annotation: Any) -> ModelHandle | None: ...
-    def field_model(
-        self, parent_model: ModelHandle, field_name: str
-    ) -> ModelHandle | None: ...
-
-
-@runtime_checkable
-class PayloadCodec(Protocol):
-    """Payload validation / materialization surface."""
-
-    def finalize(
-        self, target_model: ModelHandle, data: dict[str, Any]
-    ) -> dict[str, Any]: ...
-    def validate(
-        self,
-        data: dict[str, Any],
-        container: ModelHandle,
-        *,
-        strict: bool = False,
-    ) -> dict[str, Any]: ...
-    def instantiate(self, container: ModelHandle, data: ModelData) -> Any: ...
-    def dump(self, model: object) -> ModelData: ...
-
-
-@runtime_checkable
-class ContainerPolicy(Protocol):
-    """Container compatibility surface."""
-
-    def can_handle(
-        self, container: Any, *, fields: frozenset[str] | None = None
-    ) -> bool: ...
-    def ensure_compatible(self, container: Any, *, fields: frozenset[str]) -> None: ...
-
-
-@runtime_checkable
-class SchemaDiffProvider(Protocol):
-    """Schema diff surface."""
-
-    def diff(
-        self,
-        source: Versionable[VersionValue_co],
-        target: Comparable[VersionValue_co],
-    ) -> Diff[VersionValue_co]: ...
-
-
-@runtime_checkable
-class ModelMaterializerPort(Protocol):
-    """Model materialization surface."""
-
-    def materialize_model(self, diff: Diffable[VersionValue_co]) -> ModelHandle: ...
-
-
-@runtime_checkable
-class ModelAdapter(ModelIdentity, Protocol):
+class ModelAdapter(ModelIdentity, Protocol[VersionValue_co]):
     """Provider-specific model operations.
 
     The single provider seam: the migration engine and registry stay
@@ -166,20 +93,24 @@ class ModelAdapter(ModelIdentity, Protocol):
 
     def identify(self, model_cls: ModelHandle) -> bool: ...
 
+    def ref(self, handle: ModelHandle) -> ModelRef: ...
+
+    def resolve(self, ref: ModelRef) -> ModelHandle: ...
+
     def versionable(
         self,
         model_cls: ModelHandle,
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> VersionNode[VersionValue]: ...
+    ) -> VersionNode[VersionValue_co]: ...
 
     def version_key(
         self,
         *,
         kind: str,
         version: str,
-    ) -> Comparable[VersionValue]: ...
+    ) -> Comparable[VersionValue_co]: ...
 
     def diff(
         self,
@@ -191,3 +122,7 @@ class ModelAdapter(ModelIdentity, Protocol):
         self,
         diff: Diffable[VersionValue_co],
     ) -> ModelHandle: ...
+
+    def materialize(
+        self, diff: Diffable[VersionValue_co]
+    ) -> VersionNode[VersionValue_co]: ...

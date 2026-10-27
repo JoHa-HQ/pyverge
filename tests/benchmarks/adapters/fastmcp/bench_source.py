@@ -6,6 +6,7 @@ import asyncio
 from typing import Any
 
 import pytest
+import semver
 from fastmcp import FastMCP
 
 from pyverge.adapters.fastmcp import (
@@ -15,7 +16,9 @@ from pyverge.adapters.fastmcp import (
     ToolReflection,
 )
 from pyverge.discovery import RegistrationCollector
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
+
+pytestmark = pytest.mark.benchmark
 
 
 @pytest.fixture(scope="module")
@@ -27,7 +30,7 @@ def loop() -> Any:
 
 @pytest.fixture(scope="module")
 def source() -> FastMCPSource:
-    adapter = PydanticModelAdapter()
+    adapter = PydanticModelAdapter[semver.Version](codec=ModelCodec())
     server = FastMCP("source-bench")
 
     @server.tool(name="User", version="2.0.0")

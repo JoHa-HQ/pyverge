@@ -244,3 +244,6 @@ showcases/ci/target/
 !.vale/styles/config/vocabularies/
 !.vale/styles/config/vocabularies/Project/
 !.vale/styles/config/vocabularies/Project/accept.txt
+
+# Benchmark reports
+reports/

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import pytest
 
-from benchmarks.migrations._support import build_chain, payload
 from pyverge.jgf import JgfExporter
 from pyverge.versioning import default_content_hasher
+from tests.benchmarks.migrations._support import build_chain, payload
+
+pytestmark = pytest.mark.benchmark
 
 SIZES = [5, 25, 50]
 

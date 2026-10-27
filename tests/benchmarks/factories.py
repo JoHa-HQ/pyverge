@@ -1,4 +1,4 @@
-"""Schema-rigorous payload synthesis for benchmarks.
+"""Hypothesis payload factory for benchmarks.
 
 Payloads are generated from the registered models with Hypothesis
 (``st.from_type``) and never hand-written, then serialized the way the adapter
@@ -16,6 +16,11 @@ from hypothesis import strategies as st
 from pyverge import Manager
 
 
+def payload_strategy(model: type) -> st.SearchStrategy[Any]:
+    """Return the Hypothesis strategy for a registered model."""
+    return st.from_type(model)
+
+
 def valid_instances(model: type, count: int) -> list[Any]:
     """Return up to *count* schema-valid instances of *model*, deterministically.
 
@@ -31,7 +36,7 @@ def valid_instances(model: type, count: int) -> list[Any]:
         deadline=None,
         suppress_health_check=list(HealthCheck),
     )
-    @given(st.from_type(model))
+    @given(payload_strategy(model))
     def _collect(instance: Any) -> None:
         pool.append(instance)
 
@@ -51,9 +56,8 @@ def payloads(
     Each payload is serialized from a generated instance and validated against
     the source version's model; an invalid one raises rather than being used.
     """
-    model = manager.get(kind, version).model
-    if model is None:
-        raise ValueError(f"No concrete model registered for {kind}@{version}")
+    node = manager.get(kind, version)
+    model = manager.engine.adapter.resolve(node.descriptor.ref)
 
     result: list[dict[str, Any]] = []
     for instance in valid_instances(model, count):
@@ -63,4 +67,4 @@ def payloads(
     return result
 
 
-__all__ = ["payloads", "valid_instances"]
+__all__ = ["payload_strategy", "payloads", "valid_instances"]

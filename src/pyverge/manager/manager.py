@@ -15,7 +15,6 @@ from pyverge.migrations.identity import (
 )
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.registry import Registry
-from pyverge.schemas.backend import ModelMaterializer
 from pyverge.schemas.types import (
     ModelAdapter,
 )
@@ -103,8 +102,7 @@ class Manager(
         reflector = Reflector[VersionValue](
             adapter,
             settings.diff_provider or Reflection(adapter, CompositeDiffDiscovery()),
-            model_materializer=settings.model_materializer
-            or ModelMaterializer(adapter),
+            model_materializer=settings.model_materializer or adapter,
             migration_materializer=(
                 settings.migration_materializer
                 or MigrationMaterializer(JsonPatchMigrationBackend())

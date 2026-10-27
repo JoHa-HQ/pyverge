@@ -9,10 +9,10 @@ from pydantic import BaseModel
 from pyverge import Manager
 from pyverge.export import ManifestDiff
 from pyverge.jgf import JgfExporter
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.versioning import default_content_hasher
 
-UserManager = Manager[semver.Version].configure(PydanticModelAdapter())
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
 
 
 @UserManager.model()

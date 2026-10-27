@@ -12,7 +12,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.discovery import MigrationSpec, RegisterMigration
-from pyverge.providers import JsonataMigration, JsonPatchMigration
+from pyverge.migrations import JsonataMigration, JsonPatchMigration
 from pyverge.versioning import EdgeKey, Migratable
 
 from ..descriptors import hybridmethod

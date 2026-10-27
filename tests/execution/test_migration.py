@@ -12,17 +12,12 @@ import semver
 from pyverge import types
 from pyverge.core import MigrationContext
 from pyverge.discovery.reflection import JsonPatchRenderer
-from pyverge.providers import (
-    JsonataMigration,
-    JsonPatchMigration,
-    JsonSchemaModelAdapter,
-    PydanticDiff,
-    PydanticModelAdapter,
-)
-from pyverge.providers.types import (
+from pyverge.migrations import JsonataMigration, JsonPatchMigration
+from pyverge.registry import Registry
+from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
+from pyverge.schemas.types import (
     ModelHandle,
 )
-from pyverge.registry import Registry
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     CompatibilityReport,
@@ -30,7 +25,10 @@ from pyverge.versioning import (
     DiffOrigin,
     FieldChange,
     FieldStatus,
+    FrozenMap,
     MigrationIdentity,
+    ModelDescriptor,
+    ModelRef,
     VersionEdge,
     VersionKey,
     VersionNode,
@@ -258,8 +256,8 @@ class TestCompiler:
         }
 
 
-class TestPydanticDiff:
-    """Tests for ``PydanticDiff`` — construction, predicates, rendering."""
+class TestDiff:
+    """Tests for ``Diff`` — construction, predicates, rendering."""
 
     @pytest.mark.parametrize(
         "source_model, target_model",
@@ -280,7 +278,7 @@ class TestPydanticDiff:
         source = envelope_model(model_adapter, versioning_settings, source_model)
         target = envelope_model(model_adapter, versioning_settings, target_model)
 
-        diff = PydanticDiff.from_pair(source=source, target=target)
+        diff = Diff.from_pair(source=source, target=target, adapter=model_adapter)
         assert diff.has_additions
         assert "last_name" in diff.added_fields
 
@@ -303,7 +301,7 @@ class TestPydanticDiff:
         source = envelope_model(model_adapter, versioning_settings, source_model)
         target = envelope_model(model_adapter, versioning_settings, target_model)
 
-        diff = PydanticDiff.from_pair(source=source, target=target)
+        diff = Diff.from_pair(source=source, target=target, adapter=model_adapter)
         assert diff.has_removals
         assert "last_name" in diff.removed_fields
 
@@ -315,7 +313,7 @@ class TestPydanticDiff:
         """from_pair returns identity diff when models are identical."""
         version = envelope_model(model_adapter, versioning_settings, UserV1)
 
-        diff = PydanticDiff.from_pair(source=version, target=version)
+        diff = Diff.from_pair(source=version, target=version, adapter=model_adapter)
         assert diff.is_identity
         assert not diff.has_additions
         assert not diff.has_removals
@@ -330,7 +328,7 @@ class TestPydanticDiff:
         source = envelope_model(model_adapter, versioning_settings, UserV1)
         target = envelope_model(model_adapter, versioning_settings, UserV2)
 
-        diff = PydanticDiff.from_pair(source=source, target=target)
+        diff = Diff.from_pair(source=source, target=target, adapter=model_adapter)
         assert diff.added_default("age") is None
 
     def test_added_required(
@@ -342,7 +340,7 @@ class TestPydanticDiff:
         source = envelope_model(model_adapter, versioning_settings, UserV1)
         target = envelope_model(model_adapter, versioning_settings, UserV3)
 
-        diff = PydanticDiff.from_pair(source=source, target=target)
+        diff = Diff.from_pair(source=source, target=target, adapter=model_adapter)
         assert "status" in diff.added_fields
         assert diff.added_default("status") == "active"
 
@@ -355,7 +353,7 @@ class TestPydanticDiff:
         source = envelope_model(model_adapter, versioning_settings, UserV1)
         target = envelope_model(model_adapter, versioning_settings, UserV2)
 
-        diff = PydanticDiff.from_pair(source=source, target=target)
+        diff = Diff.from_pair(source=source, target=target, adapter=model_adapter)
         serialized = diff.render(JsonPatchRenderer())
         assert isinstance(serialized, list)
         add_ops = [op for op in serialized if op["op"] == "add"]
@@ -370,7 +368,7 @@ class TestPydanticDiff:
         source = envelope_model(model_adapter, versioning_settings, UserV1)
         target = envelope_model(model_adapter, versioning_settings, UserV2)
 
-        diff = PydanticDiff.from_pair(source=source, target=target)
+        diff = Diff.from_pair(source=source, target=target, adapter=model_adapter)
         assert diff.source is source
         assert diff.target is target
 
@@ -383,7 +381,7 @@ class TestPydanticDiff:
         source = envelope_model(model_adapter, versioning_settings, UserV1)
         target = envelope_model(model_adapter, versioning_settings, UserV2)
 
-        diff = PydanticDiff.from_pair(source=source, target=target)
+        diff = Diff.from_pair(source=source, target=target, adapter=model_adapter)
         assert diff.edge == (source, target)
 
     @pytest.mark.parametrize(
@@ -449,29 +447,29 @@ def _schema(version: str, props: dict, required: list[str] | None = None) -> dic
 
 class TestJsonSchemaModelAdapter:
     def test_version_and_kind(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         schema = _schema("1.0.0", {"name": {"type": "string"}})
         model = adapter.to_pydantic(schema)
         assert adapter.version(model) == "1.0.0"
         assert adapter.kind(model) == "User"
 
     def test_versionable(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         schema = _schema("1.0.0", {"name": {"type": "string"}})
         model = adapter.to_pydantic(schema)
         versionable = adapter.versionable(model)
-        assert versionable.model is model
+        assert adapter.resolve(versionable.descriptor.ref) is model
         assert str(versionable.version[1]) == "1.0.0"
 
     def test_validate_valid_payload(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         schema = _schema("1.0.0", {"name": {"type": "string"}}, required=["name"])
         model = adapter.to_pydantic(schema)
         result = adapter.validate({"name": "Alice"}, model)
         assert result["name"] == "Alice"
 
     def test_validate_invalid_payload_raises(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         schema = _schema("1.0.0", {"name": {"type": "string"}}, required=["name"])
         model = adapter.to_pydantic(schema)
         try:
@@ -482,7 +480,7 @@ class TestJsonSchemaModelAdapter:
             raise AssertionError("expected validation error")
 
     def test_finalize_applies_defaults(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         schema = _schema(
             "1.0.0",
             {"name": {"type": "string"}, "age": {"type": "integer", "default": 0}},
@@ -493,7 +491,7 @@ class TestJsonSchemaModelAdapter:
         assert result["age"] == 0
 
     def test_meta_endpoint_empty_diff(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         meta_node = VersionKey(_value=semver.Version(0, 1, 0), _kind="User")
         real = adapter.versionable(
             adapter.to_pydantic(_schema("1.0.0", {"name": {"type": "string"}}))
@@ -507,7 +505,7 @@ class TestJsonSchemaModelAdapter:
 
 class TestJsonSchemaDiff:
     def test_detects_added_and_removed(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         source = adapter.versionable(
             adapter.to_pydantic(_schema("1.0.0", {"name": {"type": "string"}}))
         )
@@ -524,7 +522,7 @@ class TestJsonSchemaDiff:
         assert diff.has_additions
 
     def test_detects_modified_type(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         source = adapter.versionable(
             adapter.to_pydantic(_schema("1.0.0", {"age": {"type": "string"}}))
         )
@@ -536,7 +534,7 @@ class TestJsonSchemaDiff:
         assert "type_changed" in diff.modified_fields["age"]
 
     def test_cross_kind_raises(self) -> None:
-        adapter = JsonSchemaModelAdapter()
+        adapter = JsonSchemaModelAdapter(codec=ModelCodec())
         source = adapter.versionable(adapter.to_pydantic(_schema("1.0.0", {})))
         target = adapter.versionable(
             adapter.to_pydantic(
@@ -568,13 +566,15 @@ class TestCompatibilityReport:
         modified: dict[str, dict[str, Any]] | None = None,
         added_info: dict[str, dict[str, Any]] | None = None,
     ) -> CompatibilityReport:
-        source = VersionNode(
-            _model=type("Model", (), {}),
-            _value=semver.Version.parse("1.0.0"),
-            _kind="User",
-            references=frozenset(),
-            fields=frozenset(),
-            model_id="tests.Model",
+        source = VersionNode[semver.Version](
+            key=VersionKey(
+                _value=semver.Version.parse("1.0.0"),
+                _kind="User",
+            ),
+            descriptor=ModelDescriptor(
+                ref=ModelRef(provider="test", model_id="tests.Model"),
+                fields=FrozenMap(),
+            ),
         )
         target = VersionKey(
             _value=semver.Version.parse("2.0.0"),
@@ -594,7 +594,7 @@ class TestCompatibilityReport:
         diff = Diff(
             source=source,
             target=target,
-            fields=fields,
+            fields=FrozenMap(fields),
             origin=DiffOrigin.SCHEMA,
         )
         return CompatibilityReport.from_diff(
@@ -693,7 +693,7 @@ class TestJsonataMigration:
 
 
 def test_version_edge_wraps_migration_failure() -> None:
-    adapter = PydanticModelAdapter()
+    adapter = PydanticModelAdapter(codec=ModelCodec())
     source = adapter.versionable(UserV1)
     target = adapter.versionable(UserV2)
 

@@ -192,7 +192,11 @@ class TargetResolutionMixin(Generic[VersionValue]):
         anchor = engine.get_model_by_class(declared)
         resolver = cls._resolve_target_policy(target, engine=engine)
         resolved = resolver(anchor)
-        return resolved.model if resolved is not None else None
+        return (
+            engine.adapter.resolve(resolved.descriptor.ref)
+            if resolved is not None
+            else None
+        )
 
     @_resolve_target_policy.register(type)
     @classmethod

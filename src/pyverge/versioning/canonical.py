@@ -17,6 +17,16 @@ class Canonicalizable(Protocol):
     def to_canonical(self) -> Canonical: ...
 
 
+@runtime_checkable
+class Addressable(Canonicalizable, Protocol):
+    """A canonical value with graph identity and content address."""
+
+    @property
+    def jgf_id(self) -> str: ...
+
+    def content_hash(self, hasher: ContentHasher) -> str: ...
+
+
 class ValueEncoder(Protocol):
     """One canonical-value encoder in the composition chain."""
 
@@ -216,6 +226,7 @@ class ContentHasher:
 
 
 __all__ = [
+    "Addressable",
     "Canonicalizable",
     "Canonicalizer",
     "ContentHasher",
@@ -223,4 +234,29 @@ __all__ = [
     "Sha256",
     "TypeEncoder",
     "ValueEncoder",
+    "default_canonicalizer",
+    "default_content_hasher",
+    "default_encoders",
 ]
+
+
+def default_encoders() -> tuple[ValueEncoder, ...]:
+    return (
+        ScalarEncoder(),
+        FloatEncoder(),
+        BytesEncoder(),
+        MappingEncoder(),
+        SequenceEncoder(),
+        SetEncoder(),
+        CanonicalizableEncoder(),
+        DataclassEncoder(),
+        TypeEncoder(),
+    )
+
+
+def default_canonicalizer() -> Canonicalizer:
+    return Canonicalizer(default_encoders())
+
+
+def default_content_hasher() -> ContentHasher:
+    return ContentHasher(default_canonicalizer(), Sha256())

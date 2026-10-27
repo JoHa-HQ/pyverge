@@ -1,9 +1,10 @@
-from .backend import ModelMaterializer
 from .base import AbstractModelAdapter
+from .codec import ModelCodec
 from .dataclasses import DataclassModelAdapter
 from .errors import ProviderCapabilityError
 from .json_schema import JsonSchemaModelAdapter
-from .pydantic import PydanticDiff, PydanticModelAdapter
+from .pydantic import PydanticModelAdapter
+from .runtime import ModelRuntime, PythonModelRuntime
 from .types import (
     ModelAdapter,
     ModelIdentity,
@@ -18,11 +19,12 @@ __all__ = [
     "DataclassModelAdapter",
     "JsonSchemaModelAdapter",
     "ModelAdapter",
+    "ModelCodec",
     "ModelIdentity",
-    "ModelMaterializer",
+    "ModelRuntime",
     "ProviderCapabilityError",
-    "PydanticDiff",
     "PydanticModelAdapter",
+    "PythonModelRuntime",
     "TContainer",
     "VModel",
     "VSource_co",

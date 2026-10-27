@@ -24,7 +24,7 @@ def export(
                 kind: [
                     {
                         "version": str(version.version[1]),
-                        "model": getattr(version.model, "__name__", None),
+                        "model": version.model_id,
                         "fields": sorted(version.fields),
                         "references": [
                             [ref_kind, str(ref_version)]

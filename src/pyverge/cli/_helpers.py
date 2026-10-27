@@ -40,11 +40,12 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
+from pyverge.schemas import ModelCodec
 from pyverge.schemas.pydantic import PydanticModelAdapter
 
 # Create a configured manager class
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(),
+    PydanticModelAdapter(codec=ModelCodec()),
 )
 
 

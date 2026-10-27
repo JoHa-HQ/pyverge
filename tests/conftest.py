@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -33,15 +33,12 @@ from pyverge.execution.types import BackendPort
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.providers import (
-    JsonSchemaModelAdapter,
-    PydanticModelAdapter,
-)
-from pyverge.providers.types import (
+from pyverge.registry import Registry
+from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.schemas.codec import ModelCodec
+from pyverge.schemas.types import (
     ModelAdapter,
 )
-from pyverge.registry import Registry
-from pyverge.schemas.backend import ModelMaterializer
 from pyverge.settings import (
     DiscoverySettings,
     MigrationSettings,
@@ -50,8 +47,9 @@ from pyverge.settings import (
     overrides,
     without_identity,
 )
+from pyverge.types import VersionEdge
 from pyverge.versioning import DiffMaterializer, default_content_hasher
-from tests.utils import register_models
+from tests.utils import edge_from_nodes, envelope_model, register_models
 from tests.utils.engine import register_migrations
 from tests.utils.source import StaticSource
 
@@ -84,8 +82,10 @@ def pydantic_model_adapter(
     versioning_settings: VersioningSettings,
 ) -> PydanticModelAdapter:
     return PydanticModelAdapter(
-        version_property=versioning_settings.version_property,
-        kind_property=versioning_settings.kind_property,
+        codec=ModelCodec(
+            version_property=versioning_settings.version_property,
+            kind_property=versioning_settings.kind_property,
+        )
     )
 
 
@@ -94,8 +94,10 @@ def json_model_adapter(
     versioning_settings: VersioningSettings,
 ) -> JsonSchemaModelAdapter:
     return JsonSchemaModelAdapter(
-        version_property=versioning_settings.version_property,
-        kind_property=versioning_settings.kind_property,
+        codec=ModelCodec(
+            version_property=versioning_settings.version_property,
+            kind_property=versioning_settings.kind_property,
+        )
     )
 
 
@@ -109,6 +111,39 @@ def model_adapter(
     if provider is PydanticModelAdapter:
         return request.getfixturevalue("pydantic_model_adapter")
     raise ValueError(f"Unknown provider: {provider}")
+
+
+@pytest.fixture
+def node(
+    request: pytest.FixtureRequest,
+    versioning_settings: VersioningSettings,
+) -> Any:
+    adapter_cls, model = request.param
+    adapter = adapter_cls(
+        codec=ModelCodec(
+            version_property=versioning_settings.version_property,
+            kind_property=versioning_settings.kind_property,
+        )
+    )
+    result = envelope_model(adapter, versioning_settings, model)
+    return result
+
+
+@pytest.fixture
+def edge(
+    request: pytest.FixtureRequest,
+    versioning_settings: VersioningSettings,
+) -> VersionEdge:
+    adapter_cls, source_model, target_model, func = request.param
+    adapter = adapter_cls(
+        codec=ModelCodec(
+            version_property=versioning_settings.version_property,
+            kind_property=versioning_settings.kind_property,
+        )
+    )
+    source = envelope_model(adapter, versioning_settings, source_model)
+    target = envelope_model(adapter, versioning_settings, target_model)
+    return edge_from_nodes(adapter, source, target, func=func)
 
 
 @pytest.fixture(scope="function", params=[(VersionValue, "test", [], [])])
@@ -222,8 +257,8 @@ def runner(
 
 
 @pytest.fixture
-def model_materializer(model_adapter: ModelAdapter) -> ModelMaterializer:
-    return ModelMaterializer(model_adapter)
+def model_materializer(model_adapter: ModelAdapter) -> ModelAdapter:
+    return model_adapter
 
 
 @pytest.fixture
@@ -235,7 +270,7 @@ def migration_materializer(request: pytest.FixtureRequest) -> MigrationMateriali
 @pytest.fixture
 def reflector(
     model_adapter: ModelAdapter,
-    model_materializer: ModelMaterializer,
+    model_materializer: ModelAdapter,
     migration_materializer: DiffMaterializer[object],
     migration_settings: MigrationSettings,
 ) -> Reflector[VersionValue]:

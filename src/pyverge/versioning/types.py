@@ -14,7 +14,6 @@ from typing import (
 from pyverge.core.types import (
     MigrationFunc,
     ModelData,
-    ModelHandle,
     ModelKind,
     ModelVersionKey,
     VersionValue_co,
@@ -25,6 +24,9 @@ from .canonical import ContentHasher
 if TYPE_CHECKING:
     from pyverge.core.context import MigrationContext
     from pyverge.core.types import Attachable
+
+    from .diff import Diff
+    from .schema import ModelDescriptor
 
 T_co = TypeVar("T_co", covariant=True)
 RenderOutput = TypeVar("RenderOutput")
@@ -78,10 +80,10 @@ class Comparable(JgfIdentifiable, Orderable, Protocol[VersionValue_co]):
 
 @runtime_checkable
 class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co]):
-    """Materialized version with an opaque model handle."""
+    """Materialized version with a serializable model descriptor."""
 
     @property
-    def model(self) -> ModelHandle: ...
+    def descriptor(self) -> ModelDescriptor: ...
     @property
     def references(self) -> frozenset[ModelVersionKey]: ...
     @property
@@ -98,6 +100,16 @@ class Transitional(Orderable, Protocol[VersionValue_co]):
     def source(self) -> Comparable: ...
     @property
     def target(self) -> Comparable: ...
+
+
+class DiffProvider(Protocol):
+    """Anything that can build a schema diff from two version endpoints."""
+
+    def diff(
+        self,
+        source: Versionable,
+        target: Comparable,
+    ) -> Diff: ...
 
 
 @runtime_checkable
@@ -215,6 +227,7 @@ __all__ = [
     "Delta",
     "DiffMaterializer",
     "DiffOrigin",
+    "DiffProvider",
     "DiffRenderer",
     "Diffable",
     "Fingerprintable",

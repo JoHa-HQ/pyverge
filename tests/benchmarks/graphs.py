@@ -10,7 +10,7 @@ import semver
 
 from pyverge import Manager
 from pyverge.core import MigrationContext
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 from tests.examples.pydantic.semver import (
     UserV1,
@@ -46,7 +46,9 @@ def user_manager() -> Manager[semver.Version]:
     Reverse edges let a produce seam converge a returned ``latest`` (v3) payload
     down to a pinned older target.
     """
-    user_manager_cls = Manager[semver.Version].configure(PydanticModelAdapter())
+    user_manager_cls = Manager[semver.Version].configure(
+        PydanticModelAdapter[semver.Version](codec=ModelCodec())
+    )
     user_manager_cls.store_model(UserV1)
     user_manager_cls.store_model(UserV2)
     user_manager_cls.store_model(UserV3)

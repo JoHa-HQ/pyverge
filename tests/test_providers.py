@@ -2,20 +2,31 @@
 
 from __future__ import annotations
 
+import pendulum
 import pytest
+from pydantic import ValidationError
 
 from pyverge.discovery.reflection import CompositeDiffDiscovery, Reflection
 from pyverge.engine import Engine
+from pyverge.migrations import JsonPatchMigration
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.providers import (
-    JsonPatchMigration,
+from pyverge.schemas import (
+    DataclassModelAdapter,
     JsonSchemaModelAdapter,
+    ModelCodec,
     PydanticModelAdapter,
 )
-from pyverge.schemas import DataclassModelAdapter
-from pyverge.schemas.backend import ModelMaterializer
 from pyverge.settings import MigrationSettings, VersioningSettings
-from pyverge.versioning import Diff, DiffOrigin, EdgeKey, FieldChange, FieldStatus
+from pyverge.versioning import (
+    Diff,
+    DiffOrigin,
+    EdgeKey,
+    FieldChange,
+    FieldDescriptor,
+    FieldStatus,
+    FrozenMap,
+    TypeRef,
+)
 from tests.examples.dataclasses import (
     AddressV1,
     ContactV1,
@@ -45,7 +56,7 @@ def _add_age():
 
 ADAPTERS = [
     pytest.param(
-        PydanticModelAdapter(),
+        PydanticModelAdapter(codec=ModelCodec()),
         UserV1,
         UserV2,
         {
@@ -58,14 +69,14 @@ ADAPTERS = [
         id="pydantic",
     ),
     pytest.param(
-        JsonSchemaModelAdapter(),
+        JsonSchemaModelAdapter(codec=ModelCodec()),
         USER_V1_0_0,
         USER_V2_0_0,
         {"kind": "User", "version": "1.0.0", "name": "Alice"},
         id="json_schema",
     ),
     pytest.param(
-        DataclassModelAdapter(),
+        DataclassModelAdapter(codec=ModelCodec()),
         DataclassUserV1,
         DataclassUserV2,
         {
@@ -86,7 +97,11 @@ def test_adapter_identity_and_codec(adapter, source_model, target_model, payload
     node = adapter.versionable(source_model)
     assert node.kind == "User"
     assert str(node.version[1]) == "1.0.0"
-    assert "version" not in adapter.fields(node.model)
+    assert "version" not in adapter.fields(adapter.resolve(node.descriptor.ref))
+    assert adapter.model_codec.version_property == "version"
+    assert adapter.model_codec.kind_property == "kind"
+    assert adapter.identify(adapter.resolve(node.descriptor.ref))
+    assert adapter.can_handle(adapter.resolve(node.descriptor.ref))
     if not isinstance(source_model, dict):
         instance = adapter.instantiate(source_model, payload)
         assert adapter.dump(instance)["kind"] == "User"
@@ -115,7 +130,7 @@ def test_adapter_diff_and_migration_materialization(
 def test_model_materializer(adapter, source_model, target_model, payload):
     source = adapter.versionable(source_model)
     target = adapter.versionable(target_model)
-    node = ModelMaterializer(adapter).materialize(adapter.diff(source, target))
+    node = adapter.materialize(adapter.diff(source, target))
     assert node.version == target.version
 
 
@@ -130,7 +145,7 @@ def test_diff_provider(adapter, source_model, target_model, payload):
 
 
 def test_diff_origin_from_migration():
-    adapter = PydanticModelAdapter()
+    adapter = PydanticModelAdapter(codec=ModelCodec())
     reflection = Reflection(adapter, CompositeDiffDiscovery())
     v1 = envelope_model(adapter, MigrationSettings(), UserV1)
     v2 = envelope_model(adapter, MigrationSettings(), UserV2)
@@ -163,8 +178,9 @@ def test_reconstructs_missing_model_on_store_migration(
     )
     reconstructed = engine.get_model(meta)
 
-    assert reconstructed.model is not None
-    assert "age" not in reconstructed.model.model_fields
+    reconstructed_model = engine.adapter.resolve(reconstructed.descriptor.ref)
+    assert reconstructed_model is not None
+    assert "age" not in reconstructed_model.model_fields
 
 
 @pytest.mark.parametrize(
@@ -193,7 +209,7 @@ def test_proposes_migration_from_schema_diff(
 
 @pytest.fixture
 def dataclass_adapter() -> DataclassModelAdapter:
-    return DataclassModelAdapter()
+    return DataclassModelAdapter(codec=ModelCodec())
 
 
 @pytest.mark.parametrize(
@@ -303,7 +319,7 @@ def test_dataclass_instantiate_nested_lists_defaults_and_errors(
     assert person.contacts[0].phone == "123"
     assert dataclass_adapter.finalize(PersonV1, {"name": "Bob"})["name"] == "Bob"
     assert dataclass_adapter.validate({"name": "Cara"}, PersonV1)["name"] == "Cara"
-    with pytest.raises(TypeError, match="Missing required dataclass field"):
+    with pytest.raises(ValidationError, match="Field required"):
         dataclass_adapter.instantiate(RequiredValue, {})
 
 
@@ -311,14 +327,24 @@ def test_dataclass_describe_fields_and_materialize(
     dataclass_adapter: DataclassModelAdapter,
 ) -> None:
     described = dataclass_adapter.describe_fields(PersonV1)
+    assert described["name"].type_ref == TypeRef.primitive("string")
     assert not described["name"].required
     assert not described["address"].required
-    assert described["address"].default == AddressV1()
+    assert described["address"].default == {
+        "kind": "Address",
+        "version": "1.0.0",
+        "street": "",
+    }
     assert dataclass_adapter.describe_fields(RequiredValue)["value"].required
 
     source = dataclass_adapter.versionable(PersonV1)
     target = dataclass_adapter.version_key(kind="Person", version="2.0.0")
-    diff = Diff(source=source, target=target, fields={}, origin=DiffOrigin.SCHEMA)
+    diff = Diff(
+        source=source,
+        target=target,
+        fields=FrozenMap(),
+        origin=DiffOrigin.SCHEMA,
+    )
     materialized = dataclass_adapter.materialize_model(diff)
     node = dataclass_adapter.versionable(materialized)
     assert node.kind == "Person"
@@ -335,13 +361,172 @@ def test_dataclass_materialize_with_added_and_defaulted_fields(
     diff = Diff(
         source=source,
         target=target,
-        fields={
-            "zip": FieldChange(FieldStatus.ADDED, {"type": str, "default": "00000"}),
-            "country": FieldChange(FieldStatus.ADDED, {"type": str, "required": True}),
-        },
+        fields=FrozenMap(
+            {
+                "zip": FieldChange(
+                    FieldStatus.ADDED, {"type": str, "default": "00000"}
+                ),
+                "country": FieldChange(
+                    FieldStatus.ADDED, {"type": str, "required": True}
+                ),
+            }
+        ),
         origin=DiffOrigin.SCHEMA,
     )
     materialized = dataclass_adapter.materialize_model(diff)
     instance = materialized(zip="12345", country="DE")
     assert instance.zip == "12345"
     assert instance.country == "DE"
+
+
+def test_model_codec_identity_operations() -> None:
+    codec = ModelCodec(version_property="v", kind_property="k")
+    fields = FrozenMap(
+        {
+            "v": FieldDescriptor(
+                name="v", type_ref=TypeRef.primitive("string"), default="1.2.3"
+            ),
+            "k": FieldDescriptor(
+                name="k", type_ref=TypeRef.primitive("string"), default="User"
+            ),
+        }
+    )
+
+    assert codec.version(fields) == "1.2.3"
+    assert codec.kind(fields) == "User"
+    assert codec.of("2024-01-01") == pendulum.Date(2024, 1, 1)
+    assert codec.version_key(kind="User", version="1.2.3").jgf_id == "User@1.2.3"
+    with pytest.raises(ValueError, match="Cannot parse version"):
+        codec.of("not-a-version")
+
+
+SIMPLE_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {"name": {"type": "string"}},
+    "required": ["name"],
+}
+
+NESTED_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {"address": {"$ref": "#/$defs/Address"}},
+    "$defs": {
+        "Address": {
+            "type": "object",
+            "properties": {"street": {"type": "string"}},
+        }
+    },
+}
+
+
+class TestJsonSchemaAdapter:
+    @pytest.mark.parametrize(
+        ("json_schema", "class_name", "expected"),
+        [
+            pytest.param(SIMPLE_JSON_SCHEMA, "User_V1", "UserV1", id="underscore"),
+            pytest.param(SIMPLE_JSON_SCHEMA, "UserV1", "UserV1", id="unchanged"),
+            pytest.param(SIMPLE_JSON_SCHEMA, "Model", "Model", id="model"),
+        ],
+    )
+    def test_class_name_normalization(
+        self,
+        json_model_adapter,
+        json_schema: dict,
+        class_name: str,
+        expected: str,
+    ) -> None:
+        model = json_model_adapter.to_pydantic(json_schema, class_name=class_name)
+
+        assert model.__name__ == expected
+
+    @pytest.mark.parametrize(
+        ("json_schema", "expected"),
+        [pytest.param(SIMPLE_JSON_SCHEMA, "Model", id="simple")],
+    )
+    def test_default_class_name_is_model(
+        self, json_model_adapter, json_schema: dict, expected: str
+    ) -> None:
+        model = json_model_adapter.to_pydantic(json_schema)
+
+        assert model.__name__ == expected
+
+    @pytest.mark.parametrize(
+        ("json_schema", "class_name", "expected"),
+        [
+            pytest.param(NESTED_JSON_SCHEMA, "User_V1", "UserV1", id="nested"),
+        ],
+    )
+    def test_nested_root_model(
+        self,
+        json_model_adapter,
+        json_schema: dict,
+        class_name: str,
+        expected: str,
+    ) -> None:
+        model = json_model_adapter.to_pydantic(json_schema, class_name=class_name)
+
+        assert model.__name__ == expected
+        assert "address" in model.model_fields
+
+    @pytest.mark.parametrize(
+        ("json_schema", "first", "second", "same"),
+        [
+            pytest.param(
+                SIMPLE_JSON_SCHEMA, "User", "Address", False, id="different-name"
+            ),
+            pytest.param(SIMPLE_JSON_SCHEMA, "User", "User", True, id="same-name"),
+        ],
+    )
+    def test_class_name_cache(
+        self,
+        json_model_adapter,
+        json_schema: dict,
+        first: str,
+        second: str,
+        same: bool,
+    ) -> None:
+        left = json_model_adapter.to_pydantic(json_schema, class_name=first)
+        right = json_model_adapter.to_pydantic(json_schema, class_name=second)
+
+        assert (left is right) is same
+
+    @pytest.mark.parametrize(
+        ("first_schema", "second_schema", "class_name"),
+        [
+            pytest.param(
+                SIMPLE_JSON_SCHEMA,
+                NESTED_JSON_SCHEMA,
+                "Model",
+                id="different-schema",
+            ),
+        ],
+    )
+    def test_same_class_name_different_schema_gets_unique_model_ref(
+        self,
+        json_model_adapter,
+        first_schema: dict,
+        second_schema: dict,
+        class_name: str,
+    ) -> None:
+        first = json_model_adapter.to_pydantic(first_schema, class_name=class_name)
+        second = json_model_adapter.to_pydantic(second_schema, class_name=class_name)
+
+        assert first is not second
+        assert json_model_adapter.model_id(first) != json_model_adapter.model_id(second)
+
+    @pytest.mark.parametrize(
+        ("json_schema", "class_name"),
+        [
+            pytest.param(SIMPLE_JSON_SCHEMA, "", id="empty"),
+            pytest.param(SIMPLE_JSON_SCHEMA, "not-valid", id="hyphen"),
+            pytest.param(SIMPLE_JSON_SCHEMA, "1Model", id="leading-digit"),
+            pytest.param(SIMPLE_JSON_SCHEMA, "with space", id="space"),
+        ],
+    )
+    def test_invalid_class_name(
+        self,
+        json_model_adapter,
+        json_schema: dict,
+        class_name: str,
+    ) -> None:
+        with pytest.raises(ValueError, match="Invalid class_name"):
+            json_model_adapter.to_pydantic(json_schema, class_name=class_name)

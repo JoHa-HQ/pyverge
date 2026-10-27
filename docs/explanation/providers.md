@@ -6,17 +6,25 @@ inspection, validation, and conversion.
 
 ## Protocol layout
 
-`ModelAdapter` is the aggregate seam. It composes four narrow protocols:
+`ModelAdapter` is the aggregate adapter seam. Shared behavior lives in
+`ModelCodec`:
 
-| Protocol | Responsibility |
+| Component | Responsibility |
 | --- | --- |
-| `ModelIdentity` | version/kind extraction, version parsing, versionable construction |
-| `ModelSchema` | field discovery, nested model resolution, container shape |
-| `ModelRuntime` | validation, finalization, instantiation, serialization |
-| `ModelReflection` | schema diffing, model reconstruction, migration proposal |
+| `ModelCodec` | version/kind keys, parsing, payload validation, Pydantic reflection |
+| `ModelAdapter` | provider-specific container identification, fields, references, model materialization |
+| `AbstractModelAdapter` | provider-neutral composition: versionable nodes, descriptors, diff, materialize |
 
-Consumers can depend on the narrow protocol they need. Implementations must
-satisfy the aggregate `ModelAdapter`.
+Every adapter receives a `ModelCodec`:
+
+```python
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
+
+adapter = PydanticModelAdapter(codec=ModelCodec())
+```
+
+`ModelCodec` is required. It carries `version_property` / `kind_property` and
+the Pydantic payload/reflection strategy shared by Pydantic-backed providers.
 
 ## Container checks
 
@@ -47,31 +55,53 @@ the payload contract.
 
 - `PydanticModelAdapter`
 - `JsonSchemaModelAdapter`
+- `DataclassModelAdapter`
 
-Both use Pydantic model classes as the runtime container; the JSON Schema
-adapter materializes schemas into Pydantic models at registration time.
+`PydanticModelAdapter` and `JsonSchemaModelAdapter` use Pydantic model classes as
+the runtime container; the JSON Schema adapter materializes schemas into
+Pydantic models at registration time. Both consume `ModelCodec` directly.
+
+`DataclassModelAdapter` uses stdlib `dataclasses` classes as the runtime
+container. Identity and payload behavior come from `ModelCodec`; `dataclass`
+reflection stays adapter-local.
+
+Migration backends live in `pyverge.migrations`. Import schema adapters
+from `pyverge.schemas`.
+
+## Planned adapters
+
+- Avro (`pyverge-avro`)
+- Protobuf (`pyverge-protobuf`)
+
+These are roadmap items, not shipped. Do not assume their APIs are stable.
 
 ## Adding a provider
 
-Subclass `AbstractModelAdapter` and implement the four protocol areas. The
-shared base supplies version parsing, property handling, `fields`, and the
-default `can_handle -> identify` relationship.
+Subclass `AbstractModelAdapter`, inject `ModelCodec`, and implement the
+provider-specific reflection hooks.
 
 ```python
+from pyverge.schemas import ModelCodec
 from pyverge.schemas.base import AbstractModelAdapter
 
 
 class MyModelAdapter(AbstractModelAdapter):
+    def __init__(self, codec: ModelCodec) -> None:
+        super().__init__(codec)
+
     def identify(self, model_cls):
-        return ...
-
-    def version(self, model_cls):
-        ...
-
-    def kind(self, model_cls):
         ...
 
     def can_handle(self, container, *, fields=None):
+        ...
+
+    def describe_fields(self, model_cls):
+        ...
+
+    def resolve_model(self, annotation):
+        ...
+
+    def field_model(self, parent_model, field_name):
         ...
 ```
 
@@ -89,10 +119,10 @@ import pendulum
 from typing import Literal
 
 from pyverge import Manager
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 UserManager = Manager[pendulum.Date].configure(
-    PydanticModelAdapter(),
+    PydanticModelAdapter(codec=ModelCodec()),
 )
 
 
@@ -105,5 +135,5 @@ class UserV20250310(BaseModel):
 ```
 
 The engine orders date versions chronologically and migrates across them the
-same way as semver. Version strings are parsed by the adapter, which
-understands both formats.
+same way as semver. Version strings are parsed by
+`ModelCodec`, which understands both formats.

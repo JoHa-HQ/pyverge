@@ -38,12 +38,9 @@ from pyverge.execution import (
 from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from pyverge.execution.context import LayeredView, RunContext, StepContext
 from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
-from pyverge.providers import (
-    JsonSchemaModelAdapter,
-    PydanticModelAdapter,
-)
 from pyverge.registry import GraphCatalog, Registry
 from pyverge.registry.errors import CatalogError
+from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.versioning import EdgeKey, VersionNode
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (
@@ -280,7 +277,7 @@ def test_path_resolver_builds_chain(
     assert resolved.target.version[1] == engine.adapter.of("3.0.0")
     assert len(resolved.steps) == 2  # noqa: PLR2004
     assert len(resolved.migrations) == 2  # noqa: PLR2004
-    assert resolved.target_model is UserV3
+    assert engine.adapter.resolve(resolved.target_model) is UserV3
     assert resolved.hooks == ((), ())
 
 
@@ -383,7 +380,7 @@ def _path_entry(
         path=path,
         source=source,
         target=target,
-        target_model=target.model,
+        target_model=target.descriptor.ref,
         steps=steps,
         hooks=(),
         migrations=(),
@@ -652,7 +649,7 @@ def test_extractor_finds_registered_versioned_dict(
 
     assert len(entries) == 1
     assert entries[0][0] == ("document",)
-    assert entries[0][2].model is UserV1
+    assert entries[0][2].model_id.endswith("UserV1")
 
 
 @pytest.mark.parametrize(
@@ -1134,12 +1131,12 @@ def test_step_context_layers_bindings(execution_environment) -> None:
         bindings=MigrationContext.create({"tenant": "acme", "region": "eu"}),
     )
     source = envelope_model(
-        PydanticModelAdapter(),
+        PydanticModelAdapter[semver.Version](codec=ModelCodec()),
         None,
         UserV1,
     )
     target = envelope_model(
-        PydanticModelAdapter(),
+        PydanticModelAdapter[semver.Version](codec=ModelCodec()),
         None,
         UserV2,
     )
@@ -1210,7 +1207,7 @@ def test_plan_preserves_version_value(
         path=(),
         source=cast("Any", source),
         target=cast("Any", target),
-        target_model=target.model,
+        target_model=target.descriptor.ref,
         steps=(),
         hooks=(),
         migrations=(),

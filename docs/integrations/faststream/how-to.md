@@ -28,7 +28,7 @@ from pyverge.adapters.faststream import (
     publisher,
     subscriber,
 )
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 
@@ -67,7 +67,7 @@ def drop_currency(data: OrderV2Data, context=None) -> OrderV1Data:
     return cast(OrderV1Data, data)
 
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter())
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
 OrderManager.store_model(Order)
 OrderManager.store_migration(ManagerMigrationKey("Order", "1.0.0", "2.0.0"), add_currency)
 OrderManager.store_migration(ManagerMigrationKey("Order", "2.0.0", "1.0.0"), drop_currency)

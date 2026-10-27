@@ -3,15 +3,18 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic
+from typing import Any, Generic, Self, TypeVar
 
 from pyverge.core.types import VersionValue
 
-from .primitives import ChangeSet
+from .frozen import FrozenMap
+from .schema import ModelDescriptor, NoDefault
 from .types import (
     Comparable,
+    Diffable,
     DiffMaterializer,
     DiffOrigin,
+    DiffProvider,
     DiffRenderer,
     MigrationKey,
     Versionable,
@@ -45,14 +48,46 @@ class FieldChange:
 class Diff(Generic[VersionValue]):
     """Differences between two model versions — data with queryable predicates.
 
-    Provider-specific construction (e.g. ``PydanticDiff.from_pair``) computes
-    the field changes. ``origin`` records how the diff was produced.
+    Provider-specific construction computes the field changes. ``origin``
+    records how the diff was produced.
     """
 
     source: Versionable[VersionValue]
     target: Comparable[VersionValue]
-    fields: Mapping[str, FieldChange]
+    fields: FrozenMap[str, FieldChange]
     origin: DiffOrigin
+
+    @classmethod
+    def from_pair(
+        cls,
+        source: Versionable[VersionValue],
+        target: Comparable[VersionValue],
+        *,
+        adapter: DiffProvider,
+    ) -> Self:
+        diff = adapter.diff(source, target)
+        return cls(
+            source=diff.source,
+            target=diff.target,
+            fields=diff.fields,
+            origin=diff.origin,
+        )
+
+    def with_field(self, name: str, change: FieldChange) -> Self:
+        return type(self)(
+            source=self.source,
+            target=self.target,
+            fields=self.fields.updated({name: change}),
+            origin=self.origin,
+        )
+
+    def with_fields(self, changes: Mapping[str, FieldChange]) -> Self:
+        return type(self)(
+            source=self.source,
+            target=self.target,
+            fields=self.fields.updated(changes),
+            origin=self.origin,
+        )
 
     def render(self, renderer: DiffRenderer[Any]) -> Any:
         return renderer.render(self)
@@ -206,9 +241,195 @@ class Diff(Generic[VersionValue]):
         return Diff(
             source=self.source,
             target=self.target,
-            fields=swapped,
+            fields=FrozenMap(swapped),
             origin=self.origin,
         )
 
 
-__all__ = ["Diff", "DiffOrigin", "FieldChange", "FieldStatus"]
+T = TypeVar("T")
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeSet(Generic[T]):
+    """Added, removed, and modified identities in one delta."""
+
+    added: frozenset[T] = frozenset()
+    removed: frozenset[T] = frozenset()
+    modified: frozenset[T] = frozenset()
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.added or self.removed or self.modified)
+
+    def summary(self, label: str) -> list[str]:
+        lines: list[str] = []
+        for verb, values in (
+            ("added", self.added),
+            ("removed", self.removed),
+            ("changed", self.modified),
+        ):
+            if values:
+                rendered = ", ".join(str(value) for value in sorted(values, key=str))
+                lines.append(f"{label} {verb}: {rendered}")
+        return lines
+
+
+def _build_diff(
+    source: Versionable[VersionValue],
+    target: Comparable[VersionValue],
+) -> Diff[VersionValue]:
+    source_descriptor = getattr(source, "descriptor", None)
+    target_descriptor = getattr(target, "descriptor", None)
+    fields: FrozenMap[str, FieldChange] = FrozenMap()
+    if source_descriptor is not None and target_descriptor is not None:
+        if source.strategy != target.strategy:
+            raise ValueError(
+                f"Cannot create diff across strategies: "
+                f"{source.strategy.__name__} != {target.strategy.__name__}"
+            )
+        if source.kind != target.kind:
+            raise ValueError(
+                f"Cannot create diff across kinds: {source.kind} != {target.kind}"
+            )
+        fields = _diff_fields(source_descriptor, target_descriptor)
+    return Diff(
+        source=source,
+        target=target,
+        fields=fields,
+        origin=DiffOrigin.SCHEMA,
+    )
+
+
+def _diff_fields(
+    source: ModelDescriptor,
+    target: ModelDescriptor,
+) -> FrozenMap[str, FieldChange]:
+    source_fields = source.fields
+    target_fields = target.fields
+    source_keys = set(source_fields)
+    target_keys = set(target_fields)
+
+    fields: dict[str, FieldChange] = {}
+    for name in sorted(target_keys - source_keys):
+        field = target_fields[name]
+        fields[name] = FieldChange(
+            FieldStatus.ADDED,
+            {
+                "type": field.annotation,
+                "type_ref": field.type_ref.to_canonical(),
+                "required": field.required,
+                "default": None
+                if isinstance(field.default, NoDefault)
+                else field.default,
+            },
+        )
+    for name in sorted(source_keys - target_keys):
+        fields[name] = FieldChange(FieldStatus.REMOVED, {})
+    for name in sorted(source_keys & target_keys):
+        source_field = source_fields[name]
+        target_field = target_fields[name]
+        changes: dict[str, Any] = {}
+        if source_field.type_ref != target_field.type_ref:
+            changes["type_changed"] = {
+                "from": source_field.type_ref.to_canonical(),
+                "to": target_field.type_ref.to_canonical(),
+            }
+        if source_field.required != target_field.required:
+            changes["required_changed"] = {
+                "from": source_field.required,
+                "to": target_field.required,
+            }
+        if source_field.default != target_field.default:
+            changes["default_changed"] = {
+                "from": source_field.default,
+                "to": target_field.default,
+            }
+        fields[name] = FieldChange(
+            FieldStatus.MODIFIED if changes else FieldStatus.UNCHANGED,
+            changes,
+        )
+    return FrozenMap(fields)
+
+
+__all__ = [
+    "BackwardCompatibilityGuard",
+    "ChangeSet",
+    "CompatibilityReport",
+    "Diff",
+    "DiffOrigin",
+    "FieldChange",
+    "FieldStatus",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class CompatibilityReport:
+    """Structural compatibility of one version transition.
+
+    Identity fields are excluded by the caller: they change on every version
+    and must not be reported as breaking schema changes.
+    """
+
+    kind: str
+    source_version: str
+    target_version: str
+    added_fields: tuple[str, ...]
+    removed_fields: tuple[str, ...]
+    modified_fields: tuple[str, ...]
+    structural_breaking: bool
+
+    @classmethod
+    def from_diff(
+        cls,
+        diff: Diffable,
+        *,
+        identity_fields: frozenset[str],
+    ) -> Self:
+        added = tuple(
+            field for field in diff.added_fields if field not in identity_fields
+        )
+        removed = tuple(
+            field for field in diff.removed_fields if field not in identity_fields
+        )
+        modified = {
+            field: change
+            for field, change in diff.modified_fields.items()
+            if field not in identity_fields
+        }
+        structural = (
+            bool(removed)
+            or any("type_changed" in change for change in modified.values())
+            or any("required_changed" in change for change in modified.values())
+            or any(diff.is_added_required(field) for field in added)
+        )
+        return cls(
+            kind=diff.source.kind,
+            source_version=str(diff.source.version[1]),
+            target_version=str(diff.target.version[1]),
+            added_fields=added,
+            removed_fields=removed,
+            modified_fields=tuple(sorted(modified)),
+            structural_breaking=structural,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BackwardCompatibilityGuard:
+    """Evaluate whether a declared compatible transition is structural breaking."""
+
+    identity_fields: frozenset[str]
+
+    def evaluate(self, diff: Diffable) -> CompatibilityReport:
+        return CompatibilityReport.from_diff(
+            diff,
+            identity_fields=self.identity_fields,
+        )
+
+    def required_additions(
+        self,
+        diff: Diffable,
+        report: CompatibilityReport,
+    ) -> tuple[str, ...]:
+        return tuple(
+            field for field in report.added_fields if diff.is_added_required(field)
+        )

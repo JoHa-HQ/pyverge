@@ -1,14 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import TYPE_CHECKING, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Self
 
 from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     MigrationFunc,
     ModelData,
-    ModelHandle,
     ModelKind,
     ModelVersionKey,
     VersionValue,
@@ -16,6 +16,7 @@ from pyverge.core.types import (
 
 from .canonical import ContentHasher
 from .errors import MigrationApplicationError
+from .schema import FieldDescriptor, ModelDescriptor
 from .types import (
     Comparable,
     Diffable,
@@ -101,22 +102,52 @@ class VersionKey(Generic[VersionValue]):
 
 
 @dataclass(frozen=True, slots=True, eq=False)
-class VersionNode(VersionKey[VersionValue]):
-    """A materialized model version that always binds a model handle.
+class VersionNode(Generic[VersionValue]):
+    """A materialized model version that binds a serializable descriptor.
 
-    ``references`` is the set of versioned kinds the model's fields declare.
-    ``fields`` is the model's field names minus identity fields. Neither
-    participates in equality or ordering.
+    The graph-facing surface lives in :class:`ModelDescriptor`; ``_model`` is
+    an optional runtime handle kept only for in-process operations.
     """
 
-    _model: ModelHandle
-    references: frozenset[ModelVersionKey]
-    fields: frozenset[str]
-    model_id: str
+    key: VersionKey[VersionValue]
+    descriptor: ModelDescriptor
 
     @property
-    def model(self) -> ModelHandle:
-        return self._model
+    def strategy(self) -> type[VersionValue]:
+        return self.key.strategy
+
+    @property
+    def version(self) -> ModelVersionKey:
+        return self.key.version
+
+    @property
+    def kind(self) -> ModelKind:
+        return self.key.kind
+
+    @property
+    def jgf_id(self) -> str:
+        return self.key.jgf_id
+
+    @property
+    def model_id(self) -> str:
+        return self.descriptor.ref.model_id
+
+    @property
+    def references(self) -> frozenset[ModelVersionKey]:
+        return self.descriptor.references
+
+    @property
+    def fields(self) -> frozenset[str]:
+        return frozenset(self.descriptor.fields)
+
+    def with_descriptor(self, descriptor: ModelDescriptor) -> Self:
+        return type(self)(key=self.key, descriptor=descriptor)
+
+    def with_fields(self, *fields: FieldDescriptor) -> Self:
+        return self.with_descriptor(self.descriptor.with_fields(*fields))
+
+    def without_fields(self, *names: str) -> Self:
+        return self.with_descriptor(self.descriptor.without_fields(*names))
 
     def content_payload(self) -> dict[str, object]:
         if not self.model_id:
@@ -132,6 +163,31 @@ class VersionNode(VersionKey[VersionValue]):
             ),
         }
 
+    @classmethod
+    def from_canonical(
+        cls,
+        value: Mapping[str, Any],
+        *,
+        parse_version: Callable[[str], Any],
+    ) -> VersionNode[VersionValue]:
+        return cls(
+            key=VersionKey[VersionValue](
+                _value=parse_version(str(value["version"])),
+                _kind=str(value["kind"]),
+            ),
+            descriptor=ModelDescriptor.from_canonical(
+                value["model"], parse_version=parse_version
+            ),
+        )
+
+    def to_canonical(self) -> dict[str, Any]:
+        return {
+            "id": self.jgf_id,
+            "kind": self.kind,
+            "version": str(self.version[1]),
+            "model": self.descriptor.to_canonical(),
+        }
+
     def content_hash(self, hasher: ContentHasher) -> str:
         return hasher.digest(self.content_payload())
 
@@ -140,12 +196,25 @@ class VersionNode(VersionKey[VersionValue]):
 
         return JgfNode.from_version(self, hasher)
 
+    def __lt__(self, other: object) -> bool:
+        return self.key < other
+
+    def __gt__(self, other: object) -> bool:
+        return self.key > other
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, VersionNode):
+            return self.key == other.key
+        return self.key == other
+
+    def __hash__(self) -> int:
+        return hash(self.key)
+
+    def __str__(self) -> str:
+        return self.jgf_id
+
     def __repr__(self) -> str:
-        model = getattr(self.model, "__name__", "model")
-        return (
-            f"VersionNode[{self.strategy.__name__}, {model}]"
-            f"({self._value}, {self._kind})"
-        )
+        return f"VersionNode[{self.strategy.__name__}]({self.version})"
 
 
 @total_ordering
@@ -210,7 +279,7 @@ class MigrationIdentity:
 
 
 @dataclass(frozen=True, slots=True, eq=False)
-class VersionEdge(EdgeKey[VersionValue]):
+class VersionEdge(Generic[VersionValue]):
     """A directed migration edge connecting two materialized versions."""
 
     source: VersionNode[VersionValue]
@@ -218,6 +287,40 @@ class VersionEdge(EdgeKey[VersionValue]):
     diff: Diffable[VersionValue]
     func: MigrationFunc
     migration: MigrationIdentity
+
+    @property
+    def kind(self) -> ModelKind:
+        return self.source.kind
+
+    @property
+    def key(self) -> MigrationKey:
+        return (self.source, self.target)
+
+    @property
+    def edge(self) -> MigrationKey:
+        return (self.source, self.target)
+
+    @property
+    def jgf_id(self) -> str:
+        return f"{self.source.jgf_id}->{self.target.jgf_id}"
+
+    def with_diff(self, diff: Diffable[VersionValue]) -> Self:
+        return type(self)(
+            source=self.source,
+            target=self.target,
+            diff=diff,
+            func=self.func,
+            migration=self.migration,
+        )
+
+    def with_migration(self, migration: MigrationIdentity) -> Self:
+        return type(self)(
+            source=self.source,
+            target=self.target,
+            diff=self.diff,
+            func=self.func,
+            migration=migration,
+        )
 
     def content_payload(self, hasher: ContentHasher) -> dict[str, object]:
         return {
@@ -254,40 +357,35 @@ class VersionEdge(EdgeKey[VersionValue]):
                 f"Failed to apply migration {self}: {e}",
             ) from e
 
+    def __lt__(self, other: object) -> bool:
+        if isinstance(other, VersionEdge):
+            return self.edge < other.edge
+        if isinstance(other, EdgeKey):
+            return self.edge < other.edge
+        return NotImplemented
+
+    def __gt__(self, other: object) -> bool:
+        if isinstance(other, VersionEdge):
+            return self.edge > other.edge
+        if isinstance(other, EdgeKey):
+            return self.edge > other.edge
+        return NotImplemented
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, VersionEdge):
+            return self.edge == other.edge
+        if isinstance(other, EdgeKey):
+            return self.edge == other.edge
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.edge)
+
     def __str__(self) -> str:
         return self.jgf_id
 
 
-T = TypeVar("T")
-
-
-@dataclass(frozen=True, slots=True)
-class ChangeSet(Generic[T]):
-    """Added, removed, and modified identities in one delta."""
-
-    added: frozenset[T] = frozenset()
-    removed: frozenset[T] = frozenset()
-    modified: frozenset[T] = frozenset()
-
-    @property
-    def changed(self) -> bool:
-        return bool(self.added or self.removed or self.modified)
-
-    def summary(self, label: str) -> list[str]:
-        lines: list[str] = []
-        for verb, values in (
-            ("added", self.added),
-            ("removed", self.removed),
-            ("changed", self.modified),
-        ):
-            if values:
-                rendered = ", ".join(str(value) for value in sorted(values, key=str))
-                lines.append(f"{label} {verb}: {rendered}")
-        return lines
-
-
 __all__ = [
-    "ChangeSet",
     "EdgeKey",
     "MigrationIdentity",
     "Transitional",

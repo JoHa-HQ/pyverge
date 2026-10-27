@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import replace
 from itertools import pairwise
 from typing import Any
 from unittest.mock import MagicMock
@@ -18,14 +17,7 @@ from pyverge.execution import (
     fixed_target_resolver,
     latest_target_resolver,
 )
-from pyverge.providers import (
-    JsonPatchMigration,
-    JsonSchemaModelAdapter,
-    PydanticModelAdapter,
-)
-from pyverge.providers.types import (
-    ModelHandle,
-)
+from pyverge.migrations import JsonPatchMigration
 from pyverge.registry.errors import (
     CatalogError,
     MigrationAlreadyRegisteredError,
@@ -35,8 +27,12 @@ from pyverge.registry.errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
+from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.schemas.types import (
+    ModelHandle,
+)
 from pyverge.settings import MigrationSettings
-from pyverge.versioning import EdgeKey, VersionKey
+from pyverge.versioning import EdgeKey, FieldDescriptor, TypeRef, VersionKey
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -90,7 +86,10 @@ class TestModelManagement:
         for model in models:
             with subtests.test(f"model={model.__name__}"):
                 version = envelope_model(engine.adapter, migration_settings, model)
-                assert engine.get_model(version).model is model
+                assert (
+                    engine.adapter.resolve(engine.get_model(version).descriptor.ref)
+                    is model
+                )
 
     @pytest.mark.parametrize(
         "model_adapter, registry, operation, expected",
@@ -117,9 +116,8 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV1], []],
                 lambda engine: engine.reconcile_model(
-                    replace(
-                        envelope_model(engine.adapter, None, UserV1),
-                        fields=frozenset({"conflict"}),
+                    envelope_model(engine.adapter, None, UserV1).with_fields(
+                        FieldDescriptor(name="conflict", type_ref=TypeRef.any())
                     )
                 ),
                 ModelConflictError,
@@ -129,9 +127,8 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [pendulum.Date, "test", [UserV20250310], []],
                 lambda engine: engine.reconcile_model(
-                    replace(
-                        envelope_model(engine.adapter, None, UserV20250310),
-                        fields=frozenset({"conflict"}),
+                    envelope_model(engine.adapter, None, UserV20250310).with_fields(
+                        FieldDescriptor(name="conflict", type_ref=TypeRef.any())
                     )
                 ),
                 ModelConflictError,
@@ -141,9 +138,8 @@ class TestModelManagement:
                 JsonSchemaModelAdapter,
                 [semver.Version, "test", [USER_V0_1_1_DEV_7], []],
                 lambda engine: engine.reconcile_model(
-                    replace(
-                        envelope_model(engine.adapter, None, USER_V0_1_1_DEV_7),
-                        fields=frozenset({"conflict"}),
+                    envelope_model(engine.adapter, None, USER_V0_1_1_DEV_7).with_fields(
+                        FieldDescriptor(name="conflict", type_ref=TypeRef.any())
                     )
                 ),
                 ModelConflictError,
@@ -188,7 +184,9 @@ class TestModelManagement:
     ) -> None:
         """A conflict exposes the diff and a resolution hint."""
         registered = envelope_model(model_adapter, migration_settings, model)
-        incoming = replace(registered, fields=registered.fields | {"extra_field"})
+        incoming = registered.with_fields(
+            FieldDescriptor(name="extra_field", type_ref=TypeRef.any())
+        )
         with pytest.raises(ModelConflictError) as raised:
             engine.reconcile_model(incoming)
         error = raised.value
@@ -348,7 +346,9 @@ class TestModelManagement:
     ) -> None:
         version = envelope_model(engine.adapter, None, model)
         if expected_error is None:
-            assert engine.get_latest_model(version.kind).model is version.model
+            assert (
+                engine.get_latest_model(version.kind).descriptor == version.descriptor
+            )
             return
         with pytest.raises(expected_error):
             engine.get_latest_model(version.kind)
@@ -936,12 +936,9 @@ class TestReflection:
         )
 
         reconstructed = engine.get_model(meta)
-        assert reconstructed.model is not None
-        assert all(
-            field in reconstructed.model.model_fields
-            for field in ["name", "age", "version"]
-        )
-        assert reconstructed.model.model_fields["version"].default == "2.0.0"
+        model = engine.adapter.resolve(reconstructed.descriptor.ref)
+        assert all(field in model.model_fields for field in ["name", "age", "version"])
+        assert model.model_fields["version"].default == "2.0.0"
 
     @pytest.mark.parametrize(
         "model_adapter, registry, migration_settings, models",
@@ -990,7 +987,7 @@ class TestLookupTyped:
     ) -> None:
         version = envelope_model(engine.adapter, None, model)
         assert version in engine
-        assert engine[version].model is version.model
+        assert engine[version].descriptor == version.descriptor
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
