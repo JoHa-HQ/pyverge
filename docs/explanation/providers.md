@@ -62,7 +62,7 @@ the runtime container; the JSON Schema adapter materializes schemas into
 Pydantic models at registration time. Both consume `ModelCodec` directly.
 
 `DataclassModelAdapter` uses stdlib `dataclasses` classes as the runtime
-container. Identity and payload behavior come from `ModelCodec`; dataclass
+container. Identity and payload behavior come from `ModelCodec`; `dataclass`
 reflection stays adapter-local.
 
 Migration backends live in `pyverge.migrations`. Import schema adapters
