@@ -21,6 +21,8 @@ Benchmark profile:
 pytest -c pytest-bench.toml
 ```
 
+CI runs only when the PR label `benchmark` is added.
+
 Equivalent explicit command:
 
 ```bash

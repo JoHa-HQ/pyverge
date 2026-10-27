@@ -1,9 +1,8 @@
 name: Benchmarks
 
 on:
-  pull_request_review:
-    types: [submitted]
-  workflow_dispatch:
+  pull_request:
+    types: [labeled]
 
 permissions:
   contents: read
@@ -11,7 +10,7 @@ permissions:
 
 jobs:
   benchmark:
-    if: github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved'
+    if: github.event.label.name == 'benchmark'
     continue-on-error: true
     runs-on: ubuntu-latest
     steps:
@@ -35,7 +34,7 @@ jobs:
           output-file-path: reports/benchmarks.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: false
-          comment-on-alert: ${{ github.event_name == 'pull_request_review' }}
+          comment-on-alert: true
           alert-threshold: "150%"
           fail-on-alert: false
           summary-always: true
