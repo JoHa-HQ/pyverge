@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Middleware test doubles."""
 
 from __future__ import annotations
@@ -115,9 +118,9 @@ class FakeTracer:
 
 class FakeLineageClient:
     def __init__(self) -> None:
-        self.events: list[Any] = []
+        self.events: list[tuple[str, Any]] = []
 
-    def emit(self, event: Any) -> None:
+    def emit(self, event: tuple[str, Any]) -> None:
         self.events.append(event)
 
 

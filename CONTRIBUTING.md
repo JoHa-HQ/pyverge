@@ -61,6 +61,26 @@ process for contributing code, documentation, and ideas.
 
 7. **Push** and open a pull request. Link the issue with `Closes #...`.
 
+### AI-assisted contributions
+
+AI-generated or AI-assisted code is allowed only when it is reviewed,
+understood, and accepted by a human contributor before submission. Contributors
+must ensure that they have the right to contribute the code and that any AI-
+assisted output is accurate, relevant, and appropriate for the project.
+
+The following rules apply:
+
+- AI-generated code must not be committed without human review and ownership.
+- Contributors must confirm they are authorized to contribute the code they
+  submit.
+- Tests generated or adapted with AI tooling must be reviewed for correctness,
+  relevance, and maintenance cost; copied or unreviewed tests are not accepted.
+- If AI assistance materially shaped a change, the contributor should be able
+  to explain the design and verify the result in review.
+
+This policy exists to protect the project’s quality, maintainers’ review
+burden, and the integrity of the repository history.
+
 ### Documentation
 
 Documentation lives in `docs/` and follows two external guides:
@@ -215,7 +235,6 @@ With the issue scope, the form is `type(#issue)!: description`, for example
 - A dev tag without a TestPyPI package does not permit promotion.
 - A stable tag means the release is prepared, not necessarily published.
 - One stable release runs at a time.
-
 
 ## Community
 

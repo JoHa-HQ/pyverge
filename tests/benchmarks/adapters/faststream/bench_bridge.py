@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """FastStream in/out bridge: consume at ``latest``, produce at ``1.0.0``."""
 
 from __future__ import annotations

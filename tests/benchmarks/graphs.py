@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Version graphs for benchmarks, built from the existing example models.
 
 No new schemas: the graphs here mirror what the test suite already exercises, so

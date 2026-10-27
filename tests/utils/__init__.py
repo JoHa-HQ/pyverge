@@ -1,4 +1,7 @@
-# Utility classes and functions for testing.
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""Utility classes and functions for testing."""
 
 from .context import ManagerContext
 from .engine import (

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from itertools import pairwise
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pendulum
@@ -495,9 +495,17 @@ class TestMigrationManagement:
         engine: Engine[types.VersionValue],
         models: list[ModelHandle],
     ) -> None:
-        versions = [envelope_model(engine.adapter, None, model) for model in models]
+        source, target = [
+            envelope_model(engine.adapter, None, model) for model in models
+        ]
         with pytest.raises(CatalogError, match="across kinds"):
-            engine.store_migration(versions, lambda d, _: d)  # ty: ignore[invalid-argument-type]
+            engine.store_migration(
+                (
+                    cast(types.VersionNode[types.VersionValue], source),
+                    cast(types.VersionNode[types.VersionValue], target),
+                ),
+                lambda d, _: d,
+            )
 
     @pytest.mark.parametrize(
         "model_adapter, registry, migration_settings, models",

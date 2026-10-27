@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Class-level registration pattern (preferred).
 
 Demonstrates static schema definition separated from dynamic runtime configuration.

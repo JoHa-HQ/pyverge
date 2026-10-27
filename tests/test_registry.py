@@ -6,7 +6,7 @@ Most behaviors are exercised for both the semver (pydantic) and chrono/JSON
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pendulum
@@ -2299,12 +2299,12 @@ class TestReferences:
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue],
         model: ModelHandle,
-        one_child: object,
+        one_child: ModelHandle,
     ) -> None:
         """Registering one ``Address`` version leaves the other two missing."""
         node = envelope_model(model_adapter, versioning_settings, model)
-        registry.store_model(model_adapter.versionable(one_child))  # ty: ignore[invalid-argument-type]
-        assert registry.missing_references(node) == frozenset(
+        registry.store_model(model_adapter.versionable(one_child))
+        assert registry.missing_references(cast(types.Comparable, node)) == frozenset(
             {
                 ("Address", semver.Version(2, 0, 0)),
                 ("Address", semver.Version(3, 0, 0)),
@@ -2743,7 +2743,9 @@ class ListEnvelope(BaseModel):
 
 
 def _extractor() -> tuple[
-    Registry[semver.Version], PydanticModelAdapter, CompositeExtractor[semver.Version]
+    Registry[semver.Version],
+    PydanticModelAdapter,
+    CompositeExtractor[semver.Version],
 ]:
     adapter = PydanticModelAdapter(codec=ModelCodec())
     registry = Registry[semver.Version](hasher=default_content_hasher())
