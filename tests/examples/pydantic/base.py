@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Provider-specific base for Pydantic test examples.
 
 Import ``BaseModel`` from this module instead of directly from ``pydantic``

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Support for driving async adapters under sync pytest-benchmark.
 
 pytest-benchmark is sync-only. Benchmarks create one **persistent** event loop

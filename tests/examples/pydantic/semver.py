@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from enum import StrEnum
 from typing import Annotated, Literal
 
@@ -109,13 +112,3 @@ class InvalidBetaModel(UserBaseModel):
 
 class InvalidAlphaModel(UserBaseModel):
     """Invalid semver: too many version segments."""
-
-    name: str
-    version: Literal["0.0.0.alpha7"] = "0.0.0.alpha7"
-
-
-class InvalidTimeModel(UserBaseModel):
-    """Invalid date: a time-of-day, not a calendar date."""
-
-    name: str
-    version: Literal["15:15:20.000Z"] = "15:15:20.000Z"

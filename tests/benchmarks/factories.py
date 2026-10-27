@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Hypothesis payload factory for benchmarks.
 
 Payloads are generated from the registered models with Hypothesis

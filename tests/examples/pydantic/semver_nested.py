@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from typing import Annotated, Literal
 
 from pyverge.core.context import MigrationContext
@@ -117,25 +120,3 @@ Person = Annotated[
 
 class PersonContainer(BaseModel):
     document: Person
-
-
-def migrate_person_100_200(data: dict, context: MigrationContext | None = None) -> dict:
-    data["email"] = None
-    data["contacts"] = []
-    return data
-
-
-def preserve_children_person(
-    data: dict, context: MigrationContext | None = None
-) -> dict:
-    """PersonV1 -> PersonV2 migration that keeps already-migrated child data."""
-    data.setdefault("email", None)
-    data.setdefault("contacts", [])
-    return data
-
-
-def demote_person(data: dict, context: MigrationContext | None = None) -> dict:
-    """PersonV2 -> PersonV1: drop fields the older version does not know."""
-    for field in ("email", "contacts"):
-        data.pop(field, None)
-    return data

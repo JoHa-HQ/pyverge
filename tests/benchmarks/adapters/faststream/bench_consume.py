@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """FastStream consume path: publish → decoder convergence → handler.
 
 Two benchmarks share the same broker and payload:

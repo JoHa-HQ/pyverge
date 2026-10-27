@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Utility functions for engine and model management in tests."""
 
 from __future__ import annotations
@@ -111,26 +114,8 @@ def register_migrations(
     registry: Registry[VersionValue],
     *migrations: _Migration | _BackwardCompatibleMigration,
 ) -> None:
-    """Register migrations, each optionally marked backward compatible.
-
-    A migration is ``((source, target), func)`` or the three-element
-    ``((source, target), func, backward_compatible)`` form; the latter lets
-    reverse edges declare themselves as backward compatible directly in the
-    parametrize data.
-    """
-    for migration in migrations:
-        pair, func, _backward_compatible = _parse_migration(migration)
-        versions = [adapter.versionable(model_cls) for model_cls in pair]
-        diff = adapter.diff(
-            versions[0],
-            versions[1],
-        )
-        registry.store_migration(
-            VersionEdge(
-                versions[0],
-                versions[1],
-                diff,
-                func,
-                migration=DefaultMigrationIdentityResolver().resolve(func),
-            )
-        )
+    """Register migration definitions in a registry."""
+    for pair, func, backward_compatible in (
+        _parse_migration(migration) for migration in migrations
+    ):
+        registry.store_migration(pair, func, backward_compatible=backward_compatible)
