@@ -14,7 +14,6 @@ from typing import (
 from pyverge.core.types import (
     MigrationFunc,
     ModelData,
-    ModelHandle,
     ModelKind,
     ModelVersionKey,
     VersionValue_co,
@@ -27,6 +26,7 @@ if TYPE_CHECKING:
     from pyverge.core.types import Attachable
 
     from .diff import Diff
+    from .schema import ModelDescriptor
 
 T_co = TypeVar("T_co", covariant=True)
 RenderOutput = TypeVar("RenderOutput")
@@ -80,10 +80,10 @@ class Comparable(JgfIdentifiable, Orderable, Protocol[VersionValue_co]):
 
 @runtime_checkable
 class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co]):
-    """Materialized version with an opaque model handle."""
+    """Materialized version with a serializable model descriptor."""
 
     @property
-    def model(self) -> ModelHandle: ...
+    def descriptor(self) -> ModelDescriptor: ...
     @property
     def references(self) -> frozenset[ModelVersionKey]: ...
     @property

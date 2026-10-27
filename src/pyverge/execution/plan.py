@@ -11,7 +11,7 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
-from pyverge.versioning import VersionNode
+from pyverge.versioning import ModelRef, VersionNode
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,7 +29,7 @@ class PathPlanEntry(Generic[VersionValue]):
     path: tuple[str | int, ...]
     source: VersionNode[VersionValue]
     target: VersionNode[VersionValue]
-    target_model: ModelHandle
+    target_model: ModelRef
     steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
     hooks: tuple[tuple[Attachable, ...], ...]
     migrations: tuple[MigrationFunc, ...]

@@ -104,7 +104,9 @@ class RuntimeMixin(Generic[VersionValue]):
         version: str,
     ) -> None:
         versionable = self.get(kind, version, engine=self.engine)
-        self.engine.adapter.validate(data, versionable.model)
+        self.engine.adapter.validate(
+            data, self.engine.adapter.resolve(versionable.descriptor.ref)
+        )
 
     @hybridmethod
     @singledispatchmethod

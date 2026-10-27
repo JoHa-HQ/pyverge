@@ -86,7 +86,10 @@ class TestModelManagement:
         for model in models:
             with subtests.test(f"model={model.__name__}"):
                 version = envelope_model(engine.adapter, migration_settings, model)
-                assert engine.get_model(version).model is model
+                assert (
+                    engine.adapter.resolve(engine.get_model(version).descriptor.ref)
+                    is model
+                )
 
     @pytest.mark.parametrize(
         "model_adapter, registry, operation, expected",
@@ -343,7 +346,9 @@ class TestModelManagement:
     ) -> None:
         version = envelope_model(engine.adapter, None, model)
         if expected_error is None:
-            assert engine.get_latest_model(version.kind).model is version.model
+            assert (
+                engine.get_latest_model(version.kind).descriptor == version.descriptor
+            )
             return
         with pytest.raises(expected_error):
             engine.get_latest_model(version.kind)
@@ -931,12 +936,9 @@ class TestReflection:
         )
 
         reconstructed = engine.get_model(meta)
-        assert reconstructed.model is not None
-        assert all(
-            field in reconstructed.model.model_fields
-            for field in ["name", "age", "version"]
-        )
-        assert reconstructed.model.model_fields["version"].default == "2.0.0"
+        model = engine.adapter.resolve(reconstructed.descriptor.ref)
+        assert all(field in model.model_fields for field in ["name", "age", "version"])
+        assert model.model_fields["version"].default == "2.0.0"
 
     @pytest.mark.parametrize(
         "model_adapter, registry, migration_settings, models",
@@ -985,7 +987,7 @@ class TestLookupTyped:
     ) -> None:
         version = envelope_model(engine.adapter, None, model)
         assert version in engine
-        assert engine[version].model is version.model
+        assert engine[version].descriptor == version.descriptor
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",

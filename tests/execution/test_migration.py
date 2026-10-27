@@ -458,7 +458,7 @@ class TestJsonSchemaModelAdapter:
         schema = _schema("1.0.0", {"name": {"type": "string"}})
         model = adapter.to_pydantic(schema)
         versionable = adapter.versionable(model)
-        assert versionable.model is model
+        assert adapter.resolve(versionable.descriptor.ref) is model
         assert str(versionable.version[1]) == "1.0.0"
 
     def test_validate_valid_payload(self) -> None:
@@ -575,7 +575,6 @@ class TestCompatibilityReport:
                 ref=ModelRef(provider="test", model_id="tests.Model"),
                 fields=FrozenMap(),
             ),
-            _model=type("Model", (), {}),
         )
         target = VersionKey(
             _value=semver.Version.parse("2.0.0"),

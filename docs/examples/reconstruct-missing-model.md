@@ -8,11 +8,11 @@ from pydantic import BaseModel
 
 from pyverge import Manager
 from pyverge.migrations import JsonPatchMigration
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(),
+    PydanticModelAdapter(codec=ModelCodec()),
     on_missing="reconstruct_model",
 )
 
@@ -39,6 +39,6 @@ UserManager.store_migration(
 manager = UserManager()
 v1 = manager.get("User", "1.0.0")
 
-assert v1.model is not None
-assert "age" not in v1.model.model_fields
+model = manager.engine.adapter.resolve(v1.descriptor.ref)
+assert "age" not in model.model_fields
 ```

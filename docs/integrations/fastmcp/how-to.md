@@ -30,7 +30,7 @@ from pyverge.adapters.fastmcp import (
     ToolReflection,
     tool,
 )
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 
@@ -55,7 +55,7 @@ def search_weather(city: str, temperature: float = 0.0, wind: float = 0.0) -> di
 
 
 WeatherManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(),
+    PydanticModelAdapter(codec=ModelCodec()),
     on_missing="reconstruct_model",
 )
 WeatherManager.store_model(WeatherV2)

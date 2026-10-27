@@ -277,7 +277,7 @@ def test_path_resolver_builds_chain(
     assert resolved.target.version[1] == engine.adapter.of("3.0.0")
     assert len(resolved.steps) == 2  # noqa: PLR2004
     assert len(resolved.migrations) == 2  # noqa: PLR2004
-    assert resolved.target_model is UserV3
+    assert engine.adapter.resolve(resolved.target_model) is UserV3
     assert resolved.hooks == ((), ())
 
 
@@ -380,7 +380,7 @@ def _path_entry(
         path=path,
         source=source,
         target=target,
-        target_model=target.model,
+        target_model=target.descriptor.ref,
         steps=steps,
         hooks=(),
         migrations=(),
@@ -649,7 +649,7 @@ def test_extractor_finds_registered_versioned_dict(
 
     assert len(entries) == 1
     assert entries[0][0] == ("document",)
-    assert entries[0][2].model is UserV1
+    assert entries[0][2].model_id.endswith("UserV1")
 
 
 @pytest.mark.parametrize(
@@ -1207,7 +1207,7 @@ def test_plan_preserves_version_value(
         path=(),
         source=cast("Any", source),
         target=cast("Any", target),
-        target_model=target.model,
+        target_model=target.descriptor.ref,
         steps=(),
         hooks=(),
         migrations=(),

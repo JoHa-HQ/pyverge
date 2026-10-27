@@ -122,7 +122,7 @@ class FastMCPDiscovery:
             for version in versions:
                 if (kind, version) in self._nodes:
                     continue
-                model = self._manager.get(kind, version).model
+                model = adapter.resolve(self._manager.get(kind, version).descriptor.ref)
                 if model is None:
                     continue
                 schema = model.model_json_schema()

@@ -45,7 +45,7 @@ class Runner(Generic[VersionValue]):
             max_depth=max_depth,
         )
         for entry in plan.path.entries:
-            if not self.adapter.identify(entry.target_model):
+            if not self.adapter.identify(self.adapter.resolve(entry.target_model)):
                 raise UnknownModelError(
                     f"Runner adapter cannot identify {entry.target_model!r}"
                 )

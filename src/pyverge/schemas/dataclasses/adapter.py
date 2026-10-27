@@ -211,7 +211,7 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
         return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
 
     def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        anchor = diff.source.model
+        anchor = self.model_codec.resolve(diff.source.descriptor.ref)
         version = diff.target.version[1]
         version_field = (
             self.version_property,

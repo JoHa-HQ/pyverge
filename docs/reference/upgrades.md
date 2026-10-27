@@ -26,6 +26,18 @@ Compatibility notes for the execution/registration architecture change.
 | `discovery.register()` | `await discovery.register(server)` |
 | `Reflector(manager)` FastStream startup hook | explicit model/migration registration before runtime |
 
+## Model codec
+
+Adapters now require an explicit `ModelCodec`:
+
+```python
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
+
+adapter = PydanticModelAdapter(
+    codec=ModelCodec(version_property="version", kind_property="kind")
+)
+```
+
 ## `MigrationSettings`
 
 `MigrationSettings` still exists. It is no longer passed directly to
@@ -33,12 +45,12 @@ Compatibility notes for the execution/registration architecture change.
 
 ```python
 from pyverge import Manager
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.settings import MigrationSettings, manager_kwargs
 
 settings = MigrationSettings(on_missing="reconstruct_model")
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(),
+    PydanticModelAdapter(codec=ModelCodec()),
     **manager_kwargs(settings),
 )
 ```
@@ -56,7 +68,7 @@ Field mapping:
 | `max_migration_depth` | `Runner.run(max_depth=...)` |
 | `execution_mode` | backend choice |
 | `parallel_workers` | backend `max_workers` |
-| `version_property` / `kind_property` | adapter constructor |
+| `version_property` / `kind_property` | `ModelCodec(...)` passed to adapter |
 
 ## Sync execution
 
@@ -130,7 +142,7 @@ result = manager.runner().run(
 ```python
 from pyverge.engine import Engine
 from pyverge.registry import Registry
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.versioning import EdgeKey, VersionNode
 ```
 
@@ -164,7 +176,7 @@ migrations before constructing the runtime manager:
 ```python
 from pyverge.types import ManagerMigrationKey
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter())
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
 OrderManager.store_model(Order)
 OrderManager.store_migration(
     ManagerMigrationKey("Order", "1.0.0", "2.0.0"),
@@ -195,7 +207,7 @@ Use the owning contexts:
 ```python
 from pyverge.engine import Engine
 from pyverge.registry import Registry
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.versioning import EdgeKey, VersionNode
 ```
 
@@ -215,7 +227,7 @@ migrations and await the runner result.
 options. If you are migrating settings, expand the supported manager options:
 
 ```python
-Manager.configure(PydanticModelAdapter(), **manager_kwargs(settings))
+Manager.configure(PydanticModelAdapter(codec=ModelCodec()), **manager_kwargs(settings))
 ```
 
 ### FastMCP startup fails after upgrade

@@ -119,7 +119,7 @@ class TestModel:
         model: ModelHandle,
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, model)
-        assert registry.get_model(version).model is version.model
+        assert registry.get_model(version).descriptor == version.descriptor
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -239,7 +239,7 @@ class TestModel:
         latest: ModelHandle,
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, latest)
-        assert registry.latest(version.version[0]).model == version.model
+        assert registry.latest(version.version[0]).descriptor == version.descriptor
 
     @pytest.mark.parametrize(
         "model_adapter, registry, key",
@@ -351,11 +351,12 @@ class TestModel:
     )
     def test_model_class_not_in_registry(
         self,
+        model_adapter: types.ModelAdapter,
         registry: Registry[types.VersionValue],
         model: ModelHandle,
     ) -> None:
         with pytest.raises(ModelNotFoundError):
-            registry.get_model_by_handle(model)
+            registry.get_model_by_ref(model_adapter.ref(model))
 
     @pytest.mark.parametrize(
         "model_adapter, registry",
@@ -585,12 +586,14 @@ class TestModel:
     )
     def test_copy_preserves_model_class_lookup(
         self,
+        model_adapter: types.ModelAdapter,
         registry: Registry[types.VersionValue],
         model: ModelHandle,
     ) -> None:
         """A copied registry keeps class-based lookups."""
         clone = registry.copy()
-        assert clone.get_model_by_handle(model).model is model
+        ref = model_adapter.ref(model)
+        assert clone.get_model_by_ref(ref).descriptor.ref == ref
 
 
 class TestMigration:
@@ -2464,13 +2467,15 @@ class TestNeutralGraphOps:
     )
     def test_handle_lookup_and_removal(
         self,
+        model_adapter: types.ModelAdapter,
         registry: Registry[types.VersionValue],
         model: ModelHandle,
     ) -> None:
-        assert registry.get_model_by_handle(model).model is model
-        registry.remove_model_by_handle(model)
+        ref = model_adapter.ref(model)
+        assert registry.get_model_by_ref(ref).descriptor.ref == ref
+        registry.remove_model_by_ref(ref)
         with pytest.raises(ModelNotFoundError):
-            registry.get_model_by_handle(model)
+            registry.get_model_by_ref(ref)
 
 
 @pytest.mark.parametrize(

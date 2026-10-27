@@ -47,9 +47,23 @@ the payload contract.
 
 - `PydanticModelAdapter`
 - `JsonSchemaModelAdapter`
+- `DataclassModelAdapter`
 
-Both use Pydantic model classes as the runtime container; the JSON Schema
-adapter materializes schemas into Pydantic models at registration time.
+`PydanticModelAdapter` and `JsonSchemaModelAdapter` use Pydantic model classes as
+the runtime container; the JSON Schema adapter materializes schemas into
+Pydantic models at registration time.
+
+`DataclassModelAdapter` uses stdlib `dataclasses` classes as the runtime
+container. Version and kind are read from field defaults, and nested dataclasses
+are discovered recursively. The adapter is exported but not yet covered by the
+conformance corpus; treat it as provisional until it is.
+
+## Planned adapters
+
+- Avro (`pyverge-avro`)
+- Protobuf (`pyverge-protobuf`)
+
+These are roadmap items, not shipped. Do not assume their APIs are stable.
 
 ## Adding a provider
 
@@ -89,10 +103,10 @@ import pendulum
 from typing import Literal
 
 from pyverge import Manager
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 UserManager = Manager[pendulum.Date].configure(
-    PydanticModelAdapter(),
+    PydanticModelAdapter(codec=ModelCodec()),
 )
 
 

@@ -139,7 +139,7 @@ class TargetCompiler(Generic[VersionValue]):
 
     def _model(self, model: type[ModelHandle]) -> TargetResolver:
         try:
-            target = self.graph.get_model_by_handle(model)
+            target = self.graph.get_model_by_ref(self.adapter.ref(model))
         except ModelNotFoundError as error:
             raise CatalogError(
                 self.graph.name,

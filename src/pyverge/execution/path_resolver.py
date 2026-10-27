@@ -7,7 +7,6 @@ from typing import Generic
 from pyverge.core.types import ModelHandle, TargetResolver, VersionValue
 from pyverge.execution.plan import ExtractedEntry, PathPlan, PathPlanEntry
 from pyverge.registry import GraphCatalog
-from pyverge.registry.errors import CatalogError
 from pyverge.versioning import EdgeKey, VersionNode
 
 
@@ -23,11 +22,6 @@ class PathResolver(Generic[VersionValue]):
         target: VersionNode[VersionValue],
     ) -> PathPlanEntry[VersionValue]:
         target_node = target
-        if target_node.model is None:
-            raise CatalogError(
-                self.graph.name,
-                f"Target {target_node} has no concrete model",
-            )
         steps = tuple(self.graph.migration_path(entry.node, target_node))
         hooks = tuple(
             tuple(self.graph.get_hooks(EdgeKey.from_pair(source, step_target)))
@@ -43,7 +37,7 @@ class PathResolver(Generic[VersionValue]):
             path=entry.path,
             source=entry.node,
             target=target_node,
-            target_model=target_node.model,
+            target_model=target_node.descriptor.ref,
             steps=steps,
             hooks=hooks,
             migrations=migrations,

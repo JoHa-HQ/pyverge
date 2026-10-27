@@ -12,7 +12,7 @@ from pyverge.core.types import (
 from pyverge.versioning import Comparable, Diffable, FieldDescriptor, Versionable
 
 if TYPE_CHECKING:
-    from pyverge.versioning import Diff, VersionNode
+    from pyverge.versioning import Diff, ModelRef, VersionNode
 
 #: Provider model TypeVars.  These live outside core on purpose: core operates
 #: on opaque :data:`ModelHandle` values, so no provider model base appears in a
@@ -158,6 +158,10 @@ class ModelAdapter(ModelIdentity, Protocol[VersionValue_co]):
     def dump(self, model: object) -> ModelData: ...
 
     def identify(self, model_cls: ModelHandle) -> bool: ...
+
+    def ref(self, handle: ModelHandle) -> ModelRef: ...
+
+    def resolve(self, ref: ModelRef) -> ModelHandle: ...
 
     def versionable(
         self,

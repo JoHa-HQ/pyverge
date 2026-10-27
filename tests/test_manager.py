@@ -192,7 +192,7 @@ class TestInstanceFacade:
         instance = manager()
         version = envelope_model(instance.engine.adapter, None, model)
         found = instance.engine.get_model(version)
-        assert found.model is version.model
+        assert found.descriptor == version.descriptor
 
 
 class TestLookupHelpers:
@@ -236,7 +236,12 @@ class TestLookupHelpers:
         by ``adapter.versionable``, whose ``of`` accepted only strings.
         """
         for model, version, payload in zip(models, versions, payloads, strict=True):
-            assert manager.get("User", version).model is model
+            assert (
+                manager().engine.adapter.resolve(
+                    manager.get("User", version).descriptor.ref
+                )
+                is model
+            )
             manager().validate(payload, "User", version)
 
     @pytest.mark.parametrize(
@@ -311,7 +316,7 @@ class TestLookupHelpers:
         manager: type[Manager],
         latest: type[BaseModel],
     ) -> None:
-        assert manager.get_latest_model("User").model is latest
+        assert manager.get_latest_model("User").model_id.endswith(latest.__name__)
 
     @pytest.mark.parametrize(
         ("model_adapter", "registry"),
@@ -351,7 +356,10 @@ class TestLookupHelpers:
         manager: type[Manager],
         expected: list[type[BaseModel]],
     ) -> None:
-        assert [n.model for n in manager.list_versions("User")] == expected
+        assert [
+            manager().engine.adapter.resolve(n.descriptor.ref)
+            for n in manager.list_versions("User")
+        ] == expected
         assert manager.list_versions("Missing") == []
 
     @pytest.mark.parametrize(
@@ -533,7 +541,9 @@ class TestFluentLookup:
         versions = [envelope_model(instance.engine.adapter, None, m) for m in models]
         result = instance[selector(versions)]
         if kind == "model":
-            assert cast(Versionable, result).model in set(models)
+            assert instance.engine.adapter.resolve(
+                cast(Versionable, result).descriptor.ref
+            ) in set(models)
         elif kind == "edge":
             assert cast(Migratable, result).func is not None
         else:

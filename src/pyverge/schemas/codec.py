@@ -46,6 +46,9 @@ class ModelCodec:
     _adapters: dict[Any, TypeAdapter[Any]] = field(
         default_factory=dict, compare=False, repr=False
     )
+    _handles: dict[ModelRef, ModelHandle] = field(
+        default_factory=dict, compare=False, repr=False
+    )
 
     # -- identity ---------------------------------------------------------
     def of(self, value: str | VersionValue) -> VersionValue:
@@ -88,6 +91,27 @@ class ModelCodec:
 
     def version_key(self, *, kind: str, version: str) -> VersionKey[VersionValue]:
         return VersionKey[VersionValue](_value=self.of(version), _kind=kind)
+
+    def ref(self, handle: ModelHandle, *, provider: str) -> ModelRef:
+        ref = ModelRef(provider=provider, model_id=self.model_id(handle))
+        self._handles[ref] = handle
+        return ref
+
+    def resolve(self, ref: ModelRef) -> ModelHandle:
+        try:
+            return self._handles[ref]
+        except KeyError as exc:
+            raise KeyError(f"No runtime handle registered for {ref}") from exc
+
+    @staticmethod
+    def model_id(handle: ModelHandle) -> str:
+        module = getattr(handle, "__module__", None) or type(handle).__module__
+        qualname = getattr(handle, "__qualname__", None) or getattr(
+            handle, "__name__", None
+        )
+        if qualname is None:
+            return f"{module}.{type(handle).__qualname__}"
+        return f"{module}.{qualname}"
 
     @staticmethod
     def _default(fields: Mapping[str, FieldDescriptor], name: str) -> str:
@@ -179,9 +203,11 @@ class ModelCodec:
             return None
         return self.resolve_model(field_info.annotation)
 
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
+    def references(
+        self, model_cls: ModelHandle, *, provider: str
+    ) -> frozenset[ModelVersionKey]:
         found: set[ModelVersionKey] = set()
-        self._collect_references(model_cls, found, set())
+        self._collect_references(model_cls, found, set(), provider=provider)
         return frozenset(found)
 
     def _collect_references(
@@ -189,6 +215,8 @@ class ModelCodec:
         model_cls: ModelHandle,
         found: set[ModelVersionKey],
         seen: set[int],
+        *,
+        provider: str,
     ) -> None:
         if not (isinstance(model_cls, type) and issubclass(model_cls, BaseModel)):
             return
@@ -200,17 +228,17 @@ class ModelCodec:
             for nested in self._iter_models(annotation):
                 if nested is model_cls:
                     continue
-                kind = self.kind(self.describe_fields(nested, provider="pydantic"))
+                kind = self.kind(self.describe_fields(nested, provider=provider))
                 if not kind:
                     continue
                 try:
                     version = self.of(
-                        self.version(self.describe_fields(nested, provider="pydantic"))
+                        self.version(self.describe_fields(nested, provider=provider))
                     )
                 except (TypeError, ValueError):
                     continue
                 found.add((kind, version))
-                self._collect_references(nested, found, seen)
+                self._collect_references(nested, found, seen, provider=provider)
 
     def _iter_models(self, annotation: Any) -> list[ModelHandle]:
         if isinstance(annotation, type) and issubclass(annotation, BaseModel):
@@ -261,7 +289,7 @@ class ModelCodec:
                 found.add((kind, self.of(self.version(fields))))
             except (TypeError, ValueError):
                 continue
-            found.update(self.references(nested))
+            found.update(self.references(nested, provider=provider))
         return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
 
     def type_ref(self, annotation: Any, *, provider: str) -> TypeRef:  # noqa: C901, PLR0911
@@ -303,10 +331,7 @@ class ModelCodec:
             fields = self.describe_fields(resolved, provider=provider)
             version = self.version(fields)
             return TypeRef.model(
-                ModelRef(
-                    provider=provider,
-                    model_id=f"{resolved.__module__}.{resolved.__qualname__}",
-                ),
+                self.ref(resolved, provider=provider),
                 version=version or None,
             )
 
@@ -315,7 +340,7 @@ class ModelCodec:
         return TypeRef.unknown(str(annotation))
 
     def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        anchor = diff.source.model
+        anchor = self.resolve(diff.source.descriptor.ref)
         version = diff.target.version[1]
         fields: dict[str, Any] = {self.version_property: (str, str(version))}
         for name, field_info in anchor.model_fields.items():

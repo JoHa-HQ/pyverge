@@ -71,13 +71,13 @@ class AbstractModelAdapter(Generic[VersionValue]):
         return self.model_codec.kind_property
 
     def model_id(self, handle: ModelHandle) -> str:
-        module = getattr(handle, "__module__", None) or type(handle).__module__
-        qualname = getattr(handle, "__qualname__", None) or getattr(
-            handle, "__name__", None
-        )
-        if qualname is None:
-            return f"{module}.{type(handle).__qualname__}"
-        return f"{module}.{qualname}"
+        return self.model_codec.model_id(handle)
+
+    def ref(self, handle: ModelHandle) -> ModelRef:
+        return self.model_codec.ref(handle, provider=self.provider)
+
+    def resolve(self, ref: ModelRef) -> ModelHandle:
+        return self.model_codec.resolve(ref)
 
     def type_ref(self, annotation: Any) -> TypeRef:  # noqa: C901, PLR0911
         if annotation is None or annotation is type(None):
@@ -138,10 +138,7 @@ class AbstractModelAdapter(Generic[VersionValue]):
             if name not in identity
         }
         return ModelDescriptor(
-            ref=ModelRef(
-                provider=self.provider,
-                model_id=self.model_id(handle),
-            ),
+            ref=self.ref(handle),
             fields=FrozenMap(fields),
         )
 
@@ -170,7 +167,6 @@ class AbstractModelAdapter(Generic[VersionValue]):
                 _kind=kind or self.kind(model_cls),
             ),
             descriptor=self.model_descriptor(model_cls),
-            _model=model_cls,
         )
 
     def version_key(

@@ -755,8 +755,8 @@ class TestGraphPrimitives:
         [[PydanticModelAdapter[semver.Version], UserV1]],
         indirect=True,
     )
-    def test_node_repr_with_handle(self, node) -> None:
-        assert "UserV1" in repr(node)
+    def test_node_repr(self, node) -> None:
+        assert "VersionNode[Version]" in repr(node)
 
     @pytest.mark.parametrize(
         "edge",
@@ -928,7 +928,7 @@ class TestPrimitives:
         assert projected.id == node.jgf_id
         assert projected.metadata["content_hash"] == node.content_hash(hasher)
         assert projected.metadata["model"] == node.descriptor.to_canonical()
-        assert node.model is DataclassPersonV1
+        assert node.model_id.endswith("PersonV1")
 
 
 class TestFieldDefaults:

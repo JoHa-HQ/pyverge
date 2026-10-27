@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import total_ordering
 from typing import TYPE_CHECKING, Any, Generic, Self
 
@@ -8,7 +8,6 @@ from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     MigrationFunc,
     ModelData,
-    ModelHandle,
     ModelKind,
     ModelVersionKey,
     VersionValue,
@@ -111,7 +110,6 @@ class VersionNode(Generic[VersionValue]):
 
     key: VersionKey[VersionValue]
     descriptor: ModelDescriptor
-    _model: ModelHandle | None = field(default=None, compare=False, repr=False)
 
     @property
     def strategy(self) -> type[VersionValue]:
@@ -130,12 +128,6 @@ class VersionNode(Generic[VersionValue]):
         return self.key.jgf_id
 
     @property
-    def model(self) -> ModelHandle:
-        if self._model is None:
-            raise ValueError(f"VersionNode {self.jgf_id} has no runtime model handle")
-        return self._model
-
-    @property
     def model_id(self) -> str:
         return self.descriptor.ref.model_id
 
@@ -148,7 +140,7 @@ class VersionNode(Generic[VersionValue]):
         return frozenset(self.descriptor.fields)
 
     def with_descriptor(self, descriptor: ModelDescriptor) -> Self:
-        return type(self)(key=self.key, descriptor=descriptor, _model=self._model)
+        return type(self)(key=self.key, descriptor=descriptor)
 
     def with_fields(self, *fields: FieldDescriptor) -> Self:
         return self.with_descriptor(self.descriptor.with_fields(*fields))
@@ -204,8 +196,7 @@ class VersionNode(Generic[VersionValue]):
         return self.jgf_id
 
     def __repr__(self) -> str:
-        model = getattr(self._model, "__name__", "model")
-        return f"VersionNode[{self.strategy.__name__}, {model}]({self.version})"
+        return f"VersionNode[{self.strategy.__name__}]({self.version})"
 
 
 @total_ordering

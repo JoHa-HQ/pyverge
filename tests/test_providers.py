@@ -97,11 +97,11 @@ def test_adapter_identity_and_codec(adapter, source_model, target_model, payload
     node = adapter.versionable(source_model)
     assert node.kind == "User"
     assert str(node.version[1]) == "1.0.0"
-    assert "version" not in adapter.fields(node.model)
+    assert "version" not in adapter.fields(adapter.resolve(node.descriptor.ref))
     assert adapter.model_codec.version_property == "version"
     assert adapter.model_codec.kind_property == "kind"
-    assert adapter.identify(node.model)
-    assert adapter.can_handle(node.model)
+    assert adapter.identify(adapter.resolve(node.descriptor.ref))
+    assert adapter.can_handle(adapter.resolve(node.descriptor.ref))
     if not isinstance(source_model, dict):
         instance = adapter.instantiate(source_model, payload)
         assert adapter.dump(instance)["kind"] == "User"
@@ -178,8 +178,9 @@ def test_reconstructs_missing_model_on_store_migration(
     )
     reconstructed = engine.get_model(meta)
 
-    assert reconstructed.model is not None
-    assert "age" not in reconstructed.model.model_fields
+    reconstructed_model = engine.adapter.resolve(reconstructed.descriptor.ref)
+    assert reconstructed_model is not None
+    assert "age" not in reconstructed_model.model_fields
 
 
 @pytest.mark.parametrize(

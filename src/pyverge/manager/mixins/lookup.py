@@ -79,7 +79,7 @@ class LookupMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         if not engine.adapter.identify(key):
             raise ModelNotFoundError(engine.registry.name, key)
-        versionable = engine.registry.get_model_by_handle(key)
+        versionable = engine.registry.get_model_by_ref(engine.adapter.ref(key))
         return VersionKey[VersionValue](
             _value=versionable.version[1],
             _kind=versionable.kind,

@@ -19,7 +19,7 @@ def info(
         typer.echo("")
 
         versions = mgr.list_versions()
-        models = sorted({v.model.__name__ for v in versions})
+        models = sorted({v.model_id.rsplit(".", 1)[-1] for v in versions})
 
         if not models:
             typer.secho("No models registered", fg=typer.colors.YELLOW)
@@ -31,7 +31,7 @@ def info(
         for model_name in models:
             typer.secho(f"  {model_name}", bold=True)
             for v in versions:
-                if v.model.__name__ == model_name:
+                if v.model_id.rsplit(".", 1)[-1] == model_name:
                     typer.echo(f"    • v{v.version[1]}")
 
         typer.echo(f"\nTotal: {len(models)} models")

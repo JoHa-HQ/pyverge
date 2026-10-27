@@ -56,7 +56,7 @@ class PydanticModelAdapter(AbstractModelAdapter[VersionValue]):
         return self.model_codec.field_model(parent_model, field_name)
 
     def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
-        return self.model_codec.references(model_cls)
+        return self.model_codec.references(model_cls, provider=self.provider)
 
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
         return self.model_codec.describe_fields(model_cls, provider=self.provider)
