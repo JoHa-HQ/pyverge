@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import logging
-import types
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin
+from typing import Any, cast
 
 import pendulum
 from pydantic import BaseModel, TypeAdapter, create_model
@@ -12,29 +11,19 @@ from pydantic_core import PydanticUndefined
 from semver import Version
 
 from pyverge.core.types import ModelData, ModelHandle, ModelVersionKey, VersionValue
+from pyverge.schemas.type_projection import annotation_type_ref
 from pyverge.versioning import (
     NO_DEFAULT,
     Diffable,
     FieldDescriptor,
     ModelRef,
     NoDefault,
-    TypeKind,
     TypeRef,
     VersionKey,
     default_canonicalizer,
 )
 
 logger = logging.getLogger(__name__)
-
-_TUPLE_ELLIPSIS_ARGS = 2
-
-_SIMPLE_TYPES: dict[Any, TypeKind] = {
-    bool: TypeKind.BOOLEAN,
-    int: TypeKind.INTEGER,
-    float: TypeKind.NUMBER,
-    str: TypeKind.STRING,
-    bytes: TypeKind.BYTES,
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,52 +281,15 @@ class ModelCodec:
             found.update(self.references(nested, provider=provider))
         return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
 
-    def type_ref(self, annotation: Any, *, provider: str) -> TypeRef:  # noqa: C901, PLR0911
-        if annotation is None or annotation is type(None):
-            return TypeRef.null()
-        if annotation is Any:
-            return TypeRef.any()
-        simple = _SIMPLE_TYPES.get(annotation)
-        if simple is not None:
-            return TypeRef.primitive(simple)
-
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-
-        if origin is Annotated:
-            return self.type_ref(args[0], provider=provider)
-        if origin is Literal:
-            return TypeRef.literal(*args)
-        if origin is Union or origin is types.UnionType:
-            return TypeRef.union(
-                *(self.type_ref(arg, provider=provider) for arg in args)
-            )
-        if origin is tuple:
-            if len(args) == _TUPLE_ELLIPSIS_ARGS and args[1] is Ellipsis:
-                return TypeRef.array(self.type_ref(args[0], provider=provider))
-            return TypeRef.array(
-                TypeRef.union(*(self.type_ref(arg, provider=provider) for arg in args))
-            )
-        if origin in (list, set, frozenset):
-            return TypeRef.array(self.type_ref(args[0], provider=provider))
-        if origin in (dict, Mapping):
-            return TypeRef.mapping(
-                self.type_ref(args[0], provider=provider),
-                self.type_ref(args[1], provider=provider),
-            )
-
-        resolved = self.resolve_model(annotation)
-        if resolved is not None:
-            fields = self.describe_fields(resolved, provider=provider)
-            version = self.version(fields)
-            return TypeRef.model(
-                self.ref(resolved, provider=provider),
-                version=version or None,
-            )
-
-        if isinstance(annotation, type):
-            return TypeRef.unknown(f"{annotation.__module__}.{annotation.__qualname__}")
-        return TypeRef.unknown(str(annotation))
+    def type_ref(self, annotation: Any, *, provider: str) -> TypeRef:
+        return annotation_type_ref(
+            annotation,
+            resolve_model=self.resolve_model,
+            model_ref=lambda handle: self.ref(handle, provider=provider),
+            version=lambda handle: self.version(
+                self.describe_fields(handle, provider=provider)
+            ),
+        )
 
     def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
         anchor = self.resolve(diff.source.descriptor.ref)
