@@ -1,7 +1,17 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, get_args, get_origin, get_type_hints
+import types
+from collections.abc import Iterable, Mapping, Sequence
+from typing import (
+    Annotated,
+    Any,
+    Literal,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
+)
 
 from pyverge.core.types import (
     ModelData,
@@ -15,10 +25,21 @@ from pyverge.versioning import (
     NO_DEFAULT,
     Diffable,
     FieldDescriptor,
+    TypeKind,
+    TypeRef,
     default_canonicalizer,
 )
 
 _MAPPING_ARG_COUNT = 2
+_TUPLE_ELLIPSIS_ARGS = 2
+
+_SIMPLE_TYPES: dict[Any, TypeKind] = {
+    bool: TypeKind.BOOLEAN,
+    int: TypeKind.INTEGER,
+    float: TypeKind.NUMBER,
+    str: TypeKind.STRING,
+    bytes: TypeKind.BYTES,
+}
 
 
 class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
@@ -162,6 +183,42 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
         strict: bool = False,
     ) -> dict[str, Any]:
         return self.model_codec.validate(container, data, strict=strict)
+
+    def type_ref(self, annotation: Any) -> TypeRef:  # noqa: C901, PLR0911
+        if annotation is None or annotation is type(None):
+            return TypeRef.null()
+        if annotation is Any:
+            return TypeRef.any()
+        simple = _SIMPLE_TYPES.get(annotation)
+        if simple is not None:
+            return TypeRef.primitive(simple)
+
+        origin = get_origin(annotation)
+        args = get_args(annotation)
+
+        if origin is Annotated:
+            return self.type_ref(args[0])
+        if origin is Literal:
+            return TypeRef.literal(*args)
+        if origin is Union or origin is types.UnionType:
+            return TypeRef.union(*(self.type_ref(arg) for arg in args))
+        if origin is tuple:
+            if len(args) == _TUPLE_ELLIPSIS_ARGS and args[1] is Ellipsis:
+                return TypeRef.array(self.type_ref(args[0]))
+            return TypeRef.array(TypeRef.union(*(self.type_ref(arg) for arg in args)))
+        if origin in (list, set, frozenset, Sequence, Iterable):
+            return TypeRef.array(self.type_ref(args[0]))
+        if origin in (dict, Mapping):
+            return TypeRef.mapping(self.type_ref(args[0]), self.type_ref(args[1]))
+
+        resolved = self.resolve_model(annotation)
+        if resolved is not None:
+            version = self.version(resolved)
+            return TypeRef.model(self.ref(resolved), version=version or None)
+
+        if isinstance(annotation, type):
+            return TypeRef.unknown(f"{annotation.__module__}.{annotation.__qualname__}")
+        return TypeRef.unknown(str(annotation))
 
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
         hints = self._hints(model_cls)

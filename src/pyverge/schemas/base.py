@@ -1,17 +1,7 @@
 from __future__ import annotations
 
-import logging
-import types
-from collections.abc import Iterable, Mapping, Sequence
-from typing import (
-    Annotated,
-    Any,
-    Generic,
-    Literal,
-    Union,
-    get_args,
-    get_origin,
-)
+from collections.abc import Mapping
+from typing import Any, Generic
 
 from pyverge.core.types import (
     ModelHandle,
@@ -28,25 +18,11 @@ from pyverge.versioning import (
     FrozenMap,
     ModelDescriptor,
     ModelRef,
-    TypeKind,
-    TypeRef,
     Versionable,
     VersionKey,
     VersionNode,
 )
 from pyverge.versioning.diff import _build_diff
-
-_TUPLE_ELLIPSIS_ARGS = 2
-
-_SIMPLE_TYPES: dict[Any, TypeKind] = {
-    bool: TypeKind.BOOLEAN,
-    int: TypeKind.INTEGER,
-    float: TypeKind.NUMBER,
-    str: TypeKind.STRING,
-    bytes: TypeKind.BYTES,
-}
-
-logger = logging.getLogger(__name__)
 
 
 class AbstractModelAdapter(Generic[VersionValue]):
@@ -78,45 +54,6 @@ class AbstractModelAdapter(Generic[VersionValue]):
 
     def resolve(self, ref: ModelRef) -> ModelHandle:
         return self.model_codec.resolve(ref)
-
-    def type_ref(self, annotation: Any) -> TypeRef:  # noqa: C901, PLR0911
-        if annotation is None or annotation is type(None):
-            return TypeRef.null()
-        if annotation is Any:
-            return TypeRef.any()
-        simple = _SIMPLE_TYPES.get(annotation)
-        if simple is not None:
-            return TypeRef.primitive(simple)
-
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-
-        if origin is Annotated:
-            return self.type_ref(args[0])
-        if origin is Literal:
-            return TypeRef.literal(*args)
-        if origin is Union or origin is types.UnionType:
-            return TypeRef.union(*(self.type_ref(arg) for arg in args))
-        if origin is tuple:
-            if len(args) == _TUPLE_ELLIPSIS_ARGS and args[1] is Ellipsis:
-                return TypeRef.array(self.type_ref(args[0]))
-            return TypeRef.array(TypeRef.union(*(self.type_ref(arg) for arg in args)))
-        if origin in (list, set, frozenset, Sequence, Iterable):
-            return TypeRef.array(self.type_ref(args[0]))
-        if origin in (dict, Mapping):
-            return TypeRef.mapping(self.type_ref(args[0]), self.type_ref(args[1]))
-
-        resolved = self.resolve_model(annotation)
-        if resolved is not None:
-            version = self.version(resolved)
-            return TypeRef.model(
-                ModelRef(provider=self.provider, model_id=self.model_id(resolved)),
-                version=version or None,
-            )
-
-        if isinstance(annotation, type):
-            return TypeRef.unknown(f"{annotation.__module__}.{annotation.__qualname__}")
-        return TypeRef.unknown(str(annotation))
 
     def materialize(self, diff: Diffable[VersionValue]) -> VersionNode[VersionValue]:
         if diff.source.version > diff.target.version:
