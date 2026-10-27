@@ -6,23 +6,23 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     Annotated,
     Any,
+    Generic,
     Literal,
     Union,
-    cast,
     get_args,
     get_origin,
 )
-
-import pendulum
-from semver import Version
 
 from pyverge.core.types import (
     ModelHandle,
     ModelVersionKey,
     VersionValue,
 )
+from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.errors import ProviderCapabilityError
 from pyverge.versioning import (
+    Comparable,
+    Diff,
     Diffable,
     FieldDescriptor,
     FrozenMap,
@@ -30,8 +30,11 @@ from pyverge.versioning import (
     ModelRef,
     TypeKind,
     TypeRef,
+    Versionable,
+    VersionKey,
     VersionNode,
 )
+from pyverge.versioning.diff import _build_diff
 
 _TUPLE_ELLIPSIS_ARGS = 2
 
@@ -46,7 +49,7 @@ _SIMPLE_TYPES: dict[Any, TypeKind] = {
 logger = logging.getLogger(__name__)
 
 
-class AbstractModelAdapter:
+class AbstractModelAdapter(Generic[VersionValue]):
     """Shared adapter behavior: version parsing and property configuration.
 
     Provider-neutral: owns only version/kind property config and version
@@ -56,21 +59,16 @@ class AbstractModelAdapter:
 
     provider: str = "custom"
 
-    def __init__(
-        self,
-        version_property: str = "version",
-        kind_property: str = "kind",
-    ) -> None:
-        self._version_property = version_property
-        self._kind_property = kind_property
+    def __init__(self, codec: ModelCodec) -> None:
+        self.model_codec = codec
 
     @property
     def version_property(self) -> str:
-        return self._version_property
+        return self.model_codec.version_property
 
     @property
     def kind_property(self) -> str:
-        return self._kind_property
+        return self.model_codec.kind_property
 
     def model_id(self, handle: ModelHandle) -> str:
         module = getattr(handle, "__module__", None) or type(handle).__module__
@@ -120,10 +118,17 @@ class AbstractModelAdapter:
             return TypeRef.unknown(f"{annotation.__module__}.{annotation.__qualname__}")
         return TypeRef.unknown(str(annotation))
 
-    def materialize(self, diff: Diffable) -> VersionNode:
+    def materialize(self, diff: Diffable[VersionValue]) -> VersionNode[VersionValue]:
         if diff.source.version > diff.target.version:
             diff = diff.inverted()
         return self.versionable(self.materialize_model(diff))
+
+    def diff(
+        self,
+        source: Versionable[VersionValue],
+        target: Comparable[VersionValue],
+    ) -> Diff[VersionValue]:
+        return _build_diff(source, target)
 
     def model_descriptor(self, handle: ModelHandle) -> ModelDescriptor:
         identity = {self.version_property, self.kind_property}
@@ -140,11 +145,11 @@ class AbstractModelAdapter:
             fields=FrozenMap(fields),
         )
 
-    def version(self, model_cls: type[Any]) -> str:
-        raise NotImplementedError
+    def version(self, model_cls: ModelHandle) -> str:
+        return self.model_codec.version(self.describe_fields(model_cls))
 
-    def kind(self, model_cls: type[Any]) -> str:
-        raise NotImplementedError
+    def kind(self, model_cls: ModelHandle) -> str:
+        return self.model_codec.kind(self.describe_fields(model_cls))
 
     def describe_fields(self, model_cls: ModelHandle) -> Mapping[str, FieldDescriptor]:
         raise NotImplementedError
@@ -158,8 +163,23 @@ class AbstractModelAdapter:
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> VersionNode:
-        raise NotImplementedError
+    ) -> VersionNode[VersionValue]:
+        return VersionNode[VersionValue](
+            key=VersionKey[VersionValue](
+                _value=self.of(version or self.version(model_cls)),
+                _kind=kind or self.kind(model_cls),
+            ),
+            descriptor=self.model_descriptor(model_cls),
+            _model=model_cls,
+        )
+
+    def version_key(
+        self,
+        *,
+        kind: str,
+        version: str,
+    ) -> Comparable[VersionValue]:
+        return self.model_codec.version_key(kind=kind, version=version)
 
     def materialize_model(self, diff: Diffable) -> ModelHandle:
         raise NotImplementedError
@@ -169,36 +189,7 @@ class AbstractModelAdapter:
 
     @classmethod
     def of(cls, value: str | VersionValue) -> VersionValue:
-        if isinstance(value, Version) or (
-            isinstance(value, pendulum.Date)
-            and not isinstance(value, pendulum.DateTime)
-        ):
-            return cast(VersionValue, value)
-
-        if not isinstance(value, str):
-            msg = f"Cannot parse version {value!r}: expected a string or VersionValue."
-            raise TypeError(msg)
-
-        try:
-            return cast(VersionValue, Version.parse(value))
-        except ValueError:
-            logger.debug(f"Failed to parse semver: {value!r}")
-
-        try:
-            parsed = pendulum.parse(str(value), exact=True)
-            if isinstance(parsed, pendulum.DateTime):
-                parsed = parsed.date()
-            if not isinstance(parsed, pendulum.Date):
-                raise ValueError(f"Expected date, got {parsed!r}")
-            return cast(VersionValue, parsed)
-        except ValueError:
-            logger.debug(f"Failed to parse date: {value!r}")
-
-        msg = (
-            f"Cannot parse version {value!r}. "
-            "Expected semver (e.g. '1.0.0') or ISO date (e.g. '2024-06-01')."
-        )
-        raise ValueError(msg)
+        return ModelCodec().of(value)
 
     def can_handle(
         self,
@@ -222,9 +213,8 @@ class AbstractModelAdapter:
                 f"cannot cover fields {sorted(fields)}"
             )
 
-    def fields(self, model_cls: type[Any]) -> frozenset[str]:
+    def fields(self, model_cls: ModelHandle) -> frozenset[str]:
         identity = {self.version_property, self.kind_property}
-        fields = getattr(model_cls, "model_fields", None)
-        if fields is None:
-            return frozenset()
-        return frozenset(name for name in fields if name not in identity)
+        return frozenset(
+            name for name in self.describe_fields(model_cls) if name not in identity
+        )

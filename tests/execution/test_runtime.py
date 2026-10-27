@@ -38,12 +38,9 @@ from pyverge.execution import (
 from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from pyverge.execution.context import LayeredView, RunContext, StepContext
 from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
-from pyverge.providers import (
-    JsonSchemaModelAdapter,
-    PydanticModelAdapter,
-)
 from pyverge.registry import GraphCatalog, Registry
 from pyverge.registry.errors import CatalogError
+from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.versioning import EdgeKey, VersionNode
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (
@@ -1134,12 +1131,12 @@ def test_step_context_layers_bindings(execution_environment) -> None:
         bindings=MigrationContext.create({"tenant": "acme", "region": "eu"}),
     )
     source = envelope_model(
-        PydanticModelAdapter(),
+        PydanticModelAdapter[semver.Version](codec=ModelCodec()),
         None,
         UserV1,
     )
     target = envelope_model(
-        PydanticModelAdapter(),
+        PydanticModelAdapter[semver.Version](codec=ModelCodec()),
         None,
         UserV2,
     )

@@ -14,6 +14,7 @@ from pyverge.versioning import (
     DiffOrigin,
     FieldChange,
     FieldStatus,
+    FrozenMap,
     Versionable,
 )
 
@@ -42,7 +43,7 @@ class JsonPatchDiffDiscovery(Generic[VersionValue]):
         return Diff(
             source=source,
             target=target,
-            fields=_fields(added, removed, modified),
+            fields=FrozenMap(_fields(added, removed, modified)),
             origin=DiffOrigin.MIGRATION,
         )
 
@@ -116,14 +117,14 @@ class CallableDiffDiscovery(Generic[VersionValue]):
             return Diff(
                 source=source,
                 target=target,
-                fields={},
+                fields=FrozenMap(),
                 origin=DiffOrigin.MIGRATION,
             )
         added, removed, modified = self._collect(ast.parse(textwrap.dedent(src)))
         return Diff(
             source=source,
             target=target,
-            fields=_fields(added, removed, modified),
+            fields=FrozenMap(_fields(added, removed, modified)),
             origin=DiffOrigin.MIGRATION,
         )
 

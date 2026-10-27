@@ -11,6 +11,7 @@ from fastmcp.prompts.function_prompt import FunctionPrompt
 from fastmcp.resources.template import FunctionResourceTemplate
 from fastmcp.tools.function_tool import FunctionTool
 
+from pyverge.schemas import ModelCodec
 from pyverge.schemas.json_schema.adapter import JsonSchemaModelAdapter
 from pyverge.schemas.types import (
     ModelAdapter,
@@ -79,7 +80,7 @@ class ReflectedNode:
         except (AttributeError, TypeError, ValueError):
             pass
 
-        model = JsonSchemaModelAdapter().to_pydantic(
+        model = JsonSchemaModelAdapter(codec=ModelCodec()).to_pydantic(
             document, class_name="ReflectedModel"
         )
         try:

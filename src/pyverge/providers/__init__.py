@@ -12,36 +12,18 @@ from pyverge.migrations import (
     SetDefaultOperation,
     SplitOperation,
 )
-from pyverge.schemas import (
-    AbstractModelAdapter,
-    DataclassModelAdapter,
-    JsonSchemaModelAdapter,
-    ModelAdapter,
-    ModelIdentity,
-    ProviderCapabilityError,
-    PydanticDiff,
-    PydanticModelAdapter,
-)
 
 __all__ = [
-    "AbstractModelAdapter",
     "CoerceOperation",
-    "DataclassModelAdapter",
     "DefaultMigrationIdentityResolver",
     "JsonPatch",
     "JsonPatchMigration",
     "JsonPatchMigrationBackend",
-    "JsonSchemaModelAdapter",
     "JsonataMigration",
     "JsonataTransform",
     "MapOperation",
     "MigrationIdentityResolver",
-    "ModelAdapter",
-    "ModelIdentity",
     "Pointer",
-    "ProviderCapabilityError",
-    "PydanticDiff",
-    "PydanticModelAdapter",
     "SetDefaultOperation",
     "SplitOperation",
 ]

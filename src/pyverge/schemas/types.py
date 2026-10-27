@@ -103,7 +103,7 @@ class SchemaDiffProvider(Protocol):
 
 
 @runtime_checkable
-class ModelAdapter(ModelIdentity, Protocol):
+class ModelAdapter(ModelIdentity, Protocol[VersionValue_co]):
     """Provider-specific model operations.
 
     The single provider seam: the migration engine and registry stay
@@ -165,14 +165,14 @@ class ModelAdapter(ModelIdentity, Protocol):
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> VersionNode[VersionValue]: ...
+    ) -> VersionNode[VersionValue_co]: ...
 
     def version_key(
         self,
         *,
         kind: str,
         version: str,
-    ) -> Comparable[VersionValue]: ...
+    ) -> Comparable[VersionValue_co]: ...
 
     def diff(
         self,
@@ -185,4 +185,6 @@ class ModelAdapter(ModelIdentity, Protocol):
         diff: Diffable[VersionValue_co],
     ) -> ModelHandle: ...
 
-    def materialize(self, diff: Diffable[VersionValue_co]) -> VersionNode: ...
+    def materialize(
+        self, diff: Diffable[VersionValue_co]
+    ) -> VersionNode[VersionValue_co]: ...

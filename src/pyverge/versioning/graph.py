@@ -295,6 +295,24 @@ class VersionEdge(Generic[VersionValue]):
     def jgf_id(self) -> str:
         return f"{self.source.jgf_id}->{self.target.jgf_id}"
 
+    def with_diff(self, diff: Diffable[VersionValue]) -> Self:
+        return type(self)(
+            source=self.source,
+            target=self.target,
+            diff=diff,
+            func=self.func,
+            migration=self.migration,
+        )
+
+    def with_migration(self, migration: MigrationIdentity) -> Self:
+        return type(self)(
+            source=self.source,
+            target=self.target,
+            diff=self.diff,
+            func=self.func,
+            migration=migration,
+        )
+
     def content_payload(self, hasher: ContentHasher) -> dict[str, object]:
         return {
             "id": self.jgf_id,
@@ -356,16 +374,6 @@ class VersionEdge(Generic[VersionValue]):
 
     def __str__(self) -> str:
         return self.jgf_id
-
-
-__all__ = [
-    "EdgeKey",
-    "MigrationIdentity",
-    "Transitional",
-    "VersionEdge",
-    "VersionKey",
-    "VersionNode",
-]
 
 
 __all__ = [

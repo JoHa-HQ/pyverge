@@ -1,8 +1,9 @@
 from .base import AbstractModelAdapter
+from .codec import ModelCodec
 from .dataclasses import DataclassModelAdapter
 from .errors import ProviderCapabilityError
 from .json_schema import JsonSchemaModelAdapter
-from .pydantic import PydanticDiff, PydanticModelAdapter
+from .pydantic import PydanticModelAdapter
 from .types import (
     ModelAdapter,
     ModelIdentity,
@@ -17,9 +18,9 @@ __all__ = [
     "DataclassModelAdapter",
     "JsonSchemaModelAdapter",
     "ModelAdapter",
+    "ModelCodec",
     "ModelIdentity",
     "ProviderCapabilityError",
-    "PydanticDiff",
     "PydanticModelAdapter",
     "TContainer",
     "VModel",

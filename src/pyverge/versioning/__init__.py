@@ -14,7 +14,6 @@ from .diff import (
     Diff,
     FieldChange,
     FieldStatus,
-    SchemaDiffer,
 )
 from .frozen import FrozenMap
 from .graph import (
@@ -71,6 +70,7 @@ __all__ = [
     "Diff",
     "DiffMaterializer",
     "DiffOrigin",
+    "DiffProvider",
     "DiffRenderer",
     "Diffable",
     "EdgeKey",
@@ -92,7 +92,6 @@ __all__ = [
     "ModelRef",
     "NoDefault",
     "Orderable",
-    "SchemaDiffer",
     "Transitional",
     "TypeKind",
     "TypeRef",

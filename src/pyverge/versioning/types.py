@@ -26,6 +26,8 @@ if TYPE_CHECKING:
     from pyverge.core.context import MigrationContext
     from pyverge.core.types import Attachable
 
+    from .diff import Diff
+
 T_co = TypeVar("T_co", covariant=True)
 RenderOutput = TypeVar("RenderOutput")
 MaterializedOutput = TypeVar("MaterializedOutput")
@@ -98,6 +100,16 @@ class Transitional(Orderable, Protocol[VersionValue_co]):
     def source(self) -> Comparable: ...
     @property
     def target(self) -> Comparable: ...
+
+
+class DiffProvider(Protocol):
+    """Anything that can build a schema diff from two version endpoints."""
+
+    def diff(
+        self,
+        source: Versionable,
+        target: Comparable,
+    ) -> Diff: ...
 
 
 @runtime_checkable
@@ -215,6 +227,7 @@ __all__ = [
     "Delta",
     "DiffMaterializer",
     "DiffOrigin",
+    "DiffProvider",
     "DiffRenderer",
     "Diffable",
     "Fingerprintable",

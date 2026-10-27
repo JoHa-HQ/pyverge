@@ -6,12 +6,14 @@ import semver
 from pydantic import create_model
 
 from pyverge import Manager
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 
 def build_chain(versions: int = 10, fields: int = 5) -> Manager[semver.Version]:
-    manager_cls = Manager[semver.Version].configure(PydanticModelAdapter())
+    manager_cls = Manager[semver.Version].configure(
+        PydanticModelAdapter[semver.Version](codec=ModelCodec())
+    )
     base = {f"f{i}": (str, "") for i in range(fields)}
     for version in range(versions):
         extra = {f"f{fields + i}": (str, "") for i in range(version)}

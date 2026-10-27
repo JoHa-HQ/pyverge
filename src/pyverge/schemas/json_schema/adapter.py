@@ -8,49 +8,20 @@ from datamodel_code_generator.enums import DataModelType
 from datamodel_code_generator.format import Formatter
 from pydantic import BaseModel
 
-from pyverge.core.types import (
-    ModelData,
-    ModelHandle,
-    ModelVersionKey,
-    VersionValue,
-)
+from pyverge.core.types import ModelData, ModelHandle, ModelVersionKey, VersionValue
 from pyverge.schemas.base import AbstractModelAdapter
-from pyverge.schemas.pydantic.adapter import PydanticCodec
-from pyverge.versioning import (
-    Comparable,
-    Diff,
-    Diffable,
-    FieldDescriptor,
-    Versionable,
-    VersionKey,
-    VersionNode,
-)
+from pyverge.schemas.codec import ModelCodec
+from pyverge.versioning import Diffable, FieldDescriptor
 
 
-class JsonSchemaModelAdapter(AbstractModelAdapter):
+class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
     """Adapter for JSON Schema documents, delegated through Pydantic."""
 
     provider = "json_schema"
 
-    def __init__(
-        self,
-        version_property: str = "version",
-        kind_property: str = "kind",
-    ) -> None:
-        self._codec = PydanticCodec(
-            version_property,
-            kind_property,
-            provider=self.provider,
-        )
+    def __init__(self, codec: ModelCodec) -> None:
+        super().__init__(codec)
         self._cache: dict[str, ModelHandle] = {}
-
-    @property
-    def version_property(self) -> str:
-        return self._codec.version_property
-
-    @property
-    def kind_property(self) -> str:
-        return self._codec.kind_property
 
     def to_pydantic(
         self, document: dict[str, Any], *, class_name: str = "Model"
@@ -82,14 +53,8 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
     def _model(self, model_cls: ModelHandle | dict[str, Any]) -> ModelHandle:
         return self.to_pydantic(model_cls) if isinstance(model_cls, dict) else model_cls
 
-    def version(self, model_cls: ModelHandle) -> str:
-        return self._codec.version(model_cls)
-
-    def kind(self, model_cls: ModelHandle) -> str:
-        return self._codec.kind(model_cls)
-
     def identify(self, model_cls: ModelHandle) -> bool:
-        return self._codec.identify(model_cls)
+        return self.model_codec.identify(model_cls)
 
     def can_handle(
         self,
@@ -97,18 +62,18 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         *,
         fields: frozenset[str] | None = None,
     ) -> bool:
-        return self._codec.can_handle(container, fields=fields)
+        return self.model_codec.can_handle(container, fields=fields)
 
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        return self._codec.instantiate(self._model(container), data)
+        return self.model_codec.materialize(self._model(container), data)
 
     def dump(self, model: object) -> ModelData:
-        return self._codec.dump(model)
+        return self.model_codec.dump(model)
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
     ) -> dict[str, Any]:
-        return self._codec.finalize(self._model(target_model), data)
+        return self.model_codec.finalize(self._model(target_model), data)
 
     def validate(
         self,
@@ -117,24 +82,23 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
-        return self._codec.validate(data, self._model(container), strict=strict)
+        return self.model_codec.validate(self._model(container), data, strict=strict)
 
     def resolve_model(self, annotation: Any) -> ModelHandle | None:
-        return self._codec.resolve_model(annotation)
+        return self.model_codec.resolve_model(annotation)
 
     def field_model(
         self, parent_model: ModelHandle, field_name: str
     ) -> ModelHandle | None:
-        return self._codec.field_model(self._model(parent_model), field_name)
-
-    def fields(self, model_cls: ModelHandle) -> frozenset[str]:
-        return self._codec.fields(self._model(model_cls))
+        return self.model_codec.field_model(self._model(parent_model), field_name)
 
     def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
-        return self._codec.references(self._model(model_cls))
+        return self.model_codec.references(self._model(model_cls))
 
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
-        return self._codec.describe_fields(self._model(model_cls))
+        return self.model_codec.describe_fields(
+            self._model(model_cls), provider=self.provider
+        )
 
     def versionable(
         self,
@@ -142,34 +106,11 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> VersionNode[VersionValue]:
-        resolved = self._model(model_cls)
-        return VersionNode[VersionValue](
-            key=VersionKey[VersionValue](
-                _value=self.of(version or self.version(resolved)),
-                _kind=kind or self.kind(resolved),
-            ),
-            descriptor=self.model_descriptor(resolved),
-            _model=resolved,
-        )
-
-    def version_key(
-        self,
-        *,
-        kind: str,
-        version: str,
-    ) -> Comparable[VersionValue]:
-        return VersionKey[VersionValue](_value=self.of(version), _kind=kind)
-
-    def diff(
-        self,
-        source: Versionable[VersionValue],
-        target: Comparable[VersionValue],
-    ) -> Diff[VersionValue]:
-        return self._codec.diff(source, target)
+    ):
+        return super().versionable(self._model(model_cls), kind=kind, version=version)
 
     def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        return self._codec.materialize_model(diff)
+        return self.model_codec.materialize_model(diff)
 
 
 __all__ = ["JsonSchemaModelAdapter"]

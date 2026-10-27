@@ -6,14 +6,13 @@ from typing import Any, cast
 
 from pyverge.core import MigrationFunc, VersionValue
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
-from pyverge.providers import PydanticDiff
 from pyverge.providers.types import (
     ModelAdapter,
     ModelHandle,
 )
 from pyverge.registry import Registry
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import VersionEdge, VersionKey, VersionNode
+from pyverge.versioning import Diff, VersionEdge, VersionKey, VersionNode
 
 
 def envelope_model(
@@ -41,6 +40,23 @@ def meta_versionable(
     )
 
 
+def edge_from_nodes(
+    adapter: ModelAdapter,
+    source: VersionNode,
+    target: VersionNode,
+    *,
+    func: MigrationFunc,
+) -> VersionEdge[VersionValue]:
+    """Build a VersionEdge from two materialized version nodes."""
+    return VersionEdge(
+        source=source,
+        target=target,
+        diff=Diff.from_pair(source=source, target=target, adapter=adapter),
+        func=func,
+        migration=DefaultMigrationIdentityResolver().resolve(func),
+    )
+
+
 def edge_from_models(  # noqa: PLR0913
     adapter: ModelAdapter,
     versioning_settings: VersioningSettings,
@@ -50,23 +66,12 @@ def edge_from_models(  # noqa: PLR0913
     func: MigrationFunc,
     backward_compatible: bool = False,
 ) -> VersionEdge[VersionValue]:
-    """Build a VersionEdge from model classes or JSON schemas.
-
-    *source_model*/*target_model* are either Pydantic model classes or JSON
-    schema documents; the JSON schema is materialized into a Pydantic model by
-    the adapter at runtime.
-    """
-    source = envelope_model(adapter, versioning_settings, source_model)
-    target = envelope_model(adapter, versioning_settings, target_model)
-    return VersionEdge(
-        source=source,
-        target=target,
-        diff=PydanticDiff.from_pair(
-            source=source,
-            target=target,
-        ),
+    """Build a VersionEdge from model classes or JSON schemas."""
+    return edge_from_nodes(
+        adapter,
+        envelope_model(adapter, versioning_settings, source_model),
+        envelope_model(adapter, versioning_settings, target_model),
         func=func,
-        migration=DefaultMigrationIdentityResolver().resolve(func),
     )
 
 

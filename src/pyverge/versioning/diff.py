@@ -14,6 +14,7 @@ from .types import (
     Diffable,
     DiffMaterializer,
     DiffOrigin,
+    DiffProvider,
     DiffRenderer,
     MigrationKey,
     Versionable,
@@ -47,18 +48,46 @@ class FieldChange:
 class Diff(Generic[VersionValue]):
     """Differences between two model versions — data with queryable predicates.
 
-    Provider-specific construction (e.g. ``PydanticDiff.from_pair``) computes
-    the field changes. ``origin`` records how the diff was produced.
+    Provider-specific construction computes the field changes. ``origin``
+    records how the diff was produced.
     """
 
     source: Versionable[VersionValue]
     target: Comparable[VersionValue]
-    fields: FrozenMap[str, FieldChange] | Mapping[str, FieldChange]
+    fields: FrozenMap[str, FieldChange]
     origin: DiffOrigin
 
-    def __post_init__(self) -> None:
-        if not isinstance(self.fields, FrozenMap):
-            object.__setattr__(self, "fields", FrozenMap(self.fields))
+    @classmethod
+    def from_pair(
+        cls,
+        source: Versionable[VersionValue],
+        target: Comparable[VersionValue],
+        *,
+        adapter: DiffProvider,
+    ) -> Self:
+        diff = adapter.diff(source, target)
+        return cls(
+            source=diff.source,
+            target=diff.target,
+            fields=diff.fields,
+            origin=diff.origin,
+        )
+
+    def with_field(self, name: str, change: FieldChange) -> Self:
+        return type(self)(
+            source=self.source,
+            target=self.target,
+            fields=self.fields.updated({name: change}),
+            origin=self.origin,
+        )
+
+    def with_fields(self, changes: Mapping[str, FieldChange]) -> Self:
+        return type(self)(
+            source=self.source,
+            target=self.target,
+            fields=self.fields.updated(changes),
+            origin=self.origin,
+        )
 
     def render(self, renderer: DiffRenderer[Any]) -> Any:
         return renderer.render(self)
@@ -212,7 +241,7 @@ class Diff(Generic[VersionValue]):
         return Diff(
             source=self.source,
             target=self.target,
-            fields=swapped,
+            fields=FrozenMap(swapped),
             origin=self.origin,
         )
 
@@ -245,85 +274,81 @@ class ChangeSet(Generic[T]):
         return lines
 
 
-class SchemaDiffer:
-    """Build a schema diff from two model descriptors."""
+def _build_diff(
+    source: Versionable[VersionValue],
+    target: Comparable[VersionValue],
+) -> Diff[VersionValue]:
+    source_descriptor = getattr(source, "descriptor", None)
+    target_descriptor = getattr(target, "descriptor", None)
+    fields: FrozenMap[str, FieldChange] = FrozenMap()
+    if source_descriptor is not None and target_descriptor is not None:
+        if source.strategy != target.strategy:
+            raise ValueError(
+                f"Cannot create diff across strategies: "
+                f"{source.strategy.__name__} != {target.strategy.__name__}"
+            )
+        if source.kind != target.kind:
+            raise ValueError(
+                f"Cannot create diff across kinds: {source.kind} != {target.kind}"
+            )
+        fields = _diff_fields(source_descriptor, target_descriptor)
+    return Diff(
+        source=source,
+        target=target,
+        fields=fields,
+        origin=DiffOrigin.SCHEMA,
+    )
 
-    def diff(
-        self,
-        source: Versionable[VersionValue],
-        target: Comparable[VersionValue],
-    ) -> Diff[VersionValue]:
-        source_descriptor = getattr(source, "descriptor", None)
-        target_descriptor = getattr(target, "descriptor", None)
-        fields = {}
-        if source_descriptor is not None and target_descriptor is not None:
-            if source.strategy != target.strategy:
-                raise ValueError(
-                    f"Cannot create diff across strategies: "
-                    f"{source.strategy.__name__} != {target.strategy.__name__}"
-                )
-            if source.kind != target.kind:
-                raise ValueError(
-                    f"Cannot create diff across kinds: {source.kind} != {target.kind}"
-                )
-            fields = self.fields(source_descriptor, target_descriptor)
-        return Diff(
-            source=source,
-            target=target,
-            fields=fields,
-            origin=DiffOrigin.SCHEMA,
+
+def _diff_fields(
+    source: ModelDescriptor,
+    target: ModelDescriptor,
+) -> FrozenMap[str, FieldChange]:
+    source_fields = source.fields
+    target_fields = target.fields
+    source_keys = set(source_fields)
+    target_keys = set(target_fields)
+
+    fields: dict[str, FieldChange] = {}
+    for name in sorted(target_keys - source_keys):
+        field = target_fields[name]
+        fields[name] = FieldChange(
+            FieldStatus.ADDED,
+            {
+                "type": field.annotation,
+                "type_ref": field.type_ref.to_canonical(),
+                "required": field.required,
+                "default": None
+                if isinstance(field.default, NoDefault)
+                else field.default,
+            },
         )
-
-    def fields(
-        self,
-        source: ModelDescriptor,
-        target: ModelDescriptor,
-    ) -> Mapping[str, FieldChange]:
-        source_fields = source.fields
-        target_fields = target.fields
-        source_keys = set(source_fields)
-        target_keys = set(target_fields)
-
-        fields: dict[str, FieldChange] = {}
-        for name in sorted(target_keys - source_keys):
-            field = target_fields[name]
-            fields[name] = FieldChange(
-                FieldStatus.ADDED,
-                {
-                    "type": field.annotation,
-                    "type_ref": field.type_ref.to_canonical(),
-                    "required": field.required,
-                    "default": None
-                    if isinstance(field.default, NoDefault)
-                    else field.default,
-                },
-            )
-        for name in sorted(source_keys - target_keys):
-            fields[name] = FieldChange(FieldStatus.REMOVED, {})
-        for name in sorted(source_keys & target_keys):
-            source_field = source_fields[name]
-            target_field = target_fields[name]
-            changes: dict[str, Any] = {}
-            if source_field.type_ref != target_field.type_ref:
-                changes["type_changed"] = {
-                    "from": source_field.type_ref.to_canonical(),
-                    "to": target_field.type_ref.to_canonical(),
-                }
-            if source_field.required != target_field.required:
-                changes["required_changed"] = {
-                    "from": source_field.required,
-                    "to": target_field.required,
-                }
-            if source_field.default != target_field.default:
-                changes["default_changed"] = {
-                    "from": source_field.default,
-                    "to": target_field.default,
-                }
-            fields[name] = FieldChange(
-                FieldStatus.MODIFIED if changes else FieldStatus.UNCHANGED,
-                changes,
-            )
-        return fields
+    for name in sorted(source_keys - target_keys):
+        fields[name] = FieldChange(FieldStatus.REMOVED, {})
+    for name in sorted(source_keys & target_keys):
+        source_field = source_fields[name]
+        target_field = target_fields[name]
+        changes: dict[str, Any] = {}
+        if source_field.type_ref != target_field.type_ref:
+            changes["type_changed"] = {
+                "from": source_field.type_ref.to_canonical(),
+                "to": target_field.type_ref.to_canonical(),
+            }
+        if source_field.required != target_field.required:
+            changes["required_changed"] = {
+                "from": source_field.required,
+                "to": target_field.required,
+            }
+        if source_field.default != target_field.default:
+            changes["default_changed"] = {
+                "from": source_field.default,
+                "to": target_field.default,
+            }
+        fields[name] = FieldChange(
+            FieldStatus.MODIFIED if changes else FieldStatus.UNCHANGED,
+            changes,
+        )
+    return FrozenMap(fields)
 
 
 __all__ = [
@@ -334,7 +359,6 @@ __all__ = [
     "DiffOrigin",
     "FieldChange",
     "FieldStatus",
-    "SchemaDiffer",
 ]
 
 

@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+import semver
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
 
 from benchmarks.graphs import user_manager
 from pyverge.adapters.faststream import FastStreamSource, subscriber
 from pyverge.discovery import RegistrationCollector
-from pyverge.providers import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from tests.examples.pydantic.semver import UserV2
 
 
@@ -22,7 +23,10 @@ def source() -> FastStreamSource:
     @subscriber(broker, "bench-source", manager=user_manager(), targets="latest")
     async def handle(user: UserV2) -> None: ...
 
-    return FastStreamSource(FastStream(broker), adapter=PydanticModelAdapter())
+    return FastStreamSource(
+        FastStream(broker),
+        adapter=PydanticModelAdapter[semver.Version](codec=ModelCodec()),
+    )
 
 
 def test_source_descriptors(benchmark: Any, source: FastStreamSource) -> None:

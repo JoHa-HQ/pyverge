@@ -29,7 +29,6 @@ from pyverge.execution.extractors import (
 )
 from pyverge.export import ManifestDiff
 from pyverge.jgf import JgfExporter, JgfImporter
-from pyverge.providers import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.providers.types import (
     ModelHandle,
 )
@@ -45,6 +44,7 @@ from pyverge.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.registry.types import PathCatalog
+from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     EdgeKey,
@@ -2740,7 +2740,7 @@ class ListEnvelope(BaseModel):
 def _extractor() -> tuple[
     Registry[semver.Version], PydanticModelAdapter, CompositeExtractor[semver.Version]
 ]:
-    adapter = PydanticModelAdapter()
+    adapter = PydanticModelAdapter(codec=ModelCodec())
     registry = Registry[semver.Version](hasher=default_content_hasher())
     registry.store_model(adapter.versionable(Leaf))
     return registry, adapter, CompositeExtractor(registry, adapter=adapter)

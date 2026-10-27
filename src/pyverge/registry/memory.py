@@ -43,9 +43,10 @@ class InMemoryCatalog(Generic[VersionValue]):
     >>> import semver
     >>> from pydantic import BaseModel
     >>> from pyverge.registry import Registry
+    >>> from pyverge.schemas import ModelCodec
     >>> from pyverge.providers import PydanticModelAdapter
     >>> from pyverge.versioning import default_content_hasher
-    >>> adapter = PydanticModelAdapter()
+    >>> adapter = PydanticModelAdapter(codec=ModelCodec())
     >>> class UserV1(BaseModel):
     ...     kind: Literal["User"] = "User"
     ...     version: Literal["1.0.0"] = "1.0.0"

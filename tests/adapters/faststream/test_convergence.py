@@ -23,8 +23,8 @@ from pyverge.adapters.faststream import (
     subscriber,
 )
 from pyverge.core import MigrationContext
-from pyverge.providers import PydanticModelAdapter
 from pyverge.registry.errors import MigrationPathError
+from pyverge.schemas import PydanticModelAdapter
 from tests.examples.pydantic.semver import (
     UserV1,
     UserV2,

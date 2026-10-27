@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-import types
-from typing import Any, Union, cast, get_args, get_origin, get_type_hints
-
-from pydantic import TypeAdapter
+from typing import Any, get_args, get_origin, get_type_hints
 
 from pyverge.core.types import (
     ModelData,
@@ -13,24 +10,18 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.schemas.base import AbstractModelAdapter
+from pyverge.schemas.codec import ModelCodec
 from pyverge.versioning import (
     NO_DEFAULT,
-    Comparable,
-    Diff,
     Diffable,
-    DiffOrigin,
     FieldDescriptor,
-    SchemaDiffer,
-    Versionable,
-    VersionKey,
-    VersionNode,
     default_canonicalizer,
 )
 
 _MAPPING_ARG_COUNT = 2
 
 
-class DataclassModelAdapter(AbstractModelAdapter):
+class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
     """Model adapter for ordinary :mod:`dataclasses` classes.
 
     Dataclasses are the runtime container, but payload validation and
@@ -43,50 +34,12 @@ class DataclassModelAdapter(AbstractModelAdapter):
 
     def __init__(
         self,
-        version_property: str = "version",
-        kind_property: str = "kind",
+        codec: ModelCodec,
     ) -> None:
-        super().__init__(version_property, kind_property)
-        self._adapters: dict[type[Any], TypeAdapter[Any]] = {}
-
-    def _adapter(self, container: ModelHandle) -> TypeAdapter[Any]:
-        adapter = self._adapters.get(container)
-        if adapter is None:
-            adapter = TypeAdapter(container)
-            self._adapters[container] = adapter
-        return adapter
-
-    def _field_default(self, model_cls: ModelHandle, name: str) -> str:
-        for field in dataclasses.fields(model_cls):
-            if field.name != name:
-                continue
-            if field.default is not dataclasses.MISSING:
-                return (
-                    field.default
-                    if isinstance(field.default, str)
-                    else str(field.default)
-                )
-            if field.default_factory is not dataclasses.MISSING:
-                return str(field.default_factory())
-            return ""
-        return ""
-
-    def version(self, model_cls: ModelHandle) -> str:
-        return self._field_default(model_cls, self._version_property)
-
-    def kind(self, model_cls: ModelHandle) -> str:
-        return self._field_default(model_cls, self._kind_property)
+        super().__init__(codec)
 
     def identify(self, model_cls: ModelHandle) -> bool:
         return isinstance(model_cls, type) and dataclasses.is_dataclass(model_cls)
-
-    def fields(self, model_cls: ModelHandle) -> frozenset[str]:
-        identity = {self._version_property, self._kind_property}
-        return frozenset(
-            field.name
-            for field in dataclasses.fields(model_cls)
-            if field.name not in identity
-        )
 
     def _hints(self, model_cls: ModelHandle) -> dict[str, Any]:
         try:
@@ -186,87 +139,20 @@ class DataclassModelAdapter(AbstractModelAdapter):
                 found.add((kind, version))
                 self._collect_references(nested, found, seen)
 
-    def _strict_validate(self, annotation: Any, value: Any) -> None:
-        if isinstance(annotation, type) and dataclasses.is_dataclass(annotation):
-            self._strict_dataclass(annotation, value)
-            return
-
-        origin = get_origin(annotation)
-        args = get_args(annotation)
-
-        if origin is Union or origin is types.UnionType:
-            self._strict_union(args, value)
-            return
-        if origin is list and args and isinstance(value, list):
-            for item in value:
-                self._strict_validate(args[0], item)
-            return
-        if (
-            origin is dict
-            and len(args) == _MAPPING_ARG_COUNT
-            and isinstance(value, dict)
-        ):
-            for key, item in value.items():
-                self._strict_validate(args[0], key)
-                self._strict_validate(args[1], item)
-            return
-
-        self._adapter(annotation).validate_python(value, strict=True)
-
-    def _strict_dataclass(self, container: ModelHandle, value: Any) -> None:
-        if isinstance(value, container):
-            value = dataclasses.asdict(value)
-        if not isinstance(value, dict):
-            self._adapter(container).validate_python(value, strict=True)
-            return
-
-        hints = self._hints(container)
-        for field in dataclasses.fields(container):
-            if not field.init:
-                continue
-            if field.name in value:
-                self._strict_validate(
-                    hints.get(field.name, field.type), value[field.name]
-                )
-            elif (
-                field.default is dataclasses.MISSING
-                and field.default_factory is dataclasses.MISSING
-            ):
-                raise TypeError(
-                    f"Missing required dataclass field '{field.name}' "
-                    f"for {container.__name__}"
-                )
-
-    def _strict_union(self, args: tuple[Any, ...], value: Any) -> None:
-        if value is None and type(None) in args:
-            return
-        errors: list[Exception] = []
-        for arg in args:
-            if arg is type(None):
-                continue
-            try:
-                self._strict_validate(arg, value)
-                return
-            except Exception as exc:
-                errors.append(exc)
-        if errors:
-            raise errors[-1]
-        raise TypeError(f"Value {value!r} does not match {args!r}")
-
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        return self._adapter(container).validate_python(data)
+        return self.model_codec.materialize(container, data)
 
     def dump(self, model: object) -> ModelData:
         if not dataclasses.is_dataclass(model):
             raise TypeError(
                 f"Cannot serialize {type(model).__name__}: expected a dataclass"
             )
-        return dataclasses.asdict(cast(Any, model))
+        return self.model_codec.dump(model)
 
     def finalize(
         self, target_model: ModelHandle, data: dict[str, Any]
     ) -> dict[str, Any]:
-        return self.dump(self.instantiate(target_model, data))
+        return self.model_codec.finalize(target_model, data)
 
     def validate(
         self,
@@ -275,9 +161,7 @@ class DataclassModelAdapter(AbstractModelAdapter):
         *,
         strict: bool = False,
     ) -> dict[str, Any]:
-        if strict:
-            self._strict_validate(container, data)
-        return self.dump(self.instantiate(container, data))
+        return self.model_codec.validate(container, data, strict=strict)
 
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]:
         hints = self._hints(model_cls)
@@ -326,56 +210,17 @@ class DataclassModelAdapter(AbstractModelAdapter):
             found.update(self.references(nested))
         return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
 
-    def versionable(
-        self,
-        model_cls: ModelHandle,
-        *,
-        kind: str | None = None,
-        version: str | None = None,
-    ) -> VersionNode[VersionValue]:
-        return VersionNode[VersionValue](
-            key=VersionKey[VersionValue](
-                _value=self.of(version or self.version(model_cls)),
-                _kind=kind or self.kind(model_cls),
-            ),
-            descriptor=self.model_descriptor(model_cls),
-            _model=model_cls,
-        )
-
-    def version_key(
-        self,
-        *,
-        kind: str,
-        version: str,
-    ) -> Comparable[VersionValue]:
-        return VersionKey[VersionValue](_value=self.of(version), _kind=kind)
-
-    def diff(
-        self,
-        source: Versionable[VersionValue],
-        target: Comparable[VersionValue],
-    ) -> Diff[VersionValue]:
-        if getattr(target, "model", None) is None:
-            return Diff(
-                source=source,
-                target=target,
-                fields={},
-                origin=DiffOrigin.SCHEMA,
-            )
-
-        return SchemaDiffer().diff(source, target)
-
     def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
         anchor = diff.source.model
         version = diff.target.version[1]
         version_field = (
-            self._version_property,
+            self.version_property,
             str,
             dataclasses.field(default=str(version)),
         )
         fields: list[Any] = [version_field]
         for field in dataclasses.fields(anchor):
-            if field.name in {self._version_property, *diff.removed_fields}:
+            if field.name in {self.version_property, *diff.removed_fields}:
                 continue
             if field.default is not dataclasses.MISSING:
                 fields.append(
