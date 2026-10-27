@@ -115,7 +115,19 @@ def register_migrations(
     *migrations: _Migration | _BackwardCompatibleMigration,
 ) -> None:
     """Register migration definitions in a registry."""
-    for pair, func, backward_compatible in (
-        _parse_migration(migration) for migration in migrations
-    ):
-        registry.store_migration(pair, func, backward_compatible=backward_compatible)
+    for migration in migrations:
+        pair, func, _backward_compatible = _parse_migration(migration)
+        versions = [adapter.versionable(model_cls) for model_cls in pair]
+        diff = adapter.diff(
+            versions[0],
+            versions[1],
+        )
+        registry.store_migration(
+            VersionEdge(
+                versions[0],
+                versions[1],
+                diff,
+                func,
+                migration=DefaultMigrationIdentityResolver().resolve(func),
+            )
+        )

@@ -122,3 +122,31 @@ class FakeLineageClient:
 
     def emit(self, event: tuple[str, Any]) -> None:
         self.events.append(event)
+
+
+class OrderMiddleware:
+    """Record onion order for middleware composition tests."""
+
+    def __init__(self, name: str, log: list[str]) -> None:
+        self._name = name
+        self._log = log
+
+    @property
+    def log(self) -> list[str]:
+        return self._log
+
+    def wrap(self, inner: Any) -> Any:
+        return _Ordered(inner, name=self._name, log=self._log)
+
+
+class _Ordered:
+    def __init__(self, inner: Any, *, name: str, log: list[str]) -> None:
+        self._inner = inner
+        self._name = name
+        self._log = log
+
+    def execute(self, plan: Any, payload: Any, run: Any, adapter: Any) -> Any:
+        self._log.append(f"{self._name}:before")
+        result = self._inner.execute(plan, payload, run, adapter)
+        self._log.append(f"{self._name}:after")
+        return result

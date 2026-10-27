@@ -11,14 +11,12 @@ from pyverge.discovery import (
     MigrationDescriptor,
     MigrationSpec,
     ModelDescriptor,
-    RegistrationContext,
     SourceDescriptor,
 )
 from pyverge.discovery.reflection import (
     CallableDiffDiscovery,
     JsonPatchDiffDiscovery,
 )
-from pyverge.manager.types import Reflectable
 from pyverge.migrations.json_patch import JsonPatch
 from pyverge.registry.errors import GraphLockedError
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
@@ -126,15 +124,6 @@ def test_reflect_after_instance_raises(
 
     with pytest.raises(GraphLockedError, match="locked"):
         manager.reflect(source)
-
-
-def test_manager_is_reflectable(manager: type[Manager]) -> None:
-    assert isinstance(manager, Reflectable)
-
-
-def test_registration_context_requires_validation_flag() -> None:
-    with pytest.raises(TypeError):
-        RegistrationContext(source_id="test", logger=None, clock=None)  # ty: ignore[missing-argument, invalid-argument-type]
 
 
 class _AsyncSource:

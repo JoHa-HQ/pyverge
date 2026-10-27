@@ -64,3 +64,75 @@ def _object(kind: str, version: str, props: dict[str, Any]) -> dict[str, Any]:
             **props,
         },
     }
+
+
+#: A ``Person`` whose ``address`` field references a *union* of three Address
+#: versions via ``oneOf``.  Mirrors the Pydantic discriminated union in
+#: ``semver_nested``: a reference walk must surface all three, not just the
+#: first.  The referenced schemas live under ``definitions`` so the JSON
+#: adapter can materialize them.
+PERSON_V1_0_0 = {
+    "type": "object",
+    "properties": {
+        "kind": {"type": "string", "default": "Person"},
+        "version": {"type": "string", "default": "1.0.0"},
+        "name": {"type": "string"},
+        "address": {
+            "oneOf": [
+                {"$ref": "#/definitions/AddressV1"},
+                {"$ref": "#/definitions/AddressV2"},
+                {"$ref": "#/definitions/AddressV3"},
+            ]
+        },
+    },
+    "required": ["name", "address"],
+    "definitions": {
+        "AddressV1": _object("Address", "1.0.0", {"street": {"type": "string"}}),
+        "AddressV2": _object("Address", "2.0.0", {"street": {"type": "string"}}),
+        "AddressV3": _object("Address", "3.0.0", {"street": {"type": "string"}}),
+    },
+}
+
+INVALID_BETA = _schema("User", "beta.7", {"name": {"type": "string"}})
+INVALID_ALPHA = _schema("User", "0.0.0.alpha7", {"name": {"type": "string"}})
+INVALID_TIME = _schema("User", "15:15:20.000Z", {"name": {"type": "string"}})
+
+
+MIGRATE_V1_TO_V2 = {
+    "from": "1.0.0",
+    "to": "2.0.0",
+    "ops": [{"op": "add", "path": "/age", "value": None}],
+}
+
+MIGRATE_V2_TO_V3 = {
+    "from": "2.0.0",
+    "to": "3.0.0",
+    "ops": [
+        {"op": "set_default", "path": "/age", "value": 0},
+        {"op": "set_default", "path": "/status", "value": "active"},
+    ],
+}
+
+MIGRATE_ADDRESS_100_200 = {
+    "from": "1.0.0",
+    "to": "2.0.0",
+    "ops": [
+        {"op": "add", "path": "/country", "value": None},
+        {"op": "add", "path": "/postal_code", "value": None},
+    ],
+}
+
+MIGRATE_CONTACT_100_200 = {
+    "from": "1.0.0",
+    "to": "2.0.0",
+    "ops": [
+        {"op": "add", "path": "/email", "value": None},
+        {"op": "add", "path": "/preferred", "value": "phone"},
+    ],
+}
+
+
+def migrate_v20250101_to_v20250310(
+    state: ModelData, context: MigrationContext | None = None
+) -> ModelData:
+    return state
