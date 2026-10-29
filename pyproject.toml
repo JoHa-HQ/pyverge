@@ -87,6 +87,7 @@ name = "cz_customize"
 version_provider = "scm"
 tag_format = "v$version"
 version_scheme = "pep440"
+ignored_tag_formats = ["v*dev[0-9]*"]
 major_version_zero = true
 update_changelog_on_bump = false
 
@@ -141,5 +142,6 @@ max-complexity = 10
 [tool.uv-dynamic-versioning]
 vcs = "git"
 style = "pep440"
+pattern = "^v(?P<base>\\d+\\.\\d+\\.\\d+)$"
 bump = true
 format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"

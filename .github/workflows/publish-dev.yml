@@ -53,15 +53,15 @@ jobs:
           set -euo pipefail
           git fetch --tags --force origin
 
-          if ! NEXT=$(uv run --no-sync cz bump --get-next 2>/dev/null); then
+          if ! NEXT=$(uv run --no-sync cz bump --get-next); then
             echo "release=false" >> "$GITHUB_OUTPUT"
             echo "No release-worthy commits; skipping TestPyPI."
             exit 0
           fi
 
-          echo "Release: ${NEXT}"
+          DEV=$(uv run --no-sync cz bump --get-next --devrelease ${GITHUB_RUN_ID})
+          echo "Release(dev): ${DEV}"
 
-          DEV="${NEXT}"
           TAG="v${DEV}"
           SHA="$(git rev-parse HEAD)"
 
