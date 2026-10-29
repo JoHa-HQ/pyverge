@@ -147,7 +147,11 @@ class TargetResolutionMixin(Generic[VersionValue]):
         def resolve(
             current: VersionNode[VersionValue],
         ) -> VersionNode[VersionValue] | None:
-            key = VersionKey[VersionValue](_value=parsed, _kind=current.kind)
+            key = VersionKey[VersionValue](
+                namespace=current.namespace,
+                kind=current.kind,
+                version=parsed,
+            )
             return engine.get_model(key)
 
         return resolve

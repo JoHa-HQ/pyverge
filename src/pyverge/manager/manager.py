@@ -1,24 +1,32 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from dataclasses import replace
+from typing import ClassVar
 
 from pyverge.core.types import VersionValue
 from pyverge.discovery.reflection import (
     CompositeDiffDiscovery,
+    DiffProvider,
     Reflection,
     Reflector,
 )
 from pyverge.engine import Engine
+from pyverge.execution.types import EntryExtractor
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import (
     DefaultMigrationIdentityResolver,
+    MigrationIdentityResolver,
 )
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.registry import Registry
 from pyverge.schemas.types import (
     ModelAdapter,
 )
-from pyverge.versioning import default_content_hasher
+from pyverge.versioning import (
+    ContentHasher,
+    DiffMaterializer,
+    default_content_hasher,
+)
 
 from .descriptors import ManagerMeta
 from .mixins import (
@@ -30,7 +38,6 @@ from .mixins import (
     RuntimeMixin,
     TargetResolutionMixin,
 )
-from .types import ManagerConfig
 
 
 class Manager(
@@ -54,6 +61,7 @@ class Manager(
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+    _namespace: ClassVar[str] = ""
     _reflection_locked: ClassVar[bool] = False
 
     def __class_getitem__(
@@ -66,6 +74,7 @@ class Manager(
                 "_strategy": strategy,
                 "_default_adapter": None,
                 "_default_engine": None,
+                "_namespace": "",
                 "_reflection_locked": False,
                 "__module__": cls.__module__,
                 "__qualname__": cls.__name__,
@@ -83,38 +92,45 @@ class Manager(
         return self.engine.registry
 
     @classmethod
-    def configure(
+    def configure(  # noqa: PLR0913
         cls,
         adapter: ModelAdapter,
         *,
-        config: ManagerConfig[VersionValue] | None = None,
-        **options: Any,
+        engine: Engine[VersionValue] | None = None,
+        walker: EntryExtractor | None = None,
+        hasher: ContentHasher | None = None,
+        identity_resolver: MigrationIdentityResolver | None = None,
+        model_materializer: DiffMaterializer[object] | None = None,
+        migration_materializer: DiffMaterializer[object] | None = None,
+        diff_provider: DiffProvider[VersionValue] | None = None,
+        on_missing: str = "raise",
+        namespace: str = "",
     ) -> type[Manager[VersionValue]]:
-        if config is not None and options:
-            raise TypeError("configure accepts either config or keyword options")
-        settings = config or ManagerConfig(**options)
-        if settings.walker is None:
+        cls._namespace = namespace
+        codec = getattr(adapter, "model_codec", None)
+        if codec is not None and not codec.namespace:
+            setattr(adapter, "model_codec", replace(codec, namespace=namespace))
+        if walker is None:
             registry = Registry[VersionValue](
-                hasher=settings.hasher or default_content_hasher()
+                namespace=namespace,
+                hasher=hasher or default_content_hasher(),
             )
         else:
-            registry = settings.walker.registry
+            registry = walker.registry
         reflector = Reflector[VersionValue](
             adapter,
-            settings.diff_provider or Reflection(adapter, CompositeDiffDiscovery()),
-            model_materializer=settings.model_materializer or adapter,
+            diff_provider or Reflection(adapter, CompositeDiffDiscovery()),
+            model_materializer=model_materializer or adapter,
             migration_materializer=(
-                settings.migration_materializer
+                migration_materializer
                 or MigrationMaterializer(JsonPatchMigrationBackend())
             ),
-            on_missing=settings.on_missing,
+            on_missing=on_missing,
         )
-        engine = settings.engine or Engine[VersionValue](
+        engine = engine or Engine[VersionValue](
             registry=registry,
             adapter=adapter,
-            identity_resolver=(
-                settings.identity_resolver or DefaultMigrationIdentityResolver()
-            ),
+            identity_resolver=(identity_resolver or DefaultMigrationIdentityResolver()),
             reflector=reflector,
         )
         cls._default_engine = engine

@@ -274,7 +274,7 @@ def test_path_resolver_builds_chain(
 
     assert len(plan.entries) == 1
     resolved = plan.entries[0]
-    assert resolved.target.version[1] == engine.adapter.of("3.0.0")
+    assert resolved.target.version == engine.adapter.of("3.0.0")
     assert len(resolved.steps) == 2  # noqa: PLR2004
     assert len(resolved.migrations) == 2  # noqa: PLR2004
     assert engine.adapter.resolve(resolved.target_model) is UserV3
@@ -332,7 +332,7 @@ def test_target_resolvers(
     if expected is None:
         assert target is None
     else:
-        assert target.version[1] == engine.adapter.of(expected)
+        assert target.version == engine.adapter.of(expected)
 
 
 @pytest.mark.parametrize(
@@ -1219,8 +1219,8 @@ def test_plan_preserves_version_value(
     )
     resolved = plan.entries[0]
 
-    assert type(resolved.source.version[1]) is version_type
-    assert type(resolved.target.version[1]) is version_type
+    assert type(resolved.source.version) is version_type
+    assert type(resolved.target.version) is version_type
 
 
 @pytest.mark.parametrize(

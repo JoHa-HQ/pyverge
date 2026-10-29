@@ -5,7 +5,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .canonical import Addressable, ContentHasher
-from .graph import VersionEdge, VersionKey, VersionNode
+from .graph import VersionEdge, VersionNode
+from .identity import VersionKey
 from .schema import ModelDescriptor
 
 
@@ -27,7 +28,7 @@ class JgfNode:
 
     @classmethod
     def from_version(cls, node: VersionNode[Any], hasher: ContentHasher) -> JgfNode:
-        return cls.from_descriptor(node.key, node.descriptor, hasher)
+        return cls.from_descriptor(node, node.descriptor, hasher)
 
     @classmethod
     def from_descriptor(
@@ -36,21 +37,21 @@ class JgfNode:
         descriptor: ModelDescriptor,
         hasher: ContentHasher,
     ) -> JgfNode:
-        references = sorted(
-            f"{kind}@{version}" for kind, version in descriptor.references
-        )
+        references = sorted(str(reference) for reference in descriptor.references)
         content = {
-            "id": key.jgf_id,
+            "id": str(key),
             "model": descriptor.ref.model_id,
             "fields": sorted(descriptor.fields),
             "references": references,
         }
+        rendered = str(key)
         return cls(
-            id=key.jgf_id,
-            label=key.jgf_id,
+            id=rendered,
+            label=rendered,
             metadata={
+                **({"namespace": key.namespace} if key.namespace else {}),
                 "kind": key.kind,
-                "version": str(key.version[1]),
+                "version": str(key.version),
                 "model": descriptor.ref.model_id,
                 "fields": sorted(descriptor.fields),
                 "references": references,
@@ -65,7 +66,8 @@ class JgfNode:
             dict(payload) if isinstance(payload, Mapping) else {"canonical": payload}
         )
         metadata["content_hash"] = value.content_hash(hasher)
-        return cls(id=value.jgf_id, label=value.jgf_id, metadata=metadata)
+        rendered = str(value)
+        return cls(id=rendered, label=rendered, metadata=metadata)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -96,14 +98,17 @@ class JgfEdge:
 
     @classmethod
     def from_version_edge(cls, edge: VersionEdge[Any]) -> JgfEdge:
+        source = str(edge.source)
+        target = str(edge.target)
         return cls(
-            id=edge.jgf_id,
-            source=edge.source.jgf_id,
-            target=edge.target.jgf_id,
+            id=f"{source}->{target}",
+            source=source,
+            target=target,
             metadata={
+                **({"namespace": edge.namespace} if edge.namespace else {}),
                 "kind": edge.kind,
-                "source_version": str(edge.source.version[1]),
-                "target_version": str(edge.target.version[1]),
+                "source_version": str(edge.source.version),
+                "target_version": str(edge.target.version),
                 "strategy": edge.migration.strategy,
                 "migration_id": edge.migration.identity,
             },

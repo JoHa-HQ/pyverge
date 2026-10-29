@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     ClassVar,
-    Generic,
     Protocol,
     Self,
     TypeAlias,
@@ -60,18 +58,6 @@ ResolverFactory: TypeAlias = Callable[
 ]
 
 
-@dataclass(frozen=True, slots=True)
-class ManagerConfig(Generic[VersionValue]):
-    engine: Engine[VersionValue] | None = None
-    walker: EntryExtractor | None = None
-    hasher: ContentHasher | None = None
-    identity_resolver: MigrationIdentityResolver | None = None
-    model_materializer: DiffMaterializer[object] | None = None
-    migration_materializer: DiffMaterializer[object] | None = None
-    diff_provider: DiffProvider[VersionValue] | None = None
-    on_missing: str = "raise"
-
-
 class ManagerClassState(Protocol[VersionValue]):
     """Class-level defaults shared by every manager instance.
 
@@ -82,15 +68,23 @@ class ManagerClassState(Protocol[VersionValue]):
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+    _namespace: ClassVar[str]
     _reflection_locked: ClassVar[bool]
 
     @classmethod
-    def configure(
+    def configure(  # noqa: PLR0913
         cls,
         adapter: ModelAdapter,
         *,
-        config: ManagerConfig[VersionValue] | None = None,
-        **options: object,
+        engine: Engine[VersionValue] | None = None,
+        walker: EntryExtractor[VersionValue] | None = None,
+        hasher: ContentHasher | None = None,
+        identity_resolver: MigrationIdentityResolver | None = None,
+        model_materializer: DiffMaterializer[object] | None = None,
+        migration_materializer: DiffMaterializer[object] | None = None,
+        diff_provider: DiffProvider[VersionValue] | None = None,
+        on_missing: str = "raise",
+        namespace: str = "",
     ) -> type[Self]: ...
 
     @classmethod

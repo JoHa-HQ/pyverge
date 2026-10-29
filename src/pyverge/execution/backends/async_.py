@@ -92,7 +92,7 @@ class AsyncBackend:
                 if inspect.isawaitable(result):
                     await result
             if isinstance(migrated, dict):
-                migrated[adapter.version_property] = str(target.version[1])
+                migrated[adapter.version_property] = str(target.version)
             current = migrated
         Path(*entry.path).set(data, current)
 

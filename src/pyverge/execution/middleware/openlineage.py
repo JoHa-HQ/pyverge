@@ -60,14 +60,14 @@ class _OpenLineageRun:
         inputs = [
             InputDataset(
                 self._namespace,
-                f"{entry.source.kind}@{entry.source.version[1]}",
+                str(entry.source),
             )
             for entry in plan.path.entries
         ]
         outputs = [
             OutputDataset(
                 self._namespace,
-                f"{entry.target.kind}@{entry.target.version[1]}",
+                str(entry.target),
             )
             for entry in plan.path.entries
         ]

@@ -5,11 +5,17 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 from pyverge.core.types import (
     ModelData,
     ModelHandle,
-    ModelVersionKey,
     VersionValue,
     VersionValue_co,
 )
-from pyverge.versioning import Comparable, Diffable, FieldDescriptor, Versionable
+from pyverge.versioning import (
+    Comparable,
+    Diffable,
+    FieldDescriptor,
+    NodeId,
+    Versionable,
+    VersionKey,
+)
 
 if TYPE_CHECKING:
     from pyverge.versioning import Diff, ModelRef, VersionNode
@@ -71,7 +77,7 @@ class ModelAdapter(ModelIdentity, Protocol[VersionValue_co]):
         self, parent_model: ModelHandle, field_name: str
     ) -> ModelHandle | None: ...
     def describe_fields(self, model_cls: ModelHandle) -> dict[str, FieldDescriptor]: ...
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]: ...
+    def references(self, model_cls: ModelHandle) -> frozenset[NodeId]: ...
 
     def ensure_compatible(
         self,
@@ -110,7 +116,7 @@ class ModelAdapter(ModelIdentity, Protocol[VersionValue_co]):
         *,
         kind: str,
         version: str,
-    ) -> Comparable[VersionValue_co]: ...
+    ) -> VersionKey[VersionValue_co]: ...
 
     def diff(
         self,

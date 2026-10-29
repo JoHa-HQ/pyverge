@@ -36,7 +36,7 @@ def info(
             typer.secho(f"  {model_name}", bold=True)
             for v in versions:
                 if _display_model(v.model_id) == model_name:
-                    typer.echo(f"    • v{v.version[1]}")
+                    typer.echo(f"    • v{v.version}")
 
         typer.echo(f"\nTotal: {len(models)} models")
 

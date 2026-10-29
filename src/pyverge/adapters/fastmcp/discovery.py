@@ -86,13 +86,14 @@ class FastMCPDiscovery:
             except ModelConflictError as error:
                 if not isinstance(command, RegisterModel):
                     raise
-                version = command.payload.version
                 raise ModelConflictError(
                     error.catalog_name,
                     error.version,
                     error.registered,
                     error.incoming,
-                    subject=f"primitive {version[0]!r}@{version[1]}",
+                    subject=(
+                        f"primitive {command.payload.kind!r}@{command.payload.version}"
+                    ),
                 ) from error
         self._reconcile()
 
@@ -150,7 +151,7 @@ class FastMCPDiscovery:
         for kind, version in self._nodes:
             kinds.setdefault(kind, []).append(version)
         for versionable in self._manager.list_versions():
-            kind, version = str(versionable.version[0]), str(versionable.version[1])
+            kind, version = str(versionable.kind), str(versionable.version)
             bucket = kinds.setdefault(kind, [])
             if version not in bucket:
                 bucket.append(version)
@@ -188,7 +189,7 @@ class FastMCPDiscovery:
     def _resolve_target(self, kind: str, policy: str) -> str:
         if policy not in ("latest", "earliest"):
             return policy
-        versions = [str(v.version[1]) for v in self._manager.list_versions(kind)]
+        versions = [str(v.version) for v in self._manager.list_versions(kind)]
         if not versions:
             raise ValueError(f"no registered versions for kind {kind!r}")
         return versions[-1] if policy == "latest" else versions[0]

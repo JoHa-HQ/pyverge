@@ -161,7 +161,7 @@ class Diff(Generic[VersionValue]):
 
     @property
     def edge(self) -> MigrationKey:
-        return (self.source, self.target)
+        return (self.source.id, self.target.id)
 
     @property
     def is_backward(self) -> bool:
@@ -404,8 +404,8 @@ class CompatibilityReport:
         )
         return cls(
             kind=diff.source.kind,
-            source_version=str(diff.source.version[1]),
-            target_version=str(diff.target.version[1]),
+            source_version=str(diff.source.version),
+            target_version=str(diff.target.version),
             added_fields=added,
             removed_fields=removed,
             modified_fields=tuple(sorted(modified)),

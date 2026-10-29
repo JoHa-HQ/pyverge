@@ -26,7 +26,7 @@ from pyverge.versioning import (
     FieldChange,
     FieldStatus,
     FrozenMap,
-    MigrationIdentity,
+    MigrationDescriptor,
     ModelDescriptor,
     ModelRef,
     VersionEdge,
@@ -459,7 +459,7 @@ class TestJsonSchemaModelAdapter:
         model = adapter.to_pydantic(schema)
         versionable = adapter.versionable(model)
         assert adapter.resolve(versionable.descriptor.ref) is model
-        assert str(versionable.version[1]) == "1.0.0"
+        assert str(versionable.version) == "1.0.0"
 
     def test_validate_valid_payload(self) -> None:
         adapter = JsonSchemaModelAdapter(codec=ModelCodec())
@@ -492,7 +492,9 @@ class TestJsonSchemaModelAdapter:
 
     def test_meta_endpoint_empty_diff(self) -> None:
         adapter = JsonSchemaModelAdapter(codec=ModelCodec())
-        meta_node = VersionKey(_value=semver.Version(0, 1, 0), _kind="User")
+        meta_node = VersionKey(
+            namespace="", kind="User", version=semver.Version(0, 1, 0)
+        )
         real = adapter.versionable(
             adapter.to_pydantic(_schema("1.0.0", {"name": {"type": "string"}}))
         )
@@ -567,18 +569,18 @@ class TestCompatibilityReport:
         added_info: dict[str, dict[str, Any]] | None = None,
     ) -> CompatibilityReport:
         source = VersionNode[semver.Version](
-            key=VersionKey(
-                _value=semver.Version.parse("1.0.0"),
-                _kind="User",
-            ),
+            namespace="",
+            kind="User",
+            version=semver.Version.parse("1.0.0"),
             descriptor=ModelDescriptor(
                 ref=ModelRef(provider="test", model_id="tests.Model"),
                 fields=FrozenMap(),
             ),
         )
         target = VersionKey(
-            _value=semver.Version.parse("2.0.0"),
-            _kind="User",
+            namespace="",
+            kind="User",
+            version=semver.Version.parse("2.0.0"),
         )
         fields = {
             **{
@@ -705,7 +707,7 @@ def test_version_edge_wraps_migration_failure() -> None:
         target=target,
         diff=adapter.diff(source, target),
         func=fail,
-        migration=MigrationIdentity("callable", "fail"),
+        migration=MigrationDescriptor("callable", "fail"),
     )
 
     with pytest.raises(MigrationApplicationError) as error:

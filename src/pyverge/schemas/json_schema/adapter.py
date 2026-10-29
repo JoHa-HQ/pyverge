@@ -10,11 +10,11 @@ from datamodel_code_generator.enums import DataModelType
 from datamodel_code_generator.format import Formatter
 from pydantic import BaseModel
 
-from pyverge.core.types import ModelData, ModelHandle, ModelVersionKey, VersionValue
+from pyverge.core.types import ModelData, ModelHandle, VersionValue
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.runtime import ModelRuntime
-from pyverge.versioning import Diffable, FieldDescriptor
+from pyverge.versioning import Diffable, FieldDescriptor, NodeId
 
 
 class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
@@ -163,7 +163,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
     ) -> ModelHandle | None:
         return self.runtime.field_model(self._model(parent_model), field_name)
 
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
+    def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:
         return self.runtime.references(
             self._model(model_cls),
             provider=self.provider,

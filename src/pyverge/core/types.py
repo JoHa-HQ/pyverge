@@ -57,7 +57,6 @@ RenderingFormat = Literal["json-patch"]
 
 ModelKind: TypeAlias = str
 ModelData: TypeAlias = dict[str, Any]
-ModelVersionKey: TypeAlias = tuple[ModelKind, VersionValue]
 
 #: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
 MIGRATION_PAIR_LEN: int = 2

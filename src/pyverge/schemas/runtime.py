@@ -17,13 +17,14 @@ from typing import (
 from pydantic import BaseModel, TypeAdapter, create_model
 from pydantic_core import PydanticUndefined
 
-from pyverge.core.types import ModelData, ModelHandle, ModelVersionKey, VersionValue
+from pyverge.core.types import ModelData, ModelHandle, VersionValue
 from pyverge.schemas.codec import ModelCodec
 from pyverge.versioning import (
     NO_DEFAULT,
     Diffable,
     FieldDescriptor,
     ModelRef,
+    NodeId,
     TypeKind,
     TypeRef,
     default_canonicalizer,
@@ -173,7 +174,7 @@ class ModelRuntime(Protocol):
         *,
         provider: str,
         codec: ModelCodec,
-    ) -> frozenset[ModelVersionKey]: ...
+    ) -> frozenset[NodeId]: ...
     def describe_fields(
         self,
         model_cls: ModelHandle,
@@ -318,8 +319,8 @@ class PythonModelRuntime:
         *,
         provider: str,
         codec: ModelCodec,
-    ) -> frozenset[ModelVersionKey]:
-        found: set[ModelVersionKey] = set()
+    ) -> frozenset[NodeId]:
+        found: set[NodeId] = set()
         self._collect_references(
             model_cls, found, set(), provider=provider, codec=codec
         )
@@ -328,7 +329,7 @@ class PythonModelRuntime:
     def _collect_references(
         self,
         model_cls: ModelHandle,
-        found: set[ModelVersionKey],
+        found: set[NodeId],
         seen: set[int],
         *,
         provider: str,
@@ -352,7 +353,7 @@ class PythonModelRuntime:
                     version = codec.of(codec.version(fields))
                 except (TypeError, ValueError):
                     continue
-                found.add((kind, version))
+                found.add(NodeId(namespace=codec.namespace, kind=kind, version=version))
                 self._collect_references(
                     nested,
                     found,
@@ -411,8 +412,8 @@ class PythonModelRuntime:
         *,
         provider: str,
         codec: ModelCodec,
-    ) -> tuple[ModelVersionKey, ...]:
-        found: set[ModelVersionKey] = set()
+    ) -> tuple[NodeId, ...]:
+        found: set[NodeId] = set()
         for nested in self._iter_models(annotation):
             if nested is model_cls:
                 continue
@@ -421,11 +422,22 @@ class PythonModelRuntime:
             if not kind:
                 continue
             try:
-                found.add((kind, codec.of(codec.version(fields))))
+                found.add(
+                    NodeId(
+                        namespace=codec.namespace,
+                        kind=kind,
+                        version=codec.of(codec.version(fields)),
+                    )
+                )
             except (TypeError, ValueError):
                 continue
             found.update(self.references(nested, provider=provider, codec=codec))
-        return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
+        return tuple(
+            sorted(
+                found,
+                key=lambda item: (item.namespace, item.kind, str(item.version)),
+            )
+        )
 
     def type_ref(
         self,
@@ -450,7 +462,7 @@ class PythonModelRuntime:
         codec: ModelCodec,
     ) -> ModelHandle:
         anchor = self.resolve(diff.source.descriptor.ref)
-        version = diff.target.version[1]
+        version = diff.target.version
         fields: dict[str, Any] = {codec.version_property: (str, str(version))}
         for name, field_info in anchor.model_fields.items():
             if name == codec.version_property or name in diff.removed_fields:

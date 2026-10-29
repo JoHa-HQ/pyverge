@@ -314,3 +314,15 @@ def manager(
         engine=engine,
         **manager_kwargs(migration_settings),
     )
+
+
+@pytest.fixture
+def namespaced_manager(
+    pydantic_model_adapter: PydanticModelAdapter,
+    migration_settings: MigrationSettings,
+) -> type[Manager[VersionValue]]:
+    return Manager[VersionValue].configure(
+        pydantic_model_adapter,
+        namespace="orders",
+        **manager_kwargs(migration_settings),
+    )

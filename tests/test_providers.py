@@ -96,7 +96,7 @@ ADAPTERS = [
 def test_adapter_identity_and_codec(adapter, source_model, target_model, payload):
     node = adapter.versionable(source_model)
     assert node.kind == "User"
-    assert str(node.version[1]) == "1.0.0"
+    assert str(node.version) == "1.0.0"
     assert "version" not in adapter.fields(adapter.resolve(node.descriptor.ref))
     assert adapter.model_codec.version_property == "version"
     assert adapter.model_codec.kind_property == "kind"
@@ -298,7 +298,8 @@ def test_dataclass_references(
     expected: set[tuple[str, str]],
 ) -> None:
     assert {
-        (kind, str(version)) for kind, version in dataclass_adapter.references(model)
+        (reference.kind, str(reference.version))
+        for reference in dataclass_adapter.references(model)
     } == expected
 
 
@@ -348,7 +349,7 @@ def test_dataclass_describe_fields_and_materialize(
     materialized = dataclass_adapter.materialize_model(diff)
     node = dataclass_adapter.versionable(materialized)
     assert node.kind == "Person"
-    assert str(node.version[1]) == "2.0.0"
+    assert str(node.version) == "2.0.0"
     assert "name" in dataclass_adapter.fields(materialized)
     assert EdgeKey.from_pair(source, node)
 
@@ -395,7 +396,7 @@ def test_model_codec_identity_operations() -> None:
     assert codec.version(fields) == "1.2.3"
     assert codec.kind(fields) == "User"
     assert codec.of("2024-01-01") == pendulum.Date(2024, 1, 1)
-    assert codec.version_key(kind="User", version="1.2.3").jgf_id == "User@1.2.3"
+    assert str(codec.version_key(kind="User", version="1.2.3")) == "User@1.2.3"
     with pytest.raises(ValueError, match="Cannot parse version"):
         codec.of("not-a-version")
 

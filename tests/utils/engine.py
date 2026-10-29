@@ -38,8 +38,9 @@ def meta_versionable(
 ) -> VersionKey[VersionValue]:
     """Build a temporary search key for a ``(kind, version)`` pair."""
     return VersionKey[VersionValue](
-        _value=cast(VersionValue, adapter.of(version)),
-        _kind=kind,
+        namespace=getattr(adapter, "model_codec").namespace,
+        kind=kind,
+        version=cast("VersionValue", adapter.of(version)),
     )
 
 
@@ -124,10 +125,10 @@ def register_migrations(
         )
         registry.store_migration(
             VersionEdge(
-                versions[0],
-                versions[1],
-                diff,
-                func,
+                source=versions[0],
+                target=versions[1],
+                diff=diff,
+                func=func,
                 migration=DefaultMigrationIdentityResolver().resolve(func),
             )
         )

@@ -30,8 +30,9 @@ from pyverge.versioning import (
     FrozenMap,
     JgfGraph,
     JgfNode,
-    MigrationIdentity,
+    MigrationDescriptor,
     ModelRef,
+    NodeId,
     TypeRef,
     VersionKey,
     VersionNode,
@@ -378,7 +379,7 @@ class TestGraphIdentity:
         ids=["pydantic", "json"],
         indirect=["model_adapter"],
     )
-    def test_node_jgf_id(
+    def test_node_identity(
         self,
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
@@ -386,7 +387,8 @@ class TestGraphIdentity:
         expected: str,
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
-        assert node.jgf_id == expected
+        assert isinstance(node.id, NodeId)
+        assert str(node.id) == expected
         assert str(node) == expected
 
     @pytest.mark.parametrize(
@@ -412,7 +414,7 @@ class TestGraphIdentity:
             target,
             func=_noop_migration,
         )
-        assert edge.jgf_id == f"{edge.source.jgf_id}->{edge.target.jgf_id}"
+        assert str(edge.id) == f"{edge.source}->{edge.target}"
 
 
 class TestContentAddress:
@@ -433,7 +435,7 @@ class TestContentAddress:
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
         payload = node.content_payload()
-        assert payload["id"] == node.jgf_id
+        assert payload["id"] == str(node.id)
         assert payload["model"] == node.model_id
         assert node.content_hash(
             default_content_hasher()
@@ -497,7 +499,7 @@ class TestContentAddress:
             target,
             func=_noop_migration,
         )
-        other = edge.with_migration(MigrationIdentity("callable", "migration:other"))
+        other = edge.with_migration(MigrationDescriptor("callable", "migration:other"))
         assert edge.content_hash(default_content_hasher()) != other.content_hash(
             default_content_hasher()
         )
@@ -741,14 +743,108 @@ class TestDiff:
         assert diff.materialize(Materializer()).startswith("materialized:")
 
 
+class TestNodeIdentity:
+    def test_node_id_parses_and_orders(self) -> None:
+        first = NodeId("orders", "Order", semver.Version.parse("1.2.3"))
+        second = NodeId("orders", "Order", semver.Version.parse("1.10.0"))
+
+        assert first.version == semver.Version.parse("1.2.3")
+        assert first < second
+        assert hash(first) == hash(
+            NodeId("orders", "Order", semver.Version.parse("1.2.3"))
+        )
+        assert first != NodeId("other", "Order", semver.Version.parse("1.2.3"))
+        assert str(first) == "orders:Order@1.2.3"
+
+    def test_node_id_rejects_invalid_version(self) -> None:
+        with pytest.raises(ValueError):
+            NodeId.from_string("orders", "Order", "not-a-version")
+
+    def test_version_key_ref_is_not_identity(self) -> None:
+        left = VersionKey(
+            namespace="orders", kind="Order", version=semver.Version.parse("1.0.0")
+        )
+        right = VersionKey(
+            namespace="orders",
+            kind="Order",
+            version=semver.Version.parse("1.0.0"),
+            ref=object(),
+        )
+
+        assert left == right
+        assert hash(left) == hash(right)
+
+    def test_edge_key_rejects_cross_namespace(self) -> None:
+        with pytest.raises(ValueError, match="Cross-namespace"):
+            EdgeKey(
+                source=NodeId[semver.Version](
+                    "a", "Order", semver.Version.parse("1.0.0")
+                ),
+                target=NodeId[semver.Version](
+                    "b", "Order", semver.Version.parse("2.0.0")
+                ),
+            )
+
+    def test_key_digests_exclude_metadata_ref(self) -> None:
+        hasher = default_content_hasher()
+        node_a = VersionKey(
+            namespace="orders",
+            kind="Order",
+            version=semver.Version.parse("1.0.0"),
+            ref=object(),
+        )
+        node_b = VersionKey(
+            namespace="orders",
+            kind="Order",
+            version=semver.Version.parse("1.0.0"),
+            ref=object(),
+        )
+        assert node_a.digest(hasher) == node_b.digest(hasher)
+
+        edge_a = EdgeKey(
+            source=NodeId[semver.Version](
+                "orders", "Order", semver.Version.parse("1.0.0")
+            ),
+            target=NodeId[semver.Version](
+                "orders", "Order", semver.Version.parse("2.0.0")
+            ),
+            ref=object(),
+        )
+        edge_b = EdgeKey(
+            source=NodeId[semver.Version](
+                "orders", "Order", semver.Version.parse("1.0.0")
+            ),
+            target=NodeId[semver.Version](
+                "orders", "Order", semver.Version.parse("2.0.0")
+            ),
+            ref=object(),
+        )
+        assert edge_a.digest(hasher) == edge_b.digest(hasher)
+
+    def test_jgf_ids_are_namespace_prefixed(self) -> None:
+        node = NodeId[semver.Version](
+            "com.joha.order", "Order", semver.Version.parse("1.0.0")
+        )
+        assert str(node) == "com.joha.order:Order@1.0.0"
+
+
 class TestGraphPrimitives:
     def test_version_key_identity_and_repr(self) -> None:
         key = VersionKey[semver.Version](
-            _value=semver.Version.parse("1.2.3"), _kind="User"
+            namespace="test",
+            kind="User",
+            version=semver.Version.parse("1.2.3"),
+            ref=object(),
         )
 
-        assert key.jgf_id == "User@1.2.3"
-        assert str(key) == "User@1.2.3"
+        assert str(key) == "test:User@1.2.3"
+        assert hash(key) == hash(
+            VersionKey[semver.Version](
+                namespace="test",
+                kind="User",
+                version=semver.Version.parse("1.2.3"),
+            )
+        )
         assert "VersionKey[Version]" in repr(key)
 
     @pytest.mark.parametrize(
@@ -771,14 +867,15 @@ class TestGraphPrimitives:
 
         assert edge_key.kind == "User"
         assert edge_key.key == (source, target)
-        assert edge_key.edge == (source, target)
+        assert edge_key.key == (source, target)
         assert edge_key == same
         assert hash(edge_key) == hash(same)
-        assert edge_key.jgf_id == "User@1.0.0->User@2.0.0"
-        assert str(edge_key) == edge_key.jgf_id
+        assert str(edge_key) == "User@1.0.0->User@2.0.0"
         assert edge_key < EdgeKey.from_pair(target, source)
-        assert edge_key.__eq__("other") is NotImplemented
-        assert edge_key.__lt__("other") is NotImplemented
+        with pytest.raises(NotImplementedError):
+            edge_key == "other"
+        with pytest.raises(NotImplementedError):
+            edge_key < "other"
 
     @pytest.mark.parametrize(
         "edge",
@@ -805,20 +902,23 @@ class TestGraphPrimitives:
 
         assert edge.kind == "User"
         assert edge.key == (source, target)
-        assert edge.edge == (source, target)
-        assert edge.jgf_id == "User@1.0.0->User@2.0.0"
-        assert str(edge) == edge.jgf_id
-        assert edge.content_payload(default_content_hasher())["id"] == edge.jgf_id
+        assert edge.key == (source, target)
+        assert str(edge) == "User@1.0.0->User@2.0.0"
+        assert edge.content_payload(default_content_hasher())["id"] == str(edge)
         assert len(edge.content_hash(default_content_hasher())) == SHA256_HEX_LENGTH
-        assert edge.to_jgf().source == source.jgf_id
+        assert edge.to_jgf().source == str(source)
         assert edge < other
         assert other > edge
         assert edge != other
         assert edge < EdgeKey.from_pair(target, source)
         assert edge == EdgeKey.from_pair(source, target)
-        assert edge.__lt__("other") is NotImplemented
-        assert edge.__gt__("other") is NotImplemented
-        assert edge.__eq__("other") is NotImplemented
+        for operation in (
+            lambda: edge < "other",
+            lambda: edge > "other",
+            lambda: edge == "other",
+        ):
+            with pytest.raises(NotImplementedError):
+                operation()
 
         with pytest.raises(MigrationApplicationError, match="bad"):
             failing({})
@@ -938,7 +1038,7 @@ class TestPrimitives:
 
         hasher = default_content_hasher()
         projected = JgfNode.from_addressable(node, hasher)
-        assert projected.id == node.jgf_id
+        assert projected.id == str(node)
         assert projected.metadata["content_hash"] == node.content_hash(hasher)
         assert projected.metadata["model"] == node.descriptor.to_canonical()
         assert node.model_id.endswith("PersonV1")
@@ -1009,14 +1109,14 @@ class TestJgfInterop:
         # validates nodes/edges/metadata and round-trips them.
         assert parsed.directed is True
         assert {node.id for node in parsed.nodes} == {
-            source_node.jgf_id,
-            target_node.jgf_id,
+            str(source_node),
+            str(target_node),
         }
         assert {node.metadata["model"] for node in parsed.nodes} == {
             source_node.model_id,
             target_node.model_id,
         }
-        assert parsed.edges[0].source == source_node.jgf_id
-        assert parsed.edges[0].target == target_node.jgf_id
+        assert parsed.edges[0].source == str(source_node)
+        assert parsed.edges[0].target == str(target_node)
         assert parsed.edges[0].metadata["migration_id"] == edge.migration.identity
         assert parsed.to_dict() == expected

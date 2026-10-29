@@ -83,7 +83,7 @@ class TestScoping:
     ) -> None:
         UserManager = Manager[semver.Version].configure(
             engine.adapter,
-            engine=engine,
+            engine=cast("Engine[semver.Version]", engine),
         )
 
         assert UserManager._default_engine is engine
@@ -405,7 +405,7 @@ class TestFluentLookup:
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV1, UserV2], []],
                 [UserV1, UserV2],
-                lambda versions: (versions[0].kind, versions[0].version[1]),
+                lambda versions: (versions[0].kind, versions[0].version),
                 True,
             ),
             (
@@ -451,7 +451,7 @@ class TestFluentLookup:
                     ],
                 ],
                 [UserV1, UserV2, UserV3],
-                lambda versions: slice(versions[0].version, versions[2].version),
+                lambda versions: slice(versions[0], versions[2]),
                 True,
             ),
             (
@@ -466,7 +466,7 @@ class TestFluentLookup:
                     ],
                 ],
                 [UserV1, UserV2, UserV3],
-                lambda versions: slice(versions[2].version, versions[0].version),
+                lambda versions: slice(versions[2], versions[0]),
                 False,
             ),
         ],
@@ -497,7 +497,7 @@ class TestFluentLookup:
                 PydanticModelAdapter,
                 [semver.Version, "test", [UserV1, UserV2], []],
                 [UserV1, UserV2],
-                lambda versions: (versions[0].kind, versions[0].version[1]),
+                lambda versions: (versions[0].kind, versions[0].version),
                 "model",
             ),
             (
@@ -524,7 +524,7 @@ class TestFluentLookup:
                     ],
                 ],
                 [UserV1, UserV2, UserV3],
-                lambda versions: slice(versions[0].version, versions[2].version),
+                lambda versions: slice(versions[0], versions[2]),
                 "path",
             ),
         ],
@@ -703,9 +703,9 @@ class TestSharedEngine:
         instance = manager()
         instance.store_model(UserV1)
 
-        assert instance.get_model(UserV1).version[1] == "1.0.0"
+        assert instance.get_model(UserV1).version == "1.0.0"
         assert [str(v) for v in instance.list_versions("User")] == ["User@1.0.0"]
-        assert cast("Any", instance[UserV1]).version[1] == "1.0.0"
+        assert cast("Any", instance[UserV1]).version == "1.0.0"
         assert manager._default_engine.registry.versions == []
 
     @pytest.mark.parametrize(
@@ -789,7 +789,7 @@ class TestCompileTargetSpec:
             assert target is None
         else:
             assert target is not None
-            assert target.version == expected
+            assert (target.kind, target.version) == expected
 
 
 @pytest.mark.parametrize(
@@ -985,3 +985,15 @@ def test_manager_runner_sync_and_async_handles(
     assert inspect.isawaitable(pending)
     async_result = asyncio.run(pending)
     assert async_result["document"]["version"] == "2.0.0"
+
+
+def test_manager_defaults_empty_namespace(
+    namespaced_manager: type[Manager[semver.Version]],
+) -> None:
+    namespaced_manager.store_model(UserV1)
+    instance = namespaced_manager()
+
+    node = instance.get_model(UserV1)
+    assert instance.registry.namespace == "orders"
+    assert node.namespace == "orders"
+    assert node.modelref == instance.adapter.ref(UserV1)

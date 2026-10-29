@@ -68,7 +68,7 @@ class ProcessBackend:
             for hook in hooks:
                 hook.after_migrate(name, source, target, current, migrated)
             if isinstance(migrated, dict):
-                migrated[adapter.version_property] = str(target.version[1])
+                migrated[adapter.version_property] = str(target.version)
             current = migrated
         Path(*entry.path).set(data, current)
 

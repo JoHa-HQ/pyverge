@@ -50,6 +50,7 @@ from pyverge.versioning import (
     EdgeKey,
     FieldDescriptor,
     JgfNode,
+    NodeId,
     TypeRef,
     VersionKey,
     VersionNode,
@@ -239,7 +240,7 @@ class TestModel:
         latest: ModelHandle,
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, latest)
-        assert registry.latest(version.version[0]).descriptor == version.descriptor
+        assert registry.latest(version.kind).descriptor == version.descriptor
 
     @pytest.mark.parametrize(
         "model_adapter, registry, key",
@@ -262,10 +263,16 @@ class TestModel:
     def test_get_nonexistent_model_raises(
         self,
         registry: Registry[types.VersionValue],
-        key: types.ModelVersionKey,
+        key: tuple[str, object],
     ) -> None:
         with pytest.raises(ModelNotFoundError, match="not found"):
-            registry.get_model(VersionKey(_value=key[1], _kind=key[0]))
+            registry.get_model(
+                VersionKey(
+                    namespace="",
+                    kind=key[0],
+                    version=cast("types.VersionValue", key[1]),
+                )
+            )
 
     @pytest.mark.parametrize(
         "model_adapter, registry, target",
@@ -304,8 +311,9 @@ class TestModel:
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV1], []],
                 VersionKey(
-                    _value=semver.Version.parse("1.0.0"),
-                    _kind="User",
+                    namespace="",
+                    kind="User",
+                    version=semver.Version.parse("1.0.0"),
                 ),
                 id="semver_version_node_v1",
             ),
@@ -313,8 +321,9 @@ class TestModel:
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV011Dev7], []],
                 VersionKey(
-                    _value=semver.Version.parse("0.1.1+dev.7"),
-                    _kind="User",
+                    namespace="",
+                    kind="User",
+                    version=semver.Version.parse("0.1.1+dev.7"),
                 ),
                 id="semver_version_node_dev",
             ),
@@ -322,8 +331,9 @@ class TestModel:
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
                 VersionKey(
-                    _value=pendulum.Date(2025, 3, 10),
-                    _kind="User",
+                    namespace="",
+                    kind="User",
+                    version=pendulum.Date(2025, 3, 10),
                 ),
                 id="json_chrono_version_node",
             ),
@@ -568,7 +578,7 @@ class TestModel:
         """Keys and real nodes order together by version value within a kind."""
         keys = [meta_versionable(model_adapter, "User", v) for v in meta_versions]
         versions = [
-            str(v.version[1]) for v in sorted([*registry.kind_versions("User"), *keys])
+            str(v.version) for v in sorted([*registry.kind_versions("User"), *keys])
         ]
         assert versions == expected
 
@@ -2089,9 +2099,9 @@ class TestReferences:
     #: The three Address versions a Person references, parsed.
     ADDRESS_VERSIONS = frozenset(
         {
-            ("Address", semver.Version(1, 0, 0)),
-            ("Address", semver.Version(2, 0, 0)),
-            ("Address", semver.Version(3, 0, 0)),
+            NodeId("", "Address", semver.Version(1, 0, 0)),
+            NodeId("", "Address", semver.Version(2, 0, 0)),
+            NodeId("", "Address", semver.Version(3, 0, 0)),
         }
     )
 
@@ -2118,8 +2128,8 @@ class TestReferences:
                 PersonV2,
                 ADDRESS_VERSIONS
                 | {
-                    ("Contact", semver.Version(1, 0, 0)),
-                    ("Contact", semver.Version(2, 0, 0)),
+                    NodeId("", "Contact", semver.Version(1, 0, 0)),
+                    NodeId("", "Contact", semver.Version(2, 0, 0)),
                 },
                 id="pydantic_list_of_union",
             ),
@@ -2146,7 +2156,7 @@ class TestReferences:
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue],
         model: ModelHandle,
-        expected: frozenset[types.ModelVersionKey],
+        expected: frozenset[NodeId],
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
         assert node.references == expected
@@ -2178,7 +2188,7 @@ class TestReferences:
     ) -> None:
         """Every declared union member is reached, not just the first."""
         node = envelope_model(model_adapter, versioning_settings, model)
-        assert {kind for kind, _ in node.references} == {"Address"}
+        assert {reference.kind for reference in node.references} == {"Address"}
         assert len(node.references) == 3  # noqa: PLR2004
 
     @pytest.mark.parametrize(
@@ -2306,8 +2316,8 @@ class TestReferences:
         registry.store_model(model_adapter.versionable(one_child))
         assert registry.missing_references(cast(types.Comparable, node)) == frozenset(
             {
-                ("Address", semver.Version(2, 0, 0)),
-                ("Address", semver.Version(3, 0, 0)),
+                NodeId("", "Address", semver.Version(2, 0, 0)),
+                NodeId("", "Address", semver.Version(3, 0, 0)),
             }
         )
 
@@ -2558,9 +2568,7 @@ def test_catalog_exports_jgf_and_imports_nodes(
     exporter = JgfExporter(default_content_hasher())
     document = exporter.export_graph(registry).to_dict()
 
-    assert set(document["graph"]["nodes"]) == {
-        node.jgf_id for node in registry.versions
-    }
+    assert set(document["graph"]["nodes"]) == {str(node) for node in registry.versions}
     assert len(document["graph"]["edges"]) == sum(
         len(registry.migrations(kind)) for kind in registry.kinds
     )
@@ -2568,7 +2576,7 @@ def test_catalog_exports_jgf_and_imports_nodes(
     assert not ManifestDiff.compare(document, document).changed
 
     nodes_by_id = {
-        model_adapter.versionable(model).jgf_id: model_adapter.versionable(model)
+        str(model_adapter.versionable(model)): model_adapter.versionable(model)
         for model in models
     }
 
@@ -2576,7 +2584,11 @@ def test_catalog_exports_jgf_and_imports_nodes(
         def resolve(self, node: JgfNode) -> types.VersionNode:
             return nodes_by_id[node.id]
 
-    imported = InMemoryCatalog(name="imported", hasher=default_content_hasher())
+    imported = InMemoryCatalog(
+        name="imported",
+        namespace=registry.namespace,
+        hasher=default_content_hasher(),
+    )
     node_document = {"graph": dict(document["graph"])}
     node_document["graph"].pop("edges")
     imported_graph = JgfImporter(_Resolver()).import_graph(
@@ -2585,7 +2597,7 @@ def test_catalog_exports_jgf_and_imports_nodes(
     )
 
     assert {node.id for node in imported_graph.nodes} == set(nodes_by_id)
-    assert {node.jgf_id for node in imported.versions} == set(nodes_by_id)
+    assert {str(node) for node in imported.versions} == set(nodes_by_id)
 
 
 @pytest.mark.parametrize(
@@ -2704,8 +2716,8 @@ def test_remote_path_catalog_is_substitutable(
 
         def migration_path(
             self,
-            from_version: types.Versionable,
-            to_version: types.Versionable,
+            from_version: VersionNode,
+            to_version: VersionNode,
         ) -> list[tuple[VersionNode, VersionNode]]:
             if from_version == source and to_version == target:
                 return [(source, target)]
@@ -2713,8 +2725,8 @@ def test_remote_path_catalog_is_substitutable(
 
     def resolve_path(
         catalog: PathCatalog,
-        from_version: types.Versionable,
-        to_version: types.Versionable,
+        from_version: VersionNode,
+        to_version: VersionNode,
     ) -> list[tuple[VersionNode, VersionNode]]:
         return catalog.migration_path(from_version, to_version)
 
@@ -2865,3 +2877,63 @@ def test_backward_compatibility_error_reports_modified_and_required(
     message = str(error)
     assert "modified=['age']" in message
     assert "required_additions=['status']" in message
+
+
+def test_registry_requires_bound_namespace() -> None:
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    adapter = PydanticModelAdapter(codec=ModelCodec(namespace="orders"))
+    stored = registry.store_model(adapter.versionable(UserV1))
+
+    assert stored.namespace == "orders"
+    assert registry.namespace == "orders"
+    assert registry.get_model(stored).namespace == "orders"
+
+
+def test_registry_rejects_foreign_namespace(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+) -> None:
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    foreign = envelope_model(
+        model_adapter,
+        versioning_settings,
+        UserV1,
+    ).with_namespace("billing")
+
+    with pytest.raises(CatalogError, match="expected 'orders'"):
+        registry.store_model(foreign)
+
+
+def test_registries_isolate_identical_kind_versions() -> None:
+    first = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    second = Registry[semver.Version](
+        namespace="billing",
+        hasher=default_content_hasher(),
+    )
+    adapter = PydanticModelAdapter(codec=ModelCodec(namespace="orders"))
+    first.store_model(adapter.versionable(UserV1))
+
+    assert first.has_model(NodeId("orders", "User", semver.Version(1, 0, 0)))
+    assert not second.has_model(NodeId("billing", "User", semver.Version(1, 0, 0)))
+    assert second.versions == []
+
+
+def test_jgf_export_prefixes_namespace() -> None:
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    adapter = PydanticModelAdapter(codec=ModelCodec(namespace="orders"))
+    registry.store_model(adapter.versionable(UserV1))
+
+    document = JgfExporter(default_content_hasher()).export_graph(registry).to_dict()
+    assert set(document["graph"]["nodes"]) == {"orders:User@1.0.0"}

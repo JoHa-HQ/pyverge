@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from pyverge.core.types import ModelData, ModelHandle, ModelVersionKey, VersionValue
+from pyverge.core.types import ModelData, ModelHandle, VersionValue
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.runtime import ModelRuntime
-from pyverge.versioning import Diffable, FieldDescriptor
+from pyverge.versioning import Diffable, FieldDescriptor, NodeId
 
 
 class PydanticModelAdapter(AbstractModelAdapter[VersionValue]):
@@ -60,7 +60,7 @@ class PydanticModelAdapter(AbstractModelAdapter[VersionValue]):
     ) -> ModelHandle | None:
         return self.runtime.field_model(parent_model, field_name)
 
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
+    def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:
         return self.runtime.references(
             model_cls, provider=self.provider, codec=self.model_codec
         )

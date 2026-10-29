@@ -174,7 +174,7 @@ class Engine(Generic[VersionValue]):
         payload = command.payload
         version = (
             payload
-            if isinstance(payload, VersionNode)
+            if isinstance(payload, Versionable)
             else self.adapter.versionable(payload)
         )
         if command.mode is ModelRegistrationMode.STRICT:
@@ -257,7 +257,7 @@ class Engine(Generic[VersionValue]):
             if absent:
                 raise MissingReferenceError(
                     self.registry.name,
-                    version.version,
+                    version,
                     absent,
                 )
 

@@ -45,7 +45,12 @@ class LookupMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
-        return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
+        namespace = getattr(key, "namespace", cls._namespace)
+        return VersionKey[VersionValue](
+            namespace=namespace,
+            kind=key.kind,
+            version=key.version,
+        )
 
     @_resolve_model_key.register(tuple)
     @classmethod
@@ -56,7 +61,11 @@ class LookupMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
         kind, value = key
-        return VersionKey[VersionValue](_value=value, _kind=kind)
+        return VersionKey[VersionValue](
+            namespace=cls._namespace,
+            kind=kind,
+            version=value,
+        )
 
     @_resolve_model_key.register(VersionNode)
     @classmethod
@@ -66,7 +75,11 @@ class LookupMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
-        return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
+        return VersionKey[VersionValue](
+            namespace=key.namespace,
+            kind=key.kind,
+            version=key.version,
+        )
 
     @_resolve_model_key.register(type)
     @classmethod
@@ -81,8 +94,9 @@ class LookupMixin(Generic[VersionValue]):
             raise ModelNotFoundError(engine.registry.name, key)
         versionable = engine.registry.get_model_by_ref(engine.adapter.ref(key))
         return VersionKey[VersionValue](
-            _value=versionable.version[1],
-            _kind=versionable.kind,
+            namespace=versionable.namespace,
+            kind=versionable.kind,
+            version=versionable.version,
         )
 
     @singledispatchmethod

@@ -1,5 +1,8 @@
 from .backend import MigrationMaterializer
-from .identity import DefaultMigrationIdentityResolver, MigrationIdentityResolver
+from .identity import (
+    DefaultMigrationIdentityResolver,
+    MigrationIdentityResolver,
+)
 from .json_patch import (
     CoerceOperation,
     JsonPatch,

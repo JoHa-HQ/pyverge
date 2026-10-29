@@ -9,7 +9,7 @@ from pyverge.core.types import (
     ModelData,
 )
 from pyverge.versioning import (
-    MigrationIdentity,
+    MigrationDescriptor,
     default_canonicalizer,
 )
 
@@ -157,8 +157,8 @@ class JsonPatch(jsonpatch.JsonPatch):
     )
 
     @property
-    def migration_identity(self) -> MigrationIdentity:
-        return MigrationIdentity(
+    def migration_identity(self) -> MigrationDescriptor:
+        return MigrationDescriptor(
             "jsonpatch",
             default_canonicalizer().dumps(self.patch),
         )

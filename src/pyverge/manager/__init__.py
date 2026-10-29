@@ -5,11 +5,9 @@ from .descriptors import (
     _ModelDescriptor,
 )
 from .manager import Manager
-from .types import ManagerConfig
 
 __all__ = [
     "Manager",
-    "ManagerConfig",
     "ManagerMeta",
     "_HookDescriptor",
     "_MigrationDescriptor",

@@ -89,7 +89,7 @@ class ThreadedBackend:
                         result.close()
                     raise AsyncExecutionRequired("async hook requires async backend")
             if isinstance(migrated, dict):
-                migrated[adapter.version_property] = str(target.version[1])
+                migrated[adapter.version_property] = str(target.version)
             current = migrated
         Path(*entry.path).set(data, current)
 

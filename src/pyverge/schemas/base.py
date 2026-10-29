@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Generic
+from typing import Any, Generic, cast
 
 from pyverge.core.types import (
     ModelHandle,
-    ModelVersionKey,
     VersionValue,
 )
 from pyverge.schemas.codec import ModelCodec
@@ -19,6 +18,7 @@ from pyverge.versioning import (
     FrozenMap,
     ModelDescriptor,
     ModelRef,
+    NodeId,
     Versionable,
     VersionKey,
     VersionNode,
@@ -109,10 +109,9 @@ class AbstractModelAdapter(Generic[VersionValue]):
         version: str | None = None,
     ) -> VersionNode[VersionValue]:
         return VersionNode[VersionValue](
-            key=VersionKey[VersionValue](
-                _value=self.of(version or self.version(model_cls)),
-                _kind=kind or self.kind(model_cls),
-            ),
+            namespace=self.model_codec.namespace,
+            kind=kind or self.kind(model_cls),
+            version=cast("VersionValue", version or self.version(model_cls)),
             descriptor=self.model_descriptor(model_cls),
         )
 
@@ -121,13 +120,13 @@ class AbstractModelAdapter(Generic[VersionValue]):
         *,
         kind: str,
         version: str,
-    ) -> Comparable[VersionValue]:
+    ) -> VersionKey[VersionValue]:
         return self.model_codec.version_key(kind=kind, version=version)
 
     def materialize_model(self, diff: Diffable) -> ModelHandle:
         raise NotImplementedError
 
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
+    def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:
         raise NotImplementedError
 
     @classmethod

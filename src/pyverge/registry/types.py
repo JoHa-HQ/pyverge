@@ -5,15 +5,14 @@ from typing import Any, Protocol
 from pyverge.core.types import (
     Attachable,
     ModelKind,
-    ModelVersionKey,
     VersionValue,
 )
 from pyverge.versioning import (
     EdgeKey,
     Migratable,
     ModelRef,
+    NodeId,
     Transitional,
-    Versionable,
     VersionEdge,
     VersionNode,
 )
@@ -41,8 +40,8 @@ class ModelCatalog(Protocol[VersionValue]):
     @property
     def latest_version(self) -> VersionNode[VersionValue]: ...
     def missing_references(
-        self, node: Versionable[VersionValue]
-    ) -> frozenset[ModelVersionKey]: ...
+        self, node: VersionNode[VersionValue]
+    ) -> frozenset[NodeId]: ...
 
 
 class PathCatalog(Protocol[VersionValue]):
@@ -50,8 +49,8 @@ class PathCatalog(Protocol[VersionValue]):
 
     def migration_path(
         self,
-        from_version: Versionable[VersionValue],
-        to_version: Versionable[VersionValue],
+        from_version: VersionNode[VersionValue],
+        to_version: VersionNode[VersionValue],
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]: ...
 
 
@@ -100,8 +99,8 @@ class MigrationWrite(Protocol[VersionValue]):
     def remove_migration(self, key: Transitional) -> None: ...
     def remove_migration_range(
         self,
-        from_version: Versionable[VersionValue],
-        to_version: Versionable[VersionValue],
+        from_version: VersionNode[VersionValue],
+        to_version: VersionNode[VersionValue],
     ) -> None: ...
     def clear_migrations(self) -> None: ...
     def add_hook(self, key: Transitional, hook: Attachable) -> None: ...

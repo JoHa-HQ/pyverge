@@ -7,14 +7,13 @@ from pyverge.core.types import (
     ModelData,
     ModelKey,
     ModelKind,
-    ModelVersionKey,
     VersionValue,
 )
 from pyverge.discovery import ModelRegistrationMode, RegisterModel
 from pyverge.schemas.types import (
     ModelHandle,
 )
-from pyverge.versioning import Comparable, Versionable, VersionNode
+from pyverge.versioning import Comparable, NodeId, Versionable, VersionNode
 
 from ..descriptors import hybridmethod
 
@@ -87,7 +86,7 @@ class ModelStoreMixin(Generic[VersionValue]):
     def missing_references(
         self: Manager[VersionValue],
         version: Versionable[VersionValue],
-    ) -> frozenset[ModelVersionKey]:
+    ) -> frozenset[NodeId]:
         return self.engine.registry.missing_references(version)
 
     def validate_graph(
@@ -154,7 +153,10 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         if isinstance(key, ModelKey):
             return engine.get_model(
-                engine.adapter.version_key(kind=key.kind, version=key.version)
+                engine.adapter.version_key(
+                    kind=key.kind,
+                    version=key.version,
+                )
             )
         return engine.get_model_by_class(key)
 

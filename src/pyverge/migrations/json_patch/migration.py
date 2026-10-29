@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from pyverge.versioning import (
-    MigrationIdentity,
+    MigrationDescriptor,
     default_canonicalizer,
 )
 
@@ -47,8 +47,8 @@ class JsonPatchMigration:
         return self._patch
 
     @property
-    def migration_identity(self) -> MigrationIdentity:
-        return MigrationIdentity(
+    def migration_identity(self) -> MigrationDescriptor:
+        return MigrationDescriptor(
             "jsonpatch",
             default_canonicalizer().dumps(self.spec),
         )

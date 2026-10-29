@@ -7,7 +7,6 @@ from pyverge.core.types import (
     Attachable,
     MigrationFunc,
     ModelKind,
-    ModelVersionKey,
     VersionValue,
 )
 from pyverge.registry.errors import (
@@ -26,8 +25,8 @@ from pyverge.versioning import (
     EdgeKey,
     Migratable,
     ModelRef,
+    NodeId,
     Transitional,
-    VersionKey,
     VersionNode,
 )
 
@@ -71,10 +70,12 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         *,
         name: str | None = None,
+        namespace: str = "",
         hasher: ContentHasher,
         index_content_hashes: bool = False,
     ) -> None:
         self._name = name or "registry"
+        self._namespace = namespace
         self._hasher = hasher
         self._locked = False
         self._index_content_hashes = index_content_hashes
@@ -124,6 +125,10 @@ class InMemoryCatalog(Generic[VersionValue]):
         return self._name
 
     @property
+    def namespace(self: Self) -> str:
+        return self._namespace
+
+    @property
     def kinds(self: Self) -> list[ModelKind]:
         return list(self._migrations.keys())
 
@@ -168,7 +173,7 @@ class InMemoryCatalog(Generic[VersionValue]):
         node: Comparable[VersionValue],
         *,
         require_registered: bool = True,
-    ) -> frozenset[ModelVersionKey]:
+    ) -> frozenset[NodeId]:
         registered = cast(
             "VersionNode[VersionValue]",
             self.get_model(node)
@@ -176,27 +181,33 @@ class InMemoryCatalog(Generic[VersionValue]):
             else self.find_model(node) or node,
         )
         missing = []
-        for kind, version in registered.references:
-            key = VersionKey[VersionValue](_value=version, _kind=kind)
-            if not self.has_model(key):
-                missing.append((kind, version))
+        for reference in registered.references:
+            resolved = reference
+            if not resolved.namespace and self._namespace:
+                resolved = NodeId(
+                    namespace=self._namespace,
+                    kind=resolved.kind,
+                    version=resolved.version,
+                )
+            if not self.has_model(resolved):
+                missing.append(resolved)
         return frozenset(missing)
 
     def _find_edge(
         self: Self,
         kind: ModelKind,
-        pair: tuple[Comparable[VersionValue], Comparable[VersionValue]],
+        pair: tuple[NodeId[VersionValue], NodeId[VersionValue]],
     ) -> Migratable[VersionValue]:
         edges = self._migrations.get(kind, [])
         key = EdgeKey.from_pair(*pair)
         idx = bisect.bisect_left(edges, key)
-        if idx < len(edges) and edges[idx].edge == pair:
+        if idx < len(edges) and edges[idx].key == pair:
             return edges[idx]
         raise MigrationNotFoundError(self._name, pair)
 
     def has_migration(self: Self, key: Transitional[VersionValue]) -> bool:
         try:
-            self._find_edge(key.kind, key.edge)
+            self._find_edge(key.kind, key.key)
             return True
         except MigrationNotFoundError:
             return False
@@ -211,7 +222,7 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         key: Transitional[VersionValue],
     ) -> Migratable[VersionValue]:
-        return self._find_edge(key.kind, key.edge)
+        return self._find_edge(key.kind, key.key)
 
     def has_hooks(self: Self, key: Transitional[VersionValue]) -> bool:
         return key in self._hooks
@@ -236,6 +247,7 @@ class InMemoryCatalog(Generic[VersionValue]):
             "InMemoryCatalog[VersionValue]",
             InMemoryCatalog(
                 name=name or self._name,
+                namespace=self._namespace,
                 hasher=self._hasher,
                 index_content_hashes=self._index_content_hashes,
             ),
@@ -281,14 +293,22 @@ class InMemoryCatalog(Generic[VersionValue]):
         version: VersionNode[VersionValue],
     ) -> VersionNode[VersionValue]:
         self._ensure_mutable("store_model")
+        if version.namespace != self._namespace:
+            raise CatalogError(
+                self._name,
+                f"Model {version} belongs to namespace "
+                f"{version.namespace!r}, expected {self._namespace!r}",
+            )
         if version in self._by_versions:
             raise ModelAlreadyRegisteredError(
                 catalog_name=self._name,
-                version=version.version,
+                version=version,
             )
-        self._by_models[version.descriptor.ref] = version
+        modelref = getattr(version, "modelref", None)
+        if modelref is not None:
+            self._by_models[modelref] = version
         bisect.insort_left(self._by_versions, version)
-        bisect.insort_left(self._by_kinds[version.version[0]], version)
+        bisect.insort_left(self._by_kinds[version.kind], version)
         return version
 
     def reconcile_model(
@@ -296,6 +316,12 @@ class InMemoryCatalog(Generic[VersionValue]):
         version: VersionNode[VersionValue],
     ) -> VersionNode[VersionValue]:
         self._ensure_mutable("reconcile_model")
+        if version.namespace != self._namespace:
+            raise CatalogError(
+                self._name,
+                f"Model {version} belongs to namespace "
+                f"{version.namespace!r}, expected {self._namespace!r}",
+            )
         try:
             existing = self.get_model(version)
         except ModelNotFoundError:
@@ -303,7 +329,7 @@ class InMemoryCatalog(Generic[VersionValue]):
         if existing.fields != version.fields:
             raise ModelConflictError(
                 self._name,
-                version.version,
+                version,
                 existing.fields,
                 version.fields,
             )
@@ -351,7 +377,9 @@ class InMemoryCatalog(Generic[VersionValue]):
         version = self._by_versions[version_idx]
 
         del self._by_kinds[key.kind][kind_idx]
-        del self._by_models[version.descriptor.ref]
+        modelref = getattr(version, "modelref", None)
+        if modelref is not None:
+            self._by_models.pop(modelref, None)
         del self._by_versions[version_idx]
 
     def remove_model_by_ref(self: Self, ref: ModelRef) -> None:
@@ -399,8 +427,8 @@ class InMemoryCatalog(Generic[VersionValue]):
         key: Migratable[VersionValue],
     ) -> MigrationFunc:
         self._ensure_mutable("store_migration")
-        if any(v not in self._by_versions for v in key.edge):
-            raise MigrationNotFoundError(self._name, key.edge)
+        if any(v not in self._by_versions for v in key.key):
+            raise MigrationNotFoundError(self._name, key.key)
 
         paths = self._migrations.get(key.kind, [])
 
@@ -413,7 +441,7 @@ class InMemoryCatalog(Generic[VersionValue]):
                 return existing.func
             raise MigrationConflictError(
                 self._name,
-                key.edge,
+                key.key,
                 registered_hash=registered_hash,
                 incoming_hash=incoming_hash,
             )
@@ -431,7 +459,7 @@ class InMemoryCatalog(Generic[VersionValue]):
         key: Transitional[VersionValue],
     ) -> Migratable[VersionValue]:
         if key.kind not in self._migrations:
-            raise MigrationNotFoundError(self._name, key.edge)
+            raise MigrationNotFoundError(self._name, key.key)
 
         idx = bisect.bisect_left(self._migrations[key.kind], key)
 
@@ -439,7 +467,7 @@ class InMemoryCatalog(Generic[VersionValue]):
             idx >= len(self._migrations[key.kind])
             or self._migrations[key.kind][idx] != key
         ):
-            raise MigrationNotFoundError(self._name, key.edge)
+            raise MigrationNotFoundError(self._name, key.key)
 
         return self._migrations[key.kind][idx]
 
@@ -539,14 +567,7 @@ class InMemoryCatalog(Generic[VersionValue]):
         to_version: Comparable[VersionValue],
     ) -> None:
         self._ensure_mutable("remove_migration_range")
-        if from_version.version[0] != to_version.version[0]:
-            raise CatalogError(
-                self._name,
-                f"Cannot remove range across kinds: "
-                f"{from_version.version[0]} != {to_version.version[0]}",
-            )
-
-        kind_versions = self.kind_versions(from_version.version[0])
+        kind_versions = self.kind_versions(from_version.kind)
         lo = bisect.bisect_left(kind_versions, from_version)
         hi = bisect.bisect_left(kind_versions, to_version)
 

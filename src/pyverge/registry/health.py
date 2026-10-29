@@ -41,10 +41,8 @@ class CatalogHealth:
         for node in catalog.versions:
             absent = catalog.missing_references(node)
             if absent:
-                rendered = ", ".join(
-                    f"{kind}@{version}" for kind, version in sorted(absent)
-                )
-                subject = f"{node.version[0]}@{node.version[1]}"
+                rendered = ", ".join(str(reference) for reference in sorted(absent))
+                subject = str(node)
                 issues.append(f"{subject} references unregistered versions: {rendered}")
 
         for kind in catalog.entities:
@@ -53,7 +51,7 @@ class CatalogHealth:
                 if not catalog.has_migration(EdgeKey.from_pair(source, target)):
                     issues.append(
                         f"{kind}: missing migration "
-                        f"{source.version[1]} -> {target.version[1]}"
+                        f"{source.version} -> {target.version}"
                     )
 
         return HealthReport(

@@ -119,7 +119,9 @@ class CompositeExtractor(Generic[VersionValue]):
             return None
         try:
             key = VersionKey[VersionValue](
-                _value=self._adapter.of(version_str), _kind=kind
+                namespace=self._registry.namespace,
+                kind=kind,
+                version=version_str,
             )
         except Exception:
             return None
@@ -145,7 +147,7 @@ class CompositeExtractor(Generic[VersionValue]):
                         path=path,
                         depth=depth,
                         kind=source.kind,
-                        version=str(source.version[1]),
+                        version=str(source.version),
                         max_depth=ctx.max_depth,
                     )
                 yield (path, depth, source)
