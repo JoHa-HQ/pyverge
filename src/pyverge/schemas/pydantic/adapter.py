@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from pyverge.core.types import ModelData, ModelHandle, VersionValue
+from pyverge.core.types import ModelData, ModelHandle
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.codec import ModelCodec
-from pyverge.schemas.runtime import ModelRuntime, build_pydantic_model
-from pyverge.versioning import Diffable, FieldDescriptor, NodeId
+from pyverge.schemas.runtime import ModelRuntime
+from pyverge.versioning import FieldDescriptor, NodeId
 
 
 class PydanticModelAdapter(AbstractModelAdapter):
@@ -69,9 +69,6 @@ class PydanticModelAdapter(AbstractModelAdapter):
         return self.runtime.describe_fields(
             model_cls, provider=self.provider, codec=self.model_codec
         )
-
-    def _build_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        return build_pydantic_model(self.runtime, diff, codec=self.model_codec)
 
 
 __all__ = ["PydanticModelAdapter"]

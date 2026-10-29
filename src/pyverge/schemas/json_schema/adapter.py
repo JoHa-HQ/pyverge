@@ -10,11 +10,11 @@ from datamodel_code_generator.enums import DataModelType
 from datamodel_code_generator.format import Formatter
 from pydantic import BaseModel
 
-from pyverge.core.types import ModelData, ModelHandle, VersionValue
+from pyverge.core.types import ModelData, ModelHandle
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.codec import ModelCodec
-from pyverge.schemas.runtime import ModelRuntime, build_pydantic_model
-from pyverge.versioning import Diffable, FieldDescriptor, NodeId
+from pyverge.schemas.runtime import ModelRuntime
+from pyverge.versioning import FieldDescriptor, NodeId
 
 
 class JsonSchemaModelAdapter(AbstractModelAdapter):
@@ -185,9 +185,6 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         version: str | None = None,
     ):
         return super().versionable(self._model(model_cls), kind=kind, version=version)
-
-    def _build_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        return build_pydantic_model(self.runtime, diff, codec=self.model_codec)
 
 
 __all__ = ["JsonSchemaModelAdapter"]

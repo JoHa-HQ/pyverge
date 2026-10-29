@@ -191,6 +191,13 @@ class ModelRuntime(Protocol):
         codec: ModelCodec,
     ) -> TypeRef: ...
 
+    def build_model(
+        self,
+        diff: Diffable[VersionValue],
+        *,
+        codec: ModelCodec,
+    ) -> ModelHandle: ...
+
 
 class PythonModelRuntime:
     """Python/Pydantic runtime: TypeAdapter cache and native handle registry."""
@@ -454,37 +461,35 @@ class PythonModelRuntime:
             ),
         )
 
-
-def build_pydantic_model(
-    runtime: ModelRuntime,
-    diff: Diffable[VersionValue],
-    *,
-    codec: ModelCodec,
-) -> ModelHandle:
-    """Build a Pydantic model handle for a target schema diff."""
-    anchor = runtime.resolve(diff.source.descriptor.ref)
-    version = diff.target.version
-    fields: dict[str, Any] = {codec.version_property: (str, str(version))}
-    for name, field_info in anchor.model_fields.items():
-        if name == codec.version_property or name in diff.removed_fields:
-            continue
-        fields[name] = (field_info.annotation, field_info)
-    for name in diff.added_fields:
-        if name in fields:
-            continue
-        info = diff.added_field_info.get(name, {})
-        annotation = info.get("type") or Any
-        default = info.get("default")
-        if info.get("required"):
-            fields[name] = (annotation, ...)
-        elif default is not None:
-            fields[name] = (annotation, default)
-        else:
-            fields[name] = (annotation, None)
-    return create_model(
-        f"{anchor.__name__}V{str(version).replace('.', '_')}",
-        **fields,
-    )
+    def build_model(
+        self,
+        diff: Diffable[VersionValue],
+        *,
+        codec: ModelCodec,
+    ) -> ModelHandle:
+        anchor = self.resolve(diff.source.descriptor.ref)
+        version = diff.target.version
+        fields: dict[str, Any] = {codec.version_property: (str, str(version))}
+        for name, field_info in anchor.model_fields.items():
+            if name == codec.version_property or name in diff.removed_fields:
+                continue
+            fields[name] = (field_info.annotation, field_info)
+        for name in diff.added_fields:
+            if name in fields:
+                continue
+            info = diff.added_field_info.get(name, {})
+            annotation = info.get("type") or Any
+            default = info.get("default")
+            if info.get("required"):
+                fields[name] = (annotation, ...)
+            elif default is not None:
+                fields[name] = (annotation, default)
+            else:
+                fields[name] = (annotation, None)
+        return create_model(
+            f"{anchor.__name__}V{str(version).replace('.', '_')}",
+            **fields,
+        )
 
 
 __all__ = ["ModelRuntime", "PythonModelRuntime"]

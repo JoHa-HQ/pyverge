@@ -124,7 +124,7 @@ class AbstractModelAdapter(Generic[VersionValue]):
         return self.model_codec.version_key(kind=kind, version=version)
 
     def _build_model(self, diff: Diffable) -> ModelHandle:
-        raise NotImplementedError
+        return self.runtime.build_model(diff, codec=self.model_codec)
 
     def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:
         raise NotImplementedError
