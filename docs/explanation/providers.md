@@ -23,8 +23,10 @@ from pyverge.schemas import ModelCodec, PydanticModelAdapter
 adapter = PydanticModelAdapter(codec=ModelCodec())
 ```
 
-`ModelCodec` is required. It carries `version_property` / `kind_property` and
-the Pydantic payload/reflection strategy shared by Pydantic-backed providers.
+`ModelCodec` is required. It carries `version_property` / `kind_property`, the
+manager namespace, and the Pydantic payload/reflection strategy shared by
+Pydantic-backed providers. Version-string parsing belongs to `NodeId`;
+`ModelCodec.of()` delegates to it.
 
 ## Container checks
 

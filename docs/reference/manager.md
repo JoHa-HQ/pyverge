@@ -6,11 +6,24 @@ High-level signatures for the public manager surface. See the
 ## Configuration
 
 ```python
-Manager.configure(adapter, *, config=None, **options)
+Manager.configure(
+    adapter,
+    *,
+    engine=None,
+    walker=None,
+    hasher=None,
+    identity_resolver=None,
+    model_materializer=None,
+    migration_materializer=None,
+    diff_provider=None,
+    on_missing="raise",
+    namespace="",
+)
 ```
 
-`ManagerConfig` groups optional engine, walker, hasher, identity resolver,
-materializer, diff provider, and `on_missing` settings.
+All configuration is passed directly as keyword arguments. `namespace`
+defaults to empty at the manager; the manager binds that namespace to the
+registry and the adapter codec.
 
 ## Registration decorators
 

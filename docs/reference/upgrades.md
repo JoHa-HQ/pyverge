@@ -137,13 +137,39 @@ result = manager.runner().run(
 )
 ```
 
+## Graph identity
+
+`VersionKey` and `EdgeKey` are now first-class identity primitives. A node ID
+carries the namespace, kind, and parsed version; keys add identity-neutral
+storage metadata.
+
+```python
+from pyverge.versioning import EdgeKey, NodeId, VersionKey, VersionNode
+
+node_id = NodeId("com.joha.order", "Order", "1.0.0")
+key = VersionKey(
+    namespace=node_id.namespace,
+    kind=node_id.kind,
+    version=node_id.version,
+    ref=storage_ref,
+)
+edge = EdgeKey(
+    source=node_id,
+    target=NodeId("com.joha.order", "Order", "2.0.0"),
+)
+```
+
+One registry owns one namespace. The manager defaults an empty namespace.
+Cross-namespace edges are forbidden. Identity objects no longer expose
+`jgf_id`; JGF/export renders namespace-prefixed external IDs.
+
 ## Import moves
 
 ```python
 from pyverge.engine import Engine
 from pyverge.registry import Registry
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey, VersionNode
+from pyverge.versioning import EdgeKey, NodeId, VersionKey, VersionNode
 ```
 
 `pyverge.migration` is gone.
@@ -223,11 +249,14 @@ migrations and await the runner result.
 
 ### `TypeError: configure() got an unexpected keyword argument`
 
-`Manager.configure` accepts `config=ManagerConfig(...)` or individual keyword
-options. If you are migrating settings, expand the supported manager options:
+`Manager.configure` accepts individual keyword options directly:
 
 ```python
-Manager.configure(PydanticModelAdapter(codec=ModelCodec()), **manager_kwargs(settings))
+Manager.configure(
+    PydanticModelAdapter(codec=ModelCodec()),
+    on_missing="raise",
+    namespace="com.joha.order",
+)
 ```
 
 ### FastMCP startup fails after upgrade

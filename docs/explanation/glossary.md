@@ -26,6 +26,16 @@
 
 **Version edge** — adjacent, executable migration between two registered versions.
 
-**Version node** — registered model at one `(kind, version)`.
+**Node ID** — frozen identity `NodeId(namespace, kind, version)`. The namespace
+must match the owning registry.
+
+**Version key** — a `NodeId` plus identity-neutral storage metadata (`ref`).
+Equality, ordering, and hashing use the node ID only.
+
+**Version node** — a hydrated `VersionKey` that always binds a `ModelRef` and a
+model descriptor.
+
+**Edge key** — a directed `(source NodeId, target NodeId)` pair plus metadata.
+Cross-namespace and cross-kind edges are rejected.
 
 **Version pair** — source and target endpoints of one migration.

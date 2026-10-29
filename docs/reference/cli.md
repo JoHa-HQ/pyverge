@@ -156,7 +156,7 @@ pyverge manifest --manager myapp.models:UserManager \
 Emits a JGF v2 envelope:
 
 - top-level `graph`
-- nodes keyed by `kind@version`
+- nodes keyed by `namespace:kind@version` (`kind@version` when the namespace is empty)
 - edges with `source`, `target`, `relation: migration`
 - node metadata: fields, references, `schema_hash`
 - edge metadata: strategy/spec, compatibility, `migration_hash`
