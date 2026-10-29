@@ -59,7 +59,9 @@ jobs:
             exit 0
           fi
 
-          DEV="${NEXT}.dev${GITHUB_RUN_ID}"
+          echo "Release: ${NEXT}"
+
+          DEV="${NEXT}"
           TAG="v${DEV}"
           SHA="$(git rev-parse HEAD)"
 
