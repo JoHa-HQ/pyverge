@@ -7,72 +7,150 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+  id-token: write
+
 concurrency:
-  group: publish-dev
-  cancel-in-progress: false
+  group: publish-dev-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
-  publish:
+  prepare-release:
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push')
+      (
+        github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push'
+      )
     runs-on: ubuntu-latest
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/project/pyverge/
-    permissions:
-      contents: write
-      id-token: write
+    outputs:
+      release: ${{ steps.version.outputs.release }}
+      dev: ${{ steps.version.outputs.dev }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           fetch-depth: 0
           token: ${{ secrets.PUBLISHING_PAT }}
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: "3.11"
-      - run: uv sync --group dev --all-extras
+
+      - name: Install dependencies
+        run: uv sync --group dev --all-extras
+
       - name: Prepare dev release
         id: version
+        shell: bash
         run: |
           set -euo pipefail
           git fetch --tags --force origin
 
-          if NEXT=$(uv run --no-sync cz bump --get-next 2>/dev/null); then
-            DEV="${NEXT}.dev${GITHUB_RUN_ID}"
-            TAG="v${DEV}"
-            SHA=$(git rev-parse HEAD)
-
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            if git rev-parse "$TAG" >/dev/null 2>&1; then
-              echo "Tag $TAG already exists"
-            else
-              git tag -a "$TAG" \
-                -m "TestPyPI ${DEV} source ${SHA} run ${GITHUB_RUN_ID}"
-              git push origin "$TAG"
-            fi
-
-            {
-              echo "release=true"
-              echo "dev=$DEV"
-              echo "tag=$TAG"
-              echo "sha=$SHA"
-            } >> "$GITHUB_OUTPUT"
-          else
+          if ! NEXT=$(uv run --no-sync cz bump --get-next); then
             echo "release=false" >> "$GITHUB_OUTPUT"
             echo "No release-worthy commits; skipping TestPyPI."
+            exit 0
           fi
+
+          DEV=$(uv run --no-sync cz bump --get-next --devrelease ${GITHUB_RUN_ID})
+          echo "Release(dev): ${DEV}"
+
+          TAG="v${DEV}"
+          SHA="$(git rev-parse HEAD)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git rev-parse --verify "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists; skipping release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git tag -a "$TAG" -m "TestPyPI ${DEV} source ${SHA} run ${GITHUB_RUN_ID}"
+          git push origin "$TAG"
+
+          {
+            echo "release=true"
+            echo "dev=${DEV}"
+            echo "tag=${TAG}"
+            echo "sha=${SHA}"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare-release
+    if: needs.prepare-release.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare-release.outputs.sha }}
+          fetch-depth: 0
+          token: ${{ secrets.PUBLISHING_PAT }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --group dev --all-extras
+
       - name: Build distribution
-        if: steps.version.outputs.release == 'true'
         env:
-          UV_DYNAMIC_VERSIONING_BYPASS: ${{ steps.version.outputs.dev }}
+          UV_DYNAMIC_VERSIONING_BYPASS: ${{ needs.prepare-release.outputs.dev }}
         run: uv build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/pyverge/
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
       - name: Publish to TestPyPI
-        if: steps.version.outputs.release == 'true'
         uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
+
+  github-release:
+    needs: [prepare-release, build, publish]
+    if: needs.prepare-release.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@e598afbe1493e6b1bafb1f389cabb956eab91231 # v3.0.3
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
+          name: pyverge ${{ needs.prepare-release.outputs.dev }}
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            Dev build published to TestPyPI.
+
+            Version: ${{ steps.version.outputs.dev }}
+            Tag: ${{ steps.version.outputs.tag }}
+            Commit: ${{ steps.version.outputs.sha }}
