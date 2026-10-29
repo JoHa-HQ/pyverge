@@ -2,7 +2,7 @@ name: Publish Dev (TestPyPI)
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: [CI]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -12,8 +12,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: publish-dev-${{ github.event.workflow_run.head_branch || github.ref_name }}
-  cancel-in-progress: false
+  group: publish-dev-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 
 jobs:
   prepare-release:
