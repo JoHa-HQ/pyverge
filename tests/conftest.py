@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 from typing import Any, cast
 
 import pytest
@@ -152,8 +153,17 @@ def registry(
     model_adapter: PydanticModelAdapter,
     migration_settings: MigrationSettings,
 ) -> Registry[VersionValue]:
-    _strategy, name, models, migrations = request.param
-    registry = Registry[VersionValue](name=name, hasher=default_content_hasher())
+    _strategy, name, models, migrations, *rest = request.param
+    namespace = rest[0] if rest else ""
+    if namespace and not model_adapter.model_codec.namespace:
+        model_adapter.model_codec = replace(
+            model_adapter.model_codec, namespace=namespace
+        )
+    registry = Registry[VersionValue](
+        name=name,
+        namespace=namespace,
+        hasher=default_content_hasher(),
+    )
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
     if migrations:
@@ -304,25 +314,16 @@ def source(request: pytest.FixtureRequest) -> StaticSource:
     return StaticSource(tuple(descriptors), source_id)
 
 
-@pytest.fixture
+@pytest.fixture()
 def manager(
+    request: pytest.FixtureRequest,
     engine: Engine[VersionValue],
     migration_settings: MigrationSettings,
 ) -> type[Manager[VersionValue]]:
+    namespace = getattr(request, "param", "")
     return Manager[VersionValue].configure(
         engine.adapter,
         engine=engine,
-        **manager_kwargs(migration_settings),
-    )
-
-
-@pytest.fixture
-def namespaced_manager(
-    pydantic_model_adapter: PydanticModelAdapter,
-    migration_settings: MigrationSettings,
-) -> type[Manager[VersionValue]]:
-    return Manager[VersionValue].configure(
-        pydantic_model_adapter,
-        namespace="orders",
+        namespace=namespace,
         **manager_kwargs(migration_settings),
     )

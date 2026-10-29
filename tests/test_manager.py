@@ -987,12 +987,28 @@ def test_manager_runner_sync_and_async_handles(
     assert async_result["document"]["version"] == "2.0.0"
 
 
+@pytest.mark.parametrize("manager", ["orders"], indirect=True)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+                "orders",
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
 def test_manager_defaults_empty_namespace(
-    namespaced_manager: type[Manager[semver.Version]],
+    model_adapter: ModelAdapter,
+    manager: type[Manager[semver.Version]],
 ) -> None:
-    namespaced_manager.store_model(UserV1)
-    instance = namespaced_manager()
-
+    instance = manager()
     node = instance.get_model(UserV1)
     assert instance.registry.namespace == "orders"
     assert node.namespace == "orders"
