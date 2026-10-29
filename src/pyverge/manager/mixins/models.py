@@ -13,7 +13,13 @@ from pyverge.discovery import ModelRegistrationMode, RegisterModel
 from pyverge.schemas.types import (
     ModelHandle,
 )
-from pyverge.versioning import Comparable, NodeId, Versionable, VersionNode
+from pyverge.versioning import (
+    Comparable,
+    NodeId,
+    Versionable,
+    VersionNode,
+    parse_version,
+)
 
 from ..descriptors import hybridmethod
 
@@ -196,5 +202,5 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> VersionNode[VersionValue]:
         engine = engine or cls._default_engine
-        key = ModelKey(kind, cast(VersionValue, engine.adapter.of(version)))
+        key = ModelKey(kind, parse_version(version))
         return cls.get_model(key, engine=engine)

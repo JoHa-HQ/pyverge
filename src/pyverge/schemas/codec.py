@@ -5,24 +5,16 @@ from dataclasses import dataclass
 from typing import cast
 
 from pyverge.core.types import VersionValue
-from pyverge.versioning import (
-    FieldDescriptor,
-    NoDefault,
-    VersionKey,
-    parse_version,
-)
+from pyverge.versioning import FieldDescriptor, NoDefault, VersionKey
 
 
 @dataclass(frozen=True, slots=True)
 class ModelCodec:
     """Identity policy shared by model adapters."""
 
-    version_property: str = "version"
-    kind_property: str = "kind"
-    namespace: str = ""
-
-    def of(self, value: str | VersionValue) -> VersionValue:
-        return parse_version(value)
+    namespace: str
+    version_property: str
+    kind_property: str
 
     def version(self, fields: Mapping[str, FieldDescriptor]) -> str:
         return self._default(fields, self.version_property)

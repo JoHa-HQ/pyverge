@@ -84,6 +84,7 @@ def pydantic_model_adapter(
 ) -> PydanticModelAdapter:
     return PydanticModelAdapter(
         codec=ModelCodec(
+            namespace="",
             version_property=versioning_settings.version_property,
             kind_property=versioning_settings.kind_property,
         )
@@ -96,6 +97,7 @@ def json_model_adapter(
 ) -> JsonSchemaModelAdapter:
     return JsonSchemaModelAdapter(
         codec=ModelCodec(
+            namespace="",
             version_property=versioning_settings.version_property,
             kind_property=versioning_settings.kind_property,
         )
@@ -122,6 +124,7 @@ def node(
     adapter_cls, model = request.param
     adapter = adapter_cls(
         codec=ModelCodec(
+            namespace="",
             version_property=versioning_settings.version_property,
             kind_property=versioning_settings.kind_property,
         )
@@ -138,6 +141,7 @@ def edge(
     adapter_cls, source_model, target_model, func = request.param
     adapter = adapter_cls(
         codec=ModelCodec(
+            namespace="",
             version_property=versioning_settings.version_property,
             kind_property=versioning_settings.kind_property,
         )

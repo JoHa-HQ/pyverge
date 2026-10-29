@@ -9,6 +9,7 @@ from typing import (
     Literal,
     Protocol,
     Union,
+    cast,
     get_args,
     get_origin,
     runtime_checkable,
@@ -234,7 +235,6 @@ class PythonModelRuntime:
             return f"{module}.{type(handle).__qualname__}"
         return f"{module}.{qualname}"
 
-    # -- payload ----------------------------------------------------------
     def materialize(
         self, container: ModelHandle, data: ModelData, *, strict: bool = False
     ) -> Any:
@@ -257,7 +257,6 @@ class PythonModelRuntime:
             self._adapters[container] = adapter
         return adapter
 
-    # -- reflection -------------------------------------------------------
     def identify(self, model_cls: ModelHandle) -> bool:
         return isinstance(model_cls, type) and issubclass(model_cls, BaseModel)
 
@@ -350,10 +349,16 @@ class PythonModelRuntime:
                 if not kind:
                     continue
                 try:
-                    version = codec.of(codec.version(fields))
+                    version = codec.version(fields)
                 except (TypeError, ValueError):
                     continue
-                found.add(NodeId(namespace=codec.namespace, kind=kind, version=version))
+                found.add(
+                    NodeId(
+                        namespace=codec.namespace,
+                        kind=kind,
+                        version=cast("VersionValue", version),  # ty: ignore[invalid-argument-type]
+                    )
+                )
                 self._collect_references(
                     nested,
                     found,
@@ -426,7 +431,7 @@ class PythonModelRuntime:
                     NodeId(
                         namespace=codec.namespace,
                         kind=kind,
-                        version=codec.of(codec.version(fields)),
+                        version=cast("VersionValue", codec.version(fields)),  # ty: ignore[invalid-argument-type]
                     )
                 )
             except (TypeError, ValueError):

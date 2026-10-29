@@ -12,7 +12,7 @@ from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
     on_missing="reconstruct_model",
 )
 

@@ -24,7 +24,9 @@ from pyverge.versioning import EdgeKey
 from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
 from tests.utils.source import StaticSource
 
-_ADAPTER = PydanticModelAdapter(codec=ModelCodec())
+_ADAPTER = PydanticModelAdapter(
+    codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+)
 _MIGRATION = MigrationDescriptor(
     MigrationSpec(
         (_ADAPTER.versionable(UserV1), _ADAPTER.versionable(UserV2)),
@@ -186,7 +188,9 @@ def _callable_migration(data: dict, context=None) -> dict:
     ],
 )
 def test_diff_discovery(discovery, migration, added, removed, modified) -> None:
-    adapter = PydanticModelAdapter(codec=ModelCodec())
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    )
     diff = discovery.discover(
         migration,
         adapter.versionable(UserV1),

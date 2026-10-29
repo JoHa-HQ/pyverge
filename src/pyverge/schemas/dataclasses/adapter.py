@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 from typing import (
     Any,
+    cast,
     get_args,
     get_origin,
     get_type_hints,
@@ -139,14 +140,14 @@ class DataclassModelAdapter(AbstractModelAdapter):
                 if not kind:
                     continue
                 try:
-                    version = self.of(self.version(nested))
+                    version = self.version(nested)
                 except (TypeError, ValueError):
                     continue
                 found.add(
                     NodeId(
                         namespace=self.model_codec.namespace,
                         kind=kind,
-                        version=version,
+                        version=cast("VersionValue", version),  # ty: ignore[invalid-argument-type]
                     )
                 )
                 self._collect_references(nested, found, seen)
@@ -228,7 +229,7 @@ class DataclassModelAdapter(AbstractModelAdapter):
                     NodeId(
                         namespace=self.model_codec.namespace,
                         kind=kind,
-                        version=self.of(self.version(nested)),
+                        version=cast("VersionValue", self.version(nested)),  # ty: ignore[invalid-argument-type]
                     )
                 )
             except (TypeError, ValueError):

@@ -55,7 +55,7 @@ def search_weather(city: str, temperature: float = 0.0, wind: float = 0.0) -> di
 
 
 WeatherManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
     on_missing="reconstruct_model",
 )
 WeatherManager.store_model(WeatherV2)

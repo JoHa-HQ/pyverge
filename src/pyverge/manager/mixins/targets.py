@@ -27,6 +27,7 @@ from pyverge.schemas.types import (
 from pyverge.versioning import (
     VersionKey,
     VersionNode,
+    parse_version,
 )
 
 from ..descriptors import hybridmethod
@@ -134,10 +135,8 @@ class TargetResolutionMixin(Generic[VersionValue]):
     ) -> TargetResolver:
         engine = engine or cls._default_engine
         registry = engine.registry
-        adapter = engine.adapter
-
         try:
-            parsed = adapter.of(value)
+            parsed = parse_version(value)
         except ValueError:
             raise CatalogError(
                 registry.name,

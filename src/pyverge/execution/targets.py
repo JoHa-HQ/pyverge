@@ -15,7 +15,7 @@ from pyverge.registry import (
 )
 from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import ModelAdapter
-from pyverge.versioning import Versionable, VersionKey, VersionNode
+from pyverge.versioning import Versionable, VersionKey, VersionNode, parse_version
 
 TargetStrategy = Literal["latest", "earliest", "skip"]
 TargetSpec = (
@@ -161,7 +161,7 @@ class TargetCompiler(Generic[VersionValue]):
 
     def _version_string(self, value: str) -> TargetResolver:
         try:
-            parsed = self.adapter.of(value)
+            parsed = parse_version(value)
         except ValueError:
             raise CatalogError(
                 self.graph.name,

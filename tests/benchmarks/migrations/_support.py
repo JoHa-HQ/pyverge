@@ -12,7 +12,11 @@ from pyverge.types import ManagerMigrationKey
 
 def build_chain(versions: int = 10, fields: int = 5) -> Manager[semver.Version]:
     manager_cls = Manager[semver.Version].configure(
-        PydanticModelAdapter(codec=ModelCodec())
+        PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        )
     )
     base = {f"f{i}": (str, "") for i in range(fields)}
     for version in range(versions):

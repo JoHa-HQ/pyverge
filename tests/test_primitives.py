@@ -39,6 +39,7 @@ from pyverge.versioning import (
     default_canonicalizer,
     default_content_hasher,
     default_encoders,
+    parse_version,
 )
 from pyverge.versioning.errors import (
     BackwardCompatibilityError,
@@ -592,7 +593,11 @@ class TestDiff:
         target_model,
         expected: str,
     ) -> None:
-        adapter = adapter_cls(codec=ModelCodec())
+        adapter = adapter_cls(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        )
         source = envelope_model(adapter, versioning_settings, source_model)
         target = envelope_model(adapter, versioning_settings, target_model)
         with pytest.raises(ValueError, match=expected):
@@ -884,7 +889,11 @@ class TestGraphPrimitives:
     )
     def test_version_edge_usage_and_failures(self, edge, versioning_settings) -> None:
         source, target = edge.source, edge.target
-        adapter = PydanticModelAdapter(codec=ModelCodec())
+        adapter = PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        )
         other = edge_from_models(
             adapter,
             versioning_settings,
@@ -1011,7 +1020,7 @@ class TestPrimitives:
     )
     def test_node_canonical_round_trip(self, node) -> None:
         payload = node.to_canonical()
-        restored = VersionNode.from_canonical(payload, parse_version=ModelCodec().of)
+        restored = VersionNode.from_canonical(payload, parse_version=parse_version)
 
         assert restored.to_canonical() == payload
         assert restored.descriptor == node.descriptor

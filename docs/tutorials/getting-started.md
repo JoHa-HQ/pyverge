@@ -39,7 +39,7 @@ from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 # A manager binds a version strategy to an adapter.
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
 )
 
 

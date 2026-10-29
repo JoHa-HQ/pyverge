@@ -20,13 +20,12 @@ Every adapter receives a `ModelCodec`:
 ```python
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-adapter = PydanticModelAdapter(codec=ModelCodec())
+adapter = PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind"))
 ```
 
-`ModelCodec` is required. It carries `version_property` / `kind_property`, the
-manager namespace, and the Pydantic payload/reflection strategy shared by
-Pydantic-backed providers. Version-string parsing belongs to `NodeId`;
-`ModelCodec.of()` delegates to it.
+`ModelCodec` is required. It carries `namespace`, `version_property`,
+`kind_property`, and the Pydantic payload/reflection strategy shared by
+Pydantic-backed providers. Version-string parsing belongs to `NodeId`.
 
 ## Container checks
 
@@ -124,7 +123,7 @@ from pyverge import Manager
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 UserManager = Manager[pendulum.Date].configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
 )
 
 

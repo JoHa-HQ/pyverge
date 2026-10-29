@@ -2759,7 +2759,9 @@ def _extractor() -> tuple[
     PydanticModelAdapter,
     CompositeExtractor[semver.Version],
 ]:
-    adapter = PydanticModelAdapter(codec=ModelCodec())
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    )
     registry = Registry[semver.Version](hasher=default_content_hasher())
     registry.store_model(adapter.versionable(Leaf))
     return registry, adapter, CompositeExtractor(registry, adapter=adapter)
@@ -2884,7 +2886,11 @@ def test_registry_requires_bound_namespace() -> None:
         namespace="orders",
         hasher=default_content_hasher(),
     )
-    adapter = PydanticModelAdapter(codec=ModelCodec(namespace="orders"))
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="orders", version_property="version", kind_property="kind"
+        )
+    )
     stored = registry.store_model(adapter.versionable(UserV1))
 
     assert stored.namespace == "orders"
@@ -2919,7 +2925,11 @@ def test_registries_isolate_identical_kind_versions() -> None:
         namespace="billing",
         hasher=default_content_hasher(),
     )
-    adapter = PydanticModelAdapter(codec=ModelCodec(namespace="orders"))
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="orders", version_property="version", kind_property="kind"
+        )
+    )
     first.store_model(adapter.versionable(UserV1))
 
     assert first.has_model(NodeId("orders", "User", semver.Version(1, 0, 0)))
@@ -2932,7 +2942,11 @@ def test_jgf_export_prefixes_namespace() -> None:
         namespace="orders",
         hasher=default_content_hasher(),
     )
-    adapter = PydanticModelAdapter(codec=ModelCodec(namespace="orders"))
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="orders", version_property="version", kind_property="kind"
+        )
+    )
     registry.store_model(adapter.versionable(UserV1))
 
     document = JgfExporter(default_content_hasher()).export_graph(registry).to_dict()

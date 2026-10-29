@@ -129,10 +129,6 @@ class AbstractModelAdapter(Generic[VersionValue]):
     def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:
         raise NotImplementedError
 
-    @classmethod
-    def of(cls, value: str | VersionValue) -> VersionValue:
-        return ModelCodec().of(value)
-
     def can_handle(
         self,
         container: Any,

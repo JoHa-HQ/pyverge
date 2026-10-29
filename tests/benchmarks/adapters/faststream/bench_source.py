@@ -26,7 +26,11 @@ def source() -> FastStreamSource:
 
     return FastStreamSource(
         FastStream(broker),
-        adapter=PydanticModelAdapter(codec=ModelCodec()),
+        adapter=PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
     )
 
 

@@ -40,7 +40,7 @@ def meta_versionable(
     return VersionKey[VersionValue](
         namespace=getattr(adapter, "model_codec").namespace,
         kind=kind,
-        version=cast("VersionValue", adapter.of(version)),
+        version=cast("VersionValue", version),
     )
 
 

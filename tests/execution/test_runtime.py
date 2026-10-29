@@ -41,7 +41,7 @@ from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
 from pyverge.registry import GraphCatalog, Registry
 from pyverge.registry.errors import CatalogError
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey, VersionNode
+from pyverge.versioning import EdgeKey, VersionNode, parse_version
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -274,7 +274,7 @@ def test_path_resolver_builds_chain(
 
     assert len(plan.entries) == 1
     resolved = plan.entries[0]
-    assert resolved.target.version == engine.adapter.of("3.0.0")
+    assert resolved.target.version == parse_version("3.0.0")
     assert len(resolved.steps) == 2  # noqa: PLR2004
     assert len(resolved.migrations) == 2  # noqa: PLR2004
     assert engine.adapter.resolve(resolved.target_model) is UserV3
@@ -332,7 +332,7 @@ def test_target_resolvers(
     if expected is None:
         assert target is None
     else:
-        assert target.version == engine.adapter.of(expected)
+        assert target.version == parse_version(expected)
 
 
 @pytest.mark.parametrize(
@@ -1131,12 +1131,20 @@ def test_step_context_layers_bindings(execution_environment) -> None:
         bindings=MigrationContext.create({"tenant": "acme", "region": "eu"}),
     )
     source = envelope_model(
-        PydanticModelAdapter(codec=ModelCodec()),
+        PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
         None,
         UserV1,
     )
     target = envelope_model(
-        PydanticModelAdapter(codec=ModelCodec()),
+        PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
         None,
         UserV2,
     )

@@ -34,7 +34,7 @@ Adapters now require an explicit `ModelCodec`:
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 adapter = PydanticModelAdapter(
-    codec=ModelCodec(version_property="version", kind_property="kind")
+    codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
 )
 ```
 
@@ -50,7 +50,7 @@ from pyverge.settings import MigrationSettings, manager_kwargs
 
 settings = MigrationSettings(on_missing="reconstruct_model")
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
     **manager_kwargs(settings),
 )
 ```
@@ -202,7 +202,7 @@ migrations before constructing the runtime manager:
 ```python
 from pyverge.types import ManagerMigrationKey
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
 OrderManager.store_model(Order)
 OrderManager.store_migration(
     ManagerMigrationKey("Order", "1.0.0", "2.0.0"),
@@ -253,7 +253,7 @@ migrations and await the runner result.
 
 ```python
 Manager.configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
     on_missing="raise",
     namespace="com.joha.order",
 )

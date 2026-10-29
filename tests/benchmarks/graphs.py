@@ -50,7 +50,11 @@ def user_manager() -> Manager[semver.Version]:
     down to a pinned older target.
     """
     user_manager_cls = Manager[semver.Version].configure(
-        PydanticModelAdapter(codec=ModelCodec())
+        PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        )
     )
     user_manager_cls.store_model(UserV1)
     user_manager_cls.store_model(UserV2)
