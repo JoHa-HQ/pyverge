@@ -2,19 +2,59 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Protocol,
+    TypeAlias,
+    Union,
+    runtime_checkable,
+)
 
 from pyverge.core.clock import Clock
+from pyverge.core.types import MigrationFunc, MigrationKeyInput, RegistrationMode
 from pyverge.discovery.commands import (
     RegisterMigration,
     RegisterModel,
     RegisterVersion,
 )
+from pyverge.versioning import MigrationEntry, NodeEntry, NodeInput
 
 if TYPE_CHECKING:
+    from pyverge.discovery.commands import MigrationSpec
     from pyverge.discovery.descriptors import SourceDescriptor
+    from pyverge.migrations import JsonataMigration, JsonPatchMigration
 
 RegistrationCommand: TypeAlias = RegisterModel | RegisterVersion | RegisterMigration
+
+#: Inputs accepted by manager migration registration.
+MigrationSource: TypeAlias = Union[
+    MigrationFunc,
+    "MigrationSpec",
+    "JsonPatchMigration",
+    "JsonataMigration",
+]
+
+
+@runtime_checkable
+class RegistrationSink(Protocol):
+    """Manager-facing registration surface used by sources."""
+
+    def store_model(
+        self,
+        payload: NodeInput,
+        *,
+        mode: RegistrationMode = "strict",
+    ) -> NodeEntry: ...
+
+    def store_migration(
+        self,
+        key: MigrationKeyInput,
+        source: MigrationSource,
+        *,
+        backward_compatible: bool = False,
+        migration_id: str | None = None,
+    ) -> MigrationEntry: ...
 
 
 @runtime_checkable
@@ -68,9 +108,11 @@ class ReflectionReport:
 __all__ = [
     "AsyncSourcePort",
     "DescriptorStrategy",
+    "MigrationSource",
     "ReflectionReport",
     "RegistrationCommand",
     "RegistrationContext",
+    "RegistrationSink",
     "SourcePort",
     "SourceVisitor",
 ]

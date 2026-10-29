@@ -14,9 +14,11 @@ from .descriptors import (
 from .types import (
     AsyncSourcePort,
     DescriptorStrategy,
+    MigrationSource,
     ReflectionReport,
     RegistrationCommand,
     RegistrationContext,
+    RegistrationSink,
     SourcePort,
     SourceVisitor,
 )
@@ -26,6 +28,7 @@ __all__ = [
     "AsyncSourcePort",
     "DescriptorStrategy",
     "MigrationDescriptor",
+    "MigrationSource",
     "MigrationSpec",
     "ModelDescriptor",
     "ModelRegistrationMode",
@@ -36,6 +39,7 @@ __all__ = [
     "RegistrationCollector",
     "RegistrationCommand",
     "RegistrationContext",
+    "RegistrationSink",
     "SourceDescriptor",
     "SourcePort",
     "SourceVisitor",

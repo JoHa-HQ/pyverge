@@ -11,10 +11,9 @@ from typing import (
 )
 
 from pyverge.core.types import (
-    ManagerMigrationKey,
     MigrationFunc,
+    MigrationKeyInput,
     ModelHandle,
-    ModelPair,
     TargetResolver,
     VersionValue,
 )
@@ -98,7 +97,7 @@ class ManagerClassState(Protocol[VersionValue]):
     @classmethod
     def store_migration(
         cls,
-        key: ModelPair | ManagerMigrationKey,
+        key: MigrationKeyInput,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -109,7 +108,7 @@ class ManagerClassState(Protocol[VersionValue]):
     @classmethod
     def add_hook(
         cls,
-        key: ModelPair | ManagerMigrationKey,
+        key: MigrationKeyInput,
         hook: Attachable,
         *,
         engine: Engine[VersionValue] | None = None,

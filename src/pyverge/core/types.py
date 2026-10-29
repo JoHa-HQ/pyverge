@@ -10,6 +10,7 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
+    Union,
     runtime_checkable,
 )
 
@@ -21,6 +22,8 @@ from .context import MigrationContext
 if TYPE_CHECKING:
     from pyverge.versioning import (
         Comparable,
+        EdgeKey,
+        VersionEdge,
         VersionNode,
     )
 
@@ -96,8 +99,16 @@ class ModelPair(NamedTuple):
     target: ModelHandle
 
 
+#: How a registration handles an existing graph entry.
+RegistrationMode: TypeAlias = Literal["strict", "reconcile"]
+
 #: Accepted migration-key shapes for the manager's registration methods.
-MigrationKeyInput: TypeAlias = ModelPair | ManagerMigrationKey
+MigrationKeyInput: TypeAlias = Union[
+    ModelPair,
+    ManagerMigrationKey,
+    "EdgeKey",
+    "VersionEdge",
+]
 
 ManagerKey: TypeAlias = ModelKey | ManagerMigrationKey | ModelPair
 
