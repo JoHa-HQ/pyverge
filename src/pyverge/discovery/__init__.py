@@ -3,6 +3,7 @@ from .commands import (
     ModelRegistrationMode,
     RegisterMigration,
     RegisterModel,
+    RegisterVersion,
 )
 from .descriptors import (
     MigrationDescriptor,
@@ -31,6 +32,7 @@ __all__ = [
     "ReflectionReport",
     "RegisterMigration",
     "RegisterModel",
+    "RegisterVersion",
     "RegistrationCollector",
     "RegistrationCommand",
     "RegistrationContext",

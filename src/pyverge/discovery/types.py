@@ -5,12 +5,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, runtime_checkable
 
 from pyverge.core.clock import Clock
-from pyverge.discovery.commands import RegisterMigration, RegisterModel
+from pyverge.discovery.commands import (
+    RegisterMigration,
+    RegisterModel,
+    RegisterVersion,
+)
 
 if TYPE_CHECKING:
     from pyverge.discovery.descriptors import SourceDescriptor
 
-RegistrationCommand: TypeAlias = RegisterModel | RegisterMigration
+RegistrationCommand: TypeAlias = RegisterModel | RegisterVersion | RegisterMigration
 
 
 @runtime_checkable

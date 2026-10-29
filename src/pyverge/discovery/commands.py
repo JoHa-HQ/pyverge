@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from pyverge.core.types import MigrationFunc
-from pyverge.versioning import VersionPair
+from pyverge.core.types import MigrationFunc, ModelHandle
+from pyverge.versioning import VersionNode, VersionPair
 
 
 class ModelRegistrationMode(StrEnum):
@@ -26,9 +26,17 @@ class MigrationSpec:
 
 @dataclass(frozen=True, slots=True)
 class RegisterModel:
-    """Register one model payload."""
+    """Register one provider model handle."""
 
-    payload: Any
+    payload: ModelHandle
+    mode: ModelRegistrationMode
+
+
+@dataclass(frozen=True, slots=True)
+class RegisterVersion:
+    """Register one already-materialized version node."""
+
+    payload: VersionNode[Any]
     mode: ModelRegistrationMode
 
 
@@ -44,4 +52,5 @@ __all__ = [
     "ModelRegistrationMode",
     "RegisterMigration",
     "RegisterModel",
+    "RegisterVersion",
 ]

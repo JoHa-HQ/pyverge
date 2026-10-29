@@ -9,8 +9,10 @@ from pyverge.discovery.commands import (
     ModelRegistrationMode,
     RegisterMigration,
     RegisterModel,
+    RegisterVersion,
 )
 from pyverge.discovery.types import RegistrationCommand
+from pyverge.versioning import VersionNode
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +55,8 @@ def _model_commands(
                 )
             )
         return tuple(commands)
+    if isinstance(payload, VersionNode):
+        return (RegisterVersion(payload, ModelRegistrationMode.RECONCILE),)
     return (RegisterModel(payload, ModelRegistrationMode.RECONCILE),)
 
 

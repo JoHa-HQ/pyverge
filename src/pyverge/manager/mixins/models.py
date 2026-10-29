@@ -9,7 +9,7 @@ from pyverge.core.types import (
     ModelKind,
     VersionValue,
 )
-from pyverge.discovery import ModelRegistrationMode, RegisterModel
+from pyverge.discovery import ModelRegistrationMode, RegisterModel, RegisterVersion
 from pyverge.schemas.types import (
     ModelHandle,
 )
@@ -57,7 +57,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         return cast(
             Versionable[VersionValue],
-            engine.register(RegisterModel(version, ModelRegistrationMode.STRICT)),
+            engine.register(RegisterVersion(version, ModelRegistrationMode.STRICT)),
         )
 
     @hybridmethod
@@ -86,7 +86,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         return cast(
             Versionable[VersionValue],
-            engine.register(RegisterModel(version, ModelRegistrationMode.RECONCILE)),
+            engine.register(RegisterVersion(version, ModelRegistrationMode.RECONCILE)),
         )
 
     def missing_references(

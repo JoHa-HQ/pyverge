@@ -18,6 +18,7 @@ from pyverge.discovery import (
     ModelRegistrationMode,
     RegisterMigration,
     RegisterModel,
+    RegisterVersion,
     RegistrationCommand,
 )
 from pyverge.discovery.reflection import Reflector
@@ -164,6 +165,8 @@ class Engine(Generic[VersionValue]):
         """Execute one registration command."""
         if isinstance(command, RegisterModel):
             return self._register_model(command)
+        if isinstance(command, RegisterVersion):
+            return self._register_version(command)
         if isinstance(command, RegisterMigration):
             return self._register_migration(command)
         raise TypeError(f"Unsupported registration command: {command!r}")
@@ -171,12 +174,15 @@ class Engine(Generic[VersionValue]):
     def _register_model(
         self: Self, command: RegisterModel
     ) -> VersionNode[VersionValue]:
-        payload = command.payload
-        version = (
-            payload
-            if isinstance(payload, Versionable)
-            else self.adapter.versionable(payload)
-        )
+        version = self.adapter.versionable(command.payload)
+        if command.mode is ModelRegistrationMode.STRICT:
+            return self.registry.store_model(version)
+        return self.registry.reconcile_model(version)
+
+    def _register_version(
+        self: Self, command: RegisterVersion
+    ) -> VersionNode[VersionValue]:
+        version = command.payload
         if command.mode is ModelRegistrationMode.STRICT:
             return self.registry.store_model(version)
         return self.registry.reconcile_model(version)
@@ -240,9 +246,15 @@ class Engine(Generic[VersionValue]):
         return spec.func
 
     def store_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
+        if isinstance(payload, VersionNode):
+            return self.register(RegisterVersion(payload, ModelRegistrationMode.STRICT))
         return self.register(RegisterModel(payload, ModelRegistrationMode.STRICT))
 
     def reconcile_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
+        if isinstance(payload, VersionNode):
+            return self.register(
+                RegisterVersion(payload, ModelRegistrationMode.RECONCILE)
+            )
         return self.register(RegisterModel(payload, ModelRegistrationMode.RECONCILE))
 
     def validate(self: Self, key: Comparable[VersionValue] | None = None) -> None:

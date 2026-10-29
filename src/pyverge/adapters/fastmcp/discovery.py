@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, Any, cast
 from pyverge.core.types import (
     Attachable,
 )
-from pyverge.discovery import RegisterModel, RegistrationCollector
+from pyverge.discovery import (
+    RegisterModel,
+    RegisterVersion,
+    RegistrationCollector,
+)
 from pyverge.manager import Manager
 from pyverge.registry.errors import MissingReferenceError, ModelConflictError
 
@@ -84,7 +88,7 @@ class FastMCPDiscovery:
             try:
                 self._manager.engine.register(command)
             except ModelConflictError as error:
-                if not isinstance(command, RegisterModel):
+                if not isinstance(command, (RegisterModel, RegisterVersion)):
                     raise
                 raise ModelConflictError(
                     error.catalog_name,
