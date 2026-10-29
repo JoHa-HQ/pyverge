@@ -15,7 +15,6 @@ from typing import (
 from pyverge.core.types import (
     MigrationFunc,
     ModelData,
-    ModelHandle,
     ModelKind,
     VersionValue_co,
 )
@@ -245,14 +244,11 @@ VersionPair = tuple[Comparable[VersionValue_co], Comparable[VersionValue_co]]
 LookupKey = Versionable[VersionValue_co] | Migratable[VersionValue_co]
 MigrationHookMap: TypeAlias = dict[Migratable, list["Attachable"]]
 
-#: Public manager inputs before normalization.
-NodeInput: TypeAlias = Union[ModelHandle, "VersionKey", "VersionNode"]
-
-#: Normalized entries accepted by the engine and registry.
+#: Normalized node entries accepted by the engine and registry.
 NodeEntry: TypeAlias = Union["VersionKey", "VersionNode"]
 
-#: Normalized migration entries accepted by the engine and registry.
-MigrationEntry: TypeAlias = Union["EdgeKey", "VersionEdge"]
+#: Normalized edge entries accepted by the engine and registry.
+EdgeEntry: TypeAlias = Union["EdgeKey", "VersionEdge"]
 
 
 __all__ = [
@@ -264,17 +260,16 @@ __all__ = [
     "DiffProvider",
     "DiffRenderer",
     "Diffable",
+    "EdgeEntry",
     "Fingerprintable",
     "KeyRef",
     "LookupKey",
     "Migratable",
-    "MigrationEntry",
     "MigrationHookMap",
     "MigrationKey",
     "ModelRefProvider",
     "NodeEntry",
     "NodeIdentifiable",
-    "NodeInput",
     "Orderable",
     "Transitional",
     "VersionPair",

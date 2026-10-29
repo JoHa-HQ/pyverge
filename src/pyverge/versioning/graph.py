@@ -12,7 +12,7 @@ from pyverge.core.types import (
 )
 
 from .canonical import ContentHasher
-from .errors import MigrationApplicationError
+from .errors import MigrationApplicationError, NodeConflictError
 from .identity import EdgeKey, NodeId, VersionKey
 from .schema import (
     FieldDescriptor,
@@ -48,6 +48,10 @@ class VersionNode(VersionKey[VersionValue]):
         return self.descriptor.ref
 
     @property
+    def is_model(self) -> bool:
+        return True
+
+    @property
     def model_id(self) -> str:
         return self.descriptor.ref.model_id
 
@@ -58,6 +62,13 @@ class VersionNode(VersionKey[VersionValue]):
     @property
     def fields(self) -> frozenset[str]:
         return frozenset(self.descriptor.fields)
+
+    def reconcile(self, existing: VersionKey[VersionValue]) -> VersionKey[VersionValue]:
+        if not existing.is_model:
+            return self
+        if self.fields != existing.fields:
+            raise NodeConflictError(existing, self)
+        return existing
 
     def with_descriptor(self, descriptor: ModelDescriptor) -> Self:
         return type(self)(
@@ -138,6 +149,10 @@ class VersionEdge(EdgeKey[VersionValue]):
     @property
     def id(self) -> VersionEdge[VersionValue]:
         return self
+
+    @property
+    def is_executable(self) -> bool:
+        return True
 
     @property
     def modelrefs(self) -> tuple[ModelRef, ModelRef]:

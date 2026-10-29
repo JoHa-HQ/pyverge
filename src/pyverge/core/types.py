@@ -24,6 +24,7 @@ if TYPE_CHECKING:
         Comparable,
         EdgeKey,
         VersionEdge,
+        VersionKey,
         VersionNode,
     )
 
@@ -101,6 +102,9 @@ class ModelPair(NamedTuple):
 
 #: How a registration handles an existing graph entry.
 RegistrationMode: TypeAlias = Literal["strict", "reconcile"]
+
+#: Public node inputs accepted by the manager before normalization.
+NodeInput: TypeAlias = Union[ModelHandle, "VersionKey", "VersionNode"]
 
 #: Accepted migration-key shapes for the manager's registration methods.
 MigrationKeyInput: TypeAlias = Union[

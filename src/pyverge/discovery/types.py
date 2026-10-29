@@ -12,13 +12,18 @@ from typing import (
 )
 
 from pyverge.core.clock import Clock
-from pyverge.core.types import MigrationFunc, MigrationKeyInput, RegistrationMode
+from pyverge.core.types import (
+    MigrationFunc,
+    MigrationKeyInput,
+    NodeInput,
+    RegistrationMode,
+)
 from pyverge.discovery.commands import (
     RegisterMigration,
     RegisterModel,
     RegisterVersion,
 )
-from pyverge.versioning import MigrationEntry, NodeEntry, NodeInput
+from pyverge.versioning import EdgeEntry, NodeEntry
 
 if TYPE_CHECKING:
     from pyverge.discovery.commands import MigrationSpec
@@ -54,7 +59,7 @@ class RegistrationSink(Protocol):
         *,
         backward_compatible: bool = False,
         migration_id: str | None = None,
-    ) -> MigrationEntry: ...
+    ) -> EdgeEntry: ...
 
 
 @runtime_checkable

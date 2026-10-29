@@ -212,6 +212,9 @@ class CompositeDiffDiscovery(Generic[VersionValue]):
     ) -> Diff[VersionValue]:
         if isinstance(migration, JsonPatch):
             return self._json_patch.discover(migration, source, target)
+        patch = getattr(migration, "patch", None)
+        if isinstance(patch, JsonPatch):
+            return self._json_patch.discover(patch, source, target)
         return self._callable.discover(migration, source, target)
 
 

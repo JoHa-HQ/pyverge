@@ -25,7 +25,7 @@ class JgfImporter:
     ) -> JgfGraph:
         graph = JgfGraph.from_dict(document)
         for node in graph.nodes:
-            models.store_model(self._node_resolver.resolve(node))
+            models.store(self._node_resolver.resolve(node))
         if graph.edges:
             if migrations is None or edge_resolver is None:
                 raise ValueError(

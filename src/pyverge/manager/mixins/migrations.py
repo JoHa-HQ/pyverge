@@ -41,7 +41,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         cls: type[Manager[VersionValue]],
         func: JsonPatchMigration,
     ) -> MigrationFunc:
-        return func.patch
+        return cast(MigrationFunc, func)
 
     @_resolve_migration.register(JsonataMigration)
     @classmethod
@@ -49,7 +49,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         cls: type[Manager[VersionValue]],
         func: JsonataMigration,
     ) -> MigrationFunc:
-        return func.migration
+        return cast(MigrationFunc, func)
 
     @hybridmethod
     @singledispatchmethod

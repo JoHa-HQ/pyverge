@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
@@ -185,7 +185,10 @@ class LookupMixin(Generic[VersionValue]):
                 engine.registry.get_migration_by_edge(EdgeKey.from_pair(src, dst))
                 for src, dst in path
             ]
-        return engine.registry[type(self)._normalize_index(index, engine=engine)]
+        return cast(
+            "VersionNode[VersionValue] | Migratable | list[Migratable]",
+            engine.registry[type(self)._normalize_index(index, engine=engine)],
+        )
 
     def migration_path(
         self: Manager[VersionValue],

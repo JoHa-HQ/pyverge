@@ -52,7 +52,7 @@ def _add_age():
             "to": "2.0.0",
             "ops": [{"op": "add", "path": "/age", "value": None}],
         }
-    ).patch
+    )
 
 
 ADAPTERS = [
@@ -189,7 +189,7 @@ def test_reconstructs_missing_model_on_store_migration(
                 "to": "2.0.0",
                 "ops": [{"op": "add", "path": "/age", "value": None}],
             }
-        ).patch,
+        ),
     )
     reconstructed = engine.get_model(meta)
 

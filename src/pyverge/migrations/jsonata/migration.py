@@ -101,6 +101,9 @@ class JsonataMigration:
     def _(cls, spec: Mapping[str, Any]) -> Self:
         return cls.from_spec(spec)
 
-    @property
-    def migration(self) -> JsonataTransform:
-        return self._migration
+    def __call__(
+        self,
+        data: ModelData,
+        context: MigrationContext | None = None,
+    ) -> ModelData:
+        return self._migration(data, context)

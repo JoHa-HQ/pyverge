@@ -85,7 +85,7 @@ migration = JsonataMigration.from_spec(
     }
 )
 
-result = migration.migration(payload, context={...})
+result = migration(payload, context={...})
 ```
 
 Factories:

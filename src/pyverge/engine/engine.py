@@ -10,6 +10,7 @@ from pyverge.core.types import (
     MigrationFunc,
     ModelHandle,
     ModelKind,
+    RegistrationMode,
     VersionMissingStrategy,
     VersionValue,
 )
@@ -51,6 +52,7 @@ from pyverge.versioning import (
     Comparable,
     EdgeKey,
     Migratable,
+    NodeEntry,
     Transitional,
     Versionable,
     VersionEdge,
@@ -159,7 +161,10 @@ class Engine(Generic[VersionValue]):
     def __getitem__(
         self, index: Any
     ) -> Versionable[VersionValue] | Migratable[VersionValue]:
-        return self.registry[index]
+        return cast(
+            "Versionable[VersionValue] | Migratable[VersionValue]",
+            self.registry[index],
+        )
 
     def register(self: Self, command: RegistrationCommand) -> Any:
         """Execute one registration command."""
@@ -175,17 +180,13 @@ class Engine(Generic[VersionValue]):
         self: Self, command: RegisterModel
     ) -> VersionNode[VersionValue]:
         version = self.adapter.versionable(command.payload)
-        if command.mode is ModelRegistrationMode.STRICT:
-            return self.registry.store_model(version)
-        return self.registry.reconcile_model(version)
+        return self._store_node(version, mode=command.mode.value)
 
     def _register_version(
         self: Self, command: RegisterVersion
     ) -> VersionNode[VersionValue]:
         version = command.payload
-        if command.mode is ModelRegistrationMode.STRICT:
-            return self.registry.store_model(version)
-        return self.registry.reconcile_model(version)
+        return self._store_node(version, mode=command.mode.value)
 
     def _register_migration(self: Self, command: RegisterMigration) -> MigrationFunc:
         spec = command.spec
@@ -204,12 +205,12 @@ class Engine(Generic[VersionValue]):
             resolved_from = self.reflector.materialize_missing(
                 resolved_to, v_from, spec.func
             )
-            self.registry.store_model(resolved_from)
+            self._store_node(resolved_from, mode="strict")
         if resolved_to is None:
             resolved_to = self.reflector.materialize_missing(
                 resolved_from, v_to, spec.func
             )
-            self.registry.store_model(resolved_to)
+            self._store_node(resolved_to, mode="strict")
         if not self.registry.is_adjacent(EdgeKey.from_pair(resolved_from, resolved_to)):
             raise CatalogError(
                 self.registry.name,
@@ -244,6 +245,19 @@ class Engine(Generic[VersionValue]):
             )
         )
         return spec.func
+
+    def _store_node(
+        self: Self,
+        version: NodeEntry,
+        *,
+        mode: RegistrationMode,
+    ) -> VersionNode[VersionValue]:
+        stored = (
+            self.registry.store(version)
+            if mode == "strict"
+            else self.registry.reconcile(version)
+        )
+        return cast("VersionNode[VersionValue]", stored)
 
     def store_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
         if isinstance(payload, VersionNode):
@@ -316,7 +330,7 @@ class Engine(Generic[VersionValue]):
         migration: JsonPatch | MigrationFunc,
     ) -> None:
         node = self.reflector.materialize_missing(anchor, target, migration)
-        self.registry.store_model(node)
+        self._store_node(node, mode="strict")
 
     def propose_migration(
         self: Self,

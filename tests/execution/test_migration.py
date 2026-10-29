@@ -50,7 +50,7 @@ from tests.utils import envelope_model, meta_versionable
 
 
 def _migrate(ops: list[dict], data: dict) -> dict:
-    return JsonPatchMigration({"from": "0.1.0", "to": "0.2.0", "ops": ops}).patch(data)
+    return JsonPatchMigration({"from": "0.1.0", "to": "0.2.0", "ops": ops})(data)
 
 
 class TestCoreOps:
@@ -251,7 +251,7 @@ class TestCompiler:
         )
         context = MigrationContext.create({"tenant": "t"})
 
-        assert migration.patch({"name": "Alice"}, context) == {
+        assert migration({"name": "Alice"}, context) == {
             "name": "Alice",
             "age": 3,
         }
@@ -697,7 +697,7 @@ class TestJsonataMigration:
         )
         context = MigrationContext.create({"tenant": "tenant_99"})
 
-        result = migration.migration(
+        result = migration(
             {"kind": "User", "version": "1.0.0", "email": "A@B.COM"},
             context,
         )
@@ -728,7 +728,7 @@ class TestJsonataMigration:
         )
 
         with pytest.raises(TypeError, match="JSON object"):
-            migration.migration({"kind": "User", "version": "1.0.0"})
+            migration({"kind": "User", "version": "1.0.0"})
 
 
 def test_version_edge_wraps_migration_failure() -> None:

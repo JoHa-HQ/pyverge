@@ -948,7 +948,7 @@ class TestReflection:
                     "to": "2.0.0",
                     "ops": [{"op": "add", "path": "/age", "value": None}],
                 }
-            ).patch,
+            ),
         )
 
         reconstructed = engine.get_model(meta)

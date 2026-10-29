@@ -422,8 +422,8 @@ class TestModel:
         The fixture already registered *model*.
         """
         with pytest.raises(ModelAlreadyRegisteredError, match="already registered"):
-            registry.store_model(
-                envelope_model(model_adapter, versioning_settings, model)
+            registry.store(
+                envelope_model(model_adapter, versioning_settings, model),
             )
 
     @pytest.mark.parametrize(
@@ -2252,7 +2252,7 @@ class TestReferences:
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
         for child in children:
-            registry.store_model(model_adapter.versionable(child))
+            registry.store(model_adapter.versionable(child))
         assert registry.missing_references(node) == frozenset()
 
     @pytest.mark.parametrize(
@@ -2313,7 +2313,7 @@ class TestReferences:
     ) -> None:
         """Registering one ``Address`` version leaves the other two missing."""
         node = envelope_model(model_adapter, versioning_settings, model)
-        registry.store_model(model_adapter.versionable(one_child))
+        registry.store(model_adapter.versionable(one_child))
         assert registry.missing_references(cast(types.Comparable, node)) == frozenset(
             {
                 NodeId("", "Address", semver.Version(2, 0, 0)),
@@ -2432,7 +2432,7 @@ class TestNeutralGraphOps:
         registry: Registry[types.VersionValue],
         model: ModelHandle,
     ) -> None:
-        again = registry.reconcile_model(
+        again = registry.reconcile(
             envelope_model(model_adapter, versioning_settings, model)
         )
         assert registry.get_model(again) is again
@@ -2461,7 +2461,7 @@ class TestNeutralGraphOps:
             FieldDescriptor(name="extra", type_ref=TypeRef.any())
         )
         with pytest.raises(ModelConflictError):
-            registry.reconcile_model(incoming)
+            registry.reconcile(incoming)
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model",
@@ -2623,7 +2623,7 @@ def test_catalog_exports_jgf_and_imports_nodes(
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_catalog_lock_freezes_writes(
+def test_catalog_lock_returns_frozen_view(
     model_adapter: types.ModelAdapter,
     registry: Registry[types.VersionValue],
     models: list[ModelHandle],
@@ -2635,10 +2635,9 @@ def test_catalog_lock_freezes_writes(
         exporter.export_graph(snapshot).to_dict()
         == exporter.export_graph(registry).to_dict()
     )
+    registry.reconcile(model_adapter.versionable(models[0]))
     with pytest.raises(GraphLockedError):
-        registry.store_model(model_adapter.versionable(models[0]))
-    with pytest.raises(GraphLockedError):
-        snapshot.store_model(model_adapter.versionable(models[0]))
+        snapshot.store(model_adapter.versionable(models[0]))
 
 
 @pytest.mark.parametrize(
@@ -2669,7 +2668,7 @@ def test_content_hash_index_tracks_registration(
     )
     nodes = [model_adapter.versionable(model) for model in models]
     for node in nodes:
-        catalog.store_model(node)
+        catalog.store(node)
 
     edge = edge_from_models(
         model_adapter,
@@ -2763,7 +2762,7 @@ def _extractor() -> tuple[
         codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
     )
     registry = Registry[semver.Version](hasher=default_content_hasher())
-    registry.store_model(adapter.versionable(Leaf))
+    registry.store(adapter.versionable(Leaf))
     return registry, adapter, CompositeExtractor(registry, adapter=adapter)
 
 
@@ -2844,8 +2843,8 @@ def test_public_registry_error_paths(
 
     source = envelope_model(model_adapter, versioning_settings, UserV1)
     target = envelope_model(model_adapter, versioning_settings, UserV2)
-    registry.store_model(source)
-    registry.store_model(target)
+    registry.store(source)
+    registry.store(target)
     registry.store_migration(
         edge_from_models(
             model_adapter,
@@ -2891,14 +2890,14 @@ def test_registry_requires_bound_namespace() -> None:
             namespace="orders", version_property="version", kind_property="kind"
         )
     )
-    stored = registry.store_model(adapter.versionable(UserV1))
+    stored = registry.store(adapter.versionable(UserV1))
 
     assert stored.namespace == "orders"
     assert registry.namespace == "orders"
     assert registry.get_model(stored).namespace == "orders"
 
 
-def test_registry_rejects_foreign_namespace(
+def test_registry_accepts_entry_namespace_as_identity(
     model_adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
 ) -> None:
@@ -2912,8 +2911,10 @@ def test_registry_rejects_foreign_namespace(
         UserV1,
     ).with_namespace("billing")
 
-    with pytest.raises(CatalogError, match="expected 'orders'"):
-        registry.store_model(foreign)
+    stored = registry.store(foreign)
+
+    assert stored.namespace == "billing"
+    assert registry.has_entry(foreign)
 
 
 def test_registries_isolate_identical_kind_versions() -> None:
@@ -2930,7 +2931,7 @@ def test_registries_isolate_identical_kind_versions() -> None:
             namespace="orders", version_property="version", kind_property="kind"
         )
     )
-    first.store_model(adapter.versionable(UserV1))
+    first.store(adapter.versionable(UserV1))
 
     assert first.has_model(NodeId("orders", "User", semver.Version(1, 0, 0)))
     assert not second.has_model(NodeId("billing", "User", semver.Version(1, 0, 0)))
@@ -2947,7 +2948,7 @@ def test_jgf_export_prefixes_namespace() -> None:
             namespace="orders", version_property="version", kind_property="kind"
         )
     )
-    registry.store_model(adapter.versionable(UserV1))
+    registry.store(adapter.versionable(UserV1))
 
     document = JgfExporter(default_content_hasher()).export_graph(registry).to_dict()
     assert set(document["graph"]["nodes"]) == {"orders:User@1.0.0"}

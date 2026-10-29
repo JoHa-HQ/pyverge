@@ -1,7 +1,9 @@
 import bisect
 from collections import defaultdict
+from collections.abc import Mapping
 from itertools import chain
-from typing import Generic, Self, cast
+from types import MappingProxyType
+from typing import Generic, NoReturn, Self, cast
 
 from pyverge.core.types import (
     Attachable,
@@ -22,13 +24,17 @@ from pyverge.registry.errors import (
 from pyverge.versioning import (
     Comparable,
     ContentHasher,
+    EdgeEntry,
     EdgeKey,
     Migratable,
     ModelRef,
+    NodeEntry,
     NodeId,
     Transitional,
+    VersionEdge,
     VersionNode,
 )
+from pyverge.versioning.errors import NodeConflictError
 
 
 class InMemoryCatalog(Generic[VersionValue]):
@@ -62,8 +68,8 @@ class InMemoryCatalog(Generic[VersionValue]):
     >>> registry = Registry[semver.Version](hasher=default_content_hasher())
     >>> v1 = adapter.versionable(UserV1)
     >>> v2 = adapter.versionable(UserV2)
-    >>> _ = registry.store_model(v1)
-    >>> _ = registry.store_model(v2)
+    >>> _ = registry.store(v1, mode="strict")
+    >>> _ = registry.store(v2, mode="strict")
     >>> registry.get_model(v1).model_id == "tests.UserV1"
     True
     >>> registry.latest("User").model_id == "tests.UserV2"
@@ -81,22 +87,17 @@ class InMemoryCatalog(Generic[VersionValue]):
         self._name = name or "registry"
         self._namespace = namespace
         self._hasher = hasher
-        self._locked = False
         self._index_content_hashes = index_content_hashes
         self._content_hash_index: dict[str, EdgeKey[VersionValue]] | None = (
             {} if index_content_hashes else None
         )
-        self._by_versions: list[VersionNode[VersionValue]] = []
-        self._by_kinds: dict[ModelKind, list[VersionNode[VersionValue]]] = defaultdict(
-            list
-        )
+        self._by_versions: list[NodeEntry] = []
+        self._by_kinds: dict[ModelKind, list[NodeEntry]] = defaultdict(list)
         self._by_models: dict[ModelRef, VersionNode[VersionValue]] = {}
-        self._migrations: dict[ModelKind, list[Migratable[VersionValue]]] = defaultdict(
-            list
+        self._migrations: dict[ModelKind, list[EdgeEntry]] = defaultdict(list)
+        self._edges_by_version: dict[Comparable[VersionValue], set[EdgeEntry]] = (
+            defaultdict(set)
         )
-        self._edges_by_version: dict[
-            Comparable[VersionValue], set[Migratable[VersionValue]]
-        ] = defaultdict(set)
         self._hooks: dict[Transitional[VersionValue], list[Attachable]] = defaultdict(
             list
         )
@@ -104,24 +105,30 @@ class InMemoryCatalog(Generic[VersionValue]):
     def __contains__(self, index: object) -> bool:
         try:
             if isinstance(index, Comparable):
-                return self.has_model(index)
+                return self.has_entry(index)
             if isinstance(index, Transitional):
-                return self.has_migration(index)
+                return self.has_edge(EdgeKey.from_pair(*index.key))
         except (ModelNotFoundError, MigrationNotFoundError, TypeError):
             return False
         raise CatalogError(self._name, f"Unsupported index type: {type(index)}")
 
-    def __getitem__(
-        self, index: object
-    ) -> VersionNode[VersionValue] | Migratable[VersionValue]:
+    def __getitem__(self, index: object) -> NodeEntry | EdgeEntry:
         if isinstance(index, Comparable):
-            return self.get_model(index)
+            return self.get_entry(index)
         if isinstance(index, Transitional):
-            return self.get_migration(index)
+            return self.get_edge(EdgeKey.from_pair(*index.key))
         raise CatalogError(self._name, f"Unsupported index type: {type(index)}")
 
     @property
     def versions(self: Self) -> list[VersionNode[VersionValue]]:
+        return [
+            cast("VersionNode[VersionValue]", entry)
+            for entry in self._by_versions
+            if entry.is_model
+        ]
+
+    @property
+    def entries(self: Self) -> list[NodeEntry]:
         return self._by_versions
 
     @property
@@ -133,6 +140,10 @@ class InMemoryCatalog(Generic[VersionValue]):
         return self._namespace
 
     @property
+    def content_hashes(self: Self) -> Mapping[str, EdgeKey[VersionValue]]:
+        return MappingProxyType(dict(self._content_hash_index or {}))
+
+    @property
     def kinds(self: Self) -> list[ModelKind]:
         return list(self._migrations.keys())
 
@@ -142,9 +153,10 @@ class InMemoryCatalog(Generic[VersionValue]):
 
     @property
     def latest_version(self) -> VersionNode[VersionValue]:
-        if not self._by_versions:
+        versions = self.versions
+        if not versions:
             raise CatalogError(self._name, "No versions registered")
-        return self._by_versions[-1]
+        return versions[-1]
 
     def is_adjacent(self, key: Transitional[VersionValue]) -> bool:
         kind_versions = self._by_kinds[key.kind]
@@ -155,17 +167,42 @@ class InMemoryCatalog(Generic[VersionValue]):
     def models(self: Self, kind: ModelKind | None) -> frozenset[ModelRef]:
         if kind is None:
             return frozenset(self._by_models)
-        return frozenset(v.descriptor.ref for v in self._by_kinds.get(kind, []))
+        return frozenset(
+            cast("ModelRef", entry.modelref)
+            for entry in self._by_kinds.get(kind, [])
+            if entry.modelref is not None
+        )
 
     def migrations(self: Self, kind: ModelKind) -> list[Migratable[VersionValue]]:
-        return self._migrations.get(kind, [])
+        return [
+            cast("Migratable[VersionValue]", entry)
+            for entry in self._migrations.get(kind, [])
+            if entry.is_executable
+        ]
+
+    def edges(self: Self, kind: ModelKind) -> list[EdgeEntry]:
+        return list(self._migrations.get(kind, []))
 
     def migrations_of(
         self: Self, key: Comparable[VersionValue]
     ) -> frozenset[Migratable[VersionValue]]:
+        return frozenset(
+            cast("Migratable[VersionValue]", edge)
+            for edge in self._edges_by_version.get(key, ())
+            if edge.is_executable
+        )
+
+    def edges_of(self: Self, key: Comparable[VersionValue]) -> frozenset[EdgeEntry]:
         return frozenset(self._edges_by_version.get(key, ()))
 
     def kind_versions(self: Self, kind: ModelKind) -> list[VersionNode[VersionValue]]:
+        return [
+            cast("VersionNode[VersionValue]", entry)
+            for entry in self._by_kinds.get(kind, [])
+            if entry.is_model
+        ]
+
+    def kind_entries(self: Self, kind: ModelKind) -> list[NodeEntry]:
         return list(self._by_kinds.get(kind, []))
 
     def has_model(self: Self, key: Comparable) -> bool:
@@ -201,7 +238,7 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         kind: ModelKind,
         pair: tuple[NodeId[VersionValue], NodeId[VersionValue]],
-    ) -> Migratable[VersionValue]:
+    ) -> EdgeEntry:
         edges = self._migrations.get(kind, [])
         key = EdgeKey.from_pair(*pair)
         idx = bisect.bisect_left(edges, key)
@@ -211,8 +248,7 @@ class InMemoryCatalog(Generic[VersionValue]):
 
     def has_migration(self: Self, key: Transitional[VersionValue]) -> bool:
         try:
-            self._find_edge(key.kind, key.key)
-            return True
+            return self._find_edge(key.kind, key.key).is_executable
         except MigrationNotFoundError:
             return False
 
@@ -226,20 +262,25 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         key: Transitional[VersionValue],
     ) -> Migratable[VersionValue]:
-        return self._find_edge(key.kind, key.key)
+        edge = self._find_edge(key.kind, key.key)
+        if not edge.is_executable:
+            raise MigrationNotFoundError(self._name, key.key)
+        return cast("Migratable[VersionValue]", edge)
 
     def has_hooks(self: Self, key: Transitional[VersionValue]) -> bool:
         return key in self._hooks
 
     def latest(self: Self, kind: ModelKind) -> VersionNode[VersionValue]:
-        if kind not in self._by_kinds:
+        versions = self.kind_versions(kind)
+        if not versions:
             raise CatalogError(self._name, "No versions registered")
-        return self._by_kinds[kind][-1]
+        return versions[-1]
 
     def earliest(self: Self, kind: ModelKind) -> VersionNode[VersionValue]:
-        if kind not in self._by_kinds:
+        versions = self.kind_versions(kind)
+        if not versions:
             raise CatalogError(self._name, "No versions registered")
-        return self._by_kinds[kind][0]
+        return versions[0]
 
     def hooks(self: Self, key: Transitional | None = None) -> list[Attachable]:
         if key is None:
@@ -256,103 +297,153 @@ class InMemoryCatalog(Generic[VersionValue]):
                 index_content_hashes=self._index_content_hashes,
             ),
         )
-        new._by_versions = list(self._by_versions)
-        new._by_kinds = defaultdict(
-            list, {k: list(v) for k, v in self._by_kinds.items()}
-        )
-        new._by_models = dict(self._by_models)
-        new._migrations = defaultdict(
-            list, {k: list(v) for k, v in self._migrations.items()}
-        )
-        new._edges_by_version = defaultdict(
-            set, {v: set(s) for v, s in self._edges_by_version.items()}
-        )
-        new._hooks = defaultdict(list, {k: list(v) for k, v in self._hooks.items()})
-        if self._content_hash_index is not None:
-            new._content_hash_index = dict(self._content_hash_index)
+        new.copy_from(self)
         return new
 
-    def _ensure_mutable(self: Self, operation: str) -> None:
-        if self._locked:
-            raise GraphLockedError(self._name, operation)
+    def lock(self: Self) -> "FrozenCatalog[VersionValue]":
+        return self.snapshot()
 
-    def lock(self: Self) -> "InMemoryCatalog[VersionValue]":
-        self._locked = True
-        snapshot = self.copy()
-        snapshot._locked = True
+    def snapshot(self: Self) -> "FrozenCatalog[VersionValue]":
+        snapshot = FrozenCatalog[VersionValue](
+            name=self._name,
+            namespace=self._namespace,
+            hasher=self._hasher,
+            index_content_hashes=self._index_content_hashes,
+        )
+        snapshot.copy_from(self)
         return snapshot
 
-    def snapshot(self: Self) -> "InMemoryCatalog[VersionValue]":
-        snapshot = self.copy()
-        snapshot._locked = True
-        return snapshot
+    def copy_from(self: Self, source: "InMemoryCatalog[VersionValue]") -> None:
+        """Replace this catalog's stores with a copy of ``source``."""
+        self._by_versions = list(source._by_versions)
+        self._by_kinds = defaultdict(
+            list, {k: list(v) for k, v in source._by_kinds.items()}
+        )
+        self._by_models = dict(source._by_models)
+        self._migrations = defaultdict(
+            list, {k: list(v) for k, v in source._migrations.items()}
+        )
+        self._edges_by_version = defaultdict(
+            set, {v: set(s) for v, s in source._edges_by_version.items()}
+        )
+        self._hooks = defaultdict(list, {k: list(v) for k, v in source._hooks.items()})
+        if source._content_hash_index is not None:
+            self._content_hash_index = dict(source._content_hash_index)
 
     def find_edge_by_content_hash(self, value: str) -> EdgeKey[VersionValue] | None:
         if self._content_hash_index is None:
             return None
         return self._content_hash_index.get(value)
 
-    def store_model(
-        self: Self,
-        version: VersionNode[VersionValue],
-    ) -> VersionNode[VersionValue]:
-        self._ensure_mutable("store_model")
-        if version.namespace != self._namespace:
-            raise CatalogError(
-                self._name,
-                f"Model {version} belongs to namespace "
-                f"{version.namespace!r}, expected {self._namespace!r}",
-            )
-        if version in self._by_versions:
+    def store(self: Self, entry: NodeEntry) -> NodeEntry:
+        """Insert a new node entry; reject duplicates."""
+        if self.find_entry(entry) is not None:
             raise ModelAlreadyRegisteredError(
                 catalog_name=self._name,
-                version=version,
+                version=entry,
             )
-        modelref = getattr(version, "modelref", None)
-        if modelref is not None:
-            self._by_models[modelref] = version
-        bisect.insort_left(self._by_versions, version)
-        bisect.insort_left(self._by_kinds[version.kind], version)
-        return version
+        bisect.insort_left(self._by_versions, entry)
+        bisect.insort_left(self._by_kinds[entry.kind], entry)
+        if entry.modelref is not None:
+            self._by_models[cast("ModelRef", entry.modelref)] = cast(
+                "VersionNode[VersionValue]", entry
+            )
+        return entry
 
-    def reconcile_model(
-        self: Self,
-        version: VersionNode[VersionValue],
-    ) -> VersionNode[VersionValue]:
-        self._ensure_mutable("reconcile_model")
-        if version.namespace != self._namespace:
-            raise CatalogError(
-                self._name,
-                f"Model {version} belongs to namespace "
-                f"{version.namespace!r}, expected {self._namespace!r}",
-            )
+    def reconcile(self: Self, entry: NodeEntry) -> NodeEntry:
+        """Insert or reconcile an existing node entry."""
+        existing = self.find_entry(entry)
+        if existing is None:
+            return self.store(entry)
         try:
-            existing = self.get_model(version)
-        except ModelNotFoundError:
-            return self.store_model(version)
-        if existing.fields != version.fields:
+            resolved = entry.reconcile(existing)
+        except NodeConflictError as error:
             raise ModelConflictError(
                 self._name,
-                version,
+                entry,
                 existing.fields,
-                version.fields,
-            )
+                entry.fields,
+            ) from error
+        if resolved is not existing:
+            self.remove_entry(existing)
+            return self.store(resolved)
         return existing
+
+    def find_entry(self: Self, key: Comparable) -> NodeEntry | None:
+        idx = bisect.bisect_left(self._by_versions, key)
+        if idx < len(self._by_versions) and self._by_versions[idx] == key:
+            return self._by_versions[idx]
+        return None
+
+    def get_entry(self: Self, key: Comparable) -> NodeEntry:
+        if entry := self.find_entry(key):
+            return entry
+        raise ModelNotFoundError(self._name, key.version)
+
+    def has_entry(self: Self, key: Comparable) -> bool:
+        return self.find_entry(key) is not None
+
+    def remove_entry(self: Self, entry: NodeEntry) -> None:
+        """Remove a node entry and its conditional secondary indexes."""
+        idx = bisect.bisect_left(self._by_versions, entry)
+        if idx < len(self._by_versions) and self._by_versions[idx] == entry:
+            del self._by_versions[idx]
+        kind_entries = self._by_kinds[entry.kind]
+        idx = bisect.bisect_left(kind_entries, entry)
+        if idx < len(kind_entries) and kind_entries[idx] == entry:
+            del kind_entries[idx]
+        if entry.modelref is not None:
+            self._by_models.pop(cast("ModelRef", entry.modelref), None)
+
+    def store_edge(self: Self, entry: EdgeEntry) -> EdgeEntry:
+        """Store a full executable edge or a key-only edge entry."""
+        paths = self._migrations[entry.kind]
+        idx = bisect.bisect_left(paths, entry)
+        if idx < len(paths) and paths[idx] == entry:
+            existing = paths[idx]
+            if isinstance(existing, VersionEdge) and isinstance(entry, VersionEdge):
+                registered_hash = existing.content_hash(self._hasher)
+                incoming_hash = entry.content_hash(self._hasher)
+                if registered_hash != incoming_hash:
+                    raise MigrationConflictError(
+                        self._name,
+                        entry.key,
+                        registered_hash=registered_hash,
+                        incoming_hash=incoming_hash,
+                    )
+            return existing
+        bisect.insort(paths, entry)
+        self._edges_by_version[entry.source].add(entry)
+        self._edges_by_version[entry.target].add(entry)
+        if isinstance(entry, VersionEdge) and self._content_hash_index is not None:
+            edge_key = EdgeKey.from_version_edge(entry)
+            self._content_hash_index[entry.content_hash(self._hasher)] = edge_key
+        return entry
+
+    def has_edge(self: Self, key: EdgeKey[VersionValue]) -> bool:
+        paths = self._migrations.get(key.kind, [])
+        idx = bisect.bisect_left(paths, key)
+        return idx < len(paths) and paths[idx] == key
+
+    def get_edge(self: Self, key: EdgeKey[VersionValue]) -> EdgeEntry:
+        paths = self._migrations.get(key.kind, [])
+        idx = bisect.bisect_left(paths, key)
+        if idx < len(paths) and paths[idx] == key:
+            return paths[idx]
+        raise MigrationNotFoundError(self._name, key.key)
 
     def get_model(
         self: Self,
         key: Comparable,
     ) -> VersionNode[VersionValue]:
-        idx = bisect.bisect_left(self._by_versions, key)
-        if idx < len(self._by_versions) and (model := self._by_versions[idx]) == key:
-            return model
+        entry = self.find_entry(key)
+        if isinstance(entry, VersionNode):
+            return entry
         raise ModelNotFoundError(self._name, key.version)
 
     def find_model(self: Self, key: Comparable) -> VersionNode[VersionValue] | None:
-        idx = bisect.bisect_left(self._by_versions, key)
-        if idx < len(self._by_versions) and (model := self._by_versions[idx]) == key:
-            return model
-        return None
+        entry = self.find_entry(key)
+        return entry if isinstance(entry, VersionNode) else None
 
     def get_model_by_ref(self: Self, ref: ModelRef) -> VersionNode[VersionValue]:
         if target := self._by_models.get(ref):
@@ -360,7 +451,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         raise ModelNotFoundError(self._name, ref)
 
     def remove_model(self: Self, key: Comparable) -> None:
-        self._ensure_mutable("remove_model")
 
         version_idx = bisect.bisect_left(self._by_versions, key)
         kind_idx = bisect.bisect_left(self._by_kinds[key.kind], key)
@@ -387,13 +477,11 @@ class InMemoryCatalog(Generic[VersionValue]):
         del self._by_versions[version_idx]
 
     def remove_model_by_ref(self: Self, ref: ModelRef) -> None:
-        self._ensure_mutable("remove_model_by_ref")
         if ref not in self._by_models:
             raise ModelNotFoundError(self._name, ref)
         self.remove_model(self._by_models[ref])
 
     def clear_models(self: Self) -> None:
-        self._ensure_mutable("clear_models")
         if self._migrations:
             raise CatalogError(self._name, "Clear migrations first")
         self._by_versions.clear()
@@ -401,7 +489,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self._by_kinds.clear()
 
     def delete_kind(self: Self, kind: ModelKind) -> None:  # noqa: C901
-        self._ensure_mutable("delete_kind")
         versions = self.kind_versions(kind)
         if not versions:
             return
@@ -430,56 +517,27 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         key: Migratable[VersionValue],
     ) -> MigrationFunc:
-        self._ensure_mutable("store_migration")
+        if not isinstance(key, VersionEdge):
+            raise TypeError(
+                f"Executable migration requires VersionEdge, got {type(key)}"
+            )
         if any(v not in self._by_versions for v in key.key):
             raise MigrationNotFoundError(self._name, key.key)
-
-        paths = self._migrations.get(key.kind, [])
-
-        idx = bisect.bisect_left(paths, key)
-        if idx < len(paths) and paths[idx] == key:
-            existing = paths[idx]
-            registered_hash = existing.content_hash(self._hasher)
-            incoming_hash = key.content_hash(self._hasher)
-            if registered_hash == incoming_hash:
-                return existing.func
-            raise MigrationConflictError(
-                self._name,
-                key.key,
-                registered_hash=registered_hash,
-                incoming_hash=incoming_hash,
-            )
-
-        bisect.insort(self._migrations[key.kind], key)
-        self._edges_by_version[key.source].add(key)
-        self._edges_by_version[key.target].add(key)
-        if self._content_hash_index is not None:
-            edge_key = EdgeKey.from_version_edge(key)
-            self._content_hash_index[key.content_hash(self._hasher)] = edge_key
-        return key.func
+        stored = self.store_edge(key)
+        if not isinstance(stored, VersionEdge):
+            raise TypeError("stored edge is not executable")
+        return stored.func
 
     def get_migration(
         self,
         key: Transitional[VersionValue],
     ) -> Migratable[VersionValue]:
-        if key.kind not in self._migrations:
-            raise MigrationNotFoundError(self._name, key.key)
-
-        idx = bisect.bisect_left(self._migrations[key.kind], key)
-
-        if (
-            idx >= len(self._migrations[key.kind])
-            or self._migrations[key.kind][idx] != key
-        ):
-            raise MigrationNotFoundError(self._name, key.key)
-
-        return self._migrations[key.kind][idx]
+        return self.get_migration_by_edge(key)
 
     def remove_migration(
         self: Self,
         key: Transitional[VersionValue],
     ) -> None:
-        self._ensure_mutable("remove_migration")
         if key in self._hooks:
             raise CatalogError(
                 self._name,
@@ -496,7 +554,9 @@ class InMemoryCatalog(Generic[VersionValue]):
             del self._migrations[key.kind][idx]
             if not self._migrations[key.kind]:
                 del self._migrations[key.kind]
-            if self._content_hash_index is not None:
+            if self._content_hash_index is not None and isinstance(
+                existing, VersionEdge
+            ):
                 self._content_hash_index.pop(existing.content_hash(self._hasher), None)
             for endpoint in (key.source, key.target):
                 bucket = self._edges_by_version.get(endpoint)
@@ -507,7 +567,6 @@ class InMemoryCatalog(Generic[VersionValue]):
                     del self._edges_by_version[endpoint]
 
     def clear_migrations(self: Self) -> None:
-        self._ensure_mutable("clear_migrations")
         self.clear_hooks()
         self._migrations.clear()
         self._edges_by_version.clear()
@@ -570,7 +629,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         from_version: Comparable[VersionValue],
         to_version: Comparable[VersionValue],
     ) -> None:
-        self._ensure_mutable("remove_migration_range")
         kind_versions = self.kind_versions(from_version.kind)
         lo = bisect.bisect_left(kind_versions, from_version)
         hi = bisect.bisect_left(kind_versions, to_version)
@@ -603,7 +661,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         key: Transitional[VersionValue],
         hook: Attachable,
     ) -> None:
-        self._ensure_mutable("add_hook")
         self._hooks[key].append(hook)
 
     def get_hooks(
@@ -617,7 +674,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         key: Transitional[VersionValue],
         hook: Attachable | None = None,
     ) -> None:
-        self._ensure_mutable("remove_hook")
         if key not in self._hooks:
             raise CatalogError(self._name, f"No hooks registered for migration {key}")
 
@@ -634,7 +690,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self,
         key: Transitional[VersionValue] | None = None,
     ) -> None:
-        self._ensure_mutable("clear_hooks")
         if key is None:
             [hooks.clear() for hooks in self._hooks.values()]
             self._hooks.clear()
@@ -648,6 +703,70 @@ class InMemoryCatalog(Generic[VersionValue]):
         else:
             self._hooks[key].clear()
             del self._hooks[key]
+
+
+class FrozenCatalog(InMemoryCatalog[VersionValue]):
+    """Immutable compiled graph view over a registry snapshot."""
+
+    def _deny(self: Self, operation: str) -> NoReturn:
+        raise GraphLockedError(self._name, operation)
+
+    def store(self: Self, entry: NodeEntry) -> NodeEntry:
+        self._deny("store")
+
+    def reconcile(self: Self, entry: NodeEntry) -> NodeEntry:
+        self._deny("reconcile")
+
+    def remove_entry(self: Self, entry: NodeEntry) -> None:
+        self._deny("remove_entry")
+
+    def store_edge(self: Self, entry: EdgeEntry) -> EdgeEntry:
+        self._deny("store_edge")
+
+    def store_migration(self: Self, key: Migratable[VersionValue]) -> MigrationFunc:
+        self._deny("store_migration")
+
+    def remove_model(self: Self, key: Comparable) -> None:
+        self._deny("remove_model")
+
+    def remove_model_by_ref(self: Self, ref: ModelRef) -> None:
+        self._deny("remove_model_by_ref")
+
+    def clear_models(self: Self) -> None:
+        self._deny("clear_models")
+
+    def delete_kind(self: Self, kind: ModelKind) -> None:
+        self._deny("delete_kind")
+
+    def remove_migration(self: Self, key: Transitional[VersionValue]) -> None:
+        self._deny("remove_migration")
+
+    def clear_migrations(self: Self) -> None:
+        self._deny("clear_migrations")
+
+    def remove_migration_range(
+        self: Self,
+        from_version: Comparable[VersionValue],
+        to_version: Comparable[VersionValue],
+    ) -> None:
+        self._deny("remove_migration_range")
+
+    def add_hook(
+        self: Self,
+        key: Transitional[VersionValue],
+        hook: Attachable,
+    ) -> None:
+        self._deny("add_hook")
+
+    def remove_hook(
+        self: Self,
+        key: Transitional[VersionValue],
+        hook: Attachable | None = None,
+    ) -> None:
+        self._deny("remove_hook")
+
+    def clear_hooks(self: Self, key: Transitional[VersionValue] | None = None) -> None:
+        self._deny("clear_hooks")
 
 
 #: Backward-compatible name for the in-memory catalog.

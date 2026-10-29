@@ -14,6 +14,7 @@ from .errors import (
     SyncExecutionRequired,
 )
 from .extractors import CompositeExtractor, ContainerExtractor, SchemaFieldsExtractor
+from .graph import MigrationGraph
 from .hooks import MigrationHook, OpenLineageHook, OTELHook
 from .middleware import (
     AuditEvent,
@@ -83,6 +84,7 @@ __all__ = [
     "IdempotencyKeyFactory",
     "IdempotencyMiddleware",
     "IdempotencyStore",
+    "MigrationGraph",
     "MigrationHook",
     "OTELHook",
     "OpenLineageHook",

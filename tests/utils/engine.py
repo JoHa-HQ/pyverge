@@ -86,7 +86,7 @@ def register_models(
     *models: ModelHandle,
 ) -> None:
     for model_cls in models:
-        registry.store_model(adapter.versionable(model_cls))
+        registry.store(adapter.versionable(model_cls))
 
 
 _Migration = tuple[tuple[type[ModelHandle], ...], MigrationFunc]

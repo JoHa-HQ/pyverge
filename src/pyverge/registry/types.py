@@ -6,11 +6,14 @@ from pyverge.core.types import (
     Attachable,
     ModelKind,
     VersionValue,
+    VersionValue_co,
 )
 from pyverge.versioning import (
+    EdgeEntry,
     EdgeKey,
     Migratable,
     ModelRef,
+    NodeEntry,
     NodeId,
     Transitional,
     VersionEdge,
@@ -78,15 +81,11 @@ class GraphCatalog(
     def snapshot(self) -> GraphCatalog[VersionValue]: ...
 
 
-class ModelWrite(Protocol[VersionValue]):
+class ModelWrite(Protocol[VersionValue_co]):
     """Write-side model capability."""
 
-    def store_model(
-        self, version: VersionNode[VersionValue]
-    ) -> VersionNode[VersionValue]: ...
-    def reconcile_model(
-        self, version: VersionNode[VersionValue]
-    ) -> VersionNode[VersionValue]: ...
+    def store(self, entry: NodeEntry) -> NodeEntry: ...
+    def reconcile(self, entry: NodeEntry) -> NodeEntry: ...
     def remove_model(self, key: Any) -> None: ...
     def remove_model_by_ref(self, ref: ModelRef) -> None: ...
     def clear_models(self) -> None: ...
@@ -95,6 +94,7 @@ class ModelWrite(Protocol[VersionValue]):
 class MigrationWrite(Protocol[VersionValue]):
     """Write-side migration capability."""
 
+    def store_edge(self, entry: EdgeEntry) -> EdgeEntry: ...
     def store_migration(self, key: VersionEdge[VersionValue]) -> Any: ...
     def remove_migration(self, key: Transitional) -> None: ...
     def remove_migration_range(

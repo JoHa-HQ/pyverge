@@ -156,6 +156,21 @@ class VersionKey(NodeId[VersionValue]):
     def key(self) -> VersionKey[VersionValue]:
         return self
 
+    @property
+    def modelref(self) -> object | None:
+        return None
+
+    @property
+    def is_model(self) -> bool:
+        return False
+
+    @property
+    def fields(self) -> frozenset[str]:
+        return frozenset()
+
+    def reconcile(self, existing: VersionKey[VersionValue]) -> VersionKey[VersionValue]:
+        return existing
+
     def __repr__(self) -> str:
         return (
             f"VersionKey[{self.strategy.__name__}]("
@@ -214,6 +229,10 @@ class EdgeKey(Generic[VersionValue]):
     @property
     def key(self) -> tuple[NodeId[VersionValue], NodeId[VersionValue]]:
         return self.source, self.target
+
+    @property
+    def is_executable(self) -> bool:
+        return False
 
     def _check(self, other: object) -> EdgeKey[Any]:
         if not isinstance(other, EdgeKey):
