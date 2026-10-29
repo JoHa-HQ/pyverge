@@ -33,7 +33,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
         return self.runtime.can_handle(container, fields=fields)
 
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        return self.runtime.materialize(container, data)
+        return self.runtime.instantiate(container, data)
 
     def dump(self, model: object) -> ModelData:
         return self.runtime.serialize(model)
@@ -70,7 +70,7 @@ class PydanticModelAdapter(AbstractModelAdapter):
             model_cls, provider=self.provider, codec=self.model_codec
         )
 
-    def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
+    def _materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
         return self.runtime.materialize_model(diff, codec=self.model_codec)
 
 

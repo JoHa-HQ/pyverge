@@ -363,8 +363,8 @@ def test_dataclass_describe_fields_and_materialize(
         fields=FrozenMap(),
         origin=DiffOrigin.SCHEMA,
     )
-    materialized = dataclass_adapter.materialize_model(diff)
-    node = dataclass_adapter.versionable(materialized)
+    node = dataclass_adapter.materialize(diff)
+    materialized = dataclass_adapter.resolve(node.descriptor.ref)
     assert node.kind == "Person"
     assert str(node.version) == "2.0.0"
     assert "name" in dataclass_adapter.fields(materialized)
@@ -391,7 +391,8 @@ def test_dataclass_materialize_with_added_and_defaulted_fields(
         ),
         origin=DiffOrigin.SCHEMA,
     )
-    materialized = dataclass_adapter.materialize_model(diff)
+    node = dataclass_adapter.materialize(diff)
+    materialized = dataclass_adapter.resolve(node.descriptor.ref)
     instance = materialized(zip="12345", country="DE")
     assert instance.zip == "12345"
     assert instance.country == "DE"

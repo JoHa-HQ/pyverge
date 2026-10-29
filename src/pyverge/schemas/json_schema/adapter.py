@@ -136,7 +136,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
         return self.runtime.can_handle(container, fields=fields)
 
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        return self.runtime.materialize(self._model(container), data)
+        return self.runtime.instantiate(self._model(container), data)
 
     def dump(self, model: object) -> ModelData:
         return self.runtime.serialize(model)
@@ -186,7 +186,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
     ):
         return super().versionable(self._model(model_cls), kind=kind, version=version)
 
-    def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
+    def _materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
         return self.runtime.materialize_model(diff, codec=self.model_codec)
 
 

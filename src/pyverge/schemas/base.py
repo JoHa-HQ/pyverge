@@ -68,7 +68,7 @@ class AbstractModelAdapter(Generic[VersionValue]):
     def materialize(self, diff: Diffable[VersionValue]) -> VersionNode[VersionValue]:
         if diff.source.version > diff.target.version:
             diff = diff.inverted()
-        return self.versionable(self.materialize_model(diff))
+        return self.versionable(self._materialize_model(diff))
 
     def diff(
         self,
@@ -123,7 +123,7 @@ class AbstractModelAdapter(Generic[VersionValue]):
     ) -> VersionKey[VersionValue]:
         return self.model_codec.version_key(kind=kind, version=version)
 
-    def materialize_model(self, diff: Diffable) -> ModelHandle:
+    def _materialize_model(self, diff: Diffable) -> ModelHandle:
         raise NotImplementedError
 
     def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:

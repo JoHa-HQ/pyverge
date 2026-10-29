@@ -153,7 +153,7 @@ class ModelRuntime(Protocol):
     def resolve(self, ref: ModelRef) -> ModelHandle: ...
     def model_id(self, handle: ModelHandle) -> str: ...
 
-    def materialize(
+    def instantiate(
         self, container: ModelHandle, data: ModelData, *, strict: bool = False
     ) -> Any: ...
     def serialize(self, model: object) -> ModelData: ...
@@ -235,7 +235,7 @@ class PythonModelRuntime:
             return f"{module}.{type(handle).__qualname__}"
         return f"{module}.{qualname}"
 
-    def materialize(
+    def instantiate(
         self, container: ModelHandle, data: ModelData, *, strict: bool = False
     ) -> Any:
         return self._adapter(container).validate_python(data, strict=strict)
@@ -248,7 +248,7 @@ class PythonModelRuntime:
     def validate(
         self, container: ModelHandle, data: ModelData, *, strict: bool = False
     ) -> ModelData:
-        return self.serialize(self.materialize(container, data, strict=strict))
+        return self.serialize(self.instantiate(container, data, strict=strict))
 
     def _adapter(self, container: ModelHandle) -> TypeAdapter[Any]:
         adapter = self._adapters.get(container)

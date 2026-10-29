@@ -114,11 +114,6 @@ class ModelAdapter(Protocol[VersionValue]):
         target: Comparable[VersionValue],
     ) -> Diff[VersionValue]: ...
 
-    def materialize_model(
-        self,
-        diff: Diffable[VersionValue],
-    ) -> ModelHandle: ...
-
     def materialize(
         self, diff: Diffable[VersionValue]
     ) -> VersionNode[VersionValue]: ...

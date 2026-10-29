@@ -153,7 +153,7 @@ class DataclassModelAdapter(AbstractModelAdapter):
                 self._collect_references(nested, found, seen)
 
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        return self.runtime.materialize(container, data)
+        return self.runtime.instantiate(container, data)
 
     def dump(self, model: object) -> ModelData:
         if not dataclasses.is_dataclass(model):
@@ -242,7 +242,7 @@ class DataclassModelAdapter(AbstractModelAdapter):
             )
         )
 
-    def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
+    def _materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
         anchor = self.runtime.resolve(diff.source.descriptor.ref)
         version = diff.target.version
         version_field = (
