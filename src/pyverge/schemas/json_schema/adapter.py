@@ -17,7 +17,7 @@ from pyverge.schemas.runtime import ModelRuntime
 from pyverge.versioning import Diffable, FieldDescriptor, NodeId
 
 
-class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
+class JsonSchemaModelAdapter(AbstractModelAdapter):
     """Adapter for JSON Schema documents, delegated through Pydantic."""
 
     provider = "json_schema"

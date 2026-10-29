@@ -6,7 +6,6 @@ from pyverge.core.types import (
     ModelData,
     ModelHandle,
     VersionValue,
-    VersionValue_co,
 )
 from pyverge.versioning import (
     Comparable,
@@ -35,15 +34,7 @@ VModel_co = TypeVar("VModel_co", covariant=True)
 
 
 @runtime_checkable
-class ModelIdentity(Protocol):
-    """Provider identity for an opaque model handle."""
-
-    def model_id(self, handle: ModelHandle) -> str: ...
-
-
-@runtime_checkable
-@runtime_checkable
-class ModelAdapter(ModelIdentity, Protocol[VersionValue_co]):
+class ModelAdapter(Protocol[VersionValue]):
     """Provider-specific model operations.
 
     The single provider seam: the migration engine and registry stay
@@ -52,6 +43,7 @@ class ModelAdapter(ModelIdentity, Protocol[VersionValue_co]):
     JSON Schema, ...).
     """
 
+    def model_id(self, handle: ModelHandle) -> str: ...
     def version(self, model_cls: ModelHandle) -> str: ...
     def kind(self, model_cls: ModelHandle) -> str: ...
     @property
@@ -109,26 +101,26 @@ class ModelAdapter(ModelIdentity, Protocol[VersionValue_co]):
         *,
         kind: str | None = None,
         version: str | None = None,
-    ) -> VersionNode[VersionValue_co]: ...
+    ) -> VersionNode[VersionValue]: ...
 
     def version_key(
         self,
         *,
         kind: str,
         version: str,
-    ) -> VersionKey[VersionValue_co]: ...
+    ) -> VersionKey[VersionValue]: ...
 
     def diff(
         self,
-        source: Versionable[VersionValue_co],
-        target: Comparable[VersionValue_co],
-    ) -> Diff[VersionValue_co]: ...
+        source: Versionable[VersionValue],
+        target: Comparable[VersionValue],
+    ) -> Diff[VersionValue]: ...
 
     def materialize_model(
         self,
-        diff: Diffable[VersionValue_co],
+        diff: Diffable[VersionValue],
     ) -> ModelHandle: ...
 
     def materialize(
-        self, diff: Diffable[VersionValue_co]
-    ) -> VersionNode[VersionValue_co]: ...
+        self, diff: Diffable[VersionValue]
+    ) -> VersionNode[VersionValue]: ...

@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-import semver
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
 
@@ -27,7 +26,7 @@ def source() -> FastStreamSource:
 
     return FastStreamSource(
         FastStream(broker),
-        adapter=PydanticModelAdapter[semver.Version](codec=ModelCodec()),
+        adapter=PydanticModelAdapter(codec=ModelCodec()),
     )
 
 

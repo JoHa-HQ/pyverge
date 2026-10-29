@@ -9,7 +9,7 @@ from pyverge.schemas.runtime import ModelRuntime
 from pyverge.versioning import Diffable, FieldDescriptor, NodeId
 
 
-class PydanticModelAdapter(AbstractModelAdapter[VersionValue]):
+class PydanticModelAdapter(AbstractModelAdapter):
     """Pydantic provider adapter backed by a model runtime."""
 
     provider = "pydantic"

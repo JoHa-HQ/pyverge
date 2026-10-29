@@ -1131,12 +1131,12 @@ def test_step_context_layers_bindings(execution_environment) -> None:
         bindings=MigrationContext.create({"tenant": "acme", "region": "eu"}),
     )
     source = envelope_model(
-        PydanticModelAdapter[semver.Version](codec=ModelCodec()),
+        PydanticModelAdapter(codec=ModelCodec()),
         None,
         UserV1,
     )
     target = envelope_model(
-        PydanticModelAdapter[semver.Version](codec=ModelCodec()),
+        PydanticModelAdapter(codec=ModelCodec()),
         None,
         UserV2,
     )

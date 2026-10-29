@@ -542,7 +542,7 @@ class TestContentAddress:
 class TestDiff:
     @pytest.mark.parametrize(
         "edge",
-        [[PydanticModelAdapter[semver.Version], UserV1, UserV2, _noop_migration]],
+        [[PydanticModelAdapter, UserV1, UserV2, _noop_migration]],
         indirect=True,
     )
     def test_from_pair_delegates_to_adapter(self, edge) -> None:
@@ -602,14 +602,14 @@ class TestDiff:
         ("edge", "added", "removed", "modified"),
         [
             pytest.param(
-                [PydanticModelAdapter[semver.Version], UserV2, UserV3, _noop_migration],
+                [PydanticModelAdapter, UserV2, UserV3, _noop_migration],
                 ["status"],
                 [],
                 ["age"],
                 id="forward",
             ),
             pytest.param(
-                [PydanticModelAdapter[semver.Version], UserV3, UserV2, _noop_migration],
+                [PydanticModelAdapter, UserV3, UserV2, _noop_migration],
                 [],
                 ["status"],
                 ["age"],
@@ -643,7 +643,7 @@ class TestDiff:
 
     @pytest.mark.parametrize(
         "edge",
-        [[PydanticModelAdapter[semver.Version], UserV2, UserV1, _noop_migration]],
+        [[PydanticModelAdapter, UserV2, UserV1, _noop_migration]],
         indirect=True,
     )
     def test_diff_predicates_inversion_and_change_set(self, edge) -> None:
@@ -725,7 +725,7 @@ class TestDiff:
 
     @pytest.mark.parametrize(
         "edge",
-        [[PydanticModelAdapter[semver.Version], UserV1, UserV2, _noop_migration]],
+        [[PydanticModelAdapter, UserV1, UserV2, _noop_migration]],
         indirect=True,
     )
     def test_diff_render_and_materialize_delegate(self, edge) -> None:
@@ -849,7 +849,7 @@ class TestGraphPrimitives:
 
     @pytest.mark.parametrize(
         "node",
-        [[PydanticModelAdapter[semver.Version], UserV1]],
+        [[PydanticModelAdapter, UserV1]],
         indirect=True,
     )
     def test_node_repr(self, node) -> None:
@@ -857,7 +857,7 @@ class TestGraphPrimitives:
 
     @pytest.mark.parametrize(
         "edge",
-        [[PydanticModelAdapter[semver.Version], UserV1, UserV2, _noop_migration]],
+        [[PydanticModelAdapter, UserV1, UserV2, _noop_migration]],
         indirect=True,
     )
     def test_edge_key_identity_and_comparison(self, edge) -> None:
@@ -879,7 +879,7 @@ class TestGraphPrimitives:
 
     @pytest.mark.parametrize(
         "edge",
-        [[PydanticModelAdapter[semver.Version], UserV1, UserV2, _noop_migration]],
+        [[PydanticModelAdapter, UserV1, UserV2, _noop_migration]],
         indirect=True,
     )
     def test_version_edge_usage_and_failures(self, edge, versioning_settings) -> None:
@@ -933,7 +933,7 @@ class TestGraphPrimitives:
 class TestVersioningErrors:
     @pytest.mark.parametrize(
         "edge",
-        [[PydanticModelAdapter[semver.Version], UserV1, UserV2, _noop_migration]],
+        [[PydanticModelAdapter, UserV1, UserV2, _noop_migration]],
         indirect=True,
     )
     def test_migration_application_error_variants(self, edge) -> None:
@@ -955,7 +955,7 @@ class TestVersioningErrors:
 
     @pytest.mark.parametrize(
         "edge",
-        [[PydanticModelAdapter[semver.Version], UserV1, UserV2, _noop_migration]],
+        [[PydanticModelAdapter, UserV1, UserV2, _noop_migration]],
         indirect=True,
     )
     def test_backward_compatibility_error(self, edge) -> None:
@@ -980,7 +980,7 @@ class TestVersioningErrors:
 class TestPrimitives:
     @pytest.mark.parametrize(
         "node",
-        [[DataclassModelAdapter[semver.Version], DataclassPersonV1]],
+        [[DataclassModelAdapter, DataclassPersonV1]],
         indirect=True,
     )
     def test_descriptor_projects_references_and_extends_immutably(self, node) -> None:
@@ -1006,7 +1006,7 @@ class TestPrimitives:
 
     @pytest.mark.parametrize(
         "node",
-        [[DataclassModelAdapter[semver.Version], DataclassPersonV1]],
+        [[DataclassModelAdapter, DataclassPersonV1]],
         indirect=True,
     )
     def test_node_canonical_round_trip(self, node) -> None:
@@ -1018,7 +1018,7 @@ class TestPrimitives:
 
     @pytest.mark.parametrize(
         "node",
-        [[DataclassModelAdapter[semver.Version], DataclassPersonV1]],
+        [[DataclassModelAdapter, DataclassPersonV1]],
         indirect=True,
     )
     def test_node_projects_extends_and_serializes(self, node) -> None:

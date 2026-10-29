@@ -7,7 +7,6 @@ from .pydantic import PydanticModelAdapter
 from .runtime import ModelRuntime, PythonModelRuntime
 from .types import (
     ModelAdapter,
-    ModelIdentity,
     TContainer,
     VModel,
     VSource_co,
@@ -20,7 +19,6 @@ __all__ = [
     "JsonSchemaModelAdapter",
     "ModelAdapter",
     "ModelCodec",
-    "ModelIdentity",
     "ModelRuntime",
     "ProviderCapabilityError",
     "PydanticModelAdapter",

@@ -26,7 +26,7 @@ from pyverge.versioning import (
 )
 
 
-class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
+class DataclassModelAdapter(AbstractModelAdapter):
     """Model adapter for ordinary :mod:`dataclasses` classes.
 
     Dataclasses are the runtime container, but payload validation and
