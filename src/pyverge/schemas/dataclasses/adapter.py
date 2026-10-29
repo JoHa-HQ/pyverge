@@ -242,7 +242,7 @@ class DataclassModelAdapter(AbstractModelAdapter):
             )
         )
 
-    def _materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
+    def _build_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
         anchor = self.runtime.resolve(diff.source.descriptor.ref)
         version = diff.target.version
         version_field = (

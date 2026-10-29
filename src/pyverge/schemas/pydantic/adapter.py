@@ -5,7 +5,7 @@ from typing import Any
 from pyverge.core.types import ModelData, ModelHandle, VersionValue
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.codec import ModelCodec
-from pyverge.schemas.runtime import ModelRuntime
+from pyverge.schemas.runtime import ModelRuntime, build_pydantic_model
 from pyverge.versioning import Diffable, FieldDescriptor, NodeId
 
 
@@ -70,8 +70,8 @@ class PydanticModelAdapter(AbstractModelAdapter):
             model_cls, provider=self.provider, codec=self.model_codec
         )
 
-    def _materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        return self.runtime.materialize_model(diff, codec=self.model_codec)
+    def _build_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
+        return build_pydantic_model(self.runtime, diff, codec=self.model_codec)
 
 
 __all__ = ["PydanticModelAdapter"]
