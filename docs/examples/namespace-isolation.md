@@ -46,4 +46,3 @@ assert billing.get("User", "1.0.0").namespace == "com.acme.billing"
 assert orders.registry.namespace == "com.acme.orders"
 assert billing.registry.namespace == "com.acme.billing"
 ```
-MD

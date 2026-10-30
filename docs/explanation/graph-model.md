@@ -101,4 +101,3 @@ the registry.
 - [Namespaces and hydration](namespaces.md)
 - [Execution flow](execution-flow.md)
 - [Graph reference](../reference/graph.md)
-MD

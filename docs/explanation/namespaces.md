@@ -77,4 +77,3 @@ the same registry. Cross-namespace edges are never allowed.
 - [Graph model and identity](graph-model.md)
 - [Keys and hydration](../how-to/models/keys-and-hydration.md)
 - [Upgrade guide](../reference/upgrades.md)
-MD

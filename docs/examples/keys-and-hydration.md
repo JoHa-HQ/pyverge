@@ -40,4 +40,3 @@ assert registry.get_model(key) is node
 graph = GraphBuilder().build(registry)
 assert graph.get_model(key) is node
 ```
-MD

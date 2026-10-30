@@ -17,11 +17,11 @@ Generated from the public Python API.
 ## Graph and identity
 
 - [Graph identity and planning](graph.md)
-- [NodeId][pyverge.versioning.NodeId]
-- [VersionKey][pyverge.versioning.VersionKey]
-- [EdgeKey][pyverge.versioning.EdgeKey]
-- [VersionNode][pyverge.versioning.VersionNode]
-- [VersionEdge][pyverge.versioning.VersionEdge]
+- [NodeId](graph.md)
+- [VersionKey](graph.md)
+- [EdgeKey](graph.md)
+- [VersionNode](graph.md)
+- [VersionEdge](graph.md)
 
 ## Runner
 

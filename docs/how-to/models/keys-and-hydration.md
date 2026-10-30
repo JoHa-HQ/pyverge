@@ -80,4 +80,3 @@ selected node and edge to be complete.
 - [Graph model and identity](../../explanation/graph-model.md)
 - [Namespaces](../../explanation/namespaces.md)
 - [Keys and hydration example](../../examples/keys-and-hydration.md)
-MD

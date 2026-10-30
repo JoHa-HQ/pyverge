@@ -57,4 +57,3 @@ after = GraphBuilder().build(registry)
 assert len(before.versions) == 2
 assert len(after.versions) == 3
 ```
-MD

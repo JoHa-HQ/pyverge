@@ -24,4 +24,3 @@ Runnable examples, grouped by the problem they solve.
 - [OTel hooks](otel-hooks.md)
 - [OpenLineage hooks](openlineage-hooks.md)
 - [Benchmark latency](benchmark.md)
-MD
