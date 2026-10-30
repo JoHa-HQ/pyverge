@@ -66,7 +66,6 @@ class ManagerClassState(Protocol[VersionValue]):
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
-    _namespace: ClassVar[str]
     _reflection_locked: ClassVar[bool]
 
     @classmethod
@@ -81,7 +80,6 @@ class ManagerClassState(Protocol[VersionValue]):
         migration_materializer: DiffMaterializer[object] | None = None,
         diff_provider: DiffProvider[VersionValue] | None = None,
         on_missing: str = "raise",
-        namespace: str = "",
     ) -> type[Self]: ...
 
     @classmethod

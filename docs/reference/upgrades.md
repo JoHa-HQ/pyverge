@@ -230,16 +230,16 @@ manager = OrderManager()
 
 ## Descriptor registration
 
-`SourceDescriptor` string strategies were replaced by typed descriptors and
-registration commands:
+`SourceDescriptor` string strategies were replaced by typed descriptors:
 
 ```text
-ModelDescriptor      -> RegisterModel
-MigrationDescriptor  -> RegisterMigration
+ModelDescriptor      -> register_descriptor(descriptor, sink)
+MigrationDescriptor  -> register_descriptor(descriptor, sink)
 ```
 
-Sources emit descriptors. Managers collect commands and execute them through
-`Engine.register`.
+Sources emit descriptors. Discovery adapters apply them through the
+manager/application registration port. The removed command layer is not part of
+the current API.
 
 ## Troubleshooting
 
@@ -270,9 +270,14 @@ migrations and await the runner result.
 
 ```python
 Manager.configure(
-    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
+    PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="com.joha.order",
+            version_property="version",
+            kind_property="kind",
+        )
+    ),
     on_missing="raise",
-    namespace="com.joha.order",
 )
 ```
 

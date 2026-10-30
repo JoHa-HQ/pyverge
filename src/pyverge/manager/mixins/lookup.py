@@ -45,7 +45,8 @@ class LookupMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
-        namespace = getattr(key, "namespace", cls._namespace)
+        engine = engine or cls._default_engine
+        namespace = getattr(key, "namespace", engine.registry.namespace)
         return VersionKey[VersionValue](
             namespace=namespace,
             kind=key.kind,
@@ -60,9 +61,10 @@ class LookupMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
+        engine = engine or cls._default_engine
         kind, value = key
         return VersionKey[VersionValue](
-            namespace=cls._namespace,
+            namespace=engine.registry.namespace,
             kind=kind,
             version=value,
         )

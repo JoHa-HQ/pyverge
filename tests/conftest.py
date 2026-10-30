@@ -353,9 +353,11 @@ def manager(
     migration_settings: MigrationSettings,
 ) -> type[Manager[VersionValue]]:
     namespace = getattr(request, "param", "")
+    codec = getattr(engine.adapter, "model_codec", None)
+    if namespace and codec is not None and not codec.namespace:
+        setattr(engine.adapter, "model_codec", replace(codec, namespace=namespace))
     return Manager[VersionValue].configure(
         engine.adapter,
         engine=engine,
-        namespace=namespace,
         **manager_kwargs(migration_settings),
     )

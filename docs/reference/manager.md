@@ -16,13 +16,12 @@ Manager.configure(
     migration_materializer=None,
     diff_provider=None,
     on_missing="raise",
-    namespace="",
 )
 ```
 
-All configuration is passed directly as keyword arguments. `namespace`
-defaults to empty at the manager; the manager binds that namespace to the
-registry and the adapter codec.
+All configuration is passed directly as keyword arguments. Namespace comes from
+the adapter's `ModelCodec`; the manager derives its registry namespace from it.
+There is no separate manager namespace option.
 
 ## Registration decorators
 

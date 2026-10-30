@@ -14,6 +14,15 @@ Generated from the public Python API.
 
 ::: pyverge.registry.Registry
 
+## Graph and identity
+
+- [Graph identity and planning](graph.md)
+- [NodeId][pyverge.versioning.NodeId]
+- [VersionKey][pyverge.versioning.VersionKey]
+- [EdgeKey][pyverge.versioning.EdgeKey]
+- [VersionNode][pyverge.versioning.VersionNode]
+- [VersionEdge][pyverge.versioning.VersionEdge]
+
 ## Runner
 
 ::: pyverge.execution.Runner
@@ -32,11 +41,9 @@ Generated from the public Python API.
 
 ::: pyverge.discovery.MigrationSpec
 
-::: pyverge.discovery.RegisterModel
+::: pyverge.discovery.SourceVisitor
 
-::: pyverge.discovery.RegisterMigration
-
-::: pyverge.discovery.ModelRegistrationMode
+::: pyverge.discovery.RegistrationSink
 
 ## Sources
 

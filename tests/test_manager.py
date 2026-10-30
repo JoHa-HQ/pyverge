@@ -28,7 +28,7 @@ from pyverge.registry.errors import (
     CatalogError,
     ModelNotFoundError,
 )
-from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.schemas.types import (
     ModelAdapter,
     ModelHandle,
@@ -993,7 +993,7 @@ def test_manager_defaults_empty_namespace(
 @pytest.mark.parametrize("manager", ["orders"], indirect=True)
 @pytest.mark.parametrize(
     "model_adapter, registry",
-    [[PydanticModelAdapter, [semver.Version, "test", [], []]]],
+    [[PydanticModelAdapter, [semver.Version, "test", [], [], "orders"]]],
     indirect=["model_adapter", "registry"],
 )
 def test_manager_defaults_namespace_for_key_only(
@@ -1014,3 +1014,17 @@ def test_manager_defaults_namespace_for_key_only(
 
     instance.store_model(instance.adapter.versionable(UserV1))
     assert instance.registry.get_model(stored).namespace == "orders"
+
+
+def test_manager_namespace_derives_from_adapter_codec() -> None:
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="orders",
+            version_property="version",
+            kind_property="kind",
+        )
+    )
+
+    manager = Manager[semver.Version].configure(adapter)
+
+    assert manager._default_engine.registry.namespace == "orders"

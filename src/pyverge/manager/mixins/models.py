@@ -41,8 +41,9 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        if isinstance(key, VersionKey) and not key.namespace and cls._namespace:
-            key = key.with_namespace(cls._namespace)
+        namespace = engine.registry.namespace
+        if isinstance(key, VersionKey) and not key.namespace and namespace:
+            key = key.with_namespace(namespace)
         return cast(Versionable[VersionValue], engine.store_model(key))
 
     @store_model.register(VersionNode)
@@ -54,8 +55,9 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        if not version.namespace and cls._namespace:
-            version = version.with_namespace(cls._namespace)
+        namespace = engine.registry.namespace
+        if not version.namespace and namespace:
+            version = version.with_namespace(namespace)
         return cast(Versionable[VersionValue], engine.store_model(version))
 
     @hybridmethod
@@ -68,8 +70,9 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        if isinstance(key, VersionKey) and not key.namespace and cls._namespace:
-            key = key.with_namespace(cls._namespace)
+        namespace = engine.registry.namespace
+        if isinstance(key, VersionKey) and not key.namespace and namespace:
+            key = key.with_namespace(namespace)
         return cast(Versionable[VersionValue], engine.reconcile_model(key))
 
     @reconcile_model.register(VersionNode)
@@ -81,8 +84,9 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        if not version.namespace and cls._namespace:
-            version = version.with_namespace(cls._namespace)
+        namespace = engine.registry.namespace
+        if not version.namespace and namespace:
+            version = version.with_namespace(namespace)
         return cast(Versionable[VersionValue], engine.reconcile_model(version))
 
     def missing_references(

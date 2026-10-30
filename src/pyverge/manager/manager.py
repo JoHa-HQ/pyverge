@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import ClassVar
 
 from pyverge.core.types import VersionValue
@@ -60,7 +59,6 @@ class Manager(
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
-    _namespace: ClassVar[str] = ""
     _reflection_locked: ClassVar[bool] = False
 
     def __class_getitem__(
@@ -73,7 +71,6 @@ class Manager(
                 "_strategy": strategy,
                 "_default_adapter": None,
                 "_default_engine": None,
-                "_namespace": "",
                 "_reflection_locked": False,
                 "__module__": cls.__module__,
                 "__qualname__": cls.__name__,
@@ -102,12 +99,9 @@ class Manager(
         migration_materializer: DiffMaterializer[object] | None = None,
         diff_provider: DiffProvider[VersionValue] | None = None,
         on_missing: str = "raise",
-        namespace: str = "",
     ) -> type[Manager[VersionValue]]:
-        cls._namespace = namespace
         codec = getattr(adapter, "model_codec", None)
-        if codec is not None and not codec.namespace:
-            setattr(adapter, "model_codec", replace(codec, namespace=namespace))
+        namespace = codec.namespace if codec is not None else ""
         registry = Registry[VersionValue](
             namespace=namespace,
             hasher=hasher or default_content_hasher(),
