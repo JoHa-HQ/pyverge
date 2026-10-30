@@ -21,7 +21,7 @@ from __future__ import annotations
 import semver
 
 from pyverge import Manager
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
 from ..settings import GraphSettings
@@ -67,8 +67,11 @@ def build_manager(graph: GraphSettings) -> Manager[semver.Version]:
     """
     ToolManager = Manager[semver.Version].configure(
         PydanticModelAdapter(
-            version_property=graph.version_property,
-            kind_property=graph.kind_property,
+            codec=ModelCodec(
+                namespace="",
+                version_property=graph.version_property,
+                kind_property=graph.kind_property,
+            )
         ),
         on_missing="reconstruct_model",
     )

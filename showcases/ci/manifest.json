@@ -1,29 +1,20 @@
 {
   "graph": {
     "id": "pyverge",
-    "label": "pyverge migration graph",
-    "type": "directed",
     "directed": true,
-    "metadata": {
-      "manifest_version": "1.0",
-      "pyverge_version": "0.9.1.dev31",
-      "manager": "manager:manager",
-      "generated_at": "2026-10-21T10:29:18.154575+00:00",
-      "content_hash": "58e82b4820ca22018d24944d8e9ca8b3744ba40f973b056bfbb2de7b0c9c48aa"
-    },
     "nodes": {
       "Address@1.0.0": {
         "label": "Address@1.0.0",
         "metadata": {
           "kind": "Address",
           "version": "1.0.0",
-          "model": "AddressV1",
+          "model": "models.AddressV1",
           "fields": [
             "city",
             "street"
           ],
           "references": [],
-          "schema_hash": "00c0d9af5f7a59d40bf3ff44a9980ce817c7f5978c50431fe2ad1d3130f6ce73"
+          "schema_hash": "243e98d46b06796435739583cd0a5a794972cfae65493d49a0ded1c8727b481b"
         }
       },
       "Address@2.0.0": {
@@ -31,14 +22,14 @@
         "metadata": {
           "kind": "Address",
           "version": "2.0.0",
-          "model": "AddressV2",
+          "model": "models.AddressV2",
           "fields": [
             "city",
             "country",
             "street"
           ],
           "references": [],
-          "schema_hash": "48caf666eded5c31407d2c0864c8b7d6fd062b0307769455c529413d8f803763"
+          "schema_hash": "5e09731fc96a823359d0dde73794ad75a2302eda71dca47527ebc5aa601af3e4"
         }
       },
       "Person@1.0.0": {
@@ -46,7 +37,7 @@
         "metadata": {
           "kind": "Person",
           "version": "1.0.0",
-          "model": "PersonV1",
+          "model": "models.PersonV1",
           "fields": [
             "address",
             "name"
@@ -55,7 +46,7 @@
             "Address@1.0.0",
             "Address@2.0.0"
           ],
-          "schema_hash": "66585da78887c4a56f51636bb2664a3ccd5671dbd6ef325e4a8ac2786b84b7be"
+          "schema_hash": "112cf0ecf885ffcd98d8253f18a0fa12826283f5a70bcc1576e66e395de40bf4"
         }
       },
       "Person@2.0.0": {
@@ -63,7 +54,7 @@
         "metadata": {
           "kind": "Person",
           "version": "2.0.0",
-          "model": "PersonV2",
+          "model": "models.PersonV2",
           "fields": [
             "address",
             "email",
@@ -73,7 +64,7 @@
             "Address@1.0.0",
             "Address@2.0.0"
           ],
-          "schema_hash": "4761bf76fb20012b59ed1c3a3a246b60e62a38e9bfd24d513afd51eccfc64258"
+          "schema_hash": "15aed6d71dacced5a4002cbaea7c0b35247703f9eb0ece49322d905c9234b36b"
         }
       }
     },
@@ -82,36 +73,36 @@
         "id": "Address@1.0.0->Address@2.0.0",
         "source": "Address@1.0.0",
         "target": "Address@2.0.0",
-        "relation": "migration",
         "directed": true,
         "metadata": {
           "kind": "Address",
-          "from": "1.0.0",
-          "to": "2.0.0",
-          "backward_compatible": false,
+          "source_version": "1.0.0",
+          "target_version": "2.0.0",
           "strategy": "callable",
-          "callable": "migrate_address",
-          "module": "migrations",
-          "migration_hash": "985a47658c1f92b2fcf1fe2671b07698fcf30af472267d55ac7f20927630f9f1"
+          "migration_id": "migrations.migrate_address"
         }
       },
       {
         "id": "Person@1.0.0->Person@2.0.0",
         "source": "Person@1.0.0",
         "target": "Person@2.0.0",
-        "relation": "migration",
         "directed": true,
         "metadata": {
           "kind": "Person",
-          "from": "1.0.0",
-          "to": "2.0.0",
-          "backward_compatible": false,
+          "source_version": "1.0.0",
+          "target_version": "2.0.0",
           "strategy": "callable",
-          "callable": "migrate_person",
-          "module": "migrations",
-          "migration_hash": "68ea805d24c7206fd6c3912fac052c833336ad69dcbb8cfb91eced80a8b78964"
+          "migration_id": "migrations.migrate_person"
         }
       }
-    ]
+    ],
+    "label": "pyverge migration graph",
+    "type": "directed",
+    "metadata": {
+      "manifest_version": "1.0",
+      "pyverge_version": "0.14.1.dev4",
+      "manager": "manager:manager",
+      "content_hash": "d147250c9a59390f704afa98d4886993165846b41cd8dcad00a15e359dc03664"
+    }
   }
 }
