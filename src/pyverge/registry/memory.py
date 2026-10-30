@@ -336,11 +336,35 @@ class InMemoryCatalog(Generic[VersionValue]):
             )
         return entry
 
+    def hydrate(
+        self: Self, entry: VersionNode[VersionValue]
+    ) -> VersionNode[VersionValue]:
+        """Upgrade a key-only entry with its full version node.
+
+        Hydration is distinct from reconciliation: it installs the model
+        payload for an identity that is already known (or is new).  A full node
+        and a key-only entry cannot both exist for the same identity.
+        """
+        if not isinstance(entry, VersionNode):
+            raise TypeError(f"Hydration requires a VersionNode, got {type(entry)!r}")
+        existing = self.find_entry(entry)
+        if existing is None:
+            return cast("VersionNode[VersionValue]", self.store(entry))
+        if isinstance(existing, VersionNode):
+            return cast("VersionNode[VersionValue]", self.reconcile(entry))
+        self.remove_entry(existing)
+        return cast("VersionNode[VersionValue]", self.store(entry))
+
     def reconcile(self: Self, entry: NodeEntry) -> NodeEntry:
         """Insert or reconcile an existing node entry."""
         existing = self.find_entry(entry)
         if existing is None:
             return self.store(entry)
+        if not existing.is_model and entry.is_model:
+            raise CatalogError(
+                self._name,
+                f"Cannot reconcile key-only entry {entry}; hydrate it instead",
+            )
         try:
             resolved = entry.reconcile(existing)
         except NodeConflictError as error:
@@ -387,17 +411,26 @@ class InMemoryCatalog(Generic[VersionValue]):
         idx = bisect.bisect_left(paths, entry)
         if idx < len(paths) and paths[idx] == entry:
             existing = paths[idx]
-            if isinstance(existing, VersionEdge) and isinstance(entry, VersionEdge):
-                registered_hash = existing.content_hash(self._hasher)
-                incoming_hash = entry.content_hash(self._hasher)
-                if registered_hash != incoming_hash:
-                    raise MigrationConflictError(
-                        self._name,
-                        entry.key,
-                        registered_hash=registered_hash,
-                        incoming_hash=incoming_hash,
-                    )
-            return existing
+            if isinstance(entry, VersionEdge) and not isinstance(existing, VersionEdge):
+                del paths[idx]
+                for endpoint in (existing.source, existing.target):
+                    bucket = self._edges_by_version.get(endpoint)
+                    if bucket is not None:
+                        bucket.discard(existing)
+                        if not bucket:
+                            del self._edges_by_version[endpoint]
+            else:
+                if isinstance(existing, VersionEdge) and isinstance(entry, VersionEdge):
+                    registered_hash = existing.content_hash(self._hasher)
+                    incoming_hash = entry.content_hash(self._hasher)
+                    if registered_hash != incoming_hash:
+                        raise MigrationConflictError(
+                            self._name,
+                            entry.key,
+                            registered_hash=registered_hash,
+                            incoming_hash=incoming_hash,
+                        )
+                return existing
         bisect.insort(paths, entry)
         self._edges_by_version[entry.source].add(entry)
         self._edges_by_version[entry.target].add(entry)

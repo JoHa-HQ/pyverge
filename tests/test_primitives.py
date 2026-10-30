@@ -3,8 +3,10 @@ from __future__ import annotations
 import copy
 import operator
 import pickle
+from dataclasses import FrozenInstanceError
 from typing import Any, cast
 
+import pendulum
 import pytest
 import semver
 from json_graph_lite.jgf import Graph as LiteGraph
@@ -825,6 +827,81 @@ class TestNodeIdentity:
             ref=object(),
         )
         assert edge_a.digest(hasher) == edge_b.digest(hasher)
+
+    def test_node_id_parse_semver_and_date(self) -> None:
+        semver_node = NodeId.parse("orders", "Order", "1.2.3")
+        date_node = NodeId.parse("orders", "Order", "2026-10-30")
+
+        assert semver_node.version == semver.Version.parse("1.2.3")
+        assert date_node.version == pendulum.Date(2026, 10, 30)
+        assert NodeId.parse("orders", "Order", semver_node.version) == semver_node
+
+    def test_node_id_is_frozen_and_slotted(self) -> None:
+        node = NodeId.parse("orders", "Order", "1.2.3")
+
+        with pytest.raises(FrozenInstanceError):
+            node.kind = "Other"  # ty: ignore[invalid-assignment]
+        assert not hasattr(node, "__dict__")
+        assert not hasattr(node, "jgf_id")
+
+    @pytest.mark.parametrize(
+        ("namespace", "kind", "version", "equal"),
+        [
+            pytest.param("billing", "Order", "1.0.0", False, id="namespace"),
+            pytest.param("orders", "Invoice", "1.0.0", False, id="kind"),
+            pytest.param("orders", "Order", "2.0.0", False, id="version"),
+            pytest.param("orders", "Order", "1.0.0", True, id="same"),
+        ],
+    )
+    def test_node_id_distinguishes_namespace_kind_and_version(
+        self,
+        namespace: str,
+        kind: str,
+        version: str,
+        equal: bool,
+    ) -> None:
+        base = NodeId.parse("orders", "Order", "1.0.0")
+        other = NodeId.parse(namespace, kind, version)
+
+        assert (base == other) is equal
+
+    def test_version_key_ref_survives_copy_and_pickle(self) -> None:
+        key = VersionKey(
+            namespace="orders",
+            kind="Order",
+            version=semver.Version.parse("1.0.0"),
+            ref=object(),
+        )
+
+        copied = copy.copy(key)
+        restored = pickle.loads(pickle.dumps(key))
+
+        assert copied.ref is key.ref
+        assert restored.ref is not None
+        assert restored == key
+        assert hash(restored) == hash(key)
+
+    def test_edge_key_rejects_cross_kind(self) -> None:
+        with pytest.raises(ValueError, match="Cross-kind"):
+            EdgeKey(
+                source=NodeId.parse("orders", "Order", "1.0.0"),
+                target=NodeId.parse("orders", "Invoice", "2.0.0"),
+            )
+
+    def test_key_digest_includes_namespace(self) -> None:
+        hasher = default_content_hasher()
+        left = VersionKey(
+            namespace="orders",
+            kind="Order",
+            version=semver.Version.parse("1.0.0"),
+        )
+        right = VersionKey(
+            namespace="billing",
+            kind="Order",
+            version=semver.Version.parse("1.0.0"),
+        )
+
+        assert left.digest(hasher) != right.digest(hasher)
 
     def test_jgf_ids_are_namespace_prefixed(self) -> None:
         node = NodeId[semver.Version](

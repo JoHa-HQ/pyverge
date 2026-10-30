@@ -52,6 +52,7 @@ from pyverge.versioning import (
     Transitional,
     Versionable,
     VersionEdge,
+    VersionKey,
     VersionNode,
     VersionPair,
 )
@@ -229,18 +230,21 @@ class Engine(Generic[VersionValue]):
         )
         return cast("VersionNode[VersionValue]", stored)
 
-    def store_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
-        version = (
-            payload
-            if isinstance(payload, VersionNode)
-            else self.adapter.versionable(payload)
-        )
-        return self._store_node(version, mode="strict")
+    def store_model(self: Self, payload: Any) -> NodeEntry:
+        """Store a key or node, upgrading and reconciling as needed."""
+        if isinstance(payload, VersionNode):
+            return self.registry.hydrate(payload)
+        if isinstance(payload, VersionKey):
+            existing = self.registry.find_entry(payload)
+            if existing is not None:
+                return existing
+            return self.registry.store(payload)
+        return self.registry.hydrate(self.adapter.versionable(payload))
 
     def reconcile_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
         version = (
             payload
-            if isinstance(payload, VersionNode)
+            if isinstance(payload, VersionKey)
             else self.adapter.versionable(payload)
         )
         return self._store_node(version, mode="reconcile")

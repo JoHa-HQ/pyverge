@@ -65,13 +65,23 @@ class NodeId(Generic[VersionValue]):
             object.__setattr__(self, "version", parse_version(self.version))
 
     @classmethod
+    def parse(
+        cls,
+        namespace: str,
+        kind: ModelKind,
+        version: str | VersionValue,
+    ) -> Self:
+        """Build a node identity, parsing its version when needed."""
+        return cls(namespace=namespace, kind=kind, version=parse_version(version))
+
+    @classmethod
     def from_string(
         cls,
         namespace: str,
         kind: ModelKind,
         version: str,
     ) -> NodeId[VersionValue]:
-        return cls(namespace=namespace, kind=kind, version=parse_version(version))
+        return cls.parse(namespace, kind, version)
 
     @property
     def id(self) -> NodeId[VersionValue]:

@@ -9,7 +9,6 @@ from typing import (
     Literal,
     Protocol,
     Union,
-    cast,
     get_args,
     get_origin,
     runtime_checkable,
@@ -353,13 +352,7 @@ class PythonModelRuntime:
                     version = codec.version(fields)
                 except (TypeError, ValueError):
                     continue
-                found.add(
-                    NodeId(
-                        namespace=codec.namespace,
-                        kind=kind,
-                        version=cast("VersionValue", version),  # ty: ignore[invalid-argument-type]
-                    )
-                )
+                found.add(NodeId.parse(codec.namespace, kind, version))
                 self._collect_references(
                     nested,
                     found,
@@ -428,13 +421,7 @@ class PythonModelRuntime:
             if not kind:
                 continue
             try:
-                found.add(
-                    NodeId(
-                        namespace=codec.namespace,
-                        kind=kind,
-                        version=cast("VersionValue", codec.version(fields)),  # ty: ignore[invalid-argument-type]
-                    )
-                )
+                found.add(NodeId.parse(codec.namespace, kind, codec.version(fields)))
             except (TypeError, ValueError):
                 continue
             found.update(self.references(nested, provider=provider, codec=codec))

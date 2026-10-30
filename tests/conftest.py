@@ -54,7 +54,7 @@ from pyverge.settings import (
     without_identity,
 )
 from pyverge.types import VersionEdge
-from pyverge.versioning import DiffMaterializer, default_content_hasher
+from pyverge.versioning import default_content_hasher
 from tests.utils import edge_from_nodes, envelope_model, register_models
 from tests.utils.engine import register_migrations
 from tests.utils.source import StaticSource
@@ -121,19 +121,26 @@ def model_adapter(
     raise ValueError(f"Unknown provider: {provider}")
 
 
+@pytest.fixture(params=[""])
+def codec(
+    request: pytest.FixtureRequest,
+    versioning_settings: VersioningSettings,
+) -> ModelCodec:
+    return ModelCodec(
+        namespace=request.param,
+        version_property=versioning_settings.version_property,
+        kind_property=versioning_settings.kind_property,
+    )
+
+
 @pytest.fixture
 def node(
     request: pytest.FixtureRequest,
+    codec: ModelCodec,
     versioning_settings: VersioningSettings,
 ) -> Any:
     adapter_cls, model = request.param
-    adapter = adapter_cls(
-        codec=ModelCodec(
-            namespace="",
-            version_property=versioning_settings.version_property,
-            kind_property=versioning_settings.kind_property,
-        )
-    )
+    adapter = adapter_cls(codec=codec)
     result = envelope_model(adapter, versioning_settings, model)
     return result
 
@@ -141,16 +148,11 @@ def node(
 @pytest.fixture
 def edge(
     request: pytest.FixtureRequest,
+    codec: ModelCodec,
     versioning_settings: VersioningSettings,
 ) -> VersionEdge:
     adapter_cls, source_model, target_model, func = request.param
-    adapter = adapter_cls(
-        codec=ModelCodec(
-            namespace="",
-            version_property=versioning_settings.version_property,
-            kind_property=versioning_settings.kind_property,
-        )
-    )
+    adapter = adapter_cls(codec)
     source = envelope_model(adapter, versioning_settings, source_model)
     target = envelope_model(adapter, versioning_settings, target_model)
     return edge_from_nodes(adapter, source, target, func=func)
@@ -163,7 +165,7 @@ def registry(
     migration_settings: MigrationSettings,
 ) -> Registry[VersionValue]:
     _strategy, name, models, migrations, *rest = request.param
-    namespace = rest[0] if rest else ""
+    namespace = rest[0] if rest else model_adapter.model_codec.namespace
     if namespace and not model_adapter.model_codec.namespace:
         model_adapter.model_codec = replace(
             model_adapter.model_codec, namespace=namespace
@@ -214,12 +216,16 @@ def execution_environment(
     )
 
 
-@pytest.fixture
+@pytest.fixture(params=[("raise", "raise", -1, "raise")])
 def coordinator(
+    request: pytest.FixtureRequest,
     walker: PayloadWalker[VersionValue],
     registry: Registry[VersionValue],
     model_adapter: ModelAdapter,
 ) -> ExecutionCoordinator[VersionValue]:
+    on_direction_violation, on_missing_path, depth_limit, on_depth_violation = (
+        request.param
+    )
     graph = GraphBuilder().build(registry)
     return ExecutionCoordinator(
         extractor=walker,
@@ -229,10 +235,10 @@ def coordinator(
             migrations=MigrationBindings.from_catalog(registry),
             policy=PolicyEngine(
                 direction=AnyDirection(),
-                on_direction_violation="raise",
-                on_missing_path="raise",
-                depth_limit=-1,
-                on_depth_violation="raise",
+                on_direction_violation=on_direction_violation,
+                on_missing_path=on_missing_path,
+                depth_limit=depth_limit,
+                on_depth_violation=on_depth_violation,
             ),
         ),
         planner=ExecutionPlanner(),
@@ -306,28 +312,15 @@ def runner(
 
 
 @pytest.fixture
-def model_materializer(model_adapter: ModelAdapter) -> ModelAdapter:
-    return model_adapter
-
-
-@pytest.fixture
-def migration_materializer(request: pytest.FixtureRequest) -> MigrationMaterializer:
-    backend = getattr(request, "param", JsonPatchMigrationBackend)
-    return MigrationMaterializer(backend())
-
-
-@pytest.fixture
 def reflector(
     model_adapter: ModelAdapter,
-    model_materializer: ModelAdapter,
-    migration_materializer: DiffMaterializer[object],
     migration_settings: MigrationSettings,
 ) -> Reflector[VersionValue]:
     return Reflector[VersionValue](
         model_adapter,
         Reflection[VersionValue](model_adapter, CompositeDiffDiscovery()),
-        model_materializer=model_materializer,
-        migration_materializer=migration_materializer,
+        model_materializer=model_adapter,
+        migration_materializer=MigrationMaterializer(JsonPatchMigrationBackend()),
         on_missing=migration_settings.on_missing,
     )
 
@@ -344,6 +337,11 @@ def engine(
         DefaultMigrationIdentityResolver(),
         reflector,
     )
+
+
+@pytest.fixture
+def graph(engine: Engine[VersionValue]):
+    return engine.snapshot()
 
 
 @pytest.fixture

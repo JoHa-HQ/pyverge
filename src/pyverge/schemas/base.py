@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, Generic, cast
+from typing import Any, Generic
 
 from pyverge.core.types import (
     ModelHandle,
@@ -22,6 +22,7 @@ from pyverge.versioning import (
     Versionable,
     VersionKey,
     VersionNode,
+    parse_version,
 )
 from pyverge.versioning.diff import _build_diff
 
@@ -106,12 +107,14 @@ class AbstractModelAdapter(Generic[VersionValue]):
         model_cls: ModelHandle,
         *,
         kind: str | None = None,
-        version: str | None = None,
+        version: str | VersionValue | None = None,
     ) -> VersionNode[VersionValue]:
         return VersionNode[VersionValue](
             namespace=self.model_codec.namespace,
             kind=kind or self.kind(model_cls),
-            version=cast("VersionValue", version or self.version(model_cls)),
+            version=parse_version(
+                version if version is not None else self.version(model_cls)
+            ),
             descriptor=self.model_descriptor(model_cls),
         )
 

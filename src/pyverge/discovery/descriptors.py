@@ -6,7 +6,7 @@ from typing import Any
 
 from pyverge.discovery.types import RegistrationSink
 from pyverge.migrations import MigrationSpec
-from pyverge.versioning import EdgeKey
+from pyverge.versioning import EdgeKey, NodeId, VersionKey
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +54,18 @@ def _register_model_descriptor(
                 ModelDescriptor(item, descriptor.source_id, descriptor.metadata),
                 sink,
             )
+        return True
+    if isinstance(payload, VersionKey):
+        sink.reconcile_model(payload)
+        return True
+    if isinstance(payload, NodeId):
+        sink.reconcile_model(
+            VersionKey(
+                namespace=payload.namespace,
+                kind=payload.kind,
+                version=payload.version,
+            )
+        )
         return True
     sink.reconcile_model(payload)
     return True

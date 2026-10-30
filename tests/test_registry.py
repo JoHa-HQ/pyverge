@@ -2487,6 +2487,148 @@ class TestNeutralGraphOps:
         with pytest.raises(ModelNotFoundError):
             registry.get_model_by_ref(ref)
 
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [], []],
+                [UserV1, UserV2],
+                id="pydantic_key_only_path",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_key_only_path_forbids_planning_until_hydrated(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
+    ) -> None:
+        source = envelope_model(model_adapter, versioning_settings, models[0])
+        target = envelope_model(model_adapter, versioning_settings, models[1])
+        source_key = VersionKey(
+            namespace=source.namespace,
+            kind=source.kind,
+            version=source.version,
+        )
+        target_key = VersionKey(
+            namespace=target.namespace,
+            kind=target.kind,
+            version=target.version,
+        )
+        registry.store(source_key)
+        registry.store(target_key)
+
+        graph = GraphBuilder().build(registry)
+        with pytest.raises(MigrationPathError):
+            graph.migration_path(source, target)
+
+        registry.hydrate(source)
+        registry.hydrate(target)
+        registry.store_migration(
+            edge_from_models(
+                model_adapter,
+                versioning_settings,
+                models[0],
+                models[1],
+                func=lambda data, _: data,
+            )
+        )
+
+        graph = GraphBuilder().build(registry)
+        assert graph.migration_path(source, target) == [(source, target)]
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="pydantic_key_only_edge",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_key_only_edge",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_key_only_edge_forbids_planning(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
+    ) -> None:
+        source = envelope_model(model_adapter, versioning_settings, models[0])
+        target = envelope_model(model_adapter, versioning_settings, models[1])
+        edge_key = EdgeKey.from_pair(source, target)
+        registry.store_edge(edge_key)
+
+        graph = GraphBuilder().build(registry)
+        assert graph.has_edge(edge_key)
+        assert not graph.has_migration(edge_key)
+        with pytest.raises(MigrationPathError):
+            graph.migration_path(source, target)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, models",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "semver_test", [UserV1, UserV2], []],
+                [UserV1, UserV2],
+                id="pydantic_key_only_edge_bound",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [
+                    pendulum.Date,
+                    "json_chrono_test",
+                    [USER_V2025_01_01, USER_V2025_03_10],
+                    [],
+                ],
+                [USER_V2025_01_01, USER_V2025_03_10],
+                id="json_chrono_key_only_edge_bound",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_key_only_edge_upgrades_when_bound(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+        models: list[ModelHandle],
+    ) -> None:
+        source = envelope_model(model_adapter, versioning_settings, models[0])
+        target = envelope_model(model_adapter, versioning_settings, models[1])
+        edge_key = EdgeKey.from_pair(source, target)
+        registry.store_edge(edge_key)
+        registry.store_migration(
+            edge_from_models(
+                model_adapter,
+                versioning_settings,
+                models[0],
+                models[1],
+                func=lambda data, _: data,
+            )
+        )
+
+        graph = GraphBuilder().build(registry)
+        assert graph.has_migration(edge_key)
+        assert graph.migration_path(source, target) == [(source, target)]
+
 
 @pytest.mark.parametrize(
     "model_adapter, registry, models",
@@ -2879,6 +3021,77 @@ def test_backward_compatibility_error_reports_modified_and_required(
     assert "required_additions=['status']" in message
 
 
+def test_key_only_entry_hydrates_to_full_node(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+    registry: Registry[types.VersionValue],
+) -> None:
+    node = envelope_model(model_adapter, versioning_settings, UserV1)
+    key = VersionKey(
+        namespace=node.namespace,
+        kind=node.kind,
+        version=node.version,
+    )
+
+    assert registry.store(key) == key
+    assert registry.has_entry(key)
+    assert registry.find_model(key) is None
+    assert registry.versions == []
+
+    hydrated = registry.hydrate(node)
+
+    assert hydrated == node
+    assert registry.get_model(key) == node
+    assert registry.versions == [node]
+    assert len(registry.entries) == 1
+
+
+def test_reconcile_does_not_hydrate_key_only_entry(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+    registry: Registry[types.VersionValue],
+) -> None:
+    node = envelope_model(model_adapter, versioning_settings, UserV1)
+    key = VersionKey(
+        namespace=node.namespace,
+        kind=node.kind,
+        version=node.version,
+    )
+    registry.store(key)
+
+    with pytest.raises(CatalogError, match="hydrate"):
+        registry.reconcile(node)
+
+    assert registry.find_model(key) is None
+    assert registry.get_entry(key) == key
+
+
+def test_hydration_uses_entry_namespace(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+) -> None:
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    node = envelope_model(
+        model_adapter,
+        versioning_settings,
+        UserV1,
+    ).with_namespace("billing")
+    key = VersionKey(
+        namespace=node.namespace,
+        kind=node.kind,
+        version=node.version,
+    )
+    registry.store(key)
+
+    assert registry.hydrate(node) == node
+    assert registry.get_model(key) == node
+    assert len(registry.entries) == 1
+    assert GraphBuilder().build(registry).get_model(key) == node
+
+
 def test_registry_requires_bound_namespace() -> None:
     registry = Registry[semver.Version](
         namespace="orders",
@@ -2896,7 +3109,7 @@ def test_registry_requires_bound_namespace() -> None:
     assert registry.get_model(stored).namespace == "orders"
 
 
-def test_registry_accepts_entry_namespace_as_identity(
+def test_registry_accepts_foreign_namespace_entry(
     model_adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
 ) -> None:
@@ -2914,6 +3127,7 @@ def test_registry_accepts_entry_namespace_as_identity(
 
     assert stored.namespace == "billing"
     assert registry.has_entry(foreign)
+    assert registry.reconcile(foreign) is foreign
 
 
 def test_registries_isolate_identical_kind_versions() -> None:

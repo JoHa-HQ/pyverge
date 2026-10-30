@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import cast
 
 from pyverge.core.types import VersionValue
 from pyverge.versioning import FieldDescriptor, NoDefault, VersionKey
@@ -22,12 +21,13 @@ class ModelCodec:
     def kind(self, fields: Mapping[str, FieldDescriptor]) -> str:
         return self._default(fields, self.kind_property)
 
-    def version_key(self, *, kind: str, version: str) -> VersionKey[VersionValue]:
-        return VersionKey[VersionValue](
-            namespace=self.namespace,
-            kind=kind,
-            version=cast("VersionValue", version),
-        )
+    def version_key(
+        self,
+        *,
+        kind: str,
+        version: str | VersionValue,
+    ) -> VersionKey[VersionValue]:
+        return VersionKey[VersionValue].parse(self.namespace, kind, version)
 
     @staticmethod
     def _default(fields: Mapping[str, FieldDescriptor], name: str) -> str:

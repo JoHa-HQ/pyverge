@@ -38,6 +38,7 @@ from tests.examples.json import (
     USER_V0_1_1_DEV_7,
     USER_V1_0_0,
     USER_V1_2_3,
+    USER_V2025_03_10,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -421,6 +422,47 @@ class TestModelManagement:
         version = envelope_model(engine.adapter, None, models)
         with pytest.raises(CatalogError):
             engine.remove_model(version)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "store_cases_semver", [], []],
+                UserV1,
+                id="pydantic_store_cases",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "store_cases_chrono", [], []],
+                USER_V2025_03_10,
+                id="json_chrono_store_cases",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_store_model_key_and_node_cases(
+        self,
+        model_adapter: types.ModelAdapter,
+        migration_settings: MigrationSettings,
+        engine: Engine[types.VersionValue],
+        model: ModelHandle,
+    ) -> None:
+        node = envelope_model(model_adapter, migration_settings, model)
+        key = VersionKey(
+            namespace=node.namespace,
+            kind=node.kind,
+            version=node.version,
+        )
+
+        assert engine.store_model(key) == key
+        assert engine.store_model(key) == key
+        assert engine.registry.find_model(key) is None
+
+        assert engine.store_model(node) == node
+        assert engine.store_model(node) == node
+        assert engine.store_model(model) == node
+        assert engine.registry.get_model(key) == node
 
 
 class TestMigrationManagement:
