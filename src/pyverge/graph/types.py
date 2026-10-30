@@ -9,6 +9,7 @@ from pyverge.versioning import (
     Diffable,
     EdgeEntry,
     EdgeKey,
+    MigrationDescriptor,
     ModelRef,
     NodeEntry,
     Transitional,
@@ -60,6 +61,9 @@ class MigrationDefinition(Protocol[VersionValue]):
 
     @property
     def func(self) -> MigrationFunc: ...
+
+    @property
+    def migration(self) -> MigrationDescriptor: ...
 
 
 @runtime_checkable

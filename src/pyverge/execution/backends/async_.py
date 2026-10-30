@@ -12,6 +12,7 @@ import anyio
 from pyverge.core.context import MigrationContext
 from pyverge.core.types import VersionValue
 from pyverge.execution.context import RunContext, StepContext
+from pyverge.execution.hooks.state import new_hook_state
 from pyverge.execution.plan import ExecutionPlan, PathPlanEntry
 from pyverge.graph.planning.path import Path
 from pyverge.schemas.types import ModelIdentityPort
@@ -40,6 +41,7 @@ class AsyncBackend:
         adapter: ModelIdentityPort,
     ) -> dict[str, Any]:
         data = copy.deepcopy(payload)
+        hook_state = new_hook_state()
         for level in plan.levels:
             if self.max_workers > 1:
                 limiter = anyio.CapacityLimiter(self.max_workers)
@@ -51,16 +53,19 @@ class AsyncBackend:
                             data,
                             run,
                             adapter,
+                            hook_state,
                             limiter,
                         )
             else:
                 for entry in level:
-                    await self._execute_entry(entry, data, run, adapter)
+                    await self._execute_entry(entry, data, run, adapter, hook_state)
         return data
 
-    async def _execute_entry_limited(self, entry, data, run, adapter, limiter) -> None:
+    async def _execute_entry_limited(  # noqa: PLR0913, PLR0917
+        self, entry, data, run, adapter, hook_state, limiter
+    ) -> None:
         async with limiter:
-            await self._execute_entry(entry, data, run, adapter)
+            await self._execute_entry(entry, data, run, adapter, hook_state)
 
     async def _execute_entry(
         self,
@@ -68,14 +73,27 @@ class AsyncBackend:
         data: dict[str, Any],
         run: RunContext,
         adapter: ModelIdentityPort,
+        hook_state: Any,
     ) -> None:
         current = Path(*entry.path).get(data)
         for index, (source, target) in enumerate(entry.steps):
             func = entry.migrations[index]
             hooks = entry.hooks[index]
             name = getattr(func, "__name__", f"{source}->{target}")
+            migration = (
+                entry.migration_descriptors[index]
+                if index < len(entry.migration_descriptors)
+                else None
+            )
             for hook in hooks:
-                result = hook.before_migrate(name, source, target, current)
+                result = hook.before_migrate(
+                    name,
+                    source,
+                    target,
+                    current,
+                    migration=migration,
+                    state=hook_state,
+                )
                 if inspect.isawaitable(result):
                     await result
             step = self._step(entry, index, source, target, run)
@@ -83,12 +101,28 @@ class AsyncBackend:
                 migrated = await self._invoke(func, current, step.view)
             except Exception as error:
                 for hook in hooks:
-                    result = hook.on_error(name, source, target, current, error)
+                    result = hook.on_error(
+                        name,
+                        source,
+                        target,
+                        current,
+                        error,
+                        migration=migration,
+                        state=hook_state,
+                    )
                     if inspect.isawaitable(result):
                         await result
                 raise
             for hook in hooks:
-                result = hook.after_migrate(name, source, target, current, migrated)
+                result = hook.after_migrate(
+                    name,
+                    source,
+                    target,
+                    current,
+                    migrated,
+                    migration=migration,
+                    state=hook_state,
+                )
                 if inspect.isawaitable(result):
                     await result
             if isinstance(migrated, dict):

@@ -1216,15 +1216,35 @@ def test_runner_calls_sync_hooks(
     calls: list[str] = []
 
     class _Hook:
-        def before_migrate(self, name, from_version, to_version, data):
+        def before_migrate(  # noqa: PLR0913
+            self, name, from_version, to_version, data, *, migration=None, state=None
+        ):
             calls.append("before")
 
-        def after_migrate(
-            self, name, from_version, to_version, original_data, migrated_data
+        def after_migrate(  # noqa: PLR0913
+            self,
+            name,
+            from_version,
+            to_version,
+            original_data,
+            migrated_data,
+            *,
+            migration=None,
+            state=None,
         ):
             calls.append("after")
 
-        def on_error(self, name, from_version, to_version, data, error):
+        def on_error(  # noqa: PLR0913
+            self,
+            name,
+            from_version,
+            to_version,
+            data,
+            error,
+            *,
+            migration=None,
+            state=None,
+        ):
             calls.append("error")
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
@@ -1271,15 +1291,35 @@ def test_runner_awaits_async_hooks(
     calls: list[str] = []
 
     class _AsyncHook:
-        async def before_migrate(self, name, from_version, to_version, data):
+        async def before_migrate(  # noqa: PLR0913
+            self, name, from_version, to_version, data, *, migration=None, state=None
+        ):
             calls.append("before")
 
-        async def after_migrate(
-            self, name, from_version, to_version, original_data, migrated_data
+        async def after_migrate(  # noqa: PLR0913
+            self,
+            name,
+            from_version,
+            to_version,
+            original_data,
+            migrated_data,
+            *,
+            migration=None,
+            state=None,
         ):
             calls.append("after")
 
-        def on_error(self, name, from_version, to_version, data, error):
+        def on_error(  # noqa: PLR0913
+            self,
+            name,
+            from_version,
+            to_version,
+            data,
+            error,
+            *,
+            migration=None,
+            state=None,
+        ):
             calls.append("error")
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))

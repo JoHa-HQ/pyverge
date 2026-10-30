@@ -10,7 +10,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.graph.planning.path import Path
-from pyverge.versioning import ModelRef, VersionNode
+from pyverge.versioning import MigrationDescriptor, ModelRef, VersionNode
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +24,7 @@ class PathPlanEntry(Generic[VersionValue]):
     steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
     hooks: tuple[tuple[Attachable, ...], ...]
     migrations: tuple[MigrationFunc, ...]
+    migration_descriptors: tuple[MigrationDescriptor, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

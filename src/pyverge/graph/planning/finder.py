@@ -15,7 +15,7 @@ from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
 from pyverge.graph.planning.policy import PolicyEngine
 from pyverge.graph.planning.targets import TargetCompiler, TargetPolicy
 from pyverge.graph.types import MigrationResolver, PathGraphView
-from pyverge.versioning import EdgeKey, NodeId, VersionNode
+from pyverge.versioning import EdgeKey, MigrationDescriptor, NodeId, VersionNode
 
 if TYPE_CHECKING:
     from pyverge.execution.plan import ExtractedEntry
@@ -28,6 +28,7 @@ class ResolvedPath(Generic[VersionValue]):
     steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
     hooks: tuple[tuple[Attachable, ...], ...]
     migrations: tuple[MigrationFunc, ...]
+    descriptors: tuple[MigrationDescriptor, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,14 +90,15 @@ class PathFinder(Generic[VersionValue]):
                 tuple(self.migrations.hooks(EdgeKey.from_pair(source, step_target)))
                 for source, step_target in steps
             )
-            migrations = tuple(
-                self.migrations.resolve(EdgeKey.from_pair(source, step_target)).func
+            definitions = tuple(
+                self.migrations.resolve(EdgeKey.from_pair(source, step_target))
                 for source, step_target in steps
             )
             resolved = ResolvedPath(
                 steps=steps,
                 hooks=hooks,
-                migrations=migrations,
+                migrations=tuple(definition.func for definition in definitions),
+                descriptors=tuple(definition.migration for definition in definitions),
             )
             self._cache[cache_key] = resolved
         else:
@@ -109,6 +111,7 @@ class PathFinder(Generic[VersionValue]):
             steps=resolved.steps,
             hooks=resolved.hooks,
             migrations=resolved.migrations,
+            migration_descriptors=resolved.descriptors,
         )
 
 

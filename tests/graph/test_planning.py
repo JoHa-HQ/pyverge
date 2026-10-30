@@ -344,6 +344,9 @@ def test_path_finder_resolves_declarative_migrations(
     )
 
     assert plan.entries[0].migrations == (migration,)
+    descriptor = plan.entries[0].migration_descriptors[0]
+    assert descriptor.strategy == strategy
+    assert descriptor.identity
     assert plan.entries[0].steps[-1][1] == target
     edge = next(iter(snapshot.migrations("User")))
     assert snapshot.edge_metadata[edge]["strategy"] == strategy
