@@ -31,6 +31,14 @@ policy, and graph-level plans. Execution consumes those services.
 
 ::: pyverge.graph.TargetCompiler
 
+::: pyverge.graph.types.MigrationDefinition
+
+::: pyverge.graph.types.MigrationResolver
+
+::: pyverge.graph.types.GraphView
+
+::: pyverge.graph.types.PathGraphView
+
 ::: pyverge.graph.PolicyEngine
 
 ## Boundaries
@@ -40,3 +48,5 @@ policy, and graph-level plans. Execution consumes those services.
 - A key-only entry is a valid placeholder.
 - Execution requires the selected path to be fully hydrated and every edge to
   have an executable migration binding.
+- `PathPlanEntry.migration_descriptors` exposes strategy and identity for each
+  step; callables and descriptors are resolved separately from graph identity.

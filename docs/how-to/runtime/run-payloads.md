@@ -8,7 +8,16 @@ Task examples for sync, async, process-isolated, and context-aware execution.
 - A target policy.
 - A backend matching sync, async, or process execution needs.
 
-## Steps
+## Before execution
+
+Planning validates the complete selected path against the graph snapshot:
+
+- every selected node must be hydrated;
+- every selected edge must have an executable migration binding;
+- the graph namespace must match the manager namespace.
+
+Key-only nodes and unbound edges are valid graph content, but they forbid
+execution until completed.
 
 ## Sync
 

@@ -21,7 +21,8 @@ newest, asserting every hop yields the correctly-typed container.
 ```python
 def test_migration_topology(manager, kind, versions):
     newest, oldest = versions[-1], versions[0]
-    newest_cls = manager.get(kind, newest).model
+    newest_node = manager.get(kind, newest)
+    newest_cls = manager.adapter.resolve(newest_node.descriptor.ref)
 
     data = newest_cls.model_validate(
         {"kind": kind, "version": newest, "city": "Berlin"}
@@ -29,7 +30,8 @@ def test_migration_topology(manager, kind, versions):
 
     # Down-walk: newest -> oldest, validating each hop against its model.
     for version in reversed(versions):
-        cls = manager.get(kind, version).model
+        node = manager.get(kind, version)
+        cls = manager.adapter.resolve(node.descriptor.ref)
         result = manager.runner().run(
             data.model_dump(mode="json"), target=version, container=cls
         )
@@ -107,7 +109,8 @@ per version:
 ```python
 def test_older_models_were_reconstructed(manager):
     v1 = manager.get(kind, "1.0.0")
-    assert "wind" not in v1.model.model_fields
+    model = manager.adapter.resolve(v1.descriptor.ref)
+    assert "wind" not in model.model_fields
 ```
 
 ### Testing callable migrations
@@ -169,7 +172,9 @@ def test_all_versions_match_snapshot(manager, snapshot, subtests):
     for node in manager.list_versions(kind):
         version = str(node.version[1])
         with subtests.test(version=version):
-            payload = node.model.sample()
+            # Build a valid payload for this version from your model factory.
+            model = manager.adapter.resolve(node.descriptor.ref)
+            payload = model(**valid_payload_for(version))
             document = {"container": payload.model_dump(mode="json")}
             assert Doc.model_validate(document).model_dump(mode="json") == snapshot(
                 name=version
@@ -190,7 +195,8 @@ def _field_surface(model: type[BaseModel]) -> dict[str, str]:
 
 @pytest.mark.parametrize("version", ALL_VERSIONS)
 def test_version_field_surface_matches_snapshot(manager, version, snapshot):
-    model = manager.get(kind, version).model
+    node = manager.get(kind, version)
+    model = manager.adapter.resolve(node.descriptor.ref)
     assert _field_surface(model) == snapshot(name=f"{kind}@{version}")
 ```
 
@@ -207,6 +213,26 @@ def test_one_span_per_step(manager, span_exporter):
     spans = span_exporter.get_finished_spans()
     assert all(s.name.endswith(".migrate") for s in spans)
     assert span_exporter.get_finished_spans()[0].attributes["migration.kind"] == kind
+```
+
+### Graph and synthetic coverage
+
+The repository separates graph tests into `tests/graph/`:
+
+- `test_identity.py` — `NodeId`, `VersionKey`, `EdgeKey`, digests;
+- `test_builder.py` — snapshot construction and key-only entries;
+- `test_paths.py` — complete-path hydration and binding;
+- `test_planning.py` — `PathFinder`, target policy, policy engine;
+- `test_synthetic.py` — Hypothesis-generated graph shapes.
+
+Prefer behavior-level assertions through the public graph API. Reuse the shared
+`registry`, `graph`, `nodes`, and `path_finder` fixtures instead of rebuilding
+adapters in each test.
+
+```python
+@pytest.mark.parametrize("nodes", [[UserV1, UserV2]], indirect=True)
+def test_graph_path(graph, nodes):
+    assert graph().migration_path(nodes[0], nodes[1]) == [(nodes[0], nodes[1])]
 ```
 
 See [testing approach](../../explanation/testing.md) for layering and end-to-end test strategy.

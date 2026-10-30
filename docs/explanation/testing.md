@@ -11,8 +11,17 @@ for hop in walk_topology(manager, kind, versions):
     ...
 ```
 
-Define the round-trip helper **locally in the test module** — it is a few lines
-and has a single caller, so a separate module would be over-abstraction.
+Graph-specific fixtures live in `tests/graph/conftest.py`:
+
+- `registry` — configured storage;
+- `graph` — an `engine.snapshot` factory;
+- `nodes` — materialized nodes from parametrized models;
+- `path_finder` — a planner facade configured through `request.param`.
+
+Prefer behavior-level graph tests over internal reassembly. The graph suite is
+split into identity, builder, paths, planning, and synthetic Hypothesis-driven
+scenarios. Use `GraphBuilder`, `PathFinder`, and public registry operations
+rather than reaching into private indexes.
 
 Framework wiring (servers, tracing) lives behind adapters and is exercised by
 its own thin suite. Dependency injection keeps the graph construction testable:
@@ -41,6 +50,7 @@ async def test_call_any_version_converges(app):
         assert result.structured_content == expected_anchor_shape
 ```
 
-Reserve unit-style tests for pure layers (the domain graph), and keep the
-end-to-end suite small: one convergence suite plus the topology round trip is
-usually enough.
+Reserve unit-style tests for pure layers, and keep the end-to-end suite small:
+one convergence suite plus the topology round trip is usually enough. For graph
+topology use Hypothesis to generate namespace, node count, hydration, and edge
+connectivity combinations, then assert observable path behavior only.

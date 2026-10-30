@@ -51,3 +51,24 @@ be executed until hydrated and bound.
 
 **PathFinder** — graph-planning facade that compiles target policy, resolves
 migration paths, applies policy, and produces a `PathPlan`.
+
+**GraphBuilder** — compiles registry storage into an immutable `MigrationGraph`
+snapshot.
+
+**MigrationDefinition** — executable binding for one edge: diff, callable, and
+`MigrationDescriptor`.
+
+**MigrationResolver** — execution-side lookup for migration definitions and
+hooks by `EdgeKey`.
+
+**PathFinder** — graph-planning facade that compiles target policy, resolves
+paths, applies policy, and returns a `PathPlan`.
+
+**Path plan** — `PathPlan` and `PathPlanEntry`: resolved steps, hooks, callables,
+migration descriptors, and target model for each discovered payload entry.
+
+**Graph view** — protocol used by graph consumers. `GraphView` covers models and
+migration existence; `PathGraphView` adds `migration_path`.
+
+**Hook state** — backend-provided `ContextVar` used to keep per-step telemetry
+state isolated across async tasks and threads.

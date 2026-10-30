@@ -180,6 +180,38 @@ Key-only entries and hydrated entries are both valid registry content.
 Hydration upgrades a key placeholder to a full node; reconciliation resolves
 schema differences on an existing full node. The two operations are distinct.
 
+## Hook contract
+
+Hook callbacks now receive explicit graph identity and migration metadata:
+
+```python
+def before_migrate(
+    self,
+    name,
+    from_version: NodeId,
+    to_version: NodeId,
+    data,
+    *,
+    migration: MigrationDescriptor | None = None,
+    state: HookState,
+): ...
+```
+
+- `from_version` / `to_version` are `NodeId`, not generic comparable values.
+- `migration` carries `strategy` and `identity`.
+- `state` is a backend-provided `ContextVar`; hooks must not keep per-step state
+  on the instance.
+- Async hooks are declared with `async def` on the normal callback names.
+  `abefore_migrate` / `aafter_migrate` do not exist.
+
+OpenLineage namespace validation moved to `OpenLineageMiddleware`. The middleware
+compares its configured namespace with the graph namespace when the graph has
+one.
+
+Path resolution moved out of the registry. Use `GraphBuilder` plus
+`MigrationGraph.migration_path` or `PathFinder`; `InMemoryCatalog.migration_path`
+no longer exists.
+
 ## Import moves
 
 ```python

@@ -87,15 +87,23 @@ manager = UserManager()
 ### Runtime instance registration
 
 A runtime instance receives a **copy** of the class engine and registry at
-construction time. Registration methods are class methods, so this writes to the
-class graph:
+construction time. Calling a registration method on an instance updates that
+instance's engine only; calling it on the class updates the class default engine
+copied by future instances.
 
 ```python
+from pyverge.types import ManagerMigrationKey
+
 manager = UserManager()
-manager.store_model(UserV1)  # class graph, not manager.engine
+manager.store_model(UserV1)  # this instance only
+manager.store_migration(
+    ManagerMigrationKey("User", "1.0.0", "2.0.0"),
+    add_age,
+)
 ```
 
-Register before instantiating when possible:
+Register on the class before instantiating when every instance should share the
+same graph:
 
 ```python
 UserManager.model()(UserV1)
@@ -104,23 +112,8 @@ UserManager.migration("User", "1.0.0", "2.0.0")(add_age)
 manager = UserManager()
 ```
 
-For deliberate instance-local registration, target the instance engine:
-
-```python
-from pyverge.types import ManagerMigrationKey
-
-manager = UserManager()
-manager.store_model(UserV1, engine=manager.engine)
-manager.store_model(UserV2, engine=manager.engine)
-manager.store_migration(
-    ManagerMigrationKey("User", "1.0.0", "2.0.0"),
-    add_age,
-    engine=manager.engine,
-)
-```
-
-Use instance-local registration only for isolated runtimes, tests, or dynamic
-graphs. Class-level registration remains the default.
+Use instance-local registration for isolated runtimes, tests, or dynamic
+graphs. Class-level registration remains the default for application wiring.
 
 ## Verify
 

@@ -39,6 +39,7 @@ Manager.get_latest_model(kind)
 Manager.list_versions(kind=None)
 Manager.get_entities()
 Manager.diff(key)
+Manager.migration_graph()
 ```
 
 ## Registration and lifecycle
@@ -53,9 +54,14 @@ Manager.add_hook(key, hook)
 Manager.attach_hooks(hooks)
 ```
 
-Class-level calls update the default engine copied by new instances. Instance
-calls update only that instance's engine. Existing instances are not affected by
-later class-level registration.
+`store_model` accepts a model class, `VersionKey`, or `VersionNode`.
+Key-only entries are valid placeholders; `VersionNode` hydrates a matching
+placeholder. `reconcile_model` is schema reconciliation, not hydration.
+
+`migration_graph()` returns an immutable graph snapshot built from the current
+engine registry. Class-level calls update the default engine copied by new
+instances. Instance calls update only that instance's engine. Existing
+instances are not affected by later class-level registration.
 
 ```python
 UserManager.add_hook(key, hook)  # affects new instances

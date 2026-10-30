@@ -26,6 +26,9 @@ adapter = PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="
 `ModelCodec` is required. It carries `namespace`, `version_property`,
 `kind_property`, and the Pydantic payload/reflection strategy shared by
 Pydantic-backed providers. Version-string parsing belongs to `NodeId`.
+`ModelCodec.namespace` is the adapter's identity namespace: adapters stamp it
+onto nodes, keys, and references. The manager derives its registry namespace
+from the same codec, so there is no second namespace setting to keep in sync.
 
 ## Container checks
 

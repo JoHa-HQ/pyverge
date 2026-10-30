@@ -1,5 +1,24 @@
 # Real-World Scenarios
 
+## Multi-tenant and multi-package graphs
+
+The same kind and version can exist in different namespaces:
+
+```text
+com.acme.orders:User@1.0.0
+com.acme.billing:User@1.0.0
+```
+
+Each graph snapshot is single-namespace, and cross-namespace edges are
+rejected. This lets packages, tenants, or deployment units evolve independently
+while sharing one runtime library.
+
+## Discovery before model loading
+
+Some sources know topology before they can load models. Store key-only entries
+first, hydrate nodes when schemas become available, and only then execute a
+path. Discovery can therefore be decoupled from schema loading and deployment.
+
 ## MCP tool schemas
 
 An LLM tool platform exposes hundreds of tools. Each tool has an input schema

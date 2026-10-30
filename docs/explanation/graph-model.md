@@ -51,7 +51,16 @@ VersionEdge  EdgeKey + diff + executable migration
 ```
 
 Graph snapshots contain identity and serializable migration metadata. They never
-contain Python callables.
+contain Python callables. The execution side resolves them through a
+`MigrationResolver`:
+
+```text
+MigrationDefinition  diff + callable + MigrationDescriptor
+MigrationResolver    EdgeKey -> MigrationDefinition / hooks
+```
+
+This is what lets graph topology be cached and compared independently of
+executable code.
 
 ## Key-only and hydrated entries
 
@@ -68,6 +77,10 @@ Key-only entries are valid graph content. They let discovery and routing record
 topology before models are loaded.
 
 ```python
+from pyverge.registry import Registry
+from pyverge.versioning import default_content_hasher
+
+registry = Registry(namespace="com.acme.users", hasher=default_content_hasher())
 registry.store(key)          # key-only placeholder
 registry.hydrate(node)       # upgrade with a full node
 ```

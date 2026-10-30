@@ -156,13 +156,13 @@ class CallSpanMiddleware(Middleware):
 server.middleware = [CallSpanMiddleware(tracer, "my-service")]
 ```
 
-See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the per-step `OTELHook`.
+See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the per-step `OTELHook`. Step spans include graph namespace, kind, source/target, and migration strategy/identity when available.
 
 ### Testing
 
 The adapter is designed to be driven through the public server surface. See the
 [Testing](../../how-to/operations/test-migrations.md) guide and the worked
-[`showcases/fastmcp`https://github.com/JoHa-HQ/pyverge/tree/main/showcases/fastmcp
+[`showcases/fastmcp`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/fastmcp)
 project (a layered FastMCP app with `dependency-injector` and OpenTelemetry).
 
 ## Verify
