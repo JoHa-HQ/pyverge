@@ -2330,6 +2330,29 @@ class TestReferences:
         with pytest.raises(ModelNotFoundError):
             registry.missing_references(unregistered)
 
+    def test_references_and_missing_references_carry_namespace(self) -> None:
+        adapter = PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="orders",
+                version_property="version",
+                kind_property="kind",
+            )
+        )
+        registry = Registry[semver.Version](
+            namespace="orders",
+            hasher=default_content_hasher(),
+        )
+        node = adapter.versionable(PersonV1)
+        registry.store(node)
+
+        expected = {
+            NodeId("orders", "Address", semver.Version(1, 0, 0)),
+            NodeId("orders", "Address", semver.Version(2, 0, 0)),
+            NodeId("orders", "Address", semver.Version(3, 0, 0)),
+        }
+        assert node.references == expected
+        assert registry.missing_references(node) == expected
+
 
 class TestNeutralGraphOps:
     """Registry owns low-level graph traversal and reconciliation."""

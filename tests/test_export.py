@@ -18,8 +18,9 @@ from pyverge.export import (
 )
 from pyverge.jgf import JgfExporter
 from pyverge.registry import Registry
-from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.schemas.types import ModelHandle
+from pyverge.settings import VersioningSettings
 from pyverge.versioning import (
     ChangeSet,
     ContentHasher,
@@ -29,9 +30,11 @@ from pyverge.versioning import (
     FieldStatus,
     FrozenMap,
     default_canonicalizer,
+    default_content_hasher,
 )
 from tests.examples.json import USER_V2025_01_01, USER_V2025_03_10
 from tests.examples.pydantic.semver import UserV1, UserV2
+from tests.utils import edge_from_models
 
 
 class _FixedAlgorithm:
@@ -86,6 +89,60 @@ def test_manifest_uses_explicit_spec_and_injected_hasher(
     )
     assert document == snapshot
     assert exporter.content_hash(registry) == "fixed-hash"
+
+
+def test_manifest_ids_are_namespace_prefixed() -> None:
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="orders",
+            version_property="version",
+            kind_property="kind",
+        )
+    )
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    registry.store(adapter.versionable(UserV1))
+    registry.store(adapter.versionable(UserV2))
+    registry.store_migration(
+        edge_from_models(
+            adapter,
+            VersioningSettings(),
+            UserV1,
+            UserV2,
+            func=lambda data, _: data,
+        )
+    )
+    spec = ManifestSpec(
+        graph_id="orders",
+        label="orders",
+        manifest_version=ManifestVersion.V1,
+        tool_version="0.0-test",
+    )
+
+    document = ManifestExporter(spec, JgfExporter(default_content_hasher())).export(
+        registry,
+        manager="tests",
+    )
+
+    graph = document["graph"]
+    assert set(graph["nodes"]) == {"orders:User@1.0.0", "orders:User@2.0.0"}
+    assert graph["edges"][0]["id"] == "orders:User@1.0.0->orders:User@2.0.0"
+    assert graph["edges"][0]["source"] == "orders:User@1.0.0"
+    assert graph["edges"][0]["target"] == "orders:User@2.0.0"
+    assert graph["edges"][0]["metadata"]["namespace"] == "orders"
+
+
+def test_manifest_diff_treats_namespace_as_identity() -> None:
+    left = {"graph": {"nodes": {"orders:User@1.0.0": {}}, "edges": []}}
+    right = {"graph": {"nodes": {"billing:User@1.0.0": {}}, "edges": []}}
+
+    diff = ManifestDiff.compare(left, right)
+
+    assert diff.changed is True
+    assert diff.nodes.added == frozenset({"billing:User@1.0.0"})
+    assert diff.nodes.removed == frozenset({"orders:User@1.0.0"})
 
 
 def test_change_set_summary_and_flag() -> None:

@@ -1102,6 +1102,24 @@ class TestPrimitives:
         assert restored.to_canonical() == payload
         assert restored.descriptor == node.descriptor
 
+    def test_namespaced_canonical_round_trip_preserves_references(self) -> None:
+        adapter = DataclassModelAdapter(
+            codec=ModelCodec(
+                namespace="orders",
+                version_property="version",
+                kind_property="kind",
+            )
+        )
+        node = adapter.versionable(DataclassPersonV1)
+
+        payload = node.to_canonical()
+        restored = VersionNode.from_canonical(payload, parse_version=parse_version)
+
+        assert restored.namespace == "orders"
+        assert restored.to_canonical() == payload
+        assert restored.references == node.references
+        assert all(reference.namespace == "orders" for reference in restored.references)
+
     @pytest.mark.parametrize(
         "node",
         [[DataclassModelAdapter, DataclassPersonV1]],

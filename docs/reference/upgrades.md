@@ -163,6 +163,12 @@ One registry owns one namespace. The manager defaults an empty namespace.
 Cross-namespace edges are forbidden. Identity objects no longer expose
 `jgf_id`; JGF/export renders namespace-prefixed external IDs.
 
+Descriptor references are `NodeId` values and therefore carry their namespace
+through canonical serialization, missing-reference checks, and JGF/manifest
+export. A registry resolves an empty reference namespace against its own
+namespace. Explicit foreign-namespace references remain unresolved unless that
+identity is present in the same registry; cross-namespace edges are rejected.
+
 ## Import moves
 
 ```python

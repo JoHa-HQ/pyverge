@@ -23,11 +23,14 @@ def export(
             "kinds": {
                 kind: [
                     {
+                        "id": str(version),
+                        "namespace": version.namespace,
                         "version": str(version.version),
                         "model": version.model_id,
                         "fields": sorted(version.fields),
                         "references": [
                             [
+                                reference.namespace,
                                 reference.kind,
                                 str(reference.version),
                             ]
@@ -47,6 +50,8 @@ def export(
             },
             "migrations": [
                 {
+                    "id": str(edge),
+                    "namespace": edge.namespace,
                     "kind": edge.kind,
                     "from": str(edge.source.version),
                     "to": str(edge.target.version),

@@ -168,7 +168,11 @@ checks node/edge content. It exits `1` on divergence.
 This is an explicit CLI contract. The runtime/lifespan does not write it.
 Generate it in CI or from a build job, then compare snapshots across revisions.
 
-`export` remains as the legacy flat manifest.
+`export` remains as the legacy flat manifest. It renders namespace-aware IDs:
+
+- node entries include `id` (`namespace:kind@version`) and `namespace`;
+- migration entries include `id`, `namespace`, `kind`, `from`, and `to`;
+- references are `[namespace, kind, version]`.
 
 ## `init`
 
