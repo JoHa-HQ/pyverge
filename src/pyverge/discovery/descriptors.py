@@ -38,7 +38,6 @@ def register_descriptor(
     sink: RegistrationSink,
 ) -> bool:
     """Apply one descriptor through the application registration port."""
-
     return False
 
 
