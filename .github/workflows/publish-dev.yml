@@ -59,7 +59,8 @@ jobs:
             exit 0
           fi
 
-          DEV=$(uv run --no-sync cz bump --get-next --devrelease ${GITHUB_RUN_ID})
+          echo "Next release: ${NEXT}"
+          DEV=$(uv run --no-sync cz bump --get-next --devrelease "${GITHUB_RUN_ID}")
           echo "Release(dev): ${DEV}"
 
           TAG="v${DEV}"
@@ -151,6 +152,6 @@ jobs:
           body: |
             Dev build published to TestPyPI.
 
-            Version: ${{ steps.version.outputs.dev }}
-            Tag: ${{ steps.version.outputs.tag }}
-            Commit: ${{ steps.version.outputs.sha }}
+            Version: ${{ needs.prepare-release.outputs.dev }}
+            Tag: ${{ needs.prepare-release.outputs.tag }}
+            Commit: ${{ needs.prepare-release.outputs.sha }}
