@@ -47,6 +47,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter):
                 output_model_type=DataModelType.PydanticV2BaseModel,
                 formatters=[Formatter.BUILTIN],
                 use_annotated=True,
+                field_constraints=True,
                 allow_remote_refs=False,
             )
             namespace: dict[str, Any] = {}

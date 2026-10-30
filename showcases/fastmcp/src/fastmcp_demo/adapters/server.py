@@ -183,7 +183,7 @@ def build_lifespan(discovery: FastMCPDiscovery, *, transforms: Sequence[Any] = (
     async def app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
         logger.info("discovery lifecycle: search -> register -> enrich")
         await discovery.search(server)
-        discovery.register()
+        await discovery.register(server)
         await discovery.enrich(server)
         for transform in transforms:
             server.add_transform(transform)

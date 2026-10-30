@@ -1,0 +1,9 @@
+FROM docker:27-cli
+
+ARG ACT_VERSION=0.2.92
+
+RUN apk add --no-cache curl tar \
+    && curl -fsSL "https://github.com/nektos/act/releases/download/v${ACT_VERSION}/act_Linux_x86_64.tar.gz" \
+       | tar -xz -C /usr/local/bin act
+
+ENTRYPOINT ["act"]
