@@ -17,12 +17,16 @@ from pyverge.versioning import (
 
 
 @runtime_checkable
-class GraphView(
-    ModelCatalog[VersionValue], PathCatalog[VersionValue], Protocol[VersionValue]
-):
+class GraphView(ModelCatalog[VersionValue], Protocol[VersionValue]):
     """Broad read-only graph surface consumed by graph planning."""
 
     def has_migration(self, key: Transitional[VersionValue]) -> bool: ...
+
+
+class PathGraphView(
+    GraphView[VersionValue], PathCatalog[VersionValue], Protocol[VersionValue]
+):
+    """Graph view with migration-path resolution."""
 
 
 @runtime_checkable
@@ -106,4 +110,5 @@ __all__ = [
     "GraphView",
     "MigrationDefinition",
     "MigrationResolver",
+    "PathGraphView",
 ]

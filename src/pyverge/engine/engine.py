@@ -355,7 +355,7 @@ class Engine(Generic[VersionValue]):
         from_version: Versionable,
         to_version: Versionable,
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
-        return self.registry.migration_path(from_version, to_version)
+        return self.snapshot().migration_path(from_version, to_version)
 
     def add_hook(self: Self, key: Transitional[VersionValue], hook: Attachable) -> None:
         edge = self.registry.get_migration_by_edge(key)

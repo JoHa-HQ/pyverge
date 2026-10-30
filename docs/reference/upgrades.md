@@ -169,6 +169,17 @@ export. A registry resolves an empty reference namespace against its own
 namespace. Explicit foreign-namespace references remain unresolved unless that
 identity is present in the same registry; cross-namespace edges are rejected.
 
+## Compatibility boundary
+
+The manager is the compatibility layer. Manager entry points accept model
+classes and tuple-shaped migration keys; engine, registry, discovery, graph,
+and execution paths operate on `NodeId`, `VersionKey`, `EdgeKey`,
+`VersionNode`, and `VersionEdge`.
+
+Key-only entries and hydrated entries are both valid registry content.
+Hydration upgrades a key placeholder to a full node; reconciliation resolves
+schema differences on an existing full node. The two operations are distinct.
+
 ## Import moves
 
 ```python

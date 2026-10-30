@@ -27,6 +27,7 @@ from .types import (
     GraphView,
     MigrationDefinition,
     MigrationResolver,
+    PathGraphView,
 )
 
 __all__ = [
@@ -43,6 +44,7 @@ __all__ = [
     "MigrationResolver",
     "Path",
     "PathFinder",
+    "PathGraphView",
     "PathPlan",
     "PathPlanEntry",
     "PolicyEngine",

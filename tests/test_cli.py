@@ -494,7 +494,19 @@ class TestCommands:
             result = runner.invoke(app, ["export", "-m", f"{manager_name}:manager"])
 
         assert result.exit_code == 0
-        assert "User" in json.loads(result.stdout)["kinds"]
+        manifest = json.loads(result.stdout)
+        assert "User" in manifest["kinds"]
+        first = manifest["kinds"]["User"][0]
+        assert first["id"] == "User@1.0.0"
+        assert first["namespace"] == ""
+        assert all(
+            len(reference) == 3  # noqa: PLR2004
+            for reference in first["references"]
+        )
+        migration = manifest["migrations"][0]
+        assert migration["id"] == "User@1.0.0->User@2.0.0"
+        assert migration["namespace"] == ""
+        assert migration["kind"] == "User"
 
 
 def test_init_scaffolds_project(runner: CliRunner, tmp_path: Path) -> None:

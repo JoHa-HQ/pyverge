@@ -16,6 +16,7 @@ from pyverge.versioning import (
     Comparable,
     NodeId,
     Versionable,
+    VersionKey,
     VersionNode,
     parse_version,
 )
@@ -40,6 +41,8 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
+        if isinstance(key, VersionKey) and not key.namespace and cls._namespace:
+            key = key.with_namespace(cls._namespace)
         return cast(Versionable[VersionValue], engine.store_model(key))
 
     @store_model.register(VersionNode)
@@ -51,6 +54,8 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
+        if not version.namespace and cls._namespace:
+            version = version.with_namespace(cls._namespace)
         return cast(Versionable[VersionValue], engine.store_model(version))
 
     @hybridmethod
@@ -63,6 +68,8 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
+        if isinstance(key, VersionKey) and not key.namespace and cls._namespace:
+            key = key.with_namespace(cls._namespace)
         return cast(Versionable[VersionValue], engine.reconcile_model(key))
 
     @reconcile_model.register(VersionNode)
@@ -74,6 +81,8 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
+        if not version.namespace and cls._namespace:
+            version = version.with_namespace(cls._namespace)
         return cast(Versionable[VersionValue], engine.reconcile_model(version))
 
     def missing_references(

@@ -154,10 +154,6 @@ class VersionEdge(EdgeKey[VersionValue]):
     def is_executable(self) -> bool:
         return True
 
-    @property
-    def modelrefs(self) -> tuple[ModelRef, ModelRef]:
-        return self.source.modelref, self.target.modelref
-
     def with_diff(self, diff: Diffable[VersionValue]) -> Self:
         return type(self)(
             source=self.source,

@@ -340,11 +340,6 @@ def engine(
 
 
 @pytest.fixture
-def graph(engine: Engine[VersionValue]):
-    return engine.snapshot()
-
-
-@pytest.fixture
 def source(request: pytest.FixtureRequest) -> StaticSource:
     """Build a static source from ``(descriptors, source_id)`` params."""
     descriptors, source_id = request.param

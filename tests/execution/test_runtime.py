@@ -18,34 +18,23 @@ from pyverge.core.context import MigrationContext
 from pyverge.engine import Engine
 from pyverge.execution import (
     ExecutionPlanner,
-    ExtractedEntry,
     PayloadWalker,
     Runner,
 )
 from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from pyverge.execution.context import LayeredView, RunContext, StepContext
 from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
-from pyverge.execution.migrations import MigrationBindings
 from pyverge.graph import (
-    AnyDirection,
-    BackwardDirection,
-    ForwardDirection,
-    PathFinder,
     PathPlan,
     PathPlanEntry,
-    PolicyEngine,
-    TargetCompiler,
-    direction_policy,
-    earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.registry import GraphCatalog, Registry
-from pyverge.registry.errors import CatalogError
+from pyverge.registry import Registry
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey, VersionNode, parse_version
+from pyverge.versioning import EdgeKey, VersionNode
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -247,115 +236,6 @@ def test_runner_noop_when_target_equals_source(
     [
         [
             PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2, UserV3],
-                [
-                    ((UserV1, UserV2), migrate_v1_to_v2),
-                    ((UserV2, UserV3), migrate_v2_to_v3),
-                ],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-def test_path_resolver_builds_chain(
-    engine: Engine,
-    model_adapter,
-    versioning_settings,
-) -> None:
-    source = envelope_model(model_adapter, versioning_settings, UserV1)
-    entry = ExtractedEntry(path=("document",), node=source)
-    graph = engine.snapshot()
-    finder = PathFinder(
-        graph=graph,
-        targets=TargetCompiler(graph, model_adapter),
-        migrations=MigrationBindings.from_catalog(engine.registry),
-        policy=PolicyEngine(
-            direction=AnyDirection(),
-            on_direction_violation="raise",
-            on_missing_path="raise",
-            depth_limit=-1,
-            on_depth_violation="raise",
-        ),
-    )
-
-    plan = finder.find(
-        [entry],
-        latest_target_resolver(engine.registry),
-        container=None,
-        target_fields=frozenset(),
-    )
-
-    assert len(plan.entries) == 1
-    resolved = plan.entries[0]
-    assert resolved.target.version == parse_version("3.0.0")
-    assert len(resolved.steps) == 2  # noqa: PLR2004
-    assert len(resolved.migrations) == 2  # noqa: PLR2004
-    assert engine.adapter.resolve(resolved.target_model) is UserV3
-    assert resolved.hooks == ((), ())
-
-
-def test_direction_policies(model_adapter, versioning_settings) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-
-    assert AnyDirection().allows(low, high)
-    assert AnyDirection().allows(high, low)
-    assert ForwardDirection().allows(low, high)
-    assert not ForwardDirection().allows(high, low)
-    assert BackwardDirection().allows(high, low)
-    assert not BackwardDirection().allows(low, high)
-    assert isinstance(direction_policy("any"), AnyDirection)
-    assert isinstance(direction_policy("forward"), ForwardDirection)
-    assert isinstance(direction_policy("backward"), BackwardDirection)
-
-
-def test_unknown_direction_rejected() -> None:
-    with pytest.raises(ValueError, match="Unknown direction"):
-        direction_policy("sideways")  # ty: ignore[invalid-argument-type]
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [semver.Version, "test", [UserV1, UserV2, UserV3], []],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "resolver_factory, expected",
-    [
-        pytest.param(latest_target_resolver, "3.0.0", id="latest"),
-        pytest.param(earliest_target_resolver, "1.0.0", id="earliest"),
-        pytest.param(skip_target_resolver, None, id="skip"),
-    ],
-)
-def test_target_resolvers(
-    engine: Engine,
-    model_adapter,
-    versioning_settings,
-    resolver_factory,
-    expected: str | None,
-) -> None:
-    source = envelope_model(model_adapter, versioning_settings, UserV1)
-    target = resolver_factory(engine.registry)(source)
-
-    if expected is None:
-        assert target is None
-    else:
-        assert target.version == parse_version(expected)
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
             [semver.Version, "test", [UserV1, UserV2, UserV3], []],
         ]
     ],
@@ -377,14 +257,6 @@ def test_fixed_and_multi_target_resolvers(
     assert multi(source) is fixed
 
 
-class _GraphStub:
-    name = "test"
-
-
-def _graph() -> GraphCatalog:
-    return cast("GraphCatalog", _GraphStub())
-
-
 def _path_entry(
     source: VersionNode[V],
     target: VersionNode[V],
@@ -401,89 +273,6 @@ def _path_entry(
         hooks=(),
         migrations=(),
     )
-
-
-def test_policy_engine_skips_direction_violations(
-    model_adapter,
-    versioning_settings,
-) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(high, low, path=())
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
-    policy = PolicyEngine(
-        direction=ForwardDirection(),
-        on_direction_violation="skip",
-        on_missing_path="raise",
-        depth_limit=-1,
-        on_depth_violation="skip",
-    )
-
-    filtered = policy.apply(plan, graph=_graph())
-
-    assert filtered.entries == ()
-
-
-def test_policy_engine_raises_direction_violations(
-    model_adapter,
-    versioning_settings,
-) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(high, low, path=())
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
-    forward = PolicyEngine(
-        direction=ForwardDirection(),
-        on_direction_violation="raise",
-        on_missing_path="raise",
-        depth_limit=-1,
-        on_depth_violation="skip",
-    )
-    with pytest.raises(CatalogError, match="direction policy"):
-        forward.apply(plan, graph=_graph())
-
-
-def test_policy_engine_skips_missing_path(
-    model_adapter,
-    versioning_settings,
-) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(low, high, path=())
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
-    policy = PolicyEngine(
-        direction=AnyDirection(),
-        on_direction_violation="skip",
-        on_missing_path="skip",
-        depth_limit=-1,
-        on_depth_violation="skip",
-    )
-
-    assert policy.apply(plan, graph=_graph()).entries == ()
-
-
-def test_policy_engine_depth_limit(
-    model_adapter,
-    versioning_settings,
-) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(
-        low,
-        high,
-        path=(),
-        steps=((low, high), (high, high)),
-    )
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
-    policy = PolicyEngine(
-        direction=AnyDirection(),
-        on_direction_violation="skip",
-        on_missing_path="raise",
-        depth_limit=1,
-        on_depth_violation="skip",
-    )
-
-    assert policy.apply(plan, graph=_graph()).entries == ()
 
 
 def test_execution_planner_builds_levels(

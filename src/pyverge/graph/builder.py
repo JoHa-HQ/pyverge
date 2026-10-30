@@ -8,6 +8,7 @@ from typing import Any, Generic
 from pyverge.core.types import ModelKind, VersionValue
 from pyverge.graph.graph import MigrationGraph
 from pyverge.graph.types import GraphSnapshotSource
+from pyverge.registry.errors import CatalogError
 from pyverge.versioning import EdgeKey, NodeId
 
 
@@ -49,6 +50,15 @@ class GraphBuilder(Generic[VersionValue]):
                             "migration_id": migration.identity,
                         }
             edges_by_kind[kind] = tuple(edges)
+        namespaces = {node.namespace for node in nodes}
+        namespaces.update(
+            edge.source.namespace for edges in edges_by_kind.values() for edge in edges
+        )
+        if len(namespaces) > 1:
+            raise CatalogError(
+                source.name,
+                f"Graph cannot mix namespaces: {sorted(namespaces)}",
+            )
         return MigrationGraph(
             name=source.name,
             namespace=source.namespace,

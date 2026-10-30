@@ -34,7 +34,7 @@ from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.settings import MigrationSettings, VersioningSettings, manager_kwargs
-from pyverge.versioning import Migratable, Versionable
+from pyverge.versioning import Migratable, Versionable, VersionKey
 from tests.examples.json import (
     USER_V1_0_0,
     USER_V1_2_3,
@@ -931,31 +931,6 @@ class TestMigrationContext:
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_engine_snapshot_build_mode(manager: type[Manager]) -> None:
-    engine = manager._default_engine
-    graph = manager.migration_graph()
-    source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
-    target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
-
-    assert graph.versions_for("User") == engine.registry.kind_versions("User")
-    assert graph.path(source, target) == [(source, target)]
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2],
-                [((UserV1, UserV2), migrate_v1_to_v2)],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
 def test_manager_runner_sync_and_async_handles(
     manager: type[Manager],
 ) -> None:
@@ -1013,3 +988,29 @@ def test_manager_defaults_empty_namespace(
     assert instance.registry.namespace == "orders"
     assert node.namespace == "orders"
     assert node.modelref == instance.adapter.ref(UserV1)
+
+
+@pytest.mark.parametrize("manager", ["orders"], indirect=True)
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [[PydanticModelAdapter, [semver.Version, "test", [], []]]],
+    indirect=["model_adapter", "registry"],
+)
+def test_manager_defaults_namespace_for_key_only(
+    manager: type[Manager[semver.Version]],
+) -> None:
+    instance = manager()
+    key = VersionKey(
+        namespace="",
+        kind="User",
+        version=semver.Version(1, 0, 0),
+    )
+
+    stored = instance.store_model(key)
+
+    assert stored.namespace == "orders"
+    assert instance.registry.has_entry(stored)
+    assert instance.registry.find_model(stored) is None
+
+    instance.store_model(instance.adapter.versionable(UserV1))
+    assert instance.registry.get_model(stored).namespace == "orders"

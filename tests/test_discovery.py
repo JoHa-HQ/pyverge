@@ -107,8 +107,9 @@ def test_reflect_registers_migration_edge(
     assert engine.registry.has_migration(edge)
 
 
-def test_register_descriptor_accepts_key_only(engine: Engine) -> None:
-    node = engine.adapter.versionable(UserV1)
+@pytest.mark.parametrize("namespace", ["", "orders"])
+def test_register_descriptor_accepts_key_only(engine: Engine, namespace: str) -> None:
+    node = engine.adapter.versionable(UserV1).with_namespace(namespace)
     key = VersionKey(
         namespace=node.namespace,
         kind=node.kind,

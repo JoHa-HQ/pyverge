@@ -14,7 +14,7 @@ from pyverge.core.types import (
 from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
 from pyverge.graph.planning.policy import PolicyEngine
 from pyverge.graph.planning.targets import TargetCompiler, TargetPolicy
-from pyverge.graph.types import GraphView, MigrationResolver
+from pyverge.graph.types import MigrationResolver, PathGraphView
 from pyverge.versioning import EdgeKey, NodeId, VersionNode
 
 if TYPE_CHECKING:
@@ -22,21 +22,25 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True, slots=True)
+class ResolvedPath(Generic[VersionValue]):
+    """Cached graph-identity resolution for one source/target pair."""
+
+    steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
+    hooks: tuple[tuple[Attachable, ...], ...]
+    migrations: tuple[MigrationFunc, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class PathFinder(Generic[VersionValue]):
     """Resolve graph paths, apply target policy, and filter path plans."""
 
-    graph: GraphView[VersionValue]
+    graph: PathGraphView[VersionValue]
     targets: TargetCompiler[VersionValue]
     policy: PolicyEngine[VersionValue]
     migrations: MigrationResolver[VersionValue]
-    _cache: dict[
-        tuple[NodeId, NodeId],
-        tuple[
-            tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...],
-            tuple[tuple[Attachable, ...], ...],
-            tuple[MigrationFunc, ...],
-        ],
-    ] = field(default_factory=dict, compare=False, repr=False)
+    _cache: dict[tuple[NodeId, NodeId], ResolvedPath[VersionValue]] = field(
+        default_factory=dict, compare=False, repr=False
+    )
 
     def find(
         self,
@@ -89,18 +93,23 @@ class PathFinder(Generic[VersionValue]):
                 self.migrations.resolve(EdgeKey.from_pair(source, step_target)).func
                 for source, step_target in steps
             )
-            self._cache[cache_key] = (steps, hooks, migrations)
+            resolved = ResolvedPath(
+                steps=steps,
+                hooks=hooks,
+                migrations=migrations,
+            )
+            self._cache[cache_key] = resolved
         else:
-            steps, hooks, migrations = cached
+            resolved = cached
         return PathPlanEntry(
             path=entry.path,
             source=entry.node,
             target=target,
             target_model=target.descriptor.ref,
-            steps=steps,
-            hooks=hooks,
-            migrations=migrations,
+            steps=resolved.steps,
+            hooks=resolved.hooks,
+            migrations=resolved.migrations,
         )
 
 
-__all__ = ["PathFinder"]
+__all__ = ["PathFinder", "ResolvedPath"]

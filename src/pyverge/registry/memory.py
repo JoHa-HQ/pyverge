@@ -15,7 +15,6 @@ from pyverge.registry.errors import (
     CatalogError,
     MigrationConflictError,
     MigrationNotFoundError,
-    MigrationPathError,
     ModelAlreadyRegisteredError,
     ModelConflictError,
     ModelNotFoundError,
@@ -120,11 +119,7 @@ class InMemoryCatalog(Generic[VersionValue]):
 
     @property
     def versions(self: Self) -> list[VersionNode[VersionValue]]:
-        return [
-            cast("VersionNode[VersionValue]", entry)
-            for entry in self._by_versions
-            if entry.is_model
-        ]
+        return [entry for entry in self._by_versions if isinstance(entry, VersionNode)]
 
     @property
     def entries(self: Self) -> list[NodeEntry]:
@@ -167,16 +162,16 @@ class InMemoryCatalog(Generic[VersionValue]):
         if kind is None:
             return frozenset(self._by_models)
         return frozenset(
-            cast("ModelRef", entry.modelref)
+            entry.modelref
             for entry in self._by_kinds.get(kind, [])
-            if entry.modelref is not None
+            if isinstance(entry, VersionNode)
         )
 
     def migrations(self: Self, kind: ModelKind) -> list[Migratable[VersionValue]]:
         return [
-            cast("Migratable[VersionValue]", entry)
+            entry
             for entry in self._migrations.get(kind, [])
-            if entry.is_executable
+            if isinstance(entry, VersionEdge)
         ]
 
     def edges(self: Self, kind: ModelKind) -> list[EdgeEntry]:
@@ -186,9 +181,9 @@ class InMemoryCatalog(Generic[VersionValue]):
         self: Self, key: Comparable[VersionValue]
     ) -> frozenset[Migratable[VersionValue]]:
         return frozenset(
-            cast("Migratable[VersionValue]", edge)
+            edge
             for edge in self._edges_by_version.get(key, ())
-            if edge.is_executable
+            if isinstance(edge, VersionEdge)
         )
 
     def edges_of(self: Self, key: Comparable[VersionValue]) -> frozenset[EdgeEntry]:
@@ -196,9 +191,9 @@ class InMemoryCatalog(Generic[VersionValue]):
 
     def kind_versions(self: Self, kind: ModelKind) -> list[VersionNode[VersionValue]]:
         return [
-            cast("VersionNode[VersionValue]", entry)
+            entry
             for entry in self._by_kinds.get(kind, [])
-            if entry.is_model
+            if isinstance(entry, VersionNode)
         ]
 
     def kind_entries(self: Self, kind: ModelKind) -> list[NodeEntry]:
@@ -262,9 +257,9 @@ class InMemoryCatalog(Generic[VersionValue]):
         key: Transitional[VersionValue],
     ) -> Migratable[VersionValue]:
         edge = self._find_edge(key.kind, key.key)
-        if not edge.is_executable:
+        if not isinstance(edge, VersionEdge):
             raise MigrationNotFoundError(self._name, key.key)
-        return cast("Migratable[VersionValue]", edge)
+        return edge
 
     def has_hooks(self: Self, key: Transitional[VersionValue]) -> bool:
         return key in self._hooks
@@ -330,10 +325,8 @@ class InMemoryCatalog(Generic[VersionValue]):
             )
         bisect.insort_left(self._by_versions, entry)
         bisect.insort_left(self._by_kinds[entry.kind], entry)
-        if entry.modelref is not None:
-            self._by_models[cast("ModelRef", entry.modelref)] = cast(
-                "VersionNode[VersionValue]", entry
-            )
+        if isinstance(entry, VersionNode):
+            self._by_models[entry.modelref] = entry
         return entry
 
     def hydrate(
@@ -402,8 +395,8 @@ class InMemoryCatalog(Generic[VersionValue]):
         idx = bisect.bisect_left(kind_entries, entry)
         if idx < len(kind_entries) and kind_entries[idx] == entry:
             del kind_entries[idx]
-        if entry.modelref is not None:
-            self._by_models.pop(cast("ModelRef", entry.modelref), None)
+        if isinstance(entry, VersionNode):
+            self._by_models.pop(entry.modelref, None)
 
     def store_edge(self: Self, entry: EdgeEntry) -> EdgeEntry:
         """Store a full executable edge or a key-only edge entry."""
@@ -591,57 +584,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         self._edges_by_version.clear()
         if self._content_hash_index is not None:
             self._content_hash_index.clear()
-
-    def migration_path(
-        self: Self,
-        from_version: Comparable[VersionValue],
-        to_version: Comparable[VersionValue],
-    ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
-        if from_version.kind != to_version.kind:
-            raise CatalogError(
-                self._name,
-                f"Cannot find path across kinds: "
-                f"{from_version.kind} != {to_version.kind}",
-            )
-
-        kind_versions = self.kind_versions(from_version.kind)
-
-        if from_version not in kind_versions:
-            raise MigrationPathError(
-                self._name,
-                from_version,
-                to_version,
-                f"Version {from_version} is not registered",
-            )
-        if to_version not in kind_versions:
-            raise MigrationPathError(
-                self._name,
-                (from_version, to_version),
-            )
-
-        lo = bisect.bisect_left(kind_versions, from_version)
-        hi = bisect.bisect_left(kind_versions, to_version)
-        if lo == hi:
-            return []
-
-        step = 1 if lo < hi else -1
-        path: list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]] = []
-        current = kind_versions[lo]
-        while lo != hi:
-            nxt = kind_versions[lo + step]
-            edge_key = EdgeKey.from_pair(current, nxt)
-            if self.has_migration(edge_key):
-                path.append((current, nxt))
-                current = nxt
-                lo += step
-            else:
-                raise MigrationPathError(
-                    self._name,
-                    current,
-                    nxt,
-                    f"No migration key is found ({current}, {nxt})",
-                )
-        return path
 
     def remove_migration_range(
         self: Self,

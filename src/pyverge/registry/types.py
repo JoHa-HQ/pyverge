@@ -65,9 +65,7 @@ class ContentHashLookup(Protocol):
     def find_edge_by_content_hash(self, value: str) -> EdgeKey | None: ...
 
 
-class GraphCatalog(
-    PathCatalog[VersionValue], ModelCatalog[VersionValue], Protocol[VersionValue]
-):
+class GraphCatalog(ModelCatalog[VersionValue], Protocol[VersionValue]):
     """Read-only migration graph surface used by runtime planning."""
 
     def migrations(self, kind: ModelKind) -> list[Migratable[VersionValue]]: ...
