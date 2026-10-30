@@ -9,9 +9,7 @@ from pyverge.core.types import VersionValue
 from pyverge.execution.types import (
     Entry,
 )
-from pyverge.registry import (
-    Registry,
-)
+from pyverge.graph.types import GraphView
 from pyverge.schemas.types import (
     ModelAdapter,
 )
@@ -30,7 +28,7 @@ class _WalkContext:
     parent_model: type[Any] | None = None
 
 
-class CompositeExtractor(Generic[VersionValue]):
+class PayloadWalker(Generic[VersionValue]):
     """One container-aware walker for both discovery modes.
 
     - ``container is None``: dict scanning — every dict is checked for a
@@ -44,18 +42,18 @@ class CompositeExtractor(Generic[VersionValue]):
 
     def __init__(
         self,
-        registry: Registry[VersionValue],
+        graph: GraphView[VersionValue],
         *,
         adapter: ModelAdapter,
         validation_mode: Literal["strict", "lax", "none"] = "lax",
     ) -> None:
-        self._registry = registry
+        self._graph = graph
         self._validation_mode = validation_mode
         self._adapter = adapter
 
     @property
-    def registry(self) -> Registry[VersionValue]:
-        return self._registry
+    def graph(self) -> GraphView[VersionValue]:
+        return self._graph
 
     def extract(
         self,
@@ -119,16 +117,16 @@ class CompositeExtractor(Generic[VersionValue]):
             return None
         try:
             key = VersionKey[VersionValue](
-                namespace=self._registry.namespace,
+                namespace=self._graph.namespace,
                 kind=kind,
                 version=version_str,
             )
         except Exception:
             return None
-        if not self._registry.has_model(key):
+        if not self._graph.has_model(key):
             return None
         try:
-            return self._registry.get_model(key)
+            return self._graph.get_model(key)
         except Exception:
             return None
 
@@ -230,7 +228,7 @@ class CompositeExtractor(Generic[VersionValue]):
             )
 
 
-class SchemaFieldsExtractor(CompositeExtractor[VersionValue]):
+class SchemaFieldsExtractor(PayloadWalker[VersionValue]):
     """Extract versioned dicts by scanning schema fields in the payload."""
 
     def extract(
@@ -252,7 +250,7 @@ class SchemaFieldsExtractor(CompositeExtractor[VersionValue]):
         )
 
 
-class ContainerExtractor(CompositeExtractor[VersionValue]):
+class ContainerExtractor(PayloadWalker[VersionValue]):
     """Extract entries by following a typed container's field models."""
 
     def extract(
@@ -294,4 +292,4 @@ class ContainerExtractor(CompositeExtractor[VersionValue]):
         )
 
 
-__all__ = ["CompositeExtractor", "ContainerExtractor", "SchemaFieldsExtractor"]
+__all__ = ["ContainerExtractor", "PayloadWalker", "SchemaFieldsExtractor"]

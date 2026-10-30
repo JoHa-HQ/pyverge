@@ -1,22 +1,17 @@
-from .commands import (
-    MigrationSpec,
-    ModelRegistrationMode,
-    RegisterMigration,
-    RegisterModel,
-    RegisterVersion,
-)
+from pyverge.migrations import MigrationSpec
+
 from .descriptors import (
     MigrationDescriptor,
     ModelDescriptor,
     SourceDescriptor,
-    descriptor_commands,
+    is_registrable,
+    register_descriptor,
 )
 from .types import (
     AsyncSourcePort,
     DescriptorStrategy,
     MigrationSource,
     ReflectionReport,
-    RegistrationCommand,
     RegistrationContext,
     RegistrationSink,
     SourcePort,
@@ -31,17 +26,13 @@ __all__ = [
     "MigrationSource",
     "MigrationSpec",
     "ModelDescriptor",
-    "ModelRegistrationMode",
     "ReflectionReport",
-    "RegisterMigration",
-    "RegisterModel",
-    "RegisterVersion",
     "RegistrationCollector",
-    "RegistrationCommand",
     "RegistrationContext",
     "RegistrationSink",
     "SourceDescriptor",
     "SourcePort",
     "SourceVisitor",
-    "descriptor_commands",
+    "is_registrable",
+    "register_descriptor",
 ]

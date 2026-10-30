@@ -9,7 +9,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.engine import Engine
-from pyverge.execution.targets import (
+from pyverge.graph.planning.targets import (
     earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,

@@ -6,7 +6,7 @@ from typing import Any
 
 from .canonical import Addressable, ContentHasher
 from .graph import VersionEdge, VersionNode
-from .identity import VersionKey
+from .identity import EdgeKey, VersionKey
 from .schema import ModelDescriptor
 
 
@@ -97,22 +97,36 @@ class JgfEdge:
         )
 
     @classmethod
-    def from_version_edge(cls, edge: VersionEdge[Any]) -> JgfEdge:
+    def from_edge_key(
+        cls,
+        edge: EdgeKey[Any],
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> JgfEdge:
         source = str(edge.source)
         target = str(edge.target)
+        projected: dict[str, Any] = {
+            **({"namespace": edge.namespace} if edge.namespace else {}),
+            "kind": edge.kind,
+            "source_version": str(edge.source.version),
+            "target_version": str(edge.target.version),
+        }
+        migration = getattr(edge, "migration", None)
+        if migration is not None:
+            projected["strategy"] = migration.strategy
+            projected["migration_id"] = migration.identity
+        if metadata:
+            projected.update(metadata)
         return cls(
             id=f"{source}->{target}",
             source=source,
             target=target,
-            metadata={
-                **({"namespace": edge.namespace} if edge.namespace else {}),
-                "kind": edge.kind,
-                "source_version": str(edge.source.version),
-                "target_version": str(edge.target.version),
-                "strategy": edge.migration.strategy,
-                "migration_id": edge.migration.identity,
-            },
+            metadata=projected,
         )
+
+    @classmethod
+    def from_version_edge(cls, edge: VersionEdge[Any]) -> JgfEdge:
+        return cls.from_edge_key(edge)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -154,18 +168,23 @@ class JgfGraph:
     def from_versions(  # noqa: PLR0913
         cls,
         versions: Iterable[VersionNode[Any]],
-        edges: Iterable[VersionEdge[Any]] = (),
+        edges: Iterable[EdgeKey[Any]] = (),
         *,
         hasher: ContentHasher,
         id: str,
         directed: bool,
         metadata: Mapping[str, Any] | None = None,
+        edge_metadata: Mapping[EdgeKey[Any], Mapping[str, Any]] | None = None,
     ) -> JgfGraph:
+        projected_metadata = edge_metadata or {}
         return cls(
             id=id,
             directed=directed,
             nodes=tuple(node.to_jgf(hasher) for node in versions),
-            edges=tuple(edge.to_jgf() for edge in edges),
+            edges=tuple(
+                JgfEdge.from_edge_key(edge, metadata=projected_metadata.get(edge))
+                for edge in edges
+            ),
             metadata=dict(metadata or {}),
         )
 

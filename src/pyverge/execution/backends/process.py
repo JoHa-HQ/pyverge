@@ -9,9 +9,9 @@ from pyverge.core.context import MigrationContext
 from pyverge.core.types import VersionValue
 from pyverge.execution.context import RunContext, StepContext
 from pyverge.execution.errors import AsyncExecutionRequired
-from pyverge.execution.path import Path
 from pyverge.execution.plan import ExecutionPlan, PathPlanEntry
-from pyverge.schemas.types import ModelAdapter
+from pyverge.graph.planning.path import Path
+from pyverge.schemas.types import ModelIdentityPort
 from pyverge.versioning import EdgeKey
 
 
@@ -30,7 +30,7 @@ class ProcessBackend:
         plan: ExecutionPlan[VersionValue],
         payload: dict[str, Any],
         run: RunContext,
-        adapter: ModelAdapter,
+        adapter: ModelIdentityPort,
     ) -> dict[str, Any]:
         data = copy.deepcopy(payload)
         for level in plan.levels:
@@ -43,7 +43,7 @@ class ProcessBackend:
         entry: PathPlanEntry[VersionValue],
         data: dict[str, Any],
         run: RunContext,
-        adapter: ModelAdapter,
+        adapter: ModelIdentityPort,
     ) -> None:
         current = Path(*entry.path).get(data)
         for index, (source, target) in enumerate(entry.steps):

@@ -17,13 +17,13 @@ from pyverge.core.types import (
     TargetResolver,
     VersionValue,
 )
-from pyverge.execution.targets import (
+from pyverge.graph.planning.targets import (
     TargetPolicy as TargetPolicy,  # noqa: PLC0414
 )
-from pyverge.execution.targets import (
+from pyverge.graph.planning.targets import (
     TargetSpec as TargetSpec,  # noqa: PLC0414
 )
-from pyverge.execution.targets import (
+from pyverge.graph.planning.targets import (
     TargetStrategy as TargetStrategy,  # noqa: PLC0414
 )
 from pyverge.schemas.types import (
@@ -42,7 +42,6 @@ if TYPE_CHECKING:
         RegistrationContext,
     )
     from pyverge.engine import Engine
-    from pyverge.execution.types import EntryExtractor
     from pyverge.migrations.identity import MigrationIdentityResolver
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
@@ -76,7 +75,6 @@ class ManagerClassState(Protocol[VersionValue]):
         adapter: ModelAdapter,
         *,
         engine: Engine[VersionValue] | None = None,
-        walker: EntryExtractor[VersionValue] | None = None,
         hasher: ContentHasher | None = None,
         identity_resolver: MigrationIdentityResolver | None = None,
         model_materializer: DiffMaterializer[object] | None = None,

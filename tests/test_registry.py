@@ -23,16 +23,16 @@ from pyverge.core import (
 from pyverge.engine import Engine
 from pyverge.execution import MigrationHook
 from pyverge.execution.extractors import (
-    CompositeExtractor,
     ContainerExtractor,
+    PayloadWalker,
     SchemaFieldsExtractor,
 )
 from pyverge.export import ManifestDiff
+from pyverge.graph import GraphBuilder
 from pyverge.jgf import JgfExporter, JgfImporter
 from pyverge.registry import InMemoryCatalog, Registry
 from pyverge.registry.errors import (
     CatalogError,
-    GraphLockedError,
     MigrationConflictError,
     MigrationNotFoundError,
     MigrationPathError,
@@ -2628,7 +2628,7 @@ def test_catalog_lock_returns_frozen_view(
     registry: Registry[types.VersionValue],
     models: list[ModelHandle],
 ) -> None:
-    snapshot = registry.lock()
+    snapshot = GraphBuilder().build(registry)
 
     exporter = JgfExporter(default_content_hasher())
     assert (
@@ -2636,8 +2636,7 @@ def test_catalog_lock_returns_frozen_view(
         == exporter.export_graph(registry).to_dict()
     )
     registry.reconcile(model_adapter.versionable(models[0]))
-    with pytest.raises(GraphLockedError):
-        snapshot.store(model_adapter.versionable(models[0]))
+    assert not hasattr(snapshot, "store")
 
 
 @pytest.mark.parametrize(
@@ -2756,14 +2755,14 @@ class ListEnvelope(BaseModel):
 def _extractor() -> tuple[
     Registry[semver.Version],
     PydanticModelAdapter,
-    CompositeExtractor[semver.Version],
+    PayloadWalker[semver.Version],
 ]:
     adapter = PydanticModelAdapter(
         codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
     )
     registry = Registry[semver.Version](hasher=default_content_hasher())
     registry.store(adapter.versionable(Leaf))
-    return registry, adapter, CompositeExtractor(registry, adapter=adapter)
+    return registry, adapter, PayloadWalker(registry, adapter=adapter)
 
 
 def test_containerless_list_and_depth() -> None:
@@ -2854,7 +2853,7 @@ def test_public_registry_error_paths(
             func=_migrate,
         )
     )
-    snapshot = registry.snapshot()
+    snapshot = GraphBuilder().build(registry)
     assert snapshot.versions == registry.versions
 
     with pytest.raises(CatalogError, match="Clear migrations first"):

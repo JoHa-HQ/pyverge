@@ -931,14 +931,14 @@ class TestMigrationContext:
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_engine_explore_build_mode(manager: type[Manager]) -> None:
+def test_engine_snapshot_build_mode(manager: type[Manager]) -> None:
     engine = manager._default_engine
-    explorer = engine.explore()
+    graph = manager.migration_graph()
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
     target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
 
-    assert explorer.versions("User") == engine.registry.kind_versions("User")
-    assert explorer.path(source, target) == [(source, target)]
+    assert graph.versions_for("User") == engine.registry.kind_versions("User")
+    assert graph.path(source, target) == [(source, target)]
 
 
 @pytest.mark.parametrize(

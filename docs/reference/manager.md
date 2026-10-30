@@ -10,7 +10,6 @@ Manager.configure(
     adapter,
     *,
     engine=None,
-    walker=None,
     hasher=None,
     identity_resolver=None,
     model_materializer=None,

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
-from pyverge.registry.types import GraphCatalog, ModelCatalog
+from pyverge.graph.types import GraphExportSource
+from pyverge.registry.types import ModelCatalog
 from pyverge.versioning import JgfGraph, JgfNode
 from pyverge.versioning.canonical import ContentHasher
 
@@ -25,25 +26,24 @@ class JgfExporter:
 
     def export_graph(
         self,
-        catalog: GraphCatalog,
+        catalog: GraphExportSource,
         *,
         id: str | None = None,
     ) -> JgfGraph:
-        edges = cast(
-            Any,
-            [edge for kind in catalog.kinds for edge in catalog.migrations(kind)],
-        )
+        edges = [edge for kind in catalog.kinds for edge in catalog.edges(kind)]
+        edge_metadata = getattr(catalog, "edge_metadata", None)
         return JgfGraph.from_versions(
             catalog.versions,
             edges,
             hasher=self._content_hasher,
             id=id or catalog.name,
             directed=True,
+            edge_metadata=edge_metadata,
         )
 
     def content_hash(
         self,
-        catalog: GraphCatalog,
+        catalog: GraphExportSource,
         *,
         id: str | None = None,
     ) -> str:

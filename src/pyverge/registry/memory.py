@@ -3,7 +3,7 @@ from collections import defaultdict
 from collections.abc import Mapping
 from itertools import chain
 from types import MappingProxyType
-from typing import Generic, NoReturn, Self, cast
+from typing import Generic, Self, cast
 
 from pyverge.core.types import (
     Attachable,
@@ -13,7 +13,6 @@ from pyverge.core.types import (
 )
 from pyverge.registry.errors import (
     CatalogError,
-    GraphLockedError,
     MigrationConflictError,
     MigrationNotFoundError,
     MigrationPathError,
@@ -299,19 +298,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         )
         new.copy_from(self)
         return new
-
-    def lock(self: Self) -> "FrozenCatalog[VersionValue]":
-        return self.snapshot()
-
-    def snapshot(self: Self) -> "FrozenCatalog[VersionValue]":
-        snapshot = FrozenCatalog[VersionValue](
-            name=self._name,
-            namespace=self._namespace,
-            hasher=self._hasher,
-            index_content_hashes=self._index_content_hashes,
-        )
-        snapshot.copy_from(self)
-        return snapshot
 
     def copy_from(self: Self, source: "InMemoryCatalog[VersionValue]") -> None:
         """Replace this catalog's stores with a copy of ``source``."""
@@ -703,70 +689,6 @@ class InMemoryCatalog(Generic[VersionValue]):
         else:
             self._hooks[key].clear()
             del self._hooks[key]
-
-
-class FrozenCatalog(InMemoryCatalog[VersionValue]):
-    """Immutable compiled graph view over a registry snapshot."""
-
-    def _deny(self: Self, operation: str) -> NoReturn:
-        raise GraphLockedError(self._name, operation)
-
-    def store(self: Self, entry: NodeEntry) -> NodeEntry:
-        self._deny("store")
-
-    def reconcile(self: Self, entry: NodeEntry) -> NodeEntry:
-        self._deny("reconcile")
-
-    def remove_entry(self: Self, entry: NodeEntry) -> None:
-        self._deny("remove_entry")
-
-    def store_edge(self: Self, entry: EdgeEntry) -> EdgeEntry:
-        self._deny("store_edge")
-
-    def store_migration(self: Self, key: Migratable[VersionValue]) -> MigrationFunc:
-        self._deny("store_migration")
-
-    def remove_model(self: Self, key: Comparable) -> None:
-        self._deny("remove_model")
-
-    def remove_model_by_ref(self: Self, ref: ModelRef) -> None:
-        self._deny("remove_model_by_ref")
-
-    def clear_models(self: Self) -> None:
-        self._deny("clear_models")
-
-    def delete_kind(self: Self, kind: ModelKind) -> None:
-        self._deny("delete_kind")
-
-    def remove_migration(self: Self, key: Transitional[VersionValue]) -> None:
-        self._deny("remove_migration")
-
-    def clear_migrations(self: Self) -> None:
-        self._deny("clear_migrations")
-
-    def remove_migration_range(
-        self: Self,
-        from_version: Comparable[VersionValue],
-        to_version: Comparable[VersionValue],
-    ) -> None:
-        self._deny("remove_migration_range")
-
-    def add_hook(
-        self: Self,
-        key: Transitional[VersionValue],
-        hook: Attachable,
-    ) -> None:
-        self._deny("add_hook")
-
-    def remove_hook(
-        self: Self,
-        key: Transitional[VersionValue],
-        hook: Attachable | None = None,
-    ) -> None:
-        self._deny("remove_hook")
-
-    def clear_hooks(self: Self, key: Transitional[VersionValue] | None = None) -> None:
-        self._deny("clear_hooks")
 
 
 #: Backward-compatible name for the in-memory catalog.

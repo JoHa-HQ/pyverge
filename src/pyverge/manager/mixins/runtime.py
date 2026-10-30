@@ -18,17 +18,16 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.engine import RunnerOptions
-from pyverge.execution import (
-    AnyDirection,
-    BackwardDirection,
-    ForwardDirection,
-    Runner,
-    ThreadedBackend,
-)
+from pyverge.execution import Runner, ThreadedBackend
 from pyverge.execution.context import ExecutionEnvironment
-from pyverge.execution.direction import DirectionPolicy
 from pyverge.execution.middleware import BackendMiddleware
 from pyverge.execution.types import BackendPort
+from pyverge.graph import (
+    AnyDirection,
+    BackwardDirection,
+    DirectionPolicy,
+    ForwardDirection,
+)
 from pyverge.versioning import Diffable
 
 from ..descriptors import hybridmethod

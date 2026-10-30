@@ -4,14 +4,12 @@ from dataclasses import dataclass
 from typing import Any, Generic
 
 from pyverge.core.types import (
-    Attachable,
     DirectionViolationStrategy,
-    MigrationFunc,
-    ModelHandle,
     VersionMissingStrategy,
     VersionValue,
 )
-from pyverge.versioning import ModelRef, VersionNode
+from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
+from pyverge.versioning import VersionNode
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,36 +18,6 @@ class ExtractedEntry(Generic[VersionValue]):
 
     path: tuple[str | int, ...]
     node: VersionNode[VersionValue]
-
-
-@dataclass(frozen=True, slots=True)
-class PathPlanEntry(Generic[VersionValue]):
-    """One extracted entry resolved to a concrete target path."""
-
-    path: tuple[str | int, ...]
-    source: VersionNode[VersionValue]
-    target: VersionNode[VersionValue]
-    target_model: ModelRef
-    steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
-    hooks: tuple[tuple[Attachable, ...], ...]
-    migrations: tuple[MigrationFunc, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class PathPlan(Generic[VersionValue]):
-    """Payload-level migration plan independent of execution strategy."""
-
-    entries: tuple[PathPlanEntry[VersionValue], ...]
-    container: ModelHandle | None
-    target_fields: frozenset[str]
-
-
-@dataclass(frozen=True, slots=True)
-class PolicyDecision:
-    """Outcome of evaluating one entry against planning policy."""
-
-    entry: PathPlanEntry | None
-    reason: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,8 +43,5 @@ class PlanningOptions:
 __all__ = [
     "ExecutionPlan",
     "ExtractedEntry",
-    "PathPlan",
-    "PathPlanEntry",
     "PlanningOptions",
-    "PolicyDecision",
 ]

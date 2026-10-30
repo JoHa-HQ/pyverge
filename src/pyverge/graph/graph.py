@@ -1,26 +1,20 @@
 from __future__ import annotations
 
 import bisect
-from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
-from itertools import chain
-from types import MappingProxyType
 from typing import Any, Generic, cast
 
-from pyverge.core.types import Attachable, ModelKind, VersionValue
+from pyverge.core.types import ModelKind, VersionValue
 from pyverge.registry.errors import (
     CatalogError,
     MigrationNotFoundError,
     MigrationPathError,
     ModelNotFoundError,
 )
-from pyverge.registry.memory import InMemoryCatalog
 from pyverge.versioning import (
     Comparable,
-    EdgeEntry,
     EdgeKey,
-    Migratable,
     ModelRef,
     NodeEntry,
     NodeId,
@@ -29,62 +23,24 @@ from pyverge.versioning import (
 )
 
 
-def _freeze(values: Mapping[Any, Any]) -> Mapping[Any, Any]:
-    return MappingProxyType(dict(values))
-
-
 @dataclass(frozen=True, slots=True)
 class MigrationGraph(Generic[VersionValue]):
-    """Immutable graph snapshot compiled from a mutable registry."""
+    """Immutable graph snapshot compiled from a mutable registry.
+
+    The graph stores edge identity only.  Executable migration bindings and
+    hooks live in an execution-side :class:`MigrationResolver`.
+    """
 
     name: str
     namespace: str
     nodes: tuple[NodeEntry, ...]
     nodes_by_kind: Mapping[ModelKind, tuple[NodeEntry, ...]]
     models_by_ref: Mapping[ModelRef, VersionNode[VersionValue]]
-    edges_by_kind: Mapping[ModelKind, tuple[EdgeEntry, ...]]
-    edges_by_endpoint: Mapping[NodeId, frozenset[EdgeEntry]]
-    hooks_by_edge: Mapping[EdgeKey, tuple[Attachable, ...]]
+    edges_by_kind: Mapping[ModelKind, tuple[EdgeKey, ...]]
+    edges_by_endpoint: Mapping[NodeId, frozenset[EdgeKey]]
+    executable_edges: frozenset[EdgeKey]
+    edge_metadata: Mapping[EdgeKey, Mapping[str, str]]
     content_hashes: Mapping[str, EdgeKey]
-
-    @classmethod
-    def from_catalog(
-        cls,
-        catalog: InMemoryCatalog[VersionValue],
-    ) -> MigrationGraph[VersionValue]:
-        nodes = tuple(catalog.entries)
-        kinds = set(catalog.entities) | set(catalog.kinds)
-        nodes_by_kind = {kind: tuple(catalog.kind_entries(kind)) for kind in kinds}
-        edges_by_kind = {kind: tuple(catalog.edges(kind)) for kind in kinds}
-        edges_by_endpoint: dict[NodeId, set[EdgeEntry]] = defaultdict(set)
-        hooks_by_edge: dict[EdgeKey, tuple[Attachable, ...]] = {}
-        for edges in edges_by_kind.values():
-            for edge in edges:
-                key = EdgeKey.from_pair(*edge.key)
-                edges_by_endpoint[edge.source].add(edge)
-                edges_by_endpoint[edge.target].add(edge)
-                registered_hooks = catalog.get_hooks(key)
-                if registered_hooks:
-                    hooks_by_edge[key] = tuple(registered_hooks)
-        content_hashes = dict(catalog.content_hashes)
-        return cls(
-            name=catalog.name,
-            namespace=catalog.namespace,
-            nodes=nodes,
-            nodes_by_kind=_freeze(nodes_by_kind),
-            models_by_ref=_freeze(
-                {ref: catalog.get_model_by_ref(ref) for ref in catalog.models(None)}
-            ),
-            edges_by_kind=_freeze(edges_by_kind),
-            edges_by_endpoint=_freeze(
-                {
-                    endpoint: frozenset(edges)
-                    for endpoint, edges in edges_by_endpoint.items()
-                }
-            ),
-            hooks_by_edge=_freeze(hooks_by_edge),
-            content_hashes=_freeze(content_hashes),
-        )
 
     @property
     def entries(self) -> tuple[NodeEntry, ...]:
@@ -105,6 +61,7 @@ class MigrationGraph(Generic[VersionValue]):
             return self.versions
         return self.kind_versions(kind)
 
+    @property
     def kinds(self) -> list[ModelKind]:
         return sorted(self.nodes_by_kind)
 
@@ -211,33 +168,35 @@ class MigrationGraph(Generic[VersionValue]):
                 missing.append(resolved)
         return frozenset(missing)
 
-    def migrations(self, kind: ModelKind) -> list[Migratable[VersionValue]]:
+    def migrations(self, kind: ModelKind) -> list[EdgeKey[VersionValue]]:
         return [
-            cast("Migratable[VersionValue]", edge)
+            edge
             for edge in self.edges_by_kind.get(kind, ())
-            if edge.is_executable
+            if edge in self.executable_edges
         ]
 
-    def edges(self, kind: ModelKind) -> list[EdgeEntry]:
+    def edges(self, kind: ModelKind) -> list[EdgeKey[VersionValue]]:
         return list(self.edges_by_kind.get(kind, ()))
 
     def migrations_of(
         self, key: Comparable[VersionValue]
-    ) -> frozenset[Migratable[VersionValue]]:
+    ) -> frozenset[EdgeKey[VersionValue]]:
         return frozenset(
-            cast("Migratable[VersionValue]", edge)
+            edge
             for edge in self.edges_by_endpoint.get(key.id, frozenset())
-            if edge.is_executable
+            if edge in self.executable_edges
         )
 
-    def edges_of(self, key: Comparable[VersionValue]) -> frozenset[EdgeEntry]:
-        return self.edges_by_endpoint.get(key.id, frozenset())
+    def edges_of(
+        self, key: Comparable[VersionValue]
+    ) -> frozenset[EdgeKey[VersionValue]]:
+        return frozenset(self.edges_by_endpoint.get(key.id, frozenset()))
 
     def _find_edge(
         self,
         kind: ModelKind,
         pair: tuple[NodeId, NodeId],
-    ) -> EdgeEntry:
+    ) -> EdgeKey[VersionValue]:
         key = EdgeKey.from_pair(*pair)
         idx = bisect.bisect_left(self.edges_by_kind.get(kind, ()), key)
         edges = self.edges_by_kind.get(kind, ())
@@ -247,9 +206,10 @@ class MigrationGraph(Generic[VersionValue]):
 
     def has_migration(self, key: Transitional[VersionValue]) -> bool:
         try:
-            return self._find_edge(key.kind, key.key).is_executable
+            edge = self._find_edge(key.kind, key.key)
         except MigrationNotFoundError:
             return False
+        return edge in self.executable_edges
 
     def has_edge(self, key: EdgeKey[VersionValue]) -> bool:
         try:
@@ -258,22 +218,20 @@ class MigrationGraph(Generic[VersionValue]):
         except MigrationNotFoundError:
             return False
 
-    def get_migration(
-        self, key: Transitional[VersionValue]
-    ) -> Migratable[VersionValue]:
+    def get_migration(self, key: Transitional[VersionValue]) -> EdgeKey[VersionValue]:
         return self.get_migration_by_edge(key)
 
-    def get_edge(self, key: EdgeKey[VersionValue]) -> EdgeEntry:
+    def get_edge(self, key: EdgeKey[VersionValue]) -> EdgeKey[VersionValue]:
         return self._find_edge(key.kind, key.key)
 
     def get_migration_by_edge(
         self,
         key: Transitional[VersionValue],
-    ) -> Migratable[VersionValue]:
+    ) -> EdgeKey[VersionValue]:
         edge = self._find_edge(key.kind, key.key)
-        if not edge.is_executable:
+        if edge not in self.executable_edges:
             raise MigrationNotFoundError(self.name, key.key)
-        return cast("Migratable[VersionValue]", edge)
+        return edge
 
     def is_adjacent(self, key: Transitional[VersionValue]) -> bool:
         nodes = self.nodes_by_kind.get(key.kind, ())
@@ -285,17 +243,6 @@ class MigrationGraph(Generic[VersionValue]):
         edges = self.edges_by_kind.get(key.kind, ())
         idx = bisect.bisect_left(edges, key)
         return len(edges) > 2 and (idx > 0 or idx < len(edges) - 1)  # noqa: PLR2004
-
-    def has_hooks(self, key: Transitional[VersionValue]) -> bool:
-        return EdgeKey.from_pair(*key.key) in self.hooks_by_edge
-
-    def hooks(self, key: Transitional[VersionValue] | None = None) -> list[Attachable]:
-        if key is None:
-            return list(chain.from_iterable(self.hooks_by_edge.values()))
-        return list(self.hooks_by_edge.get(EdgeKey.from_pair(*key.key), ()))
-
-    def get_hooks(self, key: Transitional[VersionValue]) -> list[Attachable]:
-        return self.hooks(key)
 
     def find_edge_by_content_hash(self, value: str) -> EdgeKey | None:
         return self.content_hashes.get(value)

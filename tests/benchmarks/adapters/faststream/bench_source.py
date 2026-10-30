@@ -38,7 +38,7 @@ def test_source_descriptors(benchmark: Any, source: FastStreamSource) -> None:
     def collect() -> list[Any]:
         collector = RegistrationCollector()
         source.accept(collector)
-        return collector.commands
+        return collector.registrations
 
     commands = benchmark(collect)
 

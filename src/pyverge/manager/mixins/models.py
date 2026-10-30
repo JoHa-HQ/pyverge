@@ -9,7 +9,6 @@ from pyverge.core.types import (
     ModelKind,
     VersionValue,
 )
-from pyverge.discovery import ModelRegistrationMode, RegisterModel, RegisterVersion
 from pyverge.schemas.types import (
     ModelHandle,
 )
@@ -41,10 +40,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return cast(
-            Versionable[VersionValue],
-            engine.register(RegisterModel(key, ModelRegistrationMode.STRICT)),
-        )
+        return cast(Versionable[VersionValue], engine.store_model(key))
 
     @store_model.register(VersionNode)
     @classmethod
@@ -55,10 +51,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return cast(
-            Versionable[VersionValue],
-            engine.register(RegisterVersion(version, ModelRegistrationMode.STRICT)),
-        )
+        return cast(Versionable[VersionValue], engine.store_model(version))
 
     @hybridmethod
     @singledispatchmethod
@@ -70,10 +63,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return cast(
-            Versionable[VersionValue],
-            engine.register(RegisterModel(key, ModelRegistrationMode.RECONCILE)),
-        )
+        return cast(Versionable[VersionValue], engine.reconcile_model(key))
 
     @reconcile_model.register(VersionNode)
     @classmethod
@@ -84,10 +74,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return cast(
-            Versionable[VersionValue],
-            engine.register(RegisterVersion(version, ModelRegistrationMode.RECONCILE)),
-        )
+        return cast(Versionable[VersionValue], engine.reconcile_model(version))
 
     def missing_references(
         self: Manager[VersionValue],
@@ -113,6 +100,17 @@ class ModelStoreMixin(Generic[VersionValue]):
         if kind is None:
             return engine.registry.versions
         return engine.registry.kind_versions(kind)
+
+    @hybridmethod
+    @classmethod
+    def migration_graph(
+        cls: type[Manager[VersionValue]],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ):
+        """Expose the immutable migration graph for the current manager."""
+        engine = engine or cls._default_engine
+        return engine.snapshot()
 
     @hybridmethod
     @classmethod

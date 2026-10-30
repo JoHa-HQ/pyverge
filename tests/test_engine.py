@@ -12,11 +12,8 @@ import semver
 from pyverge import types
 from pyverge.core import MigrationContext
 from pyverge.engine import Engine
-from pyverge.execution import (
-    MigrationHook,
-    fixed_target_resolver,
-    latest_target_resolver,
-)
+from pyverge.execution import MigrationHook
+from pyverge.graph import fixed_target_resolver, latest_target_resolver
 from pyverge.migrations import JsonPatchMigration
 from pyverge.registry.errors import (
     CatalogError,
@@ -531,7 +528,7 @@ class TestMigrationManagement:
     def test_unregistered_chain_reconstructs_to_latest(
         self,
         engine: Engine[types.VersionValue],
-        runner,
+        runner_factory,
         models: list[ModelHandle],
     ) -> None:
         """Unregistered endpoints are reconstructed before the chain is stored."""
@@ -547,7 +544,7 @@ class TestMigrationManagement:
                 (src, dst), lambda d, to=target: {**d, "version": to}
             )
 
-        result = runner.run(
+        result = runner_factory().run(
             {
                 "kind": "User",
                 "version": str(real.version),
@@ -578,7 +575,7 @@ class TestMigrationManagement:
     def test_unregistered_chain_missing_edge_raises(
         self,
         engine: Engine[types.VersionValue],
-        runner,
+        runner_factory,
         models: list[ModelHandle],
     ) -> None:
         """A removed edge still breaks an otherwise materialized chain."""
@@ -598,7 +595,7 @@ class TestMigrationManagement:
         engine.remove_migration(EdgeKey.from_pair(first, second), force=True)
 
         with pytest.raises(MigrationPathError):
-            runner.run(
+            runner_factory().run(
                 {
                     "kind": "User",
                     "version": str(real.version),

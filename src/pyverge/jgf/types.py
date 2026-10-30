@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from pyverge.versioning import JgfEdge, JgfNode, VersionEdge, VersionNode
+from pyverge.versioning import EdgeKey, JgfEdge, JgfNode, VersionNode
 
 
 class NodeResolver(Protocol):
@@ -12,9 +12,9 @@ class NodeResolver(Protocol):
 
 
 class EdgeResolver(Protocol):
-    """Map a JGF edge back to a concrete migration edge."""
+    """Map a JGF edge back to a graph edge identity."""
 
-    def resolve(self, edge: JgfEdge) -> VersionEdge: ...
+    def resolve(self, edge: JgfEdge) -> EdgeKey: ...
 
 
 __all__ = ["EdgeResolver", "NodeResolver"]

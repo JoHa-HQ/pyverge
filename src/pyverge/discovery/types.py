@@ -16,26 +16,18 @@ from pyverge.core.types import (
     MigrationFunc,
     MigrationKeyInput,
     NodeInput,
-    RegistrationMode,
 )
-from pyverge.discovery.commands import (
-    RegisterMigration,
-    RegisterModel,
-    RegisterVersion,
-)
-from pyverge.versioning import EdgeEntry, NodeEntry
+from pyverge.migrations import MigrationSpec
+from pyverge.versioning import EdgeEntry
 
 if TYPE_CHECKING:
-    from pyverge.discovery.commands import MigrationSpec
     from pyverge.discovery.descriptors import SourceDescriptor
     from pyverge.migrations import JsonataMigration, JsonPatchMigration
-
-RegistrationCommand: TypeAlias = RegisterModel | RegisterVersion | RegisterMigration
 
 #: Inputs accepted by manager migration registration.
 MigrationSource: TypeAlias = Union[
     MigrationFunc,
-    "MigrationSpec",
+    MigrationSpec,
     "JsonPatchMigration",
     "JsonataMigration",
 ]
@@ -43,14 +35,11 @@ MigrationSource: TypeAlias = Union[
 
 @runtime_checkable
 class RegistrationSink(Protocol):
-    """Manager-facing registration surface used by sources."""
+    """Application-facing registration surface used by discovery adapters."""
 
-    def store_model(
-        self,
-        payload: NodeInput,
-        *,
-        mode: RegistrationMode = "strict",
-    ) -> NodeEntry: ...
+    def store_model(self, payload: NodeInput) -> Any: ...
+
+    def reconcile_model(self, payload: NodeInput) -> Any: ...
 
     def store_migration(
         self,
@@ -115,7 +104,6 @@ __all__ = [
     "DescriptorStrategy",
     "MigrationSource",
     "ReflectionReport",
-    "RegistrationCommand",
     "RegistrationContext",
     "RegistrationSink",
     "SourcePort",

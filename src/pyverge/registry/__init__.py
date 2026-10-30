@@ -11,7 +11,6 @@ from .errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
-from .explorer import GraphExplorer
 from .health import CatalogHealth, HealthReport
 from .memory import InMemoryCatalog, Registry
 from .types import (
@@ -30,7 +29,6 @@ __all__ = [
     "CatalogHealth",
     "ContentHashLookup",
     "GraphCatalog",
-    "GraphExplorer",
     "GraphLockedError",
     "HealthReport",
     "InMemoryCatalog",

@@ -55,7 +55,7 @@ def test_source_descriptors(benchmark: Any, loop: Any, source: FastMCPSource) ->
     def collect() -> list[Any]:
         collector = RegistrationCollector()
         loop.run_until_complete(source.accept(collector))
-        return collector.commands
+        return collector.registrations
 
     commands = benchmark(collect)
 

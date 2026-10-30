@@ -17,17 +17,24 @@ from pyverge.core import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.context import MigrationContext
 from pyverge.engine import Engine
 from pyverge.execution import (
-    AnyDirection,
-    BackwardDirection,
-    CompositeExtractor,
     ExecutionPlanner,
     ExtractedEntry,
+    PayloadWalker,
+    Runner,
+)
+from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
+from pyverge.execution.context import LayeredView, RunContext, StepContext
+from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
+from pyverge.execution.migrations import MigrationBindings
+from pyverge.graph import (
+    AnyDirection,
+    BackwardDirection,
     ForwardDirection,
+    PathFinder,
     PathPlan,
     PathPlanEntry,
-    PathResolver,
     PolicyEngine,
-    Runner,
+    TargetCompiler,
     direction_policy,
     earliest_target_resolver,
     fixed_target_resolver,
@@ -35,9 +42,6 @@ from pyverge.execution import (
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
-from pyverge.execution.context import LayeredView, RunContext, StepContext
-from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
 from pyverge.registry import GraphCatalog, Registry
 from pyverge.registry.errors import CatalogError
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
@@ -263,9 +267,21 @@ def test_path_resolver_builds_chain(
 ) -> None:
     source = envelope_model(model_adapter, versioning_settings, UserV1)
     entry = ExtractedEntry(path=("document",), node=source)
-    resolver = PathResolver(engine.registry)
+    graph = engine.snapshot()
+    finder = PathFinder(
+        graph=graph,
+        targets=TargetCompiler(graph, model_adapter),
+        migrations=MigrationBindings.from_catalog(engine.registry),
+        policy=PolicyEngine(
+            direction=AnyDirection(),
+            on_direction_violation="raise",
+            on_missing_path="raise",
+            depth_limit=-1,
+            on_depth_violation="raise",
+        ),
+    )
 
-    plan = resolver.plan(
+    plan = finder.find(
         [entry],
         latest_target_resolver(engine.registry),
         container=None,
@@ -608,7 +624,7 @@ def test_extractor_empty_payload_returns_no_entries(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor[semver.Version](
+    extractor = PayloadWalker[semver.Version](
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -640,7 +656,7 @@ def test_extractor_finds_registered_versioned_dict(
     registry,
     container: type | None,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -668,7 +684,7 @@ def test_extractor_unknown_version_is_skipped(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -694,7 +710,7 @@ def test_extractor_max_depth_exceeded_for_nested_entry(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -728,7 +744,7 @@ def test_extractor_incompatible_container_fails_fast(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -743,7 +759,7 @@ def test_extractor_containerless_when_none(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -775,7 +791,7 @@ def test_extractor_invalid_payload_raises(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -811,7 +827,7 @@ def test_extractor_validation_mode_none_skips_validate(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -1406,7 +1422,7 @@ def test_runner_sync_backend_rejects_coroutine_migration(
 def test_runner_calls_sync_hooks(
     engine: Engine,
     registry: Registry,
-    runner: Runner,
+    runner_factory,
 ) -> None:
     calls: list[str] = []
 
@@ -1427,7 +1443,7 @@ def test_runner_calls_sync_hooks(
     engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _Hook()))
 
     _run(
-        runner,
+        runner_factory(),
         _payload(),
         latest_target_resolver(registry),
         container=None,
@@ -1461,7 +1477,7 @@ def test_runner_calls_sync_hooks(
 def test_runner_awaits_async_hooks(
     engine: Engine,
     registry: Registry,
-    runner: Runner,
+    runner_factory,
 ) -> None:
     calls: list[str] = []
 
@@ -1482,7 +1498,7 @@ def test_runner_awaits_async_hooks(
     engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _AsyncHook()))
 
     asyncio.run(
-        runner.run(
+        runner_factory().run(
             _payload(),
             latest_target_resolver(registry),
             container=None,

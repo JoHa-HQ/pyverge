@@ -7,9 +7,9 @@ from pyverge.core.types import (
     Attachable,
 )
 from pyverge.discovery import (
-    RegisterModel,
-    RegisterVersion,
+    ModelDescriptor,
     RegistrationCollector,
+    register_descriptor,
 )
 from pyverge.manager import Manager
 from pyverge.registry.errors import MissingReferenceError, ModelConflictError
@@ -84,20 +84,24 @@ class FastMCPDiscovery:
     async def register(self, server: Any) -> None:
         collector = RegistrationCollector()
         await self.source(server).accept(collector)
-        for command in collector.commands:
+        for descriptor in collector.registrations:
             try:
-                self._manager.engine.register(command)
+                register_descriptor(descriptor, self._manager)
             except ModelConflictError as error:
-                if not isinstance(command, (RegisterModel, RegisterVersion)):
+                if not isinstance(descriptor, ModelDescriptor):
                     raise
+                payload = descriptor.payload
+                subject = (
+                    f"primitive {payload.kind!r}@{payload.version}"
+                    if hasattr(payload, "kind")
+                    else f"primitive {error.version}"
+                )
                 raise ModelConflictError(
                     error.catalog_name,
                     error.version,
                     error.registered,
                     error.incoming,
-                    subject=(
-                        f"primitive {command.payload.kind!r}@{command.payload.version}"
-                    ),
+                    subject=subject,
                 ) from error
         self._reconcile()
 

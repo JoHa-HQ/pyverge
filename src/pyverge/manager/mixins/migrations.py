@@ -11,7 +11,6 @@ from pyverge.core.types import (
     ModelPair,
     VersionValue,
 )
-from pyverge.discovery import MigrationSpec, RegisterMigration
 from pyverge.migrations import JsonataMigration, JsonPatchMigration
 from pyverge.versioning import EdgeKey, Migratable
 
@@ -82,17 +81,8 @@ class MigrationStoreMixin(Generic[VersionValue]):
         func = cls._resolve_migration(func)
         if migration_id is not None:
             setattr(func, "__migration_id__", migration_id)
-        return cast(
-            MigrationFunc,
-            engine.register(
-                RegisterMigration(
-                    MigrationSpec(
-                        pair,
-                        func,
-                        backward_compatible,
-                    )
-                )
-            ),
+        return engine.store_migration(
+            pair, func, backward_compatible=backward_compatible
         )
 
     @store_migration.register(ManagerMigrationKey)
@@ -115,17 +105,27 @@ class MigrationStoreMixin(Generic[VersionValue]):
         func = cls._resolve_migration(func)
         if migration_id is not None:
             setattr(func, "__migration_id__", migration_id)
-        return cast(
-            MigrationFunc,
-            engine.register(
-                RegisterMigration(
-                    MigrationSpec(
-                        pair,
-                        func,
-                        backward_compatible,
-                    )
-                )
-            ),
+        return engine.store_migration(
+            pair, func, backward_compatible=backward_compatible
+        )
+
+    @store_migration.register(EdgeKey)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        key: EdgeKey,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
+        *,
+        engine: Engine[VersionValue] | None = None,
+        backward_compatible: bool = False,
+        migration_id: str | None = None,
+    ) -> MigrationFunc:
+        engine = engine or cls._default_engine
+        func = cls._resolve_migration(func)
+        if migration_id is not None:
+            setattr(func, "__migration_id__", migration_id)
+        return engine.store_migration(
+            key.key, func, backward_compatible=backward_compatible
         )
 
     @hybridmethod

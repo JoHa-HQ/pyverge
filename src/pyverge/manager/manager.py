@@ -11,7 +11,6 @@ from pyverge.discovery.reflection import (
     Reflector,
 )
 from pyverge.engine import Engine
-from pyverge.execution.types import EntryExtractor
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import (
     DefaultMigrationIdentityResolver,
@@ -97,7 +96,6 @@ class Manager(
         adapter: ModelAdapter,
         *,
         engine: Engine[VersionValue] | None = None,
-        walker: EntryExtractor | None = None,
         hasher: ContentHasher | None = None,
         identity_resolver: MigrationIdentityResolver | None = None,
         model_materializer: DiffMaterializer[object] | None = None,
@@ -110,13 +108,10 @@ class Manager(
         codec = getattr(adapter, "model_codec", None)
         if codec is not None and not codec.namespace:
             setattr(adapter, "model_codec", replace(codec, namespace=namespace))
-        if walker is None:
-            registry = Registry[VersionValue](
-                namespace=namespace,
-                hasher=hasher or default_content_hasher(),
-            )
-        else:
-            registry = walker.registry
+        registry = Registry[VersionValue](
+            namespace=namespace,
+            hasher=hasher or default_content_hasher(),
+        )
         reflector = Reflector[VersionValue](
             adapter,
             diff_provider or Reflection(adapter, CompositeDiffDiscovery()),

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, cast
 
 from pyverge.registry.types import MigrationWrite, ModelWrite
 from pyverge.versioning import JgfGraph
@@ -33,7 +33,11 @@ class JgfImporter:
                     "and an EdgeResolver"
                 )
             for edge in graph.edges:
-                migrations.store_migration(edge_resolver.resolve(edge))
+                resolved = edge_resolver.resolve(edge)
+                if resolved.is_executable:
+                    migrations.store_migration(cast("Any", resolved))
+                else:
+                    migrations.store_edge(resolved)
         return graph
 
 

@@ -7,10 +7,10 @@ from pyverge.core.context import MigrationContext
 from pyverge.core.types import TargetResolver, VersionValue
 from pyverge.execution.context import RunContext
 from pyverge.execution.plan import ExecutionPlan
-from pyverge.schemas.types import ModelAdapter
+from pyverge.schemas.types import ModelIdentityPort
 
 if TYPE_CHECKING:
-    from pyverge.registry import Registry
+    from pyverge.graph.types import GraphView
     from pyverge.versioning import VersionNode
 
 T = TypeVar("T")
@@ -23,7 +23,7 @@ class EntryExtractor(Protocol[VersionValue]):
     """Protocol for schema-aware payload discovery."""
 
     @property
-    def registry(self) -> Registry[VersionValue]: ...
+    def graph(self) -> GraphView[VersionValue]: ...
 
     def extract(
         self,
@@ -42,7 +42,7 @@ class BackendPort(Protocol[VersionValue]):
         plan: ExecutionPlan[VersionValue],
         payload: dict[str, Any],
         run: RunContext,
-        adapter: ModelAdapter,
+        adapter: ModelIdentityPort,
     ) -> dict[str, Any] | Awaitable[dict[str, Any]]: ...
 
 

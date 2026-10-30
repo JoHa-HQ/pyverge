@@ -14,6 +14,7 @@ from .json_patch import (
     SplitOperation,
 )
 from .jsonata import JsonataMigration, JsonataTransform
+from .spec import MigrationSpec
 
 __all__ = [
     "CoerceOperation",
@@ -26,6 +27,7 @@ __all__ = [
     "MapOperation",
     "MigrationIdentityResolver",
     "MigrationMaterializer",
+    "MigrationSpec",
     "Pointer",
     "SetDefaultOperation",
     "SplitOperation",

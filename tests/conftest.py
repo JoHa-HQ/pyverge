@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from typing import Any, cast
 
@@ -17,20 +17,25 @@ from pyverge.discovery.reflection import (
     Reflection,
     Reflector,
 )
-from pyverge.engine import Engine
+from pyverge.engine import Engine, RunnerOptions
 from pyverge.execution import (
-    AnyDirection,
-    CompositeExtractor,
     ExecutionCoordinator,
     ExecutionPlanner,
-    PathResolver,
-    PolicyEngine,
+    PayloadWalker,
     Runner,
-    TargetCompiler,
 )
 from pyverge.execution.backends import ThreadedBackend
 from pyverge.execution.context import ExecutionEnvironment
+from pyverge.execution.migrations import MigrationBindings
 from pyverge.execution.types import BackendPort
+from pyverge.graph import (
+    AnyDirection,
+    GraphBuilder,
+    PathFinder,
+    PolicyEngine,
+    TargetCompiler,
+    direction_policy,
+)
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
@@ -180,14 +185,14 @@ def walker(
     registry: Registry[VersionValue],
     migration_settings: MigrationSettings,
     model_adapter: PydanticModelAdapter,
-) -> CompositeExtractor:
-    """A preconfigured :class:`CompositeExtractor` bound to the shared registry.
+) -> PayloadWalker:
+    """A preconfigured :class:`PayloadWalker` bound to the shared registry.
 
     Pass it to ``Manager[VersionValue].configure(settings, adapter, walker=...)``
     to drive container-guided discovery.
     """
-    return CompositeExtractor(
-        registry,
+    return PayloadWalker(
+        GraphBuilder().build(registry),
         adapter=model_adapter,
         validation_mode=migration_settings.validation_mode,
     )
@@ -211,21 +216,52 @@ def execution_environment(
 
 @pytest.fixture
 def coordinator(
-    walker: CompositeExtractor[VersionValue],
+    walker: PayloadWalker[VersionValue],
     registry: Registry[VersionValue],
+    model_adapter: ModelAdapter,
 ) -> ExecutionCoordinator[VersionValue]:
+    graph = GraphBuilder().build(registry)
     return ExecutionCoordinator(
         extractor=walker,
-        paths=PathResolver(registry),
-        policy=PolicyEngine(
-            direction=AnyDirection(),
-            on_direction_violation="raise",
-            on_missing_path="raise",
-            depth_limit=-1,
-            on_depth_violation="raise",
+        finder=PathFinder(
+            graph=graph,
+            targets=TargetCompiler(graph, model_adapter),
+            migrations=MigrationBindings.from_catalog(registry),
+            policy=PolicyEngine(
+                direction=AnyDirection(),
+                on_direction_violation="raise",
+                on_missing_path="raise",
+                depth_limit=-1,
+                on_depth_violation="raise",
+            ),
         ),
         planner=ExecutionPlanner(),
     )
+
+
+@pytest.fixture
+def runner_factory(
+    engine: Engine[VersionValue],
+    runtime_backend: BackendPort,
+    runtime_environment: ExecutionEnvironment,
+    migration_settings: MigrationSettings,
+) -> Callable[[], Runner[VersionValue]]:
+    def build() -> Runner[VersionValue]:
+        return engine.runner(
+            RunnerOptions(
+                backend=runtime_backend,
+                environment=runtime_environment,
+                direction=direction_policy(migration_settings.direction),
+                on_direction_violation=migration_settings.on_direction_violation,
+                on_missing_path=migration_settings.on_missing_path,
+                depth_limit=migration_settings.max_migration_depth,
+                on_depth_violation="raise",
+                validation_mode=migration_settings.validation_mode,
+                middleware=(),
+            )
+        )
+
+    return build
 
 
 @pytest.fixture
@@ -266,7 +302,6 @@ def runner(
         backend=runtime_backend,
         middleware=(),
         environment=runtime_environment,
-        target_compiler=TargetCompiler[VersionValue](registry, model_adapter),
     )
 
 
