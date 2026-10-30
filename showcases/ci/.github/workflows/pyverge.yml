@@ -11,12 +11,14 @@ jobs:
     defaults:
       run:
         working-directory: showcases/ci
+    env:
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-      - run: pip install "pyverge[cli]"
+      - run: pip install -e "../..[cli]"
 
       - name: Registry health
         run: pyverge doctor --manager manager:manager
@@ -29,6 +31,7 @@ jobs:
             --baseline manifest.json
 
       - name: Upload manifest
+        if: ${{ env.ACT != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: pyverge-manifest
@@ -38,5 +41,6 @@ jobs:
         run: pyverge compat --manager manager:manager --fail-on-breaking
 
       - name: Check nested payload convergence
-        run: pyverge migrate payloads/person_v1.json \
-          --manager manager:manager --check
+        run: |
+          pyverge migrate payloads/person_v1.json \
+            --manager manager:manager --check

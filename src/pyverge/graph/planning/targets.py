@@ -10,12 +10,10 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
-from pyverge.registry import (
-    GraphCatalog,
-)
+from pyverge.graph.types import GraphView
 from pyverge.registry.errors import CatalogError, ModelNotFoundError
-from pyverge.schemas.types import ModelAdapter
-from pyverge.versioning import Versionable, VersionKey, VersionNode
+from pyverge.schemas.types import ModelIdentityPort
+from pyverge.versioning import Versionable, VersionKey, VersionNode, parse_version
 
 TargetStrategy = Literal["latest", "earliest", "skip"]
 TargetSpec = (
@@ -29,7 +27,7 @@ TargetPolicy = (
 
 
 def skip_target_resolver(
-    registry: GraphCatalog[VersionValue],
+    registry: GraphView[VersionValue],
 ) -> TargetResolver:
 
     def resolve(
@@ -41,7 +39,7 @@ def skip_target_resolver(
 
 
 def latest_target_resolver(
-    registry: GraphCatalog[VersionValue],
+    registry: GraphView[VersionValue],
 ) -> TargetResolver:
 
     def resolve(
@@ -53,7 +51,7 @@ def latest_target_resolver(
 
 
 def earliest_target_resolver(
-    registry: GraphCatalog[VersionValue],
+    registry: GraphView[VersionValue],
 ) -> TargetResolver:
 
     def resolve(
@@ -65,7 +63,7 @@ def earliest_target_resolver(
 
 
 def fixed_target_resolver(
-    registry: GraphCatalog[VersionValue],
+    registry: GraphView[VersionValue],
     target: VersionNode[VersionValue],
 ) -> TargetResolver:
     if not registry.has_model(target):
@@ -111,8 +109,8 @@ def multi_target_resolver(
 class TargetCompiler(Generic[VersionValue]):
     """Compile declarative target policy into a resolver."""
 
-    graph: GraphCatalog[VersionValue]
-    adapter: ModelAdapter
+    graph: GraphView[VersionValue]
+    adapter: ModelIdentityPort
 
     def compile(self, target: TargetPolicy) -> TargetResolver:  # noqa: PLR0911
         if callable(target) and not isinstance(target, type):
@@ -161,7 +159,7 @@ class TargetCompiler(Generic[VersionValue]):
 
     def _version_string(self, value: str) -> TargetResolver:
         try:
-            parsed = self.adapter.of(value)
+            parsed = parse_version(value)
         except ValueError:
             raise CatalogError(
                 self.graph.name,
@@ -171,7 +169,11 @@ class TargetCompiler(Generic[VersionValue]):
         def resolve(
             current: VersionNode[VersionValue],
         ) -> VersionNode[VersionValue] | None:
-            key = VersionKey[VersionValue](_value=parsed, _kind=current.kind)
+            key = VersionKey[VersionValue](
+                namespace=current.namespace,
+                kind=current.kind,
+                version=parsed,
+            )
             return self.graph.get_model(key)
 
         return resolve

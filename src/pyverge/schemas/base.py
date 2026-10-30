@@ -5,7 +5,6 @@ from typing import Any, Generic
 
 from pyverge.core.types import (
     ModelHandle,
-    ModelVersionKey,
     VersionValue,
 )
 from pyverge.schemas.codec import ModelCodec
@@ -19,9 +18,11 @@ from pyverge.versioning import (
     FrozenMap,
     ModelDescriptor,
     ModelRef,
+    NodeId,
     Versionable,
     VersionKey,
     VersionNode,
+    parse_version,
 )
 from pyverge.versioning.diff import _build_diff
 
@@ -68,7 +69,7 @@ class AbstractModelAdapter(Generic[VersionValue]):
     def materialize(self, diff: Diffable[VersionValue]) -> VersionNode[VersionValue]:
         if diff.source.version > diff.target.version:
             diff = diff.inverted()
-        return self.versionable(self.materialize_model(diff))
+        return self.versionable(self._build_model(diff))
 
     def diff(
         self,
@@ -106,12 +107,13 @@ class AbstractModelAdapter(Generic[VersionValue]):
         model_cls: ModelHandle,
         *,
         kind: str | None = None,
-        version: str | None = None,
+        version: str | VersionValue | None = None,
     ) -> VersionNode[VersionValue]:
         return VersionNode[VersionValue](
-            key=VersionKey[VersionValue](
-                _value=self.of(version or self.version(model_cls)),
-                _kind=kind or self.kind(model_cls),
+            namespace=self.model_codec.namespace,
+            kind=kind or self.kind(model_cls),
+            version=parse_version(
+                version if version is not None else self.version(model_cls)
             ),
             descriptor=self.model_descriptor(model_cls),
         )
@@ -121,18 +123,14 @@ class AbstractModelAdapter(Generic[VersionValue]):
         *,
         kind: str,
         version: str,
-    ) -> Comparable[VersionValue]:
+    ) -> VersionKey[VersionValue]:
         return self.model_codec.version_key(kind=kind, version=version)
 
-    def materialize_model(self, diff: Diffable) -> ModelHandle:
-        raise NotImplementedError
+    def _build_model(self, diff: Diffable) -> ModelHandle:
+        return self.runtime.build_model(diff, codec=self.model_codec)
 
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
+    def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:
         raise NotImplementedError
-
-    @classmethod
-    def of(cls, value: str | VersionValue) -> VersionValue:
-        return ModelCodec().of(value)
 
     def can_handle(
         self,

@@ -19,23 +19,12 @@ nav:
   - Tutorials:
       - tutorials/index.md
       - Getting started: tutorials/getting-started.md
-      - Examples:
-          - Executable quickstart: examples/quickstart.md
-          - Target policies: examples/target-policies.md
-          - Async execution: examples/async-runner.md
-          - Reconstruct a missing model: examples/reconstruct-missing-model.md
-          - Generate a migration from models: examples/generate-migration.md
-          - OTel hooks: examples/otel-hooks.md
-          - OpenLineage hooks: examples/openlineage-hooks.md
-          - CLI: examples/cli.md
-          - Benchmark latency: examples/benchmark.md
-          - JGF API: examples/jgf-api.md
-          - CI manifest comparison: examples/ci-manifest.md
   - How-to:
       - how-to/index.md
       - Models:
           - how-to/models/index.md
           - Register models and migrations: how-to/models/register-models.md
+          - Keys and hydration: how-to/models/keys-and-hydration.md
           - Use the manager: how-to/models/use-manager.md
       - Migrations:
           - how-to/migrations/index.md
@@ -52,6 +41,22 @@ nav:
           - Test migrations: how-to/operations/test-migrations.md
           - Instrument migrations with hooks: how-to/operations/instrument-migrations.md
           - Benchmark adapters: how-to/operations/benchmark-adapters.md
+  - Examples:
+      - examples/index.md
+      - Executable quickstart: examples/quickstart.md
+      - Keys and hydration: examples/keys-and-hydration.md
+      - Namespace isolation: examples/namespace-isolation.md
+      - Graph snapshots: examples/graph-snapshot.md
+      - Target policies: examples/target-policies.md
+      - Async execution: examples/async-runner.md
+      - Reconstruct a missing model: examples/reconstruct-missing-model.md
+      - Generate a migration from models: examples/generate-migration.md
+      - OTel hooks: examples/otel-hooks.md
+      - OpenLineage hooks: examples/openlineage-hooks.md
+      - CLI: examples/cli.md
+      - Benchmark latency: examples/benchmark.md
+      - JGF API: examples/jgf-api.md
+      - CI manifest comparison: examples/ci-manifest.md
   - Integrations:
       - integrations/index.md
       - FastMCP:
@@ -65,6 +70,7 @@ nav:
   - Reference:
       - reference/index.md
       - API reference: reference/api.md
+      - Graph and identity: reference/graph.md
       - Manager API: reference/manager.md
       - Runtime and execution: reference/runtime.md
       - Migration formats: reference/migration-formats.md
@@ -75,6 +81,8 @@ nav:
   - Explanation:
       - explanation/index.md
       - Concepts: explanation/concepts.md
+      - Graph model and identity: explanation/graph-model.md
+      - Namespaces and hydration: explanation/namespaces.md
       - Glossary: explanation/glossary.md
       - Managers: explanation/managers.md
       - Providers: explanation/providers.md

@@ -9,14 +9,15 @@ The library automates the entire flow:
 4. **Execute** migrations safely with hooks and error handling.
 5. **Finalize** each entry against the target schema.
 
-For every discovered entry the engine asks the resolver for a target, then
-asks the registry for a migration path. The decision chain looks like this:
+For every discovered entry, `PathFinder` compiles the target policy, asks the
+immutable `MigrationGraph` for a path, applies policy, and resolves executable
+bindings through the migration resolver. The decision chain looks like this:
 
 ```mermaid
 flowchart TD
     A[Discover versioned entry] --> B{source == target?}
     B -->|yes| C[No-op]
-    B -->|no| D{Path exists in registry?}
+    B -->|no| D{Path exists in graph?}
     D -->|no| E[Missing path: skip / raise]
     D -->|yes| F{Direction allows migration?}
     F -->|no| G[Direction violation: skip / raise]
@@ -53,9 +54,9 @@ flowchart LR
     Payload --> Resolution
 ```
 
-The walker finds both entries. The resolver picks targets. The graph builder
-computes paths. The executor runs `Address 1.0.0 -> 2.0.0` first (child), then
-`User 1.0.0 -> 2.0.0 -> 3.0.0` (parent).
+`PayloadWalker` finds both entries. `PathFinder` compiles targets and resolves
+the paths from the graph snapshot. The executor runs `Address 1.0.0 -> 2.0.0`
+first (child), then `User 1.0.0 -> 2.0.0 -> 3.0.0` (parent).
 
 ## Nested model structure
 
@@ -80,13 +81,14 @@ PersonContainer
         └── AddressV3 (version="3.0.0"): +region?
 ```
 
-The walker discovers every versioned entry at any depth. The graph builder
-orders them so children migrate before their parents: `Address` and `Contact`
-entries converge first, then the enclosing `Person`.
+The walker discovers every versioned entry at any depth. Path planning orders
+them so children migrate before their parents: `Address` and `Contact` entries
+converge first, then the enclosing `Person`.
 
 ## Execution
 
-The backend owns execution; the runner owns planning and materialization.
-Hooks wrap each migration step, and middleware wraps the backend execution seam.
+`PayloadWalker` owns discovery. `PathFinder` owns graph planning. The backend
+owns execution. Hooks wrap each migration step, and middleware wraps the backend
+execution seam.
 See [Runtime reference](../reference/runtime.md) and
 [Run payloads](../how-to/runtime/run-payloads.md).

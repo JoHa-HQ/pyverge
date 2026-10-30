@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import Protocol
 
 from pyverge.core.types import MigrationFunc
-from pyverge.versioning import MigrationIdentity
+from pyverge.versioning import MigrationDescriptor
 
 
 class MigrationIdentityResolver(Protocol):
     """Resolve a migration callable to a stable provider identity."""
 
-    def resolve(self, func: MigrationFunc) -> MigrationIdentity: ...
+    def resolve(self, func: MigrationFunc) -> MigrationDescriptor: ...
 
 
 class DefaultMigrationIdentityResolver:
@@ -20,14 +20,14 @@ class DefaultMigrationIdentityResolver:
     source line as an explicit convenience identity.
     """
 
-    def resolve(self, func: MigrationFunc) -> MigrationIdentity:
+    def resolve(self, func: MigrationFunc) -> MigrationDescriptor:
         declared = getattr(func, "migration_identity", None)
-        if isinstance(declared, MigrationIdentity):
+        if isinstance(declared, MigrationDescriptor):
             return declared
 
         explicit = getattr(func, "__migration_id__", None)
         if isinstance(explicit, str) and explicit:
-            return MigrationIdentity("callable", explicit)
+            return MigrationDescriptor("callable", explicit)
 
         module = getattr(func, "__module__", None)
         qualname = getattr(func, "__qualname__", None)
@@ -39,10 +39,13 @@ class DefaultMigrationIdentityResolver:
 
         code = getattr(func, "__code__", None)
         if "<lambda>" in qualname and code is not None:
-            return MigrationIdentity(
+            return MigrationDescriptor(
                 "callable", f"{module}.{qualname}:{code.co_firstlineno}"
             )
-        return MigrationIdentity("callable", f"{module}.{qualname}")
+        return MigrationDescriptor("callable", f"{module}.{qualname}")
 
 
-__all__ = ["DefaultMigrationIdentityResolver", "MigrationIdentityResolver"]
+__all__ = [
+    "DefaultMigrationIdentityResolver",
+    "MigrationIdentityResolver",
+]

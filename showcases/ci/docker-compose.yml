@@ -1,0 +1,17 @@
+services:
+  act:
+    build:
+      context: .
+      dockerfile: Dockerfile.act
+    working_dir: /workspace
+    volumes:
+      - ../../:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      - -W
+      - showcases/ci/.github/workflows/pyverge.yml
+      - push
+      - --container-architecture
+      - linux/amd64
+      - -P
+      - ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest

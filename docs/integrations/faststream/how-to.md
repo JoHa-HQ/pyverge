@@ -67,7 +67,7 @@ def drop_currency(data: OrderV2Data, context=None) -> OrderV1Data:
     return cast(OrderV1Data, data)
 
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
 OrderManager.store_model(Order)
 OrderManager.store_migration(ManagerMigrationKey("Order", "1.0.0", "2.0.0"), add_currency)
 OrderManager.store_migration(ManagerMigrationKey("Order", "2.0.0", "1.0.0"), drop_currency)
@@ -113,7 +113,7 @@ plain dicts at runtime. See
 ### Telemetry
 
 The adapter carries no tracing library and emits no spans. FastStream's own
-[OpenTelemetryhttps://faststream.airt.ai/latest/getting-started/integrations/
+[OpenTelemetry](https://faststream.airt.ai/latest/getting-started/integrations/)
 middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
 spans **as current**, so each step nests under the consume span:
 
@@ -125,13 +125,13 @@ broker.add_middleware(KafkaTelemetryMiddleware(tracer_provider=provider))
 manager.attach_hooks((OTELHook(tracer=provider.get_tracer("my-service")),))
 ```
 
-See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the per-step `OTELHook`.
+See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the per-step `OTELHook`. Step spans include graph namespace, kind, source/target, and migration strategy/identity when available.
 
 ### Testing
 
 Drive the adapter through FastStream's in-memory `TestKafkaBroker` — no broker
 container. See the worked
-[`showcases/faststream`https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream
+[`showcases/faststream`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream)
 project (broker selection across Kafka/RabbitMQ/NATS/Redis, Jaeger + OTLP).
 
 ## Verify

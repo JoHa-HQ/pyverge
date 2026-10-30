@@ -1,19 +1,12 @@
 from .backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from .coordinator import ExecutionCoordinator
-from .direction import (
-    AnyDirection,
-    BackwardDirection,
-    DirectionPolicy,
-    ForwardDirection,
-    direction_policy,
-)
 from .errors import (
     AsyncExecutionRequired,
     ExecutionError,
     ExecutionModeError,
     SyncExecutionRequired,
 )
-from .extractors import CompositeExtractor, ContainerExtractor, SchemaFieldsExtractor
+from .extractors import ContainerExtractor, PayloadWalker, SchemaFieldsExtractor
 from .hooks import MigrationHook, OpenLineageHook, OTELHook
 from .middleware import (
     AuditEvent,
@@ -30,27 +23,10 @@ from .middleware import (
     TransactionManager,
     TransactionMiddleware,
 )
-from .path import Path
-from .path_resolver import PathResolver
-from .plan import (
-    ExecutionPlan,
-    ExtractedEntry,
-    PathPlan,
-    PathPlanEntry,
-    PlanningOptions,
-    PolicyDecision,
-)
+from .migrations import MigrationBindings
+from .plan import ExecutionPlan, ExtractedEntry, PlanningOptions
 from .planner import ExecutionPlanner
-from .policy import PolicyEngine
 from .runner import Runner
-from .targets import (
-    TargetCompiler,
-    earliest_target_resolver,
-    fixed_target_resolver,
-    latest_target_resolver,
-    multi_target_resolver,
-    skip_target_resolver,
-)
 from .types import (
     BackendPort,
     Entry,
@@ -59,7 +35,6 @@ from .types import (
 )
 
 __all__ = [
-    "AnyDirection",
     "AsyncBackend",
     "AsyncExecutionRequired",
     "AuditEvent",
@@ -67,10 +42,7 @@ __all__ = [
     "AuditSink",
     "BackendMiddleware",
     "BackendPort",
-    "BackwardDirection",
-    "CompositeExtractor",
     "ContainerExtractor",
-    "DirectionPolicy",
     "Entry",
     "EntryExtractor",
     "ExecutionCoordinator",
@@ -79,37 +51,25 @@ __all__ = [
     "ExecutionPlan",
     "ExecutionPlanner",
     "ExtractedEntry",
-    "ForwardDirection",
     "IdempotencyKeyFactory",
     "IdempotencyMiddleware",
     "IdempotencyStore",
+    "MigrationBindings",
     "MigrationHook",
     "OTELHook",
     "OpenLineageHook",
     "OpenLineageMiddleware",
     "OtelMiddleware",
-    "Path",
-    "PathPlan",
-    "PathPlanEntry",
-    "PathResolver",
+    "PayloadWalker",
     "PlanningOptions",
-    "PolicyDecision",
-    "PolicyEngine",
     "ProcessBackend",
     "RetryMiddleware",
     "Runner",
     "RuntimePort",
     "SchemaFieldsExtractor",
     "SyncExecutionRequired",
-    "TargetCompiler",
     "ThreadedBackend",
     "Transaction",
     "TransactionManager",
     "TransactionMiddleware",
-    "direction_policy",
-    "earliest_target_resolver",
-    "fixed_target_resolver",
-    "latest_target_resolver",
-    "multi_target_resolver",
-    "skip_target_resolver",
 ]

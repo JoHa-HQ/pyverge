@@ -9,9 +9,9 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
-from pyverge.execution.direction import DirectionPolicy
-from pyverge.execution.plan import PathPlan, PathPlanEntry
-from pyverge.registry import GraphCatalog
+from pyverge.graph.planning.direction import DirectionPolicy
+from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
+from pyverge.graph.types import GraphView
 from pyverge.registry.errors import CatalogError
 from pyverge.versioning import EdgeKey
 
@@ -31,7 +31,7 @@ class PolicyEngine(Generic[VersionValue]):
     on_depth_violation: DepthViolationStrategy
 
     def apply(
-        self, plan: PathPlan[VersionValue], *, graph: GraphCatalog[VersionValue]
+        self, plan: PathPlan[VersionValue], *, graph: GraphView[VersionValue]
     ) -> PathPlan[VersionValue]:
         kept: list[PathPlanEntry[VersionValue]] = []
         for entry in plan.entries:
@@ -79,7 +79,7 @@ class PolicyEngine(Generic[VersionValue]):
 
     def _violation(
         self,
-        graph: GraphCatalog[VersionValue],
+        graph: GraphView[VersionValue],
         entry: PathPlanEntry[VersionValue],
         layer: str,
         strategy: str,

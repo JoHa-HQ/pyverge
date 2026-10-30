@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -13,8 +14,16 @@ from openlineage.client.event_v2 import (
     RunState,
 )
 
+from pyverge.core.types import HookState
+from pyverge.execution.hooks.state import pop_state, push_state
 from pyverge.execution.hooks.types import MigrationHook
-from pyverge.versioning import Comparable
+from pyverge.versioning import MigrationDescriptor, NodeId
+
+
+@dataclass(frozen=True, slots=True)
+class _RunState:
+    run_id: str
+    job_name: str
 
 
 class OpenLineageHook(MigrationHook):
@@ -30,72 +39,86 @@ class OpenLineageHook(MigrationHook):
         self._client = client
         self._namespace = namespace
         self._producer = producer
-        self._run_id: str | None = None
 
-    def before_migrate(
+    def before_migrate(  # noqa: PLR0913
         self,
         name: str,
-        from_version: Comparable,
-        to_version: Comparable,
+        from_version: NodeId,
+        to_version: NodeId,
         data: dict[str, Any],
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
     ) -> None:
-        self._run_id = uuid4().hex
-        kind = getattr(from_version, "kind", "migration")
+        job_name = self._job_name(from_version, to_version)
+        run_state = _RunState(run_id=uuid4().hex, job_name=job_name)
+        push_state(state, id(self), run_state)
         self._client.emit(
             RunEvent(
                 eventTime=datetime.now(UTC).isoformat(),
                 producer=self._producer,
                 eventType=RunState.START,
-                run=Run(runId=self._run_id),
-                job=Job(namespace=self._namespace, name=f"migration.{kind}"),
+                run=Run(runId=run_state.run_id),
+                job=Job(namespace=self._namespace, name=run_state.job_name),
                 inputs=[InputDataset(self._namespace, str(from_version))],
                 outputs=[OutputDataset(self._namespace, str(to_version))],
             )
         )
 
-    def after_migrate(
+    def after_migrate(  # noqa: PLR0913
         self,
         name: str,
-        from_version: Comparable,
-        to_version: Comparable,
+        from_version: NodeId,
+        to_version: NodeId,
         original_data: dict[str, Any],
         migrated_data: dict[str, Any],
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
     ) -> None:
-        if self._run_id is None:
+        run_state = pop_state(state, id(self))
+        if not isinstance(run_state, _RunState):
             return
-        kind = getattr(from_version, "kind", "migration")
         self._client.emit(
             RunEvent(
                 eventTime=datetime.now(UTC).isoformat(),
                 producer=self._producer,
                 eventType=RunState.COMPLETE,
-                run=Run(runId=self._run_id),
-                job=Job(namespace=self._namespace, name=f"migration.{kind}"),
+                run=Run(runId=run_state.run_id),
+                job=Job(namespace=self._namespace, name=run_state.job_name),
             )
         )
-        self._run_id = None
 
-    def on_error(
+    def on_error(  # noqa: PLR0913
         self,
         name: str,
-        from_version: Comparable,
-        to_version: Comparable,
+        from_version: NodeId,
+        to_version: NodeId,
         data: dict[str, Any],
         error: Exception,
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
     ) -> None:
-        if self._run_id is None:
+        run_state = pop_state(state, id(self))
+        if not isinstance(run_state, _RunState):
             return
-        kind = getattr(from_version, "kind", "migration")
         self._client.emit(
             RunEvent(
                 eventTime=datetime.now(UTC).isoformat(),
                 producer=self._producer,
                 eventType=RunState.FAIL,
-                run=Run(runId=self._run_id),
-                job=Job(namespace=self._namespace, name=f"migration.{kind}"),
+                run=Run(runId=run_state.run_id),
+                job=Job(namespace=self._namespace, name=run_state.job_name),
             )
         )
-        self._run_id = None
+
+    @staticmethod
+    def _job_name(from_version: NodeId, to_version: NodeId) -> str:
+        return (
+            f"migration.{from_version.kind}."
+            f"{from_version.version}->{to_version.version}"
+        )
 
 
 __all__ = ["OpenLineageHook"]

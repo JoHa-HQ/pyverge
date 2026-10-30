@@ -8,6 +8,7 @@ from pyverge.discovery import (
     ReflectionReport,
     RegistrationCollector,
     RegistrationContext,
+    register_descriptor,
 )
 from pyverge.discovery.types import AsyncSourcePort, SourcePort
 from pyverge.registry.errors import GraphLockedError
@@ -85,8 +86,8 @@ class ReflectionMixin(Generic[VersionValue]):
             len(engine.registry.migrations(kind)) for kind in engine.registry.kinds
         )
         source.accept(collector)
-        for command in collector.commands:
-            engine.register(command)
+        for descriptor in collector.registrations:
+            register_descriptor(descriptor, cls)
         return cls._report(
             registration_context,
             collector,
@@ -115,8 +116,8 @@ class ReflectionMixin(Generic[VersionValue]):
             len(engine.registry.migrations(kind)) for kind in engine.registry.kinds
         )
         await source.accept(collector)
-        for command in collector.commands:
-            engine.register(command)
+        for descriptor in collector.registrations:
+            register_descriptor(descriptor, cls)
         return cls._report(
             registration_context,
             collector,

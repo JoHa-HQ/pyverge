@@ -9,33 +9,75 @@ distributed tracing.
 - A registered migration edge.
 - A hook implementing the desired callbacks.
 
-## Steps
+## Hook contract
 
-## Writing a hook
-
-Subclass `MigrationHook` and override only the callbacks you need:
+Hooks receive the step name, `NodeId` endpoints, migration descriptor, and a
+backend-provided `HookState`:
 
 ```python
+from typing import Any
+
+from pyverge.core.types import HookState
 from pyverge.execution import MigrationHook
+from pyverge.versioning import MigrationDescriptor, NodeId
 
 
 class AuditHook(MigrationHook):
-    def before_migrate(self, name, from_version, to_version, data):
-        print(f"migrating {name} {from_version} -> {to_version}")
+    def before_migrate(
+        self,
+        name: str,
+        from_version: NodeId,
+        to_version: NodeId,
+        data: dict[str, Any],
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
+    ) -> None:
+        print(
+            f"migrating {migration.strategy if migration else name} "
+            f"{from_version} -> {to_version}"
+        )
 
-    def after_migrate(self, name, from_version, to_version, original_data, migrated_data):
-        print(f"migrated {name} {from_version} -> {to_version}")
+    def after_migrate(
+        self,
+        name: str,
+        from_version: NodeId,
+        to_version: NodeId,
+        original_data: dict[str, Any],
+        migrated_data: dict[str, Any],
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
+    ) -> None:
+        print(f"migrated {from_version} -> {to_version}")
 
-    def on_error(self, name, from_version, to_version, data, error):
-        print(f"failed {name} {from_version} -> {to_version}: {error}")
+    def on_error(
+        self,
+        name: str,
+        from_version: NodeId,
+        to_version: NodeId,
+        data: dict[str, Any],
+        error: Exception,
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
+    ) -> None:
+        print(f"failed {from_version} -> {to_version}: {error}")
 ```
+
+`state` is not global and should not be stored on the hook instance. The
+execution backend creates one `ContextVar` per run and adapts it per async task
+or thread. Store per-step state in it by hook instance key when needed.
 
 Register a hook on a specific migration edge:
 
 ```python
 from pyverge.core import ManagerMigrationKey
 
-manager.add_hook(ManagerMigrationKey("User", "1.0.0", "2.0.0"), AuditHook())
+manager.add_hook(
+    ManagerMigrationKey("User", "1.0.0", "2.0.0"),
+    AuditHook(),
+)
 ```
 
 An instance hook applies only to that manager instance. Register on the manager
@@ -43,29 +85,37 @@ class before instantiating if every instance should inherit the hook.
 
 ### Async hooks
 
-Async executors use async overrides when present:
+Define async callbacks directly on the hook. The async backend awaits them:
 
 ```python
 class AsyncAuditHook(MigrationHook):
-    async def abefore_migrate(self, name, from_version, to_version, data):
-        await audit_write(name, from_version, to_version, data)
+    async def before_migrate(
+        self,
+        name,
+        from_version,
+        to_version,
+        data,
+        *,
+        migration=None,
+        state,
+    ):
+        await audit_write(migration, from_version, to_version)
 ```
 
-If only the sync methods exist, the async executor runs them in a worker thread
-via `asyncio.to_thread`; sync hooks do not block the event loop.
+There are no separate `abefore_migrate` / `aafter_migrate` methods. The sync
+backend rejects awaitable hook results with `AsyncExecutionRequired`.
 
 ### OpenTelemetry
 
-`OTELHook` (in the adapters layer) creates a span per migration with duration,
-status, and exception recording. Wire it to your tracer provider:
+`OTELHook` creates a span per migration step. Wire it to your tracer provider:
 
 ```python
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, OTLPSpanExporter
 
-from pyverge.execution import OTELHook
 from pyverge.core import ManagerMigrationKey
+from pyverge.execution import OTELHook
 
 provider = TracerProvider()
 provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
@@ -75,22 +125,67 @@ hook = OTELHook(tracer=trace.get_tracer("converge"), service="converge")
 manager.add_hook(ManagerMigrationKey("User", "1.0.0", "2.0.0"), hook)
 ```
 
-Each migration step emits a span named `<service>.migrate` with attributes for
-the kind and the from/to versions, plus duration and status on completion.
+Each step emits `<service>.migrate` with:
+
+```text
+migration.name
+migration.namespace
+migration.kind
+migration.source
+migration.target
+migration.strategy       # when available
+migration.identity       # when available
+migration.duration_seconds
+```
+
+### OpenLineage
+
+`OpenLineageHook` emits edge-level START/COMPLETE/FAIL events. Use
+`OpenLineageMiddleware` when you also want run-level lineage and namespace
+validation:
+
+```python
+from pyverge.execution import OpenLineageHook
+from pyverge.execution.middleware import OpenLineageMiddleware
+
+middleware = OpenLineageMiddleware(
+    client=client,
+    namespace="com.acme.orders",
+    producer="orders-service",
+)
+hook = OpenLineageHook(
+    client=client,
+    namespace="com.acme.orders",
+    producer="orders-service",
+)
+```
+
+The middleware validates that the OpenLineage namespace matches the graph
+namespace when the graph has one. Dataset names use namespaced `NodeId` values;
+job names identify the edge:
+
+```text
+migration.User.1.0.0->2.0.0
+```
 
 ## Verify
 
 ```python
-manager.attach_hooks([MyHook()])
+manager.attach_hooks([AuditHook()])
+result = manager.runner().run(payload, "latest")
 ```
 
 ## Troubleshooting
 
 - Hook not called: it is attached to a different edge or manager graph.
 - Async hook not awaited: use `AsyncBackend`.
+- `TypeError` about `state`: the hook implements an outdated callback
+  signature. Add the keyword-only `state` parameter.
+- OpenLineage namespace error: align the configured namespace with the graph
+  namespace, or remove the graph namespace.
 
 ## See also
 
 - [Test migrations](test-migrations.md)
-- [Benchmark adapters](benchmark-adapters.md)
+- [Runtime reference](../../reference/runtime.md)
 - [Run payloads](../runtime/run-payloads.md)

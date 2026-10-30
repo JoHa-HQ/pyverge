@@ -11,7 +11,6 @@ from typing import (
 from pyverge.core.types import (
     ModelData,
     ModelHandle,
-    ModelVersionKey,
     VersionValue,
 )
 from pyverge.schemas.base import AbstractModelAdapter
@@ -21,12 +20,13 @@ from pyverge.versioning import (
     NO_DEFAULT,
     Diffable,
     FieldDescriptor,
+    NodeId,
     TypeRef,
     default_canonicalizer,
 )
 
 
-class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
+class DataclassModelAdapter(AbstractModelAdapter):
     """Model adapter for ordinary :mod:`dataclasses` classes.
 
     Dataclasses are the runtime container, but payload validation and
@@ -114,15 +114,15 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
                 return self.resolve_model(hints.get(field.name, field.type))
         return None
 
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
-        found: set[ModelVersionKey] = set()
+    def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:
+        found: set[NodeId] = set()
         self._collect_references(model_cls, found, set())
         return frozenset(found)
 
     def _collect_references(
         self,
         model_cls: ModelHandle,
-        found: set[ModelVersionKey],
+        found: set[NodeId],
         seen: set[int],
     ) -> None:
         if not (isinstance(model_cls, type) and dataclasses.is_dataclass(model_cls)):
@@ -139,14 +139,14 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
                 if not kind:
                     continue
                 try:
-                    version = self.of(self.version(nested))
+                    version = self.version(nested)
                 except (TypeError, ValueError):
                     continue
-                found.add((kind, version))
+                found.add(NodeId.parse(self.model_codec.namespace, kind, version))
                 self._collect_references(nested, found, seen)
 
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        return self.runtime.materialize(container, data)
+        return self.runtime.instantiate(container, data)
 
     def dump(self, model: object) -> ModelData:
         if not dataclasses.is_dataclass(model):
@@ -209,8 +209,8 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
 
     def _field_references(
         self, model_cls: ModelHandle, annotation: Any
-    ) -> tuple[ModelVersionKey, ...]:
-        found: set[ModelVersionKey] = set()
+    ) -> tuple[NodeId, ...]:
+        found: set[NodeId] = set()
         for nested in self._iter_models(annotation):
             if nested is model_cls:
                 continue
@@ -218,15 +218,22 @@ class DataclassModelAdapter(AbstractModelAdapter[VersionValue]):
             if not kind:
                 continue
             try:
-                found.add((kind, self.of(self.version(nested))))
+                found.add(
+                    NodeId.parse(self.model_codec.namespace, kind, self.version(nested))
+                )
             except (TypeError, ValueError):
                 continue
             found.update(self.references(nested))
-        return tuple(sorted(found, key=lambda item: (item[0], str(item[1]))))
+        return tuple(
+            sorted(
+                found,
+                key=lambda item: (item.namespace, item.kind, str(item.version)),
+            )
+        )
 
-    def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
+    def _build_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
         anchor = self.runtime.resolve(diff.source.descriptor.ref)
-        version = diff.target.version[1]
+        version = diff.target.version
         version_field = (
             self.version_property,
             str,

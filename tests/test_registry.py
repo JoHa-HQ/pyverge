@@ -23,19 +23,18 @@ from pyverge.core import (
 from pyverge.engine import Engine
 from pyverge.execution import MigrationHook
 from pyverge.execution.extractors import (
-    CompositeExtractor,
     ContainerExtractor,
+    PayloadWalker,
     SchemaFieldsExtractor,
 )
 from pyverge.export import ManifestDiff
+from pyverge.graph import GraphBuilder
 from pyverge.jgf import JgfExporter, JgfImporter
 from pyverge.registry import InMemoryCatalog, Registry
 from pyverge.registry.errors import (
     CatalogError,
-    GraphLockedError,
     MigrationConflictError,
     MigrationNotFoundError,
-    MigrationPathError,
     ModelAlreadyRegisteredError,
     ModelConflictError,
     ModelNotFoundError,
@@ -50,6 +49,7 @@ from pyverge.versioning import (
     EdgeKey,
     FieldDescriptor,
     JgfNode,
+    NodeId,
     TypeRef,
     VersionKey,
     VersionNode,
@@ -239,7 +239,7 @@ class TestModel:
         latest: ModelHandle,
     ) -> None:
         version = envelope_model(model_adapter, versioning_settings, latest)
-        assert registry.latest(version.version[0]).descriptor == version.descriptor
+        assert registry.latest(version.kind).descriptor == version.descriptor
 
     @pytest.mark.parametrize(
         "model_adapter, registry, key",
@@ -262,10 +262,16 @@ class TestModel:
     def test_get_nonexistent_model_raises(
         self,
         registry: Registry[types.VersionValue],
-        key: types.ModelVersionKey,
+        key: tuple[str, object],
     ) -> None:
         with pytest.raises(ModelNotFoundError, match="not found"):
-            registry.get_model(VersionKey(_value=key[1], _kind=key[0]))
+            registry.get_model(
+                VersionKey(
+                    namespace="",
+                    kind=key[0],
+                    version=cast("types.VersionValue", key[1]),
+                )
+            )
 
     @pytest.mark.parametrize(
         "model_adapter, registry, target",
@@ -304,8 +310,9 @@ class TestModel:
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV1], []],
                 VersionKey(
-                    _value=semver.Version.parse("1.0.0"),
-                    _kind="User",
+                    namespace="",
+                    kind="User",
+                    version=semver.Version.parse("1.0.0"),
                 ),
                 id="semver_version_node_v1",
             ),
@@ -313,8 +320,9 @@ class TestModel:
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV011Dev7], []],
                 VersionKey(
-                    _value=semver.Version.parse("0.1.1+dev.7"),
-                    _kind="User",
+                    namespace="",
+                    kind="User",
+                    version=semver.Version.parse("0.1.1+dev.7"),
                 ),
                 id="semver_version_node_dev",
             ),
@@ -322,8 +330,9 @@ class TestModel:
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
                 VersionKey(
-                    _value=pendulum.Date(2025, 3, 10),
-                    _kind="User",
+                    namespace="",
+                    kind="User",
+                    version=pendulum.Date(2025, 3, 10),
                 ),
                 id="json_chrono_version_node",
             ),
@@ -412,8 +421,8 @@ class TestModel:
         The fixture already registered *model*.
         """
         with pytest.raises(ModelAlreadyRegisteredError, match="already registered"):
-            registry.store_model(
-                envelope_model(model_adapter, versioning_settings, model)
+            registry.store(
+                envelope_model(model_adapter, versioning_settings, model),
             )
 
     @pytest.mark.parametrize(
@@ -568,7 +577,7 @@ class TestModel:
         """Keys and real nodes order together by version value within a kind."""
         keys = [meta_versionable(model_adapter, "User", v) for v in meta_versions]
         versions = [
-            str(v.version[1]) for v in sorted([*registry.kind_versions("User"), *keys])
+            str(v.version) for v in sorted([*registry.kind_versions("User"), *keys])
         ]
         assert versions == expected
 
@@ -2089,9 +2098,9 @@ class TestReferences:
     #: The three Address versions a Person references, parsed.
     ADDRESS_VERSIONS = frozenset(
         {
-            ("Address", semver.Version(1, 0, 0)),
-            ("Address", semver.Version(2, 0, 0)),
-            ("Address", semver.Version(3, 0, 0)),
+            NodeId("", "Address", semver.Version(1, 0, 0)),
+            NodeId("", "Address", semver.Version(2, 0, 0)),
+            NodeId("", "Address", semver.Version(3, 0, 0)),
         }
     )
 
@@ -2118,8 +2127,8 @@ class TestReferences:
                 PersonV2,
                 ADDRESS_VERSIONS
                 | {
-                    ("Contact", semver.Version(1, 0, 0)),
-                    ("Contact", semver.Version(2, 0, 0)),
+                    NodeId("", "Contact", semver.Version(1, 0, 0)),
+                    NodeId("", "Contact", semver.Version(2, 0, 0)),
                 },
                 id="pydantic_list_of_union",
             ),
@@ -2146,7 +2155,7 @@ class TestReferences:
         versioning_settings: VersioningSettings,
         registry: Registry[types.VersionValue],
         model: ModelHandle,
-        expected: frozenset[types.ModelVersionKey],
+        expected: frozenset[NodeId],
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
         assert node.references == expected
@@ -2178,7 +2187,7 @@ class TestReferences:
     ) -> None:
         """Every declared union member is reached, not just the first."""
         node = envelope_model(model_adapter, versioning_settings, model)
-        assert {kind for kind, _ in node.references} == {"Address"}
+        assert {reference.kind for reference in node.references} == {"Address"}
         assert len(node.references) == 3  # noqa: PLR2004
 
     @pytest.mark.parametrize(
@@ -2242,7 +2251,7 @@ class TestReferences:
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
         for child in children:
-            registry.store_model(model_adapter.versionable(child))
+            registry.store(model_adapter.versionable(child))
         assert registry.missing_references(node) == frozenset()
 
     @pytest.mark.parametrize(
@@ -2303,11 +2312,11 @@ class TestReferences:
     ) -> None:
         """Registering one ``Address`` version leaves the other two missing."""
         node = envelope_model(model_adapter, versioning_settings, model)
-        registry.store_model(model_adapter.versionable(one_child))
+        registry.store(model_adapter.versionable(one_child))
         assert registry.missing_references(cast(types.Comparable, node)) == frozenset(
             {
-                ("Address", semver.Version(2, 0, 0)),
-                ("Address", semver.Version(3, 0, 0)),
+                NodeId("", "Address", semver.Version(2, 0, 0)),
+                NodeId("", "Address", semver.Version(3, 0, 0)),
             }
         )
 
@@ -2320,55 +2329,32 @@ class TestReferences:
         with pytest.raises(ModelNotFoundError):
             registry.missing_references(unregistered)
 
+    def test_references_and_missing_references_carry_namespace(self) -> None:
+        adapter = PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="orders",
+                version_property="version",
+                kind_property="kind",
+            )
+        )
+        registry = Registry[semver.Version](
+            namespace="orders",
+            hasher=default_content_hasher(),
+        )
+        node = adapter.versionable(PersonV1)
+        registry.store(node)
+
+        expected = {
+            NodeId("orders", "Address", semver.Version(1, 0, 0)),
+            NodeId("orders", "Address", semver.Version(2, 0, 0)),
+            NodeId("orders", "Address", semver.Version(3, 0, 0)),
+        }
+        assert node.references == expected
+        assert registry.missing_references(node) == expected
+
 
 class TestNeutralGraphOps:
     """Registry owns low-level graph traversal and reconciliation."""
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, models",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "semver_test",
-                    [UserV1, UserV2, UserV3],
-                    [
-                        ((UserV1, UserV2), lambda d, _: d),
-                        ((UserV2, UserV3), lambda d, _: d),
-                    ],
-                ],
-                [UserV1, UserV2, UserV3],
-                id="pydantic_semver",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_migration_path_forward_and_backward(
-        self,
-        model_adapter: types.ModelAdapter,
-        versioning_settings: VersioningSettings,
-        registry: Registry[types.VersionValue],
-        models: list[ModelHandle],
-    ) -> None:
-        versions = [
-            envelope_model(model_adapter, versioning_settings, m) for m in models
-        ]
-        forward = registry.migration_path(versions[0], versions[2])
-        assert forward == [(versions[0], versions[1]), (versions[1], versions[2])]
-        assert registry.migration_path(versions[0], versions[0]) == []
-        with pytest.raises(MigrationPathError):
-            registry.migration_path(versions[2], versions[0])
-
-    def test_migration_path_unregistered_raises(
-        self,
-        model_adapter: types.ModelAdapter,
-        registry: Registry[types.VersionValue],
-    ) -> None:
-        missing = meta_versionable(model_adapter, "User", "9.9.9")
-        other = meta_versionable(model_adapter, "User", "9.9.8")
-        with pytest.raises(MigrationPathError):
-            registry.migration_path(missing, other)
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -2422,7 +2408,7 @@ class TestNeutralGraphOps:
         registry: Registry[types.VersionValue],
         model: ModelHandle,
     ) -> None:
-        again = registry.reconcile_model(
+        again = registry.reconcile(
             envelope_model(model_adapter, versioning_settings, model)
         )
         assert registry.get_model(again) is again
@@ -2451,7 +2437,7 @@ class TestNeutralGraphOps:
             FieldDescriptor(name="extra", type_ref=TypeRef.any())
         )
         with pytest.raises(ModelConflictError):
-            registry.reconcile_model(incoming)
+            registry.reconcile(incoming)
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model",
@@ -2558,9 +2544,7 @@ def test_catalog_exports_jgf_and_imports_nodes(
     exporter = JgfExporter(default_content_hasher())
     document = exporter.export_graph(registry).to_dict()
 
-    assert set(document["graph"]["nodes"]) == {
-        node.jgf_id for node in registry.versions
-    }
+    assert set(document["graph"]["nodes"]) == {str(node) for node in registry.versions}
     assert len(document["graph"]["edges"]) == sum(
         len(registry.migrations(kind)) for kind in registry.kinds
     )
@@ -2568,7 +2552,7 @@ def test_catalog_exports_jgf_and_imports_nodes(
     assert not ManifestDiff.compare(document, document).changed
 
     nodes_by_id = {
-        model_adapter.versionable(model).jgf_id: model_adapter.versionable(model)
+        str(model_adapter.versionable(model)): model_adapter.versionable(model)
         for model in models
     }
 
@@ -2576,7 +2560,11 @@ def test_catalog_exports_jgf_and_imports_nodes(
         def resolve(self, node: JgfNode) -> types.VersionNode:
             return nodes_by_id[node.id]
 
-    imported = InMemoryCatalog(name="imported", hasher=default_content_hasher())
+    imported = InMemoryCatalog(
+        name="imported",
+        namespace=registry.namespace,
+        hasher=default_content_hasher(),
+    )
     node_document = {"graph": dict(document["graph"])}
     node_document["graph"].pop("edges")
     imported_graph = JgfImporter(_Resolver()).import_graph(
@@ -2585,7 +2573,49 @@ def test_catalog_exports_jgf_and_imports_nodes(
     )
 
     assert {node.id for node in imported_graph.nodes} == set(nodes_by_id)
-    assert {node.jgf_id for node in imported.versions} == set(nodes_by_id)
+    assert {str(node) for node in imported.versions} == set(nodes_by_id)
+
+
+def test_jgf_imports_key_only_edge(model_adapter, registry) -> None:
+    source = model_adapter.versionable(UserV1)
+    target = model_adapter.versionable(UserV2)
+    registry.store(source)
+    registry.store(target)
+    document = JgfExporter(default_content_hasher()).export_graph(registry).to_dict()
+    document["graph"]["edges"] = [
+        {
+            "id": f"{source}->{target}",
+            "source": str(source),
+            "target": str(target),
+            "directed": True,
+            "metadata": {},
+        }
+    ]
+    nodes_by_id = {str(source): source, str(target): target}
+
+    class _NodeResolver:
+        def resolve(self, node: JgfNode) -> VersionNode:
+            return nodes_by_id[node.id]
+
+    class _EdgeResolver:
+        def resolve(self, edge) -> EdgeKey:
+            return EdgeKey.from_pair(nodes_by_id[edge.source], nodes_by_id[edge.target])
+
+    imported = InMemoryCatalog(
+        name="imported",
+        namespace=registry.namespace,
+        hasher=default_content_hasher(),
+    )
+    JgfImporter(_NodeResolver()).import_graph(
+        document,
+        models=imported,
+        migrations=imported,
+        edge_resolver=_EdgeResolver(),
+    )
+    edge_key = EdgeKey.from_pair(source, target)
+
+    assert imported.has_edge(edge_key)
+    assert not imported.has_migration(edge_key)
 
 
 @pytest.mark.parametrize(
@@ -2611,22 +2641,20 @@ def test_catalog_exports_jgf_and_imports_nodes(
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_catalog_lock_freezes_writes(
+def test_catalog_lock_returns_frozen_view(
     model_adapter: types.ModelAdapter,
     registry: Registry[types.VersionValue],
     models: list[ModelHandle],
 ) -> None:
-    snapshot = registry.lock()
+    snapshot = GraphBuilder().build(registry)
 
     exporter = JgfExporter(default_content_hasher())
     assert (
         exporter.export_graph(snapshot).to_dict()
         == exporter.export_graph(registry).to_dict()
     )
-    with pytest.raises(GraphLockedError):
-        registry.store_model(model_adapter.versionable(models[0]))
-    with pytest.raises(GraphLockedError):
-        snapshot.store_model(model_adapter.versionable(models[0]))
+    registry.reconcile(model_adapter.versionable(models[0]))
+    assert not hasattr(snapshot, "store")
 
 
 @pytest.mark.parametrize(
@@ -2657,7 +2685,7 @@ def test_content_hash_index_tracks_registration(
     )
     nodes = [model_adapter.versionable(model) for model in models]
     for node in nodes:
-        catalog.store_model(node)
+        catalog.store(node)
 
     edge = edge_from_models(
         model_adapter,
@@ -2704,8 +2732,8 @@ def test_remote_path_catalog_is_substitutable(
 
         def migration_path(
             self,
-            from_version: types.Versionable,
-            to_version: types.Versionable,
+            from_version: VersionNode,
+            to_version: VersionNode,
         ) -> list[tuple[VersionNode, VersionNode]]:
             if from_version == source and to_version == target:
                 return [(source, target)]
@@ -2713,8 +2741,8 @@ def test_remote_path_catalog_is_substitutable(
 
     def resolve_path(
         catalog: PathCatalog,
-        from_version: types.Versionable,
-        to_version: types.Versionable,
+        from_version: VersionNode,
+        to_version: VersionNode,
     ) -> list[tuple[VersionNode, VersionNode]]:
         return catalog.migration_path(from_version, to_version)
 
@@ -2745,12 +2773,14 @@ class ListEnvelope(BaseModel):
 def _extractor() -> tuple[
     Registry[semver.Version],
     PydanticModelAdapter,
-    CompositeExtractor[semver.Version],
+    PayloadWalker[semver.Version],
 ]:
-    adapter = PydanticModelAdapter(codec=ModelCodec())
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    )
     registry = Registry[semver.Version](hasher=default_content_hasher())
-    registry.store_model(adapter.versionable(Leaf))
-    return registry, adapter, CompositeExtractor(registry, adapter=adapter)
+    registry.store(adapter.versionable(Leaf))
+    return registry, adapter, PayloadWalker(registry, adapter=adapter)
 
 
 def test_containerless_list_and_depth() -> None:
@@ -2830,8 +2860,8 @@ def test_public_registry_error_paths(
 
     source = envelope_model(model_adapter, versioning_settings, UserV1)
     target = envelope_model(model_adapter, versioning_settings, UserV2)
-    registry.store_model(source)
-    registry.store_model(target)
+    registry.store(source)
+    registry.store(target)
     registry.store_migration(
         edge_from_models(
             model_adapter,
@@ -2841,7 +2871,7 @@ def test_public_registry_error_paths(
             func=_migrate,
         )
     )
-    snapshot = registry.snapshot()
+    snapshot = GraphBuilder().build(registry)
     assert snapshot.versions == registry.versions
 
     with pytest.raises(CatalogError, match="Clear migrations first"):
@@ -2865,3 +2895,149 @@ def test_backward_compatibility_error_reports_modified_and_required(
     message = str(error)
     assert "modified=['age']" in message
     assert "required_additions=['status']" in message
+
+
+def test_key_only_entry_hydrates_to_full_node(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+    registry: Registry[types.VersionValue],
+) -> None:
+    node = envelope_model(model_adapter, versioning_settings, UserV1)
+    key = VersionKey(
+        namespace=node.namespace,
+        kind=node.kind,
+        version=node.version,
+    )
+
+    assert registry.store(key) == key
+    assert registry.has_entry(key)
+    assert registry.find_model(key) is None
+    assert registry.versions == []
+
+    hydrated = registry.hydrate(node)
+
+    assert hydrated == node
+    assert registry.get_model(key) == node
+    assert registry.versions == [node]
+    assert len(registry.entries) == 1
+
+
+def test_reconcile_does_not_hydrate_key_only_entry(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+    registry: Registry[types.VersionValue],
+) -> None:
+    node = envelope_model(model_adapter, versioning_settings, UserV1)
+    key = VersionKey(
+        namespace=node.namespace,
+        kind=node.kind,
+        version=node.version,
+    )
+    registry.store(key)
+
+    with pytest.raises(CatalogError, match="hydrate"):
+        registry.reconcile(node)
+
+    assert registry.find_model(key) is None
+    assert registry.get_entry(key) == key
+
+
+def test_hydration_uses_entry_namespace(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+) -> None:
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    node = envelope_model(
+        model_adapter,
+        versioning_settings,
+        UserV1,
+    ).with_namespace("billing")
+    key = VersionKey(
+        namespace=node.namespace,
+        kind=node.kind,
+        version=node.version,
+    )
+    registry.store(key)
+
+    assert registry.hydrate(node) == node
+    assert registry.get_model(key) == node
+    assert len(registry.entries) == 1
+    assert GraphBuilder().build(registry).get_model(key) == node
+
+
+def test_registry_requires_bound_namespace() -> None:
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="orders", version_property="version", kind_property="kind"
+        )
+    )
+    stored = registry.store(adapter.versionable(UserV1))
+
+    assert stored.namespace == "orders"
+    assert registry.namespace == "orders"
+    assert registry.get_model(stored).namespace == "orders"
+
+
+def test_registry_accepts_foreign_namespace_entry(
+    model_adapter: types.ModelAdapter,
+    versioning_settings: VersioningSettings,
+) -> None:
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    foreign = envelope_model(
+        model_adapter,
+        versioning_settings,
+        UserV1,
+    ).with_namespace("billing")
+
+    stored = registry.store(foreign)
+
+    assert stored.namespace == "billing"
+    assert registry.has_entry(foreign)
+    assert registry.reconcile(foreign) is foreign
+
+
+def test_registries_isolate_identical_kind_versions() -> None:
+    first = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    second = Registry[semver.Version](
+        namespace="billing",
+        hasher=default_content_hasher(),
+    )
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="orders", version_property="version", kind_property="kind"
+        )
+    )
+    first.store(adapter.versionable(UserV1))
+
+    assert first.has_model(NodeId("orders", "User", semver.Version(1, 0, 0)))
+    assert not second.has_model(NodeId("billing", "User", semver.Version(1, 0, 0)))
+    assert second.versions == []
+
+
+def test_jgf_export_prefixes_namespace() -> None:
+    registry = Registry[semver.Version](
+        namespace="orders",
+        hasher=default_content_hasher(),
+    )
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="orders", version_property="version", kind_property="kind"
+        )
+    )
+    registry.store(adapter.versionable(UserV1))
+
+    document = JgfExporter(default_content_hasher()).export_graph(registry).to_dict()
+    assert set(document["graph"]["nodes"]) == {"orders:User@1.0.0"}

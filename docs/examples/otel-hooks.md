@@ -13,7 +13,7 @@ from pyverge import Manager
 from pyverge.execution import OTELHook
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
 
 
 @UserManager.model()
@@ -52,5 +52,7 @@ result = manager.runner().run(
 assert result["version"] == "2.0.0"
 spans = exporter.get_finished_spans()
 assert spans[0].name == "docs.migrate"
-assert spans[0].attributes["migration.kind"] == "add_age"
+assert spans[0].attributes["migration.kind"] == "User"
+assert spans[0].attributes["migration.strategy"] == "callable"
+assert spans[0].attributes["migration.identity"] == "docs.otel.v1_v2"
 ```

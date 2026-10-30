@@ -46,7 +46,22 @@ class MigrationApplicationError(PyvergeError):
         super().__init__(msg)
 
 
-__all__ = ["BackwardCompatibilityError", "MigrationApplicationError"]
+class NodeConflictError(PyvergeError):
+    """Raised when two full nodes share identity but not field surface."""
+
+    def __init__(self: Self, existing: Any, incoming: Any) -> None:
+        self.existing = existing
+        self.incoming = incoming
+        super().__init__(
+            f"Node {incoming} conflicts with {existing}: field surfaces differ"
+        )
+
+
+__all__ = [
+    "BackwardCompatibilityError",
+    "MigrationApplicationError",
+    "NodeConflictError",
+]
 
 
 class BackwardCompatibilityError(CatalogError):

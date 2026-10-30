@@ -3,6 +3,8 @@
 Understanding-oriented discussion of how pyverge works.
 
 - [Concepts](concepts.md)
+- [Graph model and identity](graph-model.md)
+- [Namespaces and hydration](namespaces.md)
 - [Glossary](glossary.md)
 - [Managers](managers.md)
 - [Providers](providers.md)

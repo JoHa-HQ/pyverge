@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import singledispatchmethod
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
@@ -45,7 +45,13 @@ class LookupMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
-        return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
+        engine = engine or cls._default_engine
+        namespace = getattr(key, "namespace", engine.registry.namespace)
+        return VersionKey[VersionValue](
+            namespace=namespace,
+            kind=key.kind,
+            version=key.version,
+        )
 
     @_resolve_model_key.register(tuple)
     @classmethod
@@ -55,8 +61,13 @@ class LookupMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
+        engine = engine or cls._default_engine
         kind, value = key
-        return VersionKey[VersionValue](_value=value, _kind=kind)
+        return VersionKey[VersionValue](
+            namespace=engine.registry.namespace,
+            kind=kind,
+            version=value,
+        )
 
     @_resolve_model_key.register(VersionNode)
     @classmethod
@@ -66,7 +77,11 @@ class LookupMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
-        return VersionKey[VersionValue](_value=key.version[1], _kind=key.kind)
+        return VersionKey[VersionValue](
+            namespace=key.namespace,
+            kind=key.kind,
+            version=key.version,
+        )
 
     @_resolve_model_key.register(type)
     @classmethod
@@ -81,8 +96,9 @@ class LookupMixin(Generic[VersionValue]):
             raise ModelNotFoundError(engine.registry.name, key)
         versionable = engine.registry.get_model_by_ref(engine.adapter.ref(key))
         return VersionKey[VersionValue](
-            _value=versionable.version[1],
-            _kind=versionable.kind,
+            namespace=versionable.namespace,
+            kind=versionable.kind,
+            version=versionable.version,
         )
 
     @singledispatchmethod
@@ -171,7 +187,10 @@ class LookupMixin(Generic[VersionValue]):
                 engine.registry.get_migration_by_edge(EdgeKey.from_pair(src, dst))
                 for src, dst in path
             ]
-        return engine.registry[type(self)._normalize_index(index, engine=engine)]
+        return cast(
+            "VersionNode[VersionValue] | Migratable | list[Migratable]",
+            engine.registry[type(self)._normalize_index(index, engine=engine)],
+        )
 
     def migration_path(
         self: Manager[VersionValue],

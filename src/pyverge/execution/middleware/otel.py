@@ -27,7 +27,7 @@ class _OtelRun:
         self._service = service
 
     def execute(self, plan: Any, payload: Any, run: Any, adapter: Any) -> Any:
-        span = self._tracer.start_as_current_span(
+        scope = self._tracer.start_as_current_span(
             f"{self._service}.run",
             kind=SpanKind.INTERNAL,
             attributes={
@@ -36,29 +36,34 @@ class _OtelRun:
                 "migration.entries": len(plan.path.entries),
             },
         )
-        if not hasattr(span, "__enter__"):
+        if not hasattr(scope, "__enter__"):
             return self._inner.execute(plan, payload, run, adapter)
-        with span as active:
-            try:
-                result = self._inner.execute(plan, payload, run, adapter)
-            except Exception as error:
-                active.record_exception(error)
-                active.set_status(StatusCode.ERROR, str(error))
-                raise
-            if hasattr(result, "__await__"):
-                return self._async_result(result, active)
-            active.set_status(StatusCode.OK)
-            return result
+        active = scope.__enter__()
+        try:
+            result = self._inner.execute(plan, payload, run, adapter)
+        except Exception as error:
+            active.record_exception(error)
+            active.set_status(StatusCode.ERROR, str(error))
+            scope.__exit__(None, None, None)
+            raise
+        if hasattr(result, "__await__"):
+            return self._async_result(result, active, scope)
+        active.set_status(StatusCode.OK)
+        scope.__exit__(None, None, None)
+        return result
 
-    async def _async_result(self, result: Any, span: Any) -> Any:
+    async def _async_result(self, result: Any, span: Any, scope: Any) -> Any:
         try:
             value = await result
         except Exception as error:
             span.record_exception(error)
             span.set_status(StatusCode.ERROR, str(error))
             raise
-        span.set_status(StatusCode.OK)
-        return value
+        else:
+            span.set_status(StatusCode.OK)
+            return value
+        finally:
+            scope.__exit__(None, None, None)
 
 
 __all__ = ["OtelMiddleware"]

@@ -21,9 +21,6 @@ class Canonicalizable(Protocol):
 class Addressable(Canonicalizable, Protocol):
     """A canonical value with graph identity and content address."""
 
-    @property
-    def jgf_id(self) -> str: ...
-
     def content_hash(self, hasher: ContentHasher) -> str: ...
 
 

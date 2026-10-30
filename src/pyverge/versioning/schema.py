@@ -5,9 +5,10 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Self, TypeAlias
 
-from pyverge.core.types import JsonValue, ModelVersionKey
+from pyverge.core.types import JsonValue
 
 from .frozen import FrozenMap
+from .identity import NodeId
 
 
 class TypeKind(StrEnum):
@@ -42,6 +43,24 @@ class ModelRef:
     @classmethod
     def from_canonical(cls, value: Mapping[str, Any]) -> ModelRef:
         return cls(provider=str(value["provider"]), model_id=str(value["model_id"]))
+
+
+@dataclass(frozen=True, slots=True)
+class MigrationDescriptor:
+    """Provider-neutral, serializable identity of one executable migration."""
+
+    strategy: str
+    identity: str
+
+    def to_canonical(self) -> dict[str, str]:
+        return {"strategy": self.strategy, "identity": self.identity}
+
+    @classmethod
+    def from_canonical(cls, value: Mapping[str, Any]) -> MigrationDescriptor:
+        return cls(
+            strategy=str(value["strategy"]),
+            identity=str(value["identity"]),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,7 +184,7 @@ class FieldDescriptor:
     type_ref: TypeRef
     required: bool = False
     default: DefaultValue = NO_DEFAULT
-    references: tuple[ModelVersionKey, ...] = ()
+    references: tuple[NodeId, ...] = ()
     annotation: Any = field(default=None, compare=False, repr=False)
 
     @classmethod
@@ -176,7 +195,11 @@ class FieldDescriptor:
         parse_version: Callable[[str], Any],
     ) -> FieldDescriptor:
         references = tuple(
-            (str(item["kind"]), parse_version(str(item["version"])))
+            NodeId(
+                namespace=str(item["namespace"]),
+                kind=str(item["kind"]),
+                version=parse_version(str(item["version"])),
+            )
             for item in value.get("references", ())
         )
         default: DefaultValue = (
@@ -198,8 +221,12 @@ class FieldDescriptor:
         }
         if self.references:
             payload["references"] = [
-                {"kind": kind, "version": str(version)}
-                for kind, version in self.references
+                {
+                    "namespace": reference.namespace,
+                    "kind": reference.kind,
+                    "version": str(reference.version),
+                }
+                for reference in self.references
             ]
         if not isinstance(self.default, NoDefault):
             payload["default"] = self.default
@@ -214,7 +241,7 @@ class ModelDescriptor:
     fields: FrozenMap[str, FieldDescriptor]
 
     @property
-    def references(self) -> frozenset[ModelVersionKey]:
+    def references(self) -> frozenset[NodeId]:
         return frozenset(
             reference
             for descriptor in self.fields.values()
@@ -262,9 +289,14 @@ class ModelDescriptor:
                 for name, descriptor in self.fields.sorted_items()
             },
             "references": [
-                {"kind": kind, "version": str(version)}
-                for kind, version in sorted(
-                    self.references, key=lambda item: (item[0], str(item[1]))
+                {
+                    "namespace": reference.namespace,
+                    "kind": reference.kind,
+                    "version": str(reference.version),
+                }
+                for reference in sorted(
+                    self.references,
+                    key=lambda item: (item.namespace, item.kind, str(item.version)),
                 )
             ],
         }
@@ -274,6 +306,7 @@ __all__ = [
     "NO_DEFAULT",
     "DefaultValue",
     "FieldDescriptor",
+    "MigrationDescriptor",
     "ModelDescriptor",
     "ModelRef",
     "NoDefault",

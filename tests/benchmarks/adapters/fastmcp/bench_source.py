@@ -9,7 +9,6 @@ import asyncio
 from typing import Any
 
 import pytest
-import semver
 from fastmcp import FastMCP
 
 from pyverge.adapters.fastmcp import (
@@ -33,7 +32,9 @@ def loop() -> Any:
 
 @pytest.fixture(scope="module")
 def source() -> FastMCPSource:
-    adapter = PydanticModelAdapter[semver.Version](codec=ModelCodec())
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    )
     server = FastMCP("source-bench")
 
     @server.tool(name="User", version="2.0.0")
@@ -54,7 +55,7 @@ def test_source_descriptors(benchmark: Any, loop: Any, source: FastMCPSource) ->
     def collect() -> list[Any]:
         collector = RegistrationCollector()
         loop.run_until_complete(source.accept(collector))
-        return collector.commands
+        return collector.registrations
 
     commands = benchmark(collect)
 

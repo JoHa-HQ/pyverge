@@ -2,26 +2,26 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from functools import total_ordering
-from typing import TYPE_CHECKING, Any, Generic, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     MigrationFunc,
     ModelData,
-    ModelKind,
-    ModelVersionKey,
     VersionValue,
 )
 
 from .canonical import ContentHasher
-from .errors import MigrationApplicationError
-from .schema import FieldDescriptor, ModelDescriptor
+from .errors import MigrationApplicationError, NodeConflictError
+from .identity import EdgeKey, NodeId, VersionKey
+from .schema import (
+    FieldDescriptor,
+    MigrationDescriptor,
+    ModelDescriptor,
+    ModelRef,
+)
 from .types import (
-    Comparable,
     Diffable,
-    Migratable,
-    MigrationKey,
     Transitional,
 )
 
@@ -29,119 +29,55 @@ if TYPE_CHECKING:
     from .jgf import JgfEdge, JgfNode
 
 
-@total_ordering
-@dataclass(frozen=True, slots=True)
-class VersionKey(Generic[VersionValue]):
-    """A temporary ``(kind, version)`` search key.
+@dataclass(frozen=True, slots=True, eq=False, kw_only=True)
+class VersionNode(VersionKey[VersionValue]):
+    """An enriched version key that always binds a model descriptor."""
 
-    Keys are not stored. Equality and ordering compare only the endpoint
-    identity, so a key and a :class:`VersionNode` with the same identity are
-    interchangeable inside sorted collections.
-    """
-
-    _value: VersionValue
-    _kind: ModelKind
-
-    @property
-    def strategy(self) -> type[VersionValue]:
-        return type(self._value)
-
-    @property
-    def version(self) -> ModelVersionKey:
-        return self._kind, self._value
-
-    @property
-    def kind(self) -> ModelKind:
-        return self._kind
-
-    def __lt__(self, other: object) -> bool:
-        if not isinstance(other, (VersionKey, VersionNode)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        return self.version < other.version
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, (VersionKey, VersionNode)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        return self.version == other.version
-
-    def __gt__(self, other: object) -> bool:
-        if not isinstance(other, (VersionKey, VersionNode)):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with {other.__class__.__name__}"  # noqa: E501
-            )
-        if self.strategy != other.strategy:
-            raise TypeError(
-                f"Cannot compare {self.strategy.__name__} with {other.strategy.__name__}"  # noqa: E501
-            )
-        return self.version > other.version
-
-    def __hash__(self) -> int:
-        return hash((self._kind, self._value))
-
-    @property
-    def jgf_id(self) -> str:
-        return f"{self._kind}@{self._value}"
-
-    def __str__(self) -> str:
-        return self.jgf_id
-
-    def __repr__(self) -> str:
-        return f"VersionKey[{self.strategy.__name__}]({self._value}, {self._kind})"
-
-
-@dataclass(frozen=True, slots=True, eq=False)
-class VersionNode(Generic[VersionValue]):
-    """A materialized model version that binds a serializable descriptor.
-
-    The graph-facing surface lives in :class:`ModelDescriptor`; ``_model`` is
-    an optional runtime handle kept only for in-process operations.
-    """
-
-    key: VersionKey[VersionValue]
     descriptor: ModelDescriptor
 
     @property
-    def strategy(self) -> type[VersionValue]:
-        return self.key.strategy
+    def id(self) -> VersionNode[VersionValue]:
+        return self
 
     @property
-    def version(self) -> ModelVersionKey:
-        return self.key.version
+    def key(self) -> VersionKey[VersionValue]:
+        return self
 
     @property
-    def kind(self) -> ModelKind:
-        return self.key.kind
+    def modelref(self) -> ModelRef:
+        return self.descriptor.ref
 
     @property
-    def jgf_id(self) -> str:
-        return self.key.jgf_id
+    def is_model(self) -> bool:
+        return True
 
     @property
     def model_id(self) -> str:
         return self.descriptor.ref.model_id
 
     @property
-    def references(self) -> frozenset[ModelVersionKey]:
+    def references(self) -> frozenset[NodeId[VersionValue]]:
         return self.descriptor.references
 
     @property
     def fields(self) -> frozenset[str]:
         return frozenset(self.descriptor.fields)
 
+    def reconcile(self, existing: VersionKey[VersionValue]) -> VersionKey[VersionValue]:
+        if not existing.is_model:
+            return self
+        if self.fields != existing.fields:
+            raise NodeConflictError(existing, self)
+        return existing
+
     def with_descriptor(self, descriptor: ModelDescriptor) -> Self:
-        return type(self)(key=self.key, descriptor=descriptor)
+        return type(self)(
+            namespace=self.namespace,
+            kind=self.kind,
+            version=self.version,
+            ref=self.ref,
+            descriptor=descriptor,
+        )
 
     def with_fields(self, *fields: FieldDescriptor) -> Self:
         return self.with_descriptor(self.descriptor.with_fields(*fields))
@@ -152,15 +88,13 @@ class VersionNode(Generic[VersionValue]):
     def content_payload(self) -> dict[str, object]:
         if not self.model_id:
             raise ValueError(
-                f"VersionNode {self.jgf_id} requires model_id for content hashing"
+                f"VersionNode {self} requires model_id for content hashing"
             )
         return {
-            "id": self.jgf_id,
+            "id": str(self),
             "model": self.model_id,
             "fields": sorted(self.fields),
-            "references": sorted(
-                f"{kind}@{version}" for kind, version in self.references
-            ),
+            "references": sorted(str(reference) for reference in self.references),
         }
 
     @classmethod
@@ -171,10 +105,9 @@ class VersionNode(Generic[VersionValue]):
         parse_version: Callable[[str], Any],
     ) -> VersionNode[VersionValue]:
         return cls(
-            key=VersionKey[VersionValue](
-                _value=parse_version(str(value["version"])),
-                _kind=str(value["kind"]),
-            ),
+            namespace=str(value.get("namespace", "")),
+            kind=str(value["kind"]),
+            version=parse_version(str(value["version"])),
             descriptor=ModelDescriptor.from_canonical(
                 value["model"], parse_version=parse_version
             ),
@@ -182,9 +115,9 @@ class VersionNode(Generic[VersionValue]):
 
     def to_canonical(self) -> dict[str, Any]:
         return {
-            "id": self.jgf_id,
+            "namespace": self.namespace,
             "kind": self.kind,
-            "version": str(self.version[1]),
+            "version": str(self.version),
             "model": self.descriptor.to_canonical(),
         }
 
@@ -196,113 +129,30 @@ class VersionNode(Generic[VersionValue]):
 
         return JgfNode.from_version(self, hasher)
 
-    def __lt__(self, other: object) -> bool:
-        return self.key < other
-
-    def __gt__(self, other: object) -> bool:
-        return self.key > other
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, VersionNode):
-            return self.key == other.key
-        return self.key == other
-
-    def __hash__(self) -> int:
-        return hash(self.key)
-
-    def __str__(self) -> str:
-        return self.jgf_id
-
     def __repr__(self) -> str:
-        return f"VersionNode[{self.strategy.__name__}]({self.version})"
+        return (
+            f"VersionNode[{self.strategy.__name__}]("
+            f"{self.namespace!r}, {self.kind!r}, {self.version!r})"
+        )
 
 
-@total_ordering
-@dataclass(frozen=True, slots=True)
-class EdgeKey(Generic[VersionValue]):
-    """A temporary directed ``(source, target)`` edge search key."""
-
-    source: Comparable[VersionValue]
-    target: Comparable[VersionValue]
-
-    @classmethod
-    def from_pair(
-        cls,
-        source: Comparable[VersionValue],
-        target: Comparable[VersionValue],
-    ) -> Self:
-        return cls(source, target)
-
-    @classmethod
-    def from_version_edge(cls, edge: Migratable[VersionValue]) -> Self:
-        return cls(edge.source, edge.target)
-
-    @property
-    def kind(self) -> ModelKind:
-        return self.source.kind
-
-    @property
-    def key(self) -> MigrationKey:
-        return (self.source, self.target)
-
-    @property
-    def edge(self) -> MigrationKey:
-        return (self.source, self.target)
-
-    def __lt__(self, other: object) -> bool:
-        if isinstance(other, EdgeKey):
-            return self.edge < other.edge
-        return NotImplemented
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, EdgeKey):
-            return self.edge == other.edge
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self.edge)
-
-    @property
-    def jgf_id(self) -> str:
-        return f"{self.source.jgf_id}->{self.target.jgf_id}"
-
-    def __str__(self) -> str:
-        return self.jgf_id
-
-
-@dataclass(frozen=True, slots=True)
-class MigrationIdentity:
-    """Provider-supplied migration identity: strategy + stable payload identity."""
-
-    strategy: str
-    identity: str
-
-
-@dataclass(frozen=True, slots=True, eq=False)
-class VersionEdge(Generic[VersionValue]):
-    """A directed migration edge connecting two materialized versions."""
+@dataclass(frozen=True, slots=True, eq=False, kw_only=True)
+class VersionEdge(EdgeKey[VersionValue]):
+    """An enriched edge key that binds hydrated endpoints and an executable diff."""
 
     source: VersionNode[VersionValue]
     target: VersionNode[VersionValue]
     diff: Diffable[VersionValue]
     func: MigrationFunc
-    migration: MigrationIdentity
+    migration: MigrationDescriptor
 
     @property
-    def kind(self) -> ModelKind:
-        return self.source.kind
+    def id(self) -> VersionEdge[VersionValue]:
+        return self
 
     @property
-    def key(self) -> MigrationKey:
-        return (self.source, self.target)
-
-    @property
-    def edge(self) -> MigrationKey:
-        return (self.source, self.target)
-
-    @property
-    def jgf_id(self) -> str:
-        return f"{self.source.jgf_id}->{self.target.jgf_id}"
+    def is_executable(self) -> bool:
+        return True
 
     def with_diff(self, diff: Diffable[VersionValue]) -> Self:
         return type(self)(
@@ -311,20 +161,22 @@ class VersionEdge(Generic[VersionValue]):
             diff=diff,
             func=self.func,
             migration=self.migration,
+            ref=self.ref,
         )
 
-    def with_migration(self, migration: MigrationIdentity) -> Self:
+    def with_migration(self, migration: MigrationDescriptor) -> Self:
         return type(self)(
             source=self.source,
             target=self.target,
             diff=self.diff,
             func=self.func,
             migration=migration,
+            ref=self.ref,
         )
 
     def content_payload(self, hasher: ContentHasher) -> dict[str, object]:
         return {
-            "id": self.jgf_id,
+            "id": str(self),
             "source": self.source.content_hash(hasher),
             "target": self.target.content_hash(hasher),
             "diff": self.diff.fingerprint_payload(),
@@ -357,37 +209,17 @@ class VersionEdge(Generic[VersionValue]):
                 f"Failed to apply migration {self}: {e}",
             ) from e
 
-    def __lt__(self, other: object) -> bool:
-        if isinstance(other, VersionEdge):
-            return self.edge < other.edge
-        if isinstance(other, EdgeKey):
-            return self.edge < other.edge
-        return NotImplemented
-
-    def __gt__(self, other: object) -> bool:
-        if isinstance(other, VersionEdge):
-            return self.edge > other.edge
-        if isinstance(other, EdgeKey):
-            return self.edge > other.edge
-        return NotImplemented
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, VersionEdge):
-            return self.edge == other.edge
-        if isinstance(other, EdgeKey):
-            return self.edge == other.edge
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        return hash(self.edge)
-
-    def __str__(self) -> str:
-        return self.jgf_id
+    def __repr__(self) -> str:
+        return (
+            f"VersionEdge[{type(self.source.version).__name__}]("
+            f"{self.source!r}, {self.target!r})"
+        )
 
 
 __all__ = [
     "EdgeKey",
-    "MigrationIdentity",
+    "MigrationDescriptor",
+    "NodeId",
     "Transitional",
     "VersionEdge",
     "VersionKey",

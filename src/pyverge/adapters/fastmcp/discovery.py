@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, Any, cast
 from pyverge.core.types import (
     Attachable,
 )
-from pyverge.discovery import RegisterModel, RegistrationCollector
+from pyverge.discovery import (
+    ModelDescriptor,
+    RegistrationCollector,
+    register_descriptor,
+)
 from pyverge.manager import Manager
 from pyverge.registry.errors import MissingReferenceError, ModelConflictError
 
@@ -80,19 +84,24 @@ class FastMCPDiscovery:
     async def register(self, server: Any) -> None:
         collector = RegistrationCollector()
         await self.source(server).accept(collector)
-        for command in collector.commands:
+        for descriptor in collector.registrations:
             try:
-                self._manager.engine.register(command)
+                register_descriptor(descriptor, self._manager)
             except ModelConflictError as error:
-                if not isinstance(command, RegisterModel):
+                if not isinstance(descriptor, ModelDescriptor):
                     raise
-                version = command.payload.version
+                payload = descriptor.payload
+                subject = (
+                    f"primitive {payload.kind!r}@{payload.version}"
+                    if hasattr(payload, "kind")
+                    else f"primitive {error.version}"
+                )
                 raise ModelConflictError(
                     error.catalog_name,
                     error.version,
                     error.registered,
                     error.incoming,
-                    subject=f"primitive {version[0]!r}@{version[1]}",
+                    subject=subject,
                 ) from error
         self._reconcile()
 
@@ -150,7 +159,7 @@ class FastMCPDiscovery:
         for kind, version in self._nodes:
             kinds.setdefault(kind, []).append(version)
         for versionable in self._manager.list_versions():
-            kind, version = str(versionable.version[0]), str(versionable.version[1])
+            kind, version = str(versionable.kind), str(versionable.version)
             bucket = kinds.setdefault(kind, [])
             if version not in bucket:
                 bucket.append(version)
@@ -188,7 +197,7 @@ class FastMCPDiscovery:
     def _resolve_target(self, kind: str, policy: str) -> str:
         if policy not in ("latest", "earliest"):
             return policy
-        versions = [str(v.version[1]) for v in self._manager.list_versions(kind)]
+        versions = [str(v.version) for v in self._manager.list_versions(kind)]
         if not versions:
             raise ValueError(f"no registered versions for kind {kind!r}")
         return versions[-1] if policy == "latest" else versions[0]

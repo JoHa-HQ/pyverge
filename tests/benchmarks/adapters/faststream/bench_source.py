@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-import semver
 from faststream import FastStream
 from faststream.kafka import KafkaBroker
 
@@ -27,7 +26,11 @@ def source() -> FastStreamSource:
 
     return FastStreamSource(
         FastStream(broker),
-        adapter=PydanticModelAdapter[semver.Version](codec=ModelCodec()),
+        adapter=PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
     )
 
 
@@ -35,7 +38,7 @@ def test_source_descriptors(benchmark: Any, source: FastStreamSource) -> None:
     def collect() -> list[Any]:
         collector = RegistrationCollector()
         source.accept(collector)
-        return collector.commands
+        return collector.registrations
 
     commands = benchmark(collect)
 

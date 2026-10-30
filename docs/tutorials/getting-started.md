@@ -39,7 +39,7 @@ from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 # A manager binds a version strategy to an adapter.
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
 )
 
 
@@ -88,9 +88,11 @@ assert migrated["age"] is None
 
 ## See also
 
+- [Graph model and identity](../explanation/graph-model.md)
+- [Namespaces and hydration](../explanation/namespaces.md)
 - [Upgrade guide](../reference/upgrades.md)
 - [Providers and JSON Schema models](../explanation/providers.md)
 - [Migration formats](../reference/migration-formats.md)
 - [Managers](../explanation/managers.md)
 - [Author migrations](../how-to/migrations/author-migrations.md)
-- [Showcaseshttps://github.com/JoHa-HQ/pyverge/tree/main/showcases
+- [Showcases](https://github.com/JoHa-HQ/pyverge/tree/main/showcases)

@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Generic
 
-from pyverge.core.types import TargetResolver, VersionValue
-from pyverge.execution.path_resolver import PathResolver
+from pyverge.core.types import VersionValue
 from pyverge.execution.plan import ExecutionPlan, ExtractedEntry
 from pyverge.execution.planner import ExecutionPlanner
-from pyverge.execution.policy import PolicyEngine
 from pyverge.execution.types import EntryExtractor
+from pyverge.graph.planning.finder import PathFinder
+from pyverge.graph.planning.targets import TargetPolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,8 +16,7 @@ class ExecutionCoordinator(Generic[VersionValue]):
     """Drive extraction, path resolution, policy, and plan construction."""
 
     extractor: EntryExtractor[VersionValue]
-    paths: PathResolver[VersionValue]
-    policy: PolicyEngine[VersionValue]
+    finder: PathFinder[VersionValue]
     planner: ExecutionPlanner[VersionValue]
 
     def extract(
@@ -39,7 +38,7 @@ class ExecutionCoordinator(Generic[VersionValue]):
     def plan(
         self,
         payload: dict[str, Any],
-        target_resolver: TargetResolver,
+        target: TargetPolicy,
         *,
         container: type[Any] | None,
         max_depth: int,
@@ -49,14 +48,13 @@ class ExecutionCoordinator(Generic[VersionValue]):
             container=container,
             max_depth=max_depth,
         )
-        path_plan = self.paths.plan(
+        path_plan = self.finder.find(
             entries,
-            target_resolver,
+            target,
             container=container,
             target_fields=frozenset(),
         )
-        filtered = self.policy.apply(path_plan, graph=self.paths.graph)
-        return self.planner.build(filtered, payload)
+        return self.planner.build(path_plan, payload)
 
 
 __all__ = ["ExecutionCoordinator"]

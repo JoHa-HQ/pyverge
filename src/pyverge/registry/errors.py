@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Self
 
 from pyverge.core.errors import CatalogError, PyvergeError
-from pyverge.core.types import MIGRATION_PAIR_LEN, ModelHandle, ModelVersionKey
+from pyverge.core.types import MIGRATION_PAIR_LEN, ModelHandle
 
 if TYPE_CHECKING:
     from pyverge.versioning import MigrationKey, ModelRef
@@ -27,7 +27,7 @@ class ModelNotFoundError(CatalogError):
     def __init__(
         self: Self,
         catalog_name: str,
-        key: ModelVersionKey | ModelHandle | ModelRef,
+        key: Any | ModelHandle | ModelRef,
     ) -> None:
         self.key = key
         super().__init__(catalog_name, f"Model not found: {key}")
@@ -36,7 +36,7 @@ class ModelNotFoundError(CatalogError):
 class ModelAlreadyRegisteredError(CatalogError):
     """Raised when a model is already registered."""
 
-    def __init__(self: Self, catalog_name: str, version: ModelVersionKey) -> None:
+    def __init__(self: Self, catalog_name: str, version: Any) -> None:
         self.version = version
         super().__init__(
             catalog_name, f"Model at version '{version}' is already registered"
@@ -49,7 +49,7 @@ class ModelConflictError(ModelAlreadyRegisteredError):
     def __init__(
         self: Self,
         catalog_name: str,
-        version: ModelVersionKey,
+        version: Any,
         registered: frozenset[str],
         incoming: frozenset[str],
         *,
@@ -60,7 +60,7 @@ class ModelConflictError(ModelAlreadyRegisteredError):
         self.incoming = incoming
         self.missing = registered - incoming
         self.extra = incoming - registered
-        self.subject = subject or f"{version[0]}@{version[1]}"
+        self.subject = subject or str(version)
         PyvergeError.__init__(
             self,
             f"{self.subject} is already registered with fields "
@@ -79,15 +79,15 @@ class MissingReferenceError(CatalogError):
     def __init__(
         self: Self,
         catalog_name: str,
-        version: ModelVersionKey,
-        absent: frozenset[ModelVersionKey],
+        version: Any,
+        absent: frozenset[Any],
         *,
         subject: str | None = None,
     ) -> None:
         self.version = version
         self.absent = absent
-        self.subject = subject or f"{version[0]}@{version[1]}"
-        rendered = ", ".join(f"{kind}@{ver}" for kind, ver in sorted(absent))
+        self.subject = subject or str(version)
+        rendered = ", ".join(str(item) for item in sorted(absent))
         super().__init__(
             catalog_name,
             f"{self.subject} references versioned kinds that are not "

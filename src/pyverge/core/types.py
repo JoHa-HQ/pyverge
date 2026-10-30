@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -10,6 +11,7 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
+    Union,
     runtime_checkable,
 )
 
@@ -20,7 +22,11 @@ from .context import MigrationContext
 
 if TYPE_CHECKING:
     from pyverge.versioning import (
-        Comparable,
+        EdgeKey,
+        MigrationDescriptor,
+        NodeId,
+        VersionEdge,
+        VersionKey,
         VersionNode,
     )
 
@@ -32,6 +38,9 @@ if TYPE_CHECKING:
 VersionValue = TypeVar("VersionValue", SemVer, Date)
 #: Covariant form for protocols where the version is output-only.
 VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
+
+#: Per-execution hook state supplied by the execution backend.
+HookState: TypeAlias = ContextVar[dict[int, tuple[Any, ...]]]
 
 #: Opaque, provider-owned model handle.  Core storage keys models by this
 #: without naming any provider model base, so a non-Python backend can map it.
@@ -57,7 +66,6 @@ RenderingFormat = Literal["json-patch"]
 
 ModelKind: TypeAlias = str
 ModelData: TypeAlias = dict[str, Any]
-ModelVersionKey: TypeAlias = tuple[ModelKind, VersionValue]
 
 #: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
 MIGRATION_PAIR_LEN: int = 2
@@ -97,8 +105,19 @@ class ModelPair(NamedTuple):
     target: ModelHandle
 
 
+#: How a registration handles an existing graph entry.
+RegistrationMode: TypeAlias = Literal["strict", "reconcile"]
+
+#: Public node inputs accepted by the manager before normalization.
+NodeInput: TypeAlias = Union[ModelHandle, "VersionKey", "VersionNode"]
+
 #: Accepted migration-key shapes for the manager's registration methods.
-MigrationKeyInput: TypeAlias = ModelPair | ManagerMigrationKey
+MigrationKeyInput: TypeAlias = Union[
+    ModelPair,
+    ManagerMigrationKey,
+    "EdgeKey",
+    "VersionEdge",
+]
 
 ManagerKey: TypeAlias = ModelKey | ManagerMigrationKey | ModelPair
 
@@ -112,30 +131,39 @@ ManagerKey: TypeAlias = ModelKey | ManagerMigrationKey | ModelPair
 class Attachable(Protocol):
     """Protocol for migration hook callbacks."""
 
-    def before_migrate(
+    def before_migrate(  # noqa: PLR0913
         self,
         name: str,
-        from_version: Comparable,
-        to_version: Comparable,
+        from_version: NodeId,
+        to_version: NodeId,
         data: dict[str, Any],
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
     ) -> None: ...
 
-    def after_migrate(
+    def after_migrate(  # noqa: PLR0913
         self,
         name: str,
-        from_version: Comparable,
-        to_version: Comparable,
+        from_version: NodeId,
+        to_version: NodeId,
         original_data: dict[str, Any],
         migrated_data: dict[str, Any],
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
     ) -> None: ...
 
-    def on_error(
+    def on_error(  # noqa: PLR0913
         self,
         name: str,
-        from_version: Comparable,
-        to_version: Comparable,
+        from_version: NodeId,
+        to_version: NodeId,
         data: dict[str, Any],
         error: Exception,
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
     ) -> None: ...
 
 

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
     ClassVar,
-    Generic,
     Protocol,
     Self,
     TypeAlias,
@@ -13,20 +11,19 @@ from typing import (
 )
 
 from pyverge.core.types import (
-    ManagerMigrationKey,
     MigrationFunc,
+    MigrationKeyInput,
     ModelHandle,
-    ModelPair,
     TargetResolver,
     VersionValue,
 )
-from pyverge.execution.targets import (
+from pyverge.graph.planning.targets import (
     TargetPolicy as TargetPolicy,  # noqa: PLC0414
 )
-from pyverge.execution.targets import (
+from pyverge.graph.planning.targets import (
     TargetSpec as TargetSpec,  # noqa: PLC0414
 )
-from pyverge.execution.targets import (
+from pyverge.graph.planning.targets import (
     TargetStrategy as TargetStrategy,  # noqa: PLC0414
 )
 from pyverge.schemas.types import (
@@ -45,7 +42,6 @@ if TYPE_CHECKING:
         RegistrationContext,
     )
     from pyverge.engine import Engine
-    from pyverge.execution.types import EntryExtractor
     from pyverge.migrations.identity import MigrationIdentityResolver
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
@@ -58,18 +54,6 @@ if TYPE_CHECKING:
 ResolverFactory: TypeAlias = Callable[
     ["Registry[VersionValue]"], TargetResolver[VersionValue]
 ]
-
-
-@dataclass(frozen=True, slots=True)
-class ManagerConfig(Generic[VersionValue]):
-    engine: Engine[VersionValue] | None = None
-    walker: EntryExtractor | None = None
-    hasher: ContentHasher | None = None
-    identity_resolver: MigrationIdentityResolver | None = None
-    model_materializer: DiffMaterializer[object] | None = None
-    migration_materializer: DiffMaterializer[object] | None = None
-    diff_provider: DiffProvider[VersionValue] | None = None
-    on_missing: str = "raise"
 
 
 class ManagerClassState(Protocol[VersionValue]):
@@ -85,12 +69,17 @@ class ManagerClassState(Protocol[VersionValue]):
     _reflection_locked: ClassVar[bool]
 
     @classmethod
-    def configure(
+    def configure(  # noqa: PLR0913
         cls,
         adapter: ModelAdapter,
         *,
-        config: ManagerConfig[VersionValue] | None = None,
-        **options: object,
+        engine: Engine[VersionValue] | None = None,
+        hasher: ContentHasher | None = None,
+        identity_resolver: MigrationIdentityResolver | None = None,
+        model_materializer: DiffMaterializer[object] | None = None,
+        migration_materializer: DiffMaterializer[object] | None = None,
+        diff_provider: DiffProvider[VersionValue] | None = None,
+        on_missing: str = "raise",
     ) -> type[Self]: ...
 
     @classmethod
@@ -104,7 +93,7 @@ class ManagerClassState(Protocol[VersionValue]):
     @classmethod
     def store_migration(
         cls,
-        key: ModelPair | ManagerMigrationKey,
+        key: MigrationKeyInput,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
         *,
         engine: Engine[VersionValue] | None = None,
@@ -115,7 +104,7 @@ class ManagerClassState(Protocol[VersionValue]):
     @classmethod
     def add_hook(
         cls,
-        key: ModelPair | ManagerMigrationKey,
+        key: MigrationKeyInput,
         hook: Attachable,
         *,
         engine: Engine[VersionValue] | None = None,

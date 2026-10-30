@@ -10,31 +10,44 @@ Choose the simplest format that expresses the edge.
 
 ## Specs and functions
 
-A migration is either:
+Public registration accepts:
 
 - `MigrationFunc` — callable `(payload, context) -> payload`
-- `MigrationSpec` — declarative spec exposing `.transform -> MigrationFunc`
+- `JsonPatchMigration` — declarative RFC 6902 migration
+- `JsonataMigration` — declarative JSONata migration
 
-The manager accepts both. Registration resolves a spec to its executable
-transform; callables are stored as-is.
+Internally, registration normalizes the request into a `MigrationSpec`
+(`pair`, `func`, `backward_compatible`) and stores an executable `VersionEdge`
+binding. Graph snapshots keep only serializable migration metadata; callables
+are resolved at execution time.
 
 ```python
-from pyverge import JsonPatchMigration
+from pyverge.migrations import JsonPatchMigration
 
-spec = JsonPatchMigration(
+migration = JsonPatchMigration(
     {
         "from": "1.0.0",
         "to": "2.0.0",
         "ops": [{"op": "add", "path": "/age", "value": None}],
     }
 )
-func = spec.transform
 ```
+
+Each executable edge also has a `MigrationDescriptor`:
+
+```text
+strategy   callable | jsonpatch | jsonata
+identity   stable migration identity
+```
+
+`PathPlanEntry.migration_descriptors` carries the descriptor for every step, so
+telemetry and hooks can report strategy and identity without re-introspecting
+the callable.
 
 ## JSON Patch
 
 ```python
-from pyverge import JsonPatchMigration
+from pyverge.migrations import JsonPatchMigration
 
 JsonPatchMigration(
     {
@@ -85,7 +98,7 @@ migration = JsonataMigration.from_spec(
     }
 )
 
-result = migration.migration(payload, context={...})
+result = migration(payload, context={...})
 ```
 
 Factories:

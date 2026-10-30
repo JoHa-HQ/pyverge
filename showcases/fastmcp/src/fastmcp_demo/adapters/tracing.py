@@ -24,8 +24,8 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from pyverge.adapters.otel import OTELHook
 
+from pyverge.execution import OTELHook
 from pyverge.types import Attachable
 
 from ..settings import TelemetrySettings

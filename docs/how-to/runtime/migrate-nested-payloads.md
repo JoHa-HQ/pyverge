@@ -14,7 +14,7 @@ its versioned models, then migrate a nested payload:
 from pyverge import Manager
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
 
 # Register Person/Address models and migrations on UserManager before
 # constructing the runtime instance.

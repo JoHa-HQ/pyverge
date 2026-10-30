@@ -11,8 +11,8 @@ from pyverge.execution.coordinator import ExecutionCoordinator
 from pyverge.execution.errors import UnknownModelError
 from pyverge.execution.middleware import BackendMiddleware
 from pyverge.execution.plan import ExecutionPlan
-from pyverge.execution.targets import TargetCompiler, TargetPolicy
 from pyverge.execution.types import BackendPort
+from pyverge.graph.planning.targets import TargetPolicy
 from pyverge.schemas.types import ModelAdapter
 
 RunResult: TypeAlias = Any
@@ -24,7 +24,6 @@ class Runner(Generic[VersionValue]):
 
     coordinator: ExecutionCoordinator[VersionValue]
     adapter: ModelAdapter
-    target_compiler: TargetCompiler[VersionValue]
     backend: BackendPort[VersionValue]
     middleware: tuple[BackendMiddleware, ...]
     environment: ExecutionEnvironment
@@ -37,10 +36,9 @@ class Runner(Generic[VersionValue]):
         container: type[Any] | None,
         max_depth: int,
     ) -> ExecutionPlan[VersionValue]:
-        resolver = self.target_compiler.compile(target)
         plan = self.coordinator.plan(
             payload,
-            resolver,
+            target,
             container=container,
             max_depth=max_depth,
         )

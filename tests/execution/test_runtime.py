@@ -17,29 +17,22 @@ from pyverge.core import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.context import MigrationContext
 from pyverge.engine import Engine
 from pyverge.execution import (
-    AnyDirection,
-    BackwardDirection,
-    CompositeExtractor,
     ExecutionPlanner,
-    ExtractedEntry,
-    ForwardDirection,
+    PayloadWalker,
+    Runner,
+)
+from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
+from pyverge.execution.context import LayeredView, RunContext, StepContext
+from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
+from pyverge.graph import (
     PathPlan,
     PathPlanEntry,
-    PathResolver,
-    PolicyEngine,
-    Runner,
-    direction_policy,
-    earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
-from pyverge.execution.context import LayeredView, RunContext, StepContext
-from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
-from pyverge.registry import GraphCatalog, Registry
-from pyverge.registry.errors import CatalogError
+from pyverge.registry import Registry
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.versioning import EdgeKey, VersionNode
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
@@ -243,103 +236,6 @@ def test_runner_noop_when_target_equals_source(
     [
         [
             PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2, UserV3],
-                [
-                    ((UserV1, UserV2), migrate_v1_to_v2),
-                    ((UserV2, UserV3), migrate_v2_to_v3),
-                ],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-def test_path_resolver_builds_chain(
-    engine: Engine,
-    model_adapter,
-    versioning_settings,
-) -> None:
-    source = envelope_model(model_adapter, versioning_settings, UserV1)
-    entry = ExtractedEntry(path=("document",), node=source)
-    resolver = PathResolver(engine.registry)
-
-    plan = resolver.plan(
-        [entry],
-        latest_target_resolver(engine.registry),
-        container=None,
-        target_fields=frozenset(),
-    )
-
-    assert len(plan.entries) == 1
-    resolved = plan.entries[0]
-    assert resolved.target.version[1] == engine.adapter.of("3.0.0")
-    assert len(resolved.steps) == 2  # noqa: PLR2004
-    assert len(resolved.migrations) == 2  # noqa: PLR2004
-    assert engine.adapter.resolve(resolved.target_model) is UserV3
-    assert resolved.hooks == ((), ())
-
-
-def test_direction_policies(model_adapter, versioning_settings) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-
-    assert AnyDirection().allows(low, high)
-    assert AnyDirection().allows(high, low)
-    assert ForwardDirection().allows(low, high)
-    assert not ForwardDirection().allows(high, low)
-    assert BackwardDirection().allows(high, low)
-    assert not BackwardDirection().allows(low, high)
-    assert isinstance(direction_policy("any"), AnyDirection)
-    assert isinstance(direction_policy("forward"), ForwardDirection)
-    assert isinstance(direction_policy("backward"), BackwardDirection)
-
-
-def test_unknown_direction_rejected() -> None:
-    with pytest.raises(ValueError, match="Unknown direction"):
-        direction_policy("sideways")  # ty: ignore[invalid-argument-type]
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [semver.Version, "test", [UserV1, UserV2, UserV3], []],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "resolver_factory, expected",
-    [
-        pytest.param(latest_target_resolver, "3.0.0", id="latest"),
-        pytest.param(earliest_target_resolver, "1.0.0", id="earliest"),
-        pytest.param(skip_target_resolver, None, id="skip"),
-    ],
-)
-def test_target_resolvers(
-    engine: Engine,
-    model_adapter,
-    versioning_settings,
-    resolver_factory,
-    expected: str | None,
-) -> None:
-    source = envelope_model(model_adapter, versioning_settings, UserV1)
-    target = resolver_factory(engine.registry)(source)
-
-    if expected is None:
-        assert target is None
-    else:
-        assert target.version[1] == engine.adapter.of(expected)
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
             [semver.Version, "test", [UserV1, UserV2, UserV3], []],
         ]
     ],
@@ -361,14 +257,6 @@ def test_fixed_and_multi_target_resolvers(
     assert multi(source) is fixed
 
 
-class _GraphStub:
-    name = "test"
-
-
-def _graph() -> GraphCatalog:
-    return cast("GraphCatalog", _GraphStub())
-
-
 def _path_entry(
     source: VersionNode[V],
     target: VersionNode[V],
@@ -385,89 +273,6 @@ def _path_entry(
         hooks=(),
         migrations=(),
     )
-
-
-def test_policy_engine_skips_direction_violations(
-    model_adapter,
-    versioning_settings,
-) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(high, low, path=())
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
-    policy = PolicyEngine(
-        direction=ForwardDirection(),
-        on_direction_violation="skip",
-        on_missing_path="raise",
-        depth_limit=-1,
-        on_depth_violation="skip",
-    )
-
-    filtered = policy.apply(plan, graph=_graph())
-
-    assert filtered.entries == ()
-
-
-def test_policy_engine_raises_direction_violations(
-    model_adapter,
-    versioning_settings,
-) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(high, low, path=())
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
-    forward = PolicyEngine(
-        direction=ForwardDirection(),
-        on_direction_violation="raise",
-        on_missing_path="raise",
-        depth_limit=-1,
-        on_depth_violation="skip",
-    )
-    with pytest.raises(CatalogError, match="direction policy"):
-        forward.apply(plan, graph=_graph())
-
-
-def test_policy_engine_skips_missing_path(
-    model_adapter,
-    versioning_settings,
-) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(low, high, path=())
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
-    policy = PolicyEngine(
-        direction=AnyDirection(),
-        on_direction_violation="skip",
-        on_missing_path="skip",
-        depth_limit=-1,
-        on_depth_violation="skip",
-    )
-
-    assert policy.apply(plan, graph=_graph()).entries == ()
-
-
-def test_policy_engine_depth_limit(
-    model_adapter,
-    versioning_settings,
-) -> None:
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(
-        low,
-        high,
-        path=(),
-        steps=((low, high), (high, high)),
-    )
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
-    policy = PolicyEngine(
-        direction=AnyDirection(),
-        on_direction_violation="skip",
-        on_missing_path="raise",
-        depth_limit=1,
-        on_depth_violation="skip",
-    )
-
-    assert policy.apply(plan, graph=_graph()).entries == ()
 
 
 def test_execution_planner_builds_levels(
@@ -608,7 +413,7 @@ def test_extractor_empty_payload_returns_no_entries(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor[semver.Version](
+    extractor = PayloadWalker[semver.Version](
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -640,7 +445,7 @@ def test_extractor_finds_registered_versioned_dict(
     registry,
     container: type | None,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -668,7 +473,7 @@ def test_extractor_unknown_version_is_skipped(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -694,7 +499,7 @@ def test_extractor_max_depth_exceeded_for_nested_entry(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -728,7 +533,7 @@ def test_extractor_incompatible_container_fails_fast(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -743,7 +548,7 @@ def test_extractor_containerless_when_none(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -775,7 +580,7 @@ def test_extractor_invalid_payload_raises(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -811,7 +616,7 @@ def test_extractor_validation_mode_none_skips_validate(
     discovery_settings,
     registry,
 ) -> None:
-    extractor = CompositeExtractor(
+    extractor = PayloadWalker(
         registry,
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
@@ -1131,12 +936,20 @@ def test_step_context_layers_bindings(execution_environment) -> None:
         bindings=MigrationContext.create({"tenant": "acme", "region": "eu"}),
     )
     source = envelope_model(
-        PydanticModelAdapter[semver.Version](codec=ModelCodec()),
+        PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
         None,
         UserV1,
     )
     target = envelope_model(
-        PydanticModelAdapter[semver.Version](codec=ModelCodec()),
+        PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
         None,
         UserV2,
     )
@@ -1219,8 +1032,8 @@ def test_plan_preserves_version_value(
     )
     resolved = plan.entries[0]
 
-    assert type(resolved.source.version[1]) is version_type
-    assert type(resolved.target.version[1]) is version_type
+    assert type(resolved.source.version) is version_type
+    assert type(resolved.target.version) is version_type
 
 
 @pytest.mark.parametrize(
@@ -1398,20 +1211,40 @@ def test_runner_sync_backend_rejects_coroutine_migration(
 def test_runner_calls_sync_hooks(
     engine: Engine,
     registry: Registry,
-    runner: Runner,
+    runner_factory,
 ) -> None:
     calls: list[str] = []
 
     class _Hook:
-        def before_migrate(self, name, from_version, to_version, data):
+        def before_migrate(  # noqa: PLR0913
+            self, name, from_version, to_version, data, *, migration=None, state=None
+        ):
             calls.append("before")
 
-        def after_migrate(
-            self, name, from_version, to_version, original_data, migrated_data
+        def after_migrate(  # noqa: PLR0913
+            self,
+            name,
+            from_version,
+            to_version,
+            original_data,
+            migrated_data,
+            *,
+            migration=None,
+            state=None,
         ):
             calls.append("after")
 
-        def on_error(self, name, from_version, to_version, data, error):
+        def on_error(  # noqa: PLR0913
+            self,
+            name,
+            from_version,
+            to_version,
+            data,
+            error,
+            *,
+            migration=None,
+            state=None,
+        ):
             calls.append("error")
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
@@ -1419,7 +1252,7 @@ def test_runner_calls_sync_hooks(
     engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _Hook()))
 
     _run(
-        runner,
+        runner_factory(),
         _payload(),
         latest_target_resolver(registry),
         container=None,
@@ -1453,20 +1286,40 @@ def test_runner_calls_sync_hooks(
 def test_runner_awaits_async_hooks(
     engine: Engine,
     registry: Registry,
-    runner: Runner,
+    runner_factory,
 ) -> None:
     calls: list[str] = []
 
     class _AsyncHook:
-        async def before_migrate(self, name, from_version, to_version, data):
+        async def before_migrate(  # noqa: PLR0913
+            self, name, from_version, to_version, data, *, migration=None, state=None
+        ):
             calls.append("before")
 
-        async def after_migrate(
-            self, name, from_version, to_version, original_data, migrated_data
+        async def after_migrate(  # noqa: PLR0913
+            self,
+            name,
+            from_version,
+            to_version,
+            original_data,
+            migrated_data,
+            *,
+            migration=None,
+            state=None,
         ):
             calls.append("after")
 
-        def on_error(self, name, from_version, to_version, data, error):
+        def on_error(  # noqa: PLR0913
+            self,
+            name,
+            from_version,
+            to_version,
+            data,
+            error,
+            *,
+            migration=None,
+            state=None,
+        ):
             calls.append("error")
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
@@ -1474,7 +1327,7 @@ def test_runner_awaits_async_hooks(
     engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _AsyncHook()))
 
     asyncio.run(
-        runner.run(
+        runner_factory().run(
             _payload(),
             latest_target_resolver(registry),
             container=None,

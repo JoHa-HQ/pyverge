@@ -20,11 +20,15 @@ Every adapter receives a `ModelCodec`:
 ```python
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-adapter = PydanticModelAdapter(codec=ModelCodec())
+adapter = PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind"))
 ```
 
-`ModelCodec` is required. It carries `version_property` / `kind_property` and
-the Pydantic payload/reflection strategy shared by Pydantic-backed providers.
+`ModelCodec` is required. It carries `namespace`, `version_property`,
+`kind_property`, and the Pydantic payload/reflection strategy shared by
+Pydantic-backed providers. Version-string parsing belongs to `NodeId`.
+`ModelCodec.namespace` is the adapter's identity namespace: adapters stamp it
+onto nodes, keys, and references. The manager derives its registry namespace
+from the same codec, so there is no second namespace setting to keep in sync.
 
 ## Container checks
 
@@ -122,7 +126,7 @@ from pyverge import Manager
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 UserManager = Manager[pendulum.Date].configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
 )
 
 

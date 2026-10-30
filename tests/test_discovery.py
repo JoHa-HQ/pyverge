@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 import pytest
 
@@ -11,20 +12,25 @@ from pyverge.discovery import (
     MigrationDescriptor,
     MigrationSpec,
     ModelDescriptor,
+    RegistrationSink,
     SourceDescriptor,
+    register_descriptor,
 )
 from pyverge.discovery.reflection import (
     CallableDiffDiscovery,
     JsonPatchDiffDiscovery,
 )
+from pyverge.engine import Engine
 from pyverge.migrations.json_patch import JsonPatch
 from pyverge.registry.errors import GraphLockedError
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey
+from pyverge.versioning import EdgeKey, VersionKey
 from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
 from tests.utils.source import StaticSource
 
-_ADAPTER = PydanticModelAdapter(codec=ModelCodec())
+_ADAPTER = PydanticModelAdapter(
+    codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+)
 _MIGRATION = MigrationDescriptor(
     MigrationSpec(
         (_ADAPTER.versionable(UserV1), _ADAPTER.versionable(UserV2)),
@@ -99,6 +105,28 @@ def test_reflect_registers_migration_edge(
         engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0")),
     )
     assert engine.registry.has_migration(edge)
+
+
+@pytest.mark.parametrize("namespace", ["", "orders"])
+def test_register_descriptor_accepts_key_only(engine: Engine, namespace: str) -> None:
+    node = engine.adapter.versionable(UserV1).with_namespace(namespace)
+    key = VersionKey(
+        namespace=node.namespace,
+        kind=node.kind,
+        version=node.version,
+    )
+
+    registered = register_descriptor(
+        ModelDescriptor(key, "test", {}),
+        cast("RegistrationSink", engine),
+    )
+
+    assert registered is True
+    assert engine.registry.has_entry(key)
+    assert engine.registry.find_model(key) is None
+
+    engine.store_model(node)
+    assert engine.registry.get_model(key) == node
 
 
 @pytest.mark.parametrize(
@@ -186,7 +214,9 @@ def _callable_migration(data: dict, context=None) -> dict:
     ],
 )
 def test_diff_discovery(discovery, migration, added, removed, modified) -> None:
-    adapter = PydanticModelAdapter(codec=ModelCodec())
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    )
     diff = discovery.discover(
         migration,
         adapter.versionable(UserV1),

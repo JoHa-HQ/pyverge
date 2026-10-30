@@ -10,7 +10,7 @@ from pyverge import Manager
 from pyverge.execution import OpenLineageHook
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
 
 
 @UserManager.model()
@@ -65,5 +65,5 @@ result = manager.runner().run(
 
 assert result["version"] == "2.0.0"
 assert [event.eventType.value for event in lineage.events] == ["START", "COMPLETE"]
-assert lineage.events[0].job.name == "migration.User"
+assert lineage.events[0].job.name == "migration.User.1.0.0->2.0.0"
 ```

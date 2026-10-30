@@ -26,6 +26,7 @@ from pyverge.versioning import (
     FieldStatus,
     FrozenMap,
     TypeRef,
+    parse_version,
 )
 from tests.examples.dataclasses import (
     AddressV1,
@@ -51,12 +52,16 @@ def _add_age():
             "to": "2.0.0",
             "ops": [{"op": "add", "path": "/age", "value": None}],
         }
-    ).patch
+    )
 
 
 ADAPTERS = [
     pytest.param(
-        PydanticModelAdapter(codec=ModelCodec()),
+        PydanticModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
         UserV1,
         UserV2,
         {
@@ -69,14 +74,22 @@ ADAPTERS = [
         id="pydantic",
     ),
     pytest.param(
-        JsonSchemaModelAdapter(codec=ModelCodec()),
+        JsonSchemaModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
         USER_V1_0_0,
         USER_V2_0_0,
         {"kind": "User", "version": "1.0.0", "name": "Alice"},
         id="json_schema",
     ),
     pytest.param(
-        DataclassModelAdapter(codec=ModelCodec()),
+        DataclassModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ),
         DataclassUserV1,
         DataclassUserV2,
         {
@@ -96,7 +109,7 @@ ADAPTERS = [
 def test_adapter_identity_and_codec(adapter, source_model, target_model, payload):
     node = adapter.versionable(source_model)
     assert node.kind == "User"
-    assert str(node.version[1]) == "1.0.0"
+    assert str(node.version) == "1.0.0"
     assert "version" not in adapter.fields(adapter.resolve(node.descriptor.ref))
     assert adapter.model_codec.version_property == "version"
     assert adapter.model_codec.kind_property == "kind"
@@ -145,7 +158,9 @@ def test_diff_provider(adapter, source_model, target_model, payload):
 
 
 def test_diff_origin_from_migration():
-    adapter = PydanticModelAdapter(codec=ModelCodec())
+    adapter = PydanticModelAdapter(
+        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    )
     reflection = Reflection(adapter, CompositeDiffDiscovery())
     v1 = envelope_model(adapter, MigrationSettings(), UserV1)
     v2 = envelope_model(adapter, MigrationSettings(), UserV2)
@@ -174,7 +189,7 @@ def test_reconstructs_missing_model_on_store_migration(
                 "to": "2.0.0",
                 "ops": [{"op": "add", "path": "/age", "value": None}],
             }
-        ).patch,
+        ),
     )
     reconstructed = engine.get_model(meta)
 
@@ -209,7 +224,9 @@ def test_proposes_migration_from_schema_diff(
 
 @pytest.fixture
 def dataclass_adapter() -> DataclassModelAdapter:
-    return DataclassModelAdapter(codec=ModelCodec())
+    return DataclassModelAdapter(
+        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    )
 
 
 @pytest.mark.parametrize(
@@ -298,7 +315,8 @@ def test_dataclass_references(
     expected: set[tuple[str, str]],
 ) -> None:
     assert {
-        (kind, str(version)) for kind, version in dataclass_adapter.references(model)
+        (reference.kind, str(reference.version))
+        for reference in dataclass_adapter.references(model)
     } == expected
 
 
@@ -345,10 +363,10 @@ def test_dataclass_describe_fields_and_materialize(
         fields=FrozenMap(),
         origin=DiffOrigin.SCHEMA,
     )
-    materialized = dataclass_adapter.materialize_model(diff)
-    node = dataclass_adapter.versionable(materialized)
+    node = dataclass_adapter.materialize(diff)
+    materialized = dataclass_adapter.resolve(node.descriptor.ref)
     assert node.kind == "Person"
-    assert str(node.version[1]) == "2.0.0"
+    assert str(node.version) == "2.0.0"
     assert "name" in dataclass_adapter.fields(materialized)
     assert EdgeKey.from_pair(source, node)
 
@@ -373,14 +391,15 @@ def test_dataclass_materialize_with_added_and_defaulted_fields(
         ),
         origin=DiffOrigin.SCHEMA,
     )
-    materialized = dataclass_adapter.materialize_model(diff)
+    node = dataclass_adapter.materialize(diff)
+    materialized = dataclass_adapter.resolve(node.descriptor.ref)
     instance = materialized(zip="12345", country="DE")
     assert instance.zip == "12345"
     assert instance.country == "DE"
 
 
 def test_model_codec_identity_operations() -> None:
-    codec = ModelCodec(version_property="v", kind_property="k")
+    codec = ModelCodec(namespace="", version_property="v", kind_property="k")
     fields = FrozenMap(
         {
             "v": FieldDescriptor(
@@ -394,10 +413,10 @@ def test_model_codec_identity_operations() -> None:
 
     assert codec.version(fields) == "1.2.3"
     assert codec.kind(fields) == "User"
-    assert codec.of("2024-01-01") == pendulum.Date(2024, 1, 1)
-    assert codec.version_key(kind="User", version="1.2.3").jgf_id == "User@1.2.3"
+    assert parse_version("2024-01-01") == pendulum.Date(2024, 1, 1)
+    assert str(codec.version_key(kind="User", version="1.2.3")) == "User@1.2.3"
     with pytest.raises(ValueError, match="Cannot parse version"):
-        codec.of("not-a-version")
+        parse_version("not-a-version")
 
 
 SIMPLE_JSON_SCHEMA = {

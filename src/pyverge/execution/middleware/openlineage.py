@@ -56,18 +56,19 @@ class _OpenLineageRun:
         self._producer = producer
 
     def execute(self, plan: Any, payload: Any, run: Any, adapter: Any) -> Any:
+        self._validate_namespace(plan)
         run_id = str(uuid5(NAMESPACE_URL, run.run_id))
         inputs = [
             InputDataset(
                 self._namespace,
-                f"{entry.source.kind}@{entry.source.version[1]}",
+                str(entry.source),
             )
             for entry in plan.path.entries
         ]
         outputs = [
             OutputDataset(
                 self._namespace,
-                f"{entry.target.kind}@{entry.target.version[1]}",
+                str(entry.target),
             )
             for entry in plan.path.entries
         ]
@@ -107,6 +108,23 @@ class _OpenLineageRun:
             )
         )
         return result
+
+    def _validate_namespace(self, plan: Any) -> None:
+        namespaces = {
+            entry.source.namespace
+            for entry in plan.path.entries
+            if entry.source.namespace
+        }
+        namespaces.update(
+            entry.target.namespace
+            for entry in plan.path.entries
+            if entry.target.namespace
+        )
+        if namespaces and self._namespace not in namespaces:
+            raise ValueError(
+                f"OpenLineage namespace {self._namespace!r} does not match "
+                f"graph namespace(s) {sorted(namespaces)}"
+            )
 
     async def _async_result(self, result: Any, run_id: str) -> Any:
         try:

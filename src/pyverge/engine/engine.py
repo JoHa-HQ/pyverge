@@ -10,53 +10,55 @@ from pyverge.core.types import (
     MigrationFunc,
     ModelHandle,
     ModelKind,
+    RegistrationMode,
     VersionMissingStrategy,
     VersionValue,
 )
-from pyverge.discovery import (
-    MigrationSpec,
-    ModelRegistrationMode,
-    RegisterMigration,
-    RegisterModel,
-    RegistrationCommand,
-)
-from pyverge.discovery.reflection import Reflector
 from pyverge.execution import (
-    CompositeExtractor,
     ExecutionCoordinator,
     ExecutionPlanner,
-    PathResolver,
-    PolicyEngine,
+    PayloadWalker,
     Runner,
 )
 from pyverge.execution.context import ExecutionEnvironment
-from pyverge.execution.direction import DirectionPolicy
 from pyverge.execution.middleware import BackendMiddleware
-from pyverge.execution.targets import TargetCompiler
+from pyverge.execution.migrations import MigrationBindings
 from pyverge.execution.types import BackendPort
+from pyverge.graph import (
+    DirectionPolicy,
+    GraphBuilder,
+    MigrationGraph,
+    PathFinder,
+    PolicyEngine,
+    TargetCompiler,
+)
+from pyverge.migrations import MigrationSpec
 from pyverge.migrations.identity import MigrationIdentityResolver
 from pyverge.migrations.json_patch import JsonPatch
-from pyverge.registry import GraphCatalog, Registry
+from pyverge.registry import Registry
 from pyverge.registry.errors import (
     CatalogError,
     MigrationNotFoundError,
     MissingReferenceError,
     ModelNotFoundError,
 )
-from pyverge.registry.explorer import GraphExplorer
 from pyverge.schemas.types import ModelAdapter
 from pyverge.versioning import (
     BackwardCompatibilityGuard,
     Comparable,
     EdgeKey,
     Migratable,
+    NodeEntry,
     Transitional,
     Versionable,
     VersionEdge,
+    VersionKey,
     VersionNode,
     VersionPair,
 )
 from pyverge.versioning.errors import BackwardCompatibilityError
+
+from .reflector import Reflector
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,32 +90,33 @@ class Engine(Generic[VersionValue]):
         self.adapter = adapter
         self.identity_resolver = identity_resolver
         self.reflector = reflector
-        self.explorer = GraphExplorer(registry)
 
     def runner(self, options: RunnerOptions[VersionValue]) -> Runner[VersionValue]:
+        graph = self.snapshot()
+        bindings = MigrationBindings[VersionValue].from_catalog(self.registry)
         coordinator = ExecutionCoordinator[VersionValue](
-            extractor=CompositeExtractor[VersionValue](
-                self.registry,
+            extractor=PayloadWalker[VersionValue](
+                graph,
                 adapter=self.adapter,
                 validation_mode=options.validation_mode,
             ),
-            paths=PathResolver[VersionValue](self.registry),
-            policy=PolicyEngine[VersionValue](
-                direction=options.direction,
-                on_direction_violation=options.on_direction_violation,
-                on_missing_path=options.on_missing_path,
-                depth_limit=options.depth_limit,
-                on_depth_violation=options.on_depth_violation,
+            finder=PathFinder[VersionValue](
+                graph=graph,
+                targets=TargetCompiler[VersionValue](graph, self.adapter),
+                migrations=bindings,
+                policy=PolicyEngine[VersionValue](
+                    direction=options.direction,
+                    on_direction_violation=options.on_direction_violation,
+                    on_missing_path=options.on_missing_path,
+                    depth_limit=options.depth_limit,
+                    on_depth_violation=options.on_depth_violation,
+                ),
             ),
             planner=ExecutionPlanner[VersionValue](),
         )
         return Runner[VersionValue](
             coordinator=coordinator,
             adapter=self.adapter,
-            target_compiler=TargetCompiler[VersionValue](
-                self.registry,
-                self.adapter,
-            ),
             backend=options.backend,
             middleware=options.middleware,
             environment=options.environment,
@@ -130,14 +133,8 @@ class Engine(Generic[VersionValue]):
     def copy_registry(self) -> Registry[VersionValue]:
         return self.registry.copy()
 
-    def snapshot(self) -> GraphCatalog:
-        return self.explorer.snapshot()
-
-    def lock(self) -> GraphCatalog:
-        return cast("GraphCatalog", self.registry.lock())
-
-    def explore(self) -> GraphExplorer[VersionValue]:
-        return self.explorer
+    def snapshot(self) -> MigrationGraph[VersionValue]:
+        return GraphBuilder[VersionValue]().build(self.registry)
 
     def __contains__(self, index: Any) -> bool:
         try:
@@ -158,31 +155,12 @@ class Engine(Generic[VersionValue]):
     def __getitem__(
         self, index: Any
     ) -> Versionable[VersionValue] | Migratable[VersionValue]:
-        return self.registry[index]
-
-    def register(self: Self, command: RegistrationCommand) -> Any:
-        """Execute one registration command."""
-        if isinstance(command, RegisterModel):
-            return self._register_model(command)
-        if isinstance(command, RegisterMigration):
-            return self._register_migration(command)
-        raise TypeError(f"Unsupported registration command: {command!r}")
-
-    def _register_model(
-        self: Self, command: RegisterModel
-    ) -> VersionNode[VersionValue]:
-        payload = command.payload
-        version = (
-            payload
-            if isinstance(payload, VersionNode)
-            else self.adapter.versionable(payload)
+        return cast(
+            "Versionable[VersionValue] | Migratable[VersionValue]",
+            self.registry[index],
         )
-        if command.mode is ModelRegistrationMode.STRICT:
-            return self.registry.store_model(version)
-        return self.registry.reconcile_model(version)
 
-    def _register_migration(self: Self, command: RegisterMigration) -> MigrationFunc:
-        spec = command.spec
+    def _register_migration(self: Self, spec: MigrationSpec) -> MigrationFunc:
         v_from, v_to = spec.pair
         if v_from.kind != v_to.kind:
             raise CatalogError(
@@ -198,12 +176,12 @@ class Engine(Generic[VersionValue]):
             resolved_from = self.reflector.materialize_missing(
                 resolved_to, v_from, spec.func
             )
-            self.registry.store_model(resolved_from)
+            self._store_node(resolved_from, mode="strict")
         if resolved_to is None:
             resolved_to = self.reflector.materialize_missing(
                 resolved_from, v_to, spec.func
             )
-            self.registry.store_model(resolved_to)
+            self._store_node(resolved_to, mode="strict")
         if not self.registry.is_adjacent(EdgeKey.from_pair(resolved_from, resolved_to)):
             raise CatalogError(
                 self.registry.name,
@@ -239,11 +217,37 @@ class Engine(Generic[VersionValue]):
         )
         return spec.func
 
-    def store_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
-        return self.register(RegisterModel(payload, ModelRegistrationMode.STRICT))
+    def _store_node(
+        self: Self,
+        version: NodeEntry,
+        *,
+        mode: RegistrationMode,
+    ) -> VersionNode[VersionValue]:
+        stored = (
+            self.registry.store(version)
+            if mode == "strict"
+            else self.registry.reconcile(version)
+        )
+        return cast("VersionNode[VersionValue]", stored)
+
+    def store_model(self: Self, payload: Any) -> NodeEntry:
+        """Store a key or node, upgrading and reconciling as needed."""
+        if isinstance(payload, VersionNode):
+            return self.registry.hydrate(payload)
+        if isinstance(payload, VersionKey):
+            existing = self.registry.find_entry(payload)
+            if existing is not None:
+                return existing
+            return self.registry.store(payload)
+        return self.registry.hydrate(self.adapter.versionable(payload))
 
     def reconcile_model(self: Self, payload: Any) -> VersionNode[VersionValue]:
-        return self.register(RegisterModel(payload, ModelRegistrationMode.RECONCILE))
+        version = (
+            payload
+            if isinstance(payload, VersionKey)
+            else self.adapter.versionable(payload)
+        )
+        return self._store_node(version, mode="reconcile")
 
     def validate(self: Self, key: Comparable[VersionValue] | None = None) -> None:
         if key is None:
@@ -257,7 +261,7 @@ class Engine(Generic[VersionValue]):
             if absent:
                 raise MissingReferenceError(
                     self.registry.name,
-                    version.version,
+                    version,
                     absent,
                 )
 
@@ -291,10 +295,8 @@ class Engine(Generic[VersionValue]):
         *,
         backward_compatible: bool = False,
     ) -> MigrationFunc:
-        return self.register(
-            RegisterMigration(
-                MigrationSpec(key, func, backward_compatible=backward_compatible)
-            )
+        return self._register_migration(
+            MigrationSpec(key, func, backward_compatible=backward_compatible)
         )
 
     def reconstruct(
@@ -304,7 +306,7 @@ class Engine(Generic[VersionValue]):
         migration: JsonPatch | MigrationFunc,
     ) -> None:
         node = self.reflector.materialize_missing(anchor, target, migration)
-        self.registry.store_model(node)
+        self._store_node(node, mode="strict")
 
     def propose_migration(
         self: Self,
@@ -353,7 +355,7 @@ class Engine(Generic[VersionValue]):
         from_version: Versionable,
         to_version: Versionable,
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
-        return self.registry.migration_path(from_version, to_version)
+        return self.snapshot().migration_path(from_version, to_version)
 
     def add_hook(self: Self, key: Transitional[VersionValue], hook: Attachable) -> None:
         edge = self.registry.get_migration_by_edge(key)

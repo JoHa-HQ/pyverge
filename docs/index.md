@@ -10,6 +10,8 @@ version graph: models, migrations, target policy, and an execution backend.
 | I want to... | Page |
 | --- | --- |
 | Learn pyverge | [Getting started](tutorials/getting-started.md) |
+| Understand identity and hydration | [Graph model and identity](explanation/graph-model.md) |
+| Register keys before models | [Keys and hydration](how-to/models/keys-and-hydration.md) |
 | Register models | [Register models and migrations](how-to/models/register-models.md) |
 | Write a migration | [Author migrations](how-to/migrations/author-migrations.md) |
 | Run a payload | [Run payloads](how-to/runtime/run-payloads.md) |
@@ -20,6 +22,7 @@ version graph: models, migrations, target policy, and an execution backend.
 ## Start here
 
 - **Learn by doing** — [Getting started](tutorials/getting-started.md)
+- **See runnable examples** — [Examples](examples/index.md)
 - **Solve a task** — [How-to guides](how-to/index.md)
 - **Look up an API** — [Reference](reference/index.md)
 - **Understand the model** — [Explanation](explanation/index.md)

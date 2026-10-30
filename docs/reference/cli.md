@@ -156,7 +156,7 @@ pyverge manifest --manager myapp.models:UserManager \
 Emits a JGF v2 envelope:
 
 - top-level `graph`
-- nodes keyed by `kind@version`
+- nodes keyed by `namespace:kind@version` (`kind@version` when the namespace is empty)
 - edges with `source`, `target`, `relation: migration`
 - node metadata: fields, references, `schema_hash`
 - edge metadata: strategy/spec, compatibility, `migration_hash`
@@ -168,7 +168,11 @@ checks node/edge content. It exits `1` on divergence.
 This is an explicit CLI contract. The runtime/lifespan does not write it.
 Generate it in CI or from a build job, then compare snapshots across revisions.
 
-`export` remains as the legacy flat manifest.
+`export` remains as the legacy flat manifest. It renders namespace-aware IDs:
+
+- node entries include `id` (`namespace:kind@version`) and `namespace`;
+- migration entries include `id`, `namespace`, `kind`, `from`, and `to`;
+- references are `[namespace, kind, version]`.
 
 ## `init`
 

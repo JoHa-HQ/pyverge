@@ -4,13 +4,9 @@ from dataclasses import dataclass
 from functools import singledispatch
 from typing import Any
 
-from pyverge.discovery.commands import (
-    MigrationSpec,
-    ModelRegistrationMode,
-    RegisterMigration,
-    RegisterModel,
-)
-from pyverge.discovery.types import RegistrationCommand
+from pyverge.discovery.types import RegistrationSink
+from pyverge.migrations import MigrationSpec
+from pyverge.versioning import EdgeKey, NodeId, VersionKey
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,43 +28,68 @@ class MigrationDescriptor(SourceDescriptor):
     """A normalized migration specification."""
 
 
+def is_registrable(descriptor: SourceDescriptor) -> bool:
+    return isinstance(descriptor, (ModelDescriptor, MigrationDescriptor))
+
+
 @singledispatch
-def descriptor_commands(
+def register_descriptor(
     descriptor: SourceDescriptor,
-) -> tuple[RegistrationCommand, ...]:
-    return ()
+    sink: RegistrationSink,
+) -> bool:
+    """Apply one descriptor through the application registration port."""
+    return False
 
 
-@descriptor_commands.register
-def _model_commands(
+@register_descriptor.register
+def _register_model_descriptor(
     descriptor: ModelDescriptor,
-) -> tuple[RegistrationCommand, ...]:
+    sink: RegistrationSink,
+) -> bool:
     payload = descriptor.payload
     if isinstance(payload, (list, tuple, set, frozenset)):
-        commands: list[RegistrationCommand] = []
         for item in payload:
-            commands.extend(
-                descriptor_commands(
-                    ModelDescriptor(item, descriptor.source_id, descriptor.metadata)
-                )
+            register_descriptor(
+                ModelDescriptor(item, descriptor.source_id, descriptor.metadata),
+                sink,
             )
-        return tuple(commands)
-    return (RegisterModel(payload, ModelRegistrationMode.RECONCILE),)
+        return True
+    if isinstance(payload, VersionKey):
+        sink.reconcile_model(payload)
+        return True
+    if isinstance(payload, NodeId):
+        sink.reconcile_model(
+            VersionKey(
+                namespace=payload.namespace,
+                kind=payload.kind,
+                version=payload.version,
+            )
+        )
+        return True
+    sink.reconcile_model(payload)
+    return True
 
 
-@descriptor_commands.register
-def _migration_commands(
+@register_descriptor.register
+def _register_migration_descriptor(
     descriptor: MigrationDescriptor,
-) -> tuple[RegistrationCommand, ...]:
+    sink: RegistrationSink,
+) -> bool:
     payload = descriptor.payload
     if not isinstance(payload, MigrationSpec):
         raise TypeError("migration descriptor payload must be a MigrationSpec")
-    return (RegisterMigration(payload),)
+    sink.store_migration(
+        EdgeKey.from_pair(*payload.pair),
+        payload.func,
+        backward_compatible=payload.backward_compatible,
+    )
+    return True
 
 
 __all__ = [
     "MigrationDescriptor",
     "ModelDescriptor",
     "SourceDescriptor",
-    "descriptor_commands",
+    "is_registrable",
+    "register_descriptor",
 ]

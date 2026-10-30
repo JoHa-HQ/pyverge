@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from pyverge import Manager
 from pyverge.core.context import MigrationContext
-from pyverge.schemas import PydanticModelAdapter
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.settings import MigrationSettings, manager_kwargs
 
 
@@ -66,8 +66,11 @@ def configure_manager(
     """Return the configured manager class; assembly instantiates it."""
     return Manager[semver.Version].configure(
         PydanticModelAdapter(
-            version_property=settings.version_property,
-            kind_property=settings.kind_property,
+            codec=ModelCodec(
+                namespace="",
+                version_property=settings.version_property,
+                kind_property=settings.kind_property,
+            )
         ),
         **manager_kwargs(settings),
     )

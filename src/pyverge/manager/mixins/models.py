@@ -7,14 +7,19 @@ from pyverge.core.types import (
     ModelData,
     ModelKey,
     ModelKind,
-    ModelVersionKey,
     VersionValue,
 )
-from pyverge.discovery import ModelRegistrationMode, RegisterModel
 from pyverge.schemas.types import (
     ModelHandle,
 )
-from pyverge.versioning import Comparable, Versionable, VersionNode
+from pyverge.versioning import (
+    Comparable,
+    NodeId,
+    Versionable,
+    VersionKey,
+    VersionNode,
+    parse_version,
+)
 
 from ..descriptors import hybridmethod
 
@@ -36,10 +41,10 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return cast(
-            Versionable[VersionValue],
-            engine.register(RegisterModel(key, ModelRegistrationMode.STRICT)),
-        )
+        namespace = engine.registry.namespace
+        if isinstance(key, VersionKey) and not key.namespace and namespace:
+            key = key.with_namespace(namespace)
+        return cast(Versionable[VersionValue], engine.store_model(key))
 
     @store_model.register(VersionNode)
     @classmethod
@@ -50,10 +55,10 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return cast(
-            Versionable[VersionValue],
-            engine.register(RegisterModel(version, ModelRegistrationMode.STRICT)),
-        )
+        namespace = engine.registry.namespace
+        if not version.namespace and namespace:
+            version = version.with_namespace(namespace)
+        return cast(Versionable[VersionValue], engine.store_model(version))
 
     @hybridmethod
     @singledispatchmethod
@@ -65,10 +70,10 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return cast(
-            Versionable[VersionValue],
-            engine.register(RegisterModel(key, ModelRegistrationMode.RECONCILE)),
-        )
+        namespace = engine.registry.namespace
+        if isinstance(key, VersionKey) and not key.namespace and namespace:
+            key = key.with_namespace(namespace)
+        return cast(Versionable[VersionValue], engine.reconcile_model(key))
 
     @reconcile_model.register(VersionNode)
     @classmethod
@@ -79,15 +84,15 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        return cast(
-            Versionable[VersionValue],
-            engine.register(RegisterModel(version, ModelRegistrationMode.RECONCILE)),
-        )
+        namespace = engine.registry.namespace
+        if not version.namespace and namespace:
+            version = version.with_namespace(namespace)
+        return cast(Versionable[VersionValue], engine.reconcile_model(version))
 
     def missing_references(
         self: Manager[VersionValue],
         version: Versionable[VersionValue],
-    ) -> frozenset[ModelVersionKey]:
+    ) -> frozenset[NodeId]:
         return self.engine.registry.missing_references(version)
 
     def validate_graph(
@@ -108,6 +113,17 @@ class ModelStoreMixin(Generic[VersionValue]):
         if kind is None:
             return engine.registry.versions
         return engine.registry.kind_versions(kind)
+
+    @hybridmethod
+    @classmethod
+    def migration_graph(
+        cls: type[Manager[VersionValue]],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ):
+        """Expose the immutable migration graph for the current manager."""
+        engine = engine or cls._default_engine
+        return engine.snapshot()
 
     @hybridmethod
     @classmethod
@@ -154,7 +170,10 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine = engine or cls._default_engine
         if isinstance(key, ModelKey):
             return engine.get_model(
-                engine.adapter.version_key(kind=key.kind, version=key.version)
+                engine.adapter.version_key(
+                    kind=key.kind,
+                    version=key.version,
+                )
             )
         return engine.get_model_by_class(key)
 
@@ -194,5 +213,5 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> VersionNode[VersionValue]:
         engine = engine or cls._default_engine
-        key = ModelKey(kind, cast(VersionValue, engine.adapter.of(version)))
+        key = ModelKey(kind, parse_version(version))
         return cls.get_model(key, engine=engine)

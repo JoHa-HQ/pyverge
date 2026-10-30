@@ -84,9 +84,32 @@ registries enforce compatibility but don't migrate data; event upcasting works
 for events but not arbitrary payloads; migration scripts require manual
 ordering; ETL transformers are source-specific.
 
+### Identity first
+
+Every versioned fact has a key: `NodeId(namespace, kind, version)`.
+`VersionKey` adds identity-neutral storage metadata, and `EdgeKey` is a
+directed pair of nodes. Models are attached later through hydration.
+
+That separation matters because discovery and routing can record topology
+before a model is loaded. A key-only entry is a valid placeholder; a
+`VersionNode` is the hydrated model; a `VersionEdge` is an executable edge.
+
+One graph snapshot contains one namespace. This keeps identical kind/version
+pairs from different packages or tenants distinct:
+
+```text
+com.acme.orders:User@1.0.0
+com.acme.billing:User@1.0.0
+```
+
+See [Graph model and identity](graph-model.md) and
+[Namespaces and hydration](namespaces.md).
+
 ### The pyverge approach
 
-**Convergent migration.** The engine treats each entry independently. Given a
+**Convergent migration.** The engine treats each entry independently. Graph
+identity is resolved first; model hydration and executable bindings are
+resolved only when planning the selected path. Given a
 source version and a target version, it finds the registered migration path and
 executes it. Entries converge to their targets regardless of where they
 started.

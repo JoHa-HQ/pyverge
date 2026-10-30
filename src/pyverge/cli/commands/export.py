@@ -23,12 +23,25 @@ def export(
             "kinds": {
                 kind: [
                     {
-                        "version": str(version.version[1]),
+                        "id": str(version),
+                        "namespace": version.namespace,
+                        "version": str(version.version),
                         "model": version.model_id,
                         "fields": sorted(version.fields),
                         "references": [
-                            [ref_kind, str(ref_version)]
-                            for ref_kind, ref_version in sorted(version.references)
+                            [
+                                reference.namespace,
+                                reference.kind,
+                                str(reference.version),
+                            ]
+                            for reference in sorted(
+                                version.references,
+                                key=lambda item: (
+                                    item.namespace,
+                                    item.kind,
+                                    str(item.version),
+                                ),
+                            )
                         ],
                     }
                     for version in registry.kind_versions(kind)
@@ -37,9 +50,11 @@ def export(
             },
             "migrations": [
                 {
+                    "id": str(edge),
+                    "namespace": edge.namespace,
                     "kind": edge.kind,
-                    "from": str(edge.source.version[1]),
-                    "to": str(edge.target.version[1]),
+                    "from": str(edge.source.version),
+                    "to": str(edge.target.version),
                 }
                 for kind in registry.kinds
                 for edge in registry.migrations(kind)

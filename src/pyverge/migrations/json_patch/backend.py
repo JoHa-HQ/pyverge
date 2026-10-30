@@ -16,8 +16,8 @@ class JsonPatchMigrationBackend:
 
         return JsonPatchMigration(
             {
-                "from": str(diff.source.version[1]),
-                "to": str(diff.target.version[1]),
+                "from": str(diff.source.version),
+                "to": str(diff.target.version),
                 "ops": diff.render(JsonPatchRenderer()),
             }
         )

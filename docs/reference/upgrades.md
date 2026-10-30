@@ -34,7 +34,7 @@ Adapters now require an explicit `ModelCodec`:
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 adapter = PydanticModelAdapter(
-    codec=ModelCodec(version_property="version", kind_property="kind")
+    codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
 )
 ```
 
@@ -50,7 +50,7 @@ from pyverge.settings import MigrationSettings, manager_kwargs
 
 settings = MigrationSettings(on_missing="reconstruct_model")
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(codec=ModelCodec()),
+    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
     **manager_kwargs(settings),
 )
 ```
@@ -137,13 +137,88 @@ result = manager.runner().run(
 )
 ```
 
+## Graph identity
+
+`VersionKey` and `EdgeKey` are now first-class identity primitives. A node ID
+carries the namespace, kind, and parsed version; keys add identity-neutral
+storage metadata.
+
+```python
+from pyverge.versioning import EdgeKey, NodeId, VersionKey, VersionNode
+
+node_id = NodeId("com.joha.order", "Order", "1.0.0")
+key = VersionKey(
+    namespace=node_id.namespace,
+    kind=node_id.kind,
+    version=node_id.version,
+    ref=storage_ref,
+)
+edge = EdgeKey(
+    source=node_id,
+    target=NodeId("com.joha.order", "Order", "2.0.0"),
+)
+```
+
+One registry owns one namespace. The manager defaults an empty namespace.
+Cross-namespace edges are forbidden. Identity objects no longer expose
+`jgf_id`; JGF/export renders namespace-prefixed external IDs.
+
+Descriptor references are `NodeId` values and therefore carry their namespace
+through canonical serialization, missing-reference checks, and JGF/manifest
+export. A registry resolves an empty reference namespace against its own
+namespace. Explicit foreign-namespace references remain unresolved unless that
+identity is present in the same registry; cross-namespace edges are rejected.
+
+## Compatibility boundary
+
+The manager is the compatibility layer. Manager entry points accept model
+classes and tuple-shaped migration keys; engine, registry, discovery, graph,
+and execution paths operate on `NodeId`, `VersionKey`, `EdgeKey`,
+`VersionNode`, and `VersionEdge`.
+
+Key-only entries and hydrated entries are both valid registry content.
+Hydration upgrades a key placeholder to a full node; reconciliation resolves
+schema differences on an existing full node. The two operations are distinct.
+
+## Hook contract
+
+Hook callbacks now receive explicit graph identity and migration metadata:
+
+```python
+def before_migrate(
+    self,
+    name,
+    from_version: NodeId,
+    to_version: NodeId,
+    data,
+    *,
+    migration: MigrationDescriptor | None = None,
+    state: HookState,
+): ...
+```
+
+- `from_version` / `to_version` are `NodeId`, not generic comparable values.
+- `migration` carries `strategy` and `identity`.
+- `state` is a backend-provided `ContextVar`; hooks must not keep per-step state
+  on the instance.
+- Async hooks are declared with `async def` on the normal callback names.
+  `abefore_migrate` / `aafter_migrate` do not exist.
+
+OpenLineage namespace validation moved to `OpenLineageMiddleware`. The middleware
+compares its configured namespace with the graph namespace when the graph has
+one.
+
+Path resolution moved out of the registry. Use `GraphBuilder` plus
+`MigrationGraph.migration_path` or `PathFinder`; `InMemoryCatalog.migration_path`
+no longer exists.
+
 ## Import moves
 
 ```python
 from pyverge.engine import Engine
 from pyverge.registry import Registry
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey, VersionNode
+from pyverge.versioning import EdgeKey, NodeId, VersionKey, VersionNode
 ```
 
 `pyverge.migration` is gone.
@@ -176,7 +251,7 @@ migrations before constructing the runtime manager:
 ```python
 from pyverge.types import ManagerMigrationKey
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
 OrderManager.store_model(Order)
 OrderManager.store_migration(
     ManagerMigrationKey("Order", "1.0.0", "2.0.0"),
@@ -187,16 +262,16 @@ manager = OrderManager()
 
 ## Descriptor registration
 
-`SourceDescriptor` string strategies were replaced by typed descriptors and
-registration commands:
+`SourceDescriptor` string strategies were replaced by typed descriptors:
 
 ```text
-ModelDescriptor      -> RegisterModel
-MigrationDescriptor  -> RegisterMigration
+ModelDescriptor      -> register_descriptor(descriptor, sink)
+MigrationDescriptor  -> register_descriptor(descriptor, sink)
 ```
 
-Sources emit descriptors. Managers collect commands and execute them through
-`Engine.register`.
+Sources emit descriptors. Discovery adapters apply them through the
+manager/application registration port. The removed command layer is not part of
+the current API.
 
 ## Troubleshooting
 
@@ -223,11 +298,19 @@ migrations and await the runner result.
 
 ### `TypeError: configure() got an unexpected keyword argument`
 
-`Manager.configure` accepts `config=ManagerConfig(...)` or individual keyword
-options. If you are migrating settings, expand the supported manager options:
+`Manager.configure` accepts individual keyword options directly:
 
 ```python
-Manager.configure(PydanticModelAdapter(codec=ModelCodec()), **manager_kwargs(settings))
+Manager.configure(
+    PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="com.joha.order",
+            version_property="version",
+            kind_property="kind",
+        )
+    ),
+    on_missing="raise",
+)
 ```
 
 ### FastMCP startup fails after upgrade

@@ -43,8 +43,8 @@ def compat(
                     keys.append(
                         ManagerMigrationKey(
                             kind,
-                            str(edge.source.version[1]),
-                            str(edge.target.version[1]),
+                            str(edge.source.version),
+                            str(edge.target.version),
                         )
                     )
 

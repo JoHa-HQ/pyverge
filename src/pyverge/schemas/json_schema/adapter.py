@@ -10,14 +10,14 @@ from datamodel_code_generator.enums import DataModelType
 from datamodel_code_generator.format import Formatter
 from pydantic import BaseModel
 
-from pyverge.core.types import ModelData, ModelHandle, ModelVersionKey, VersionValue
+from pyverge.core.types import ModelData, ModelHandle
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.runtime import ModelRuntime
-from pyverge.versioning import Diffable, FieldDescriptor
+from pyverge.versioning import FieldDescriptor, NodeId
 
 
-class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
+class JsonSchemaModelAdapter(AbstractModelAdapter):
     """Adapter for JSON Schema documents, delegated through Pydantic."""
 
     provider = "json_schema"
@@ -47,6 +47,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
                 output_model_type=DataModelType.PydanticV2BaseModel,
                 formatters=[Formatter.BUILTIN],
                 use_annotated=True,
+                field_constraints=True,
                 allow_remote_refs=False,
             )
             namespace: dict[str, Any] = {}
@@ -136,7 +137,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
         return self.runtime.can_handle(container, fields=fields)
 
     def instantiate(self, container: ModelHandle, data: ModelData) -> Any:
-        return self.runtime.materialize(self._model(container), data)
+        return self.runtime.instantiate(self._model(container), data)
 
     def dump(self, model: object) -> ModelData:
         return self.runtime.serialize(model)
@@ -163,7 +164,7 @@ class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
     ) -> ModelHandle | None:
         return self.runtime.field_model(self._model(parent_model), field_name)
 
-    def references(self, model_cls: ModelHandle) -> frozenset[ModelVersionKey]:
+    def references(self, model_cls: ModelHandle) -> frozenset[NodeId]:
         return self.runtime.references(
             self._model(model_cls),
             provider=self.provider,
@@ -185,9 +186,6 @@ class JsonSchemaModelAdapter(AbstractModelAdapter[VersionValue]):
         version: str | None = None,
     ):
         return super().versionable(self._model(model_cls), kind=kind, version=version)
-
-    def materialize_model(self, diff: Diffable[VersionValue]) -> ModelHandle:
-        return self.runtime.materialize_model(diff, codec=self.model_codec)
 
 
 __all__ = ["JsonSchemaModelAdapter"]

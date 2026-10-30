@@ -9,7 +9,7 @@ from jsonata import Jsonata
 
 from pyverge.core.context import EMPTY_CONTEXT, MigrationContext
 from pyverge.core.types import ModelData
-from pyverge.versioning import MigrationIdentity
+from pyverge.versioning import MigrationDescriptor
 
 
 class JsonataTransform:
@@ -42,8 +42,8 @@ class JsonataTransform:
         return result
 
     @property
-    def migration_identity(self) -> MigrationIdentity:
-        return MigrationIdentity("jsonata", self.expression)
+    def migration_identity(self) -> MigrationDescriptor:
+        return MigrationDescriptor("jsonata", self.expression)
 
     def __repr__(self) -> str:
         return f"JsonataTransform({self.expression!r})"
@@ -65,8 +65,8 @@ class JsonataMigration:
         self._migration = JsonataTransform(expression)
 
     @property
-    def migration_identity(self) -> MigrationIdentity:
-        return MigrationIdentity("jsonata", self.expression)
+    def migration_identity(self) -> MigrationDescriptor:
+        return MigrationDescriptor("jsonata", self.expression)
 
     @classmethod
     def from_expression(cls, expression: str) -> Self:
@@ -101,6 +101,9 @@ class JsonataMigration:
     def _(cls, spec: Mapping[str, Any]) -> Self:
         return cls.from_spec(spec)
 
-    @property
-    def migration(self) -> JsonataTransform:
-        return self._migration
+    def __call__(
+        self,
+        data: ModelData,
+        context: MigrationContext | None = None,
+    ) -> ModelData:
+        return self._migration(data, context)

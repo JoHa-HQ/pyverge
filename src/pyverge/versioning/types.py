@@ -8,6 +8,7 @@ from typing import (
     Protocol,
     TypeAlias,
     TypeVar,
+    Union,
     runtime_checkable,
 )
 
@@ -15,18 +16,20 @@ from pyverge.core.types import (
     MigrationFunc,
     ModelData,
     ModelKind,
-    ModelVersionKey,
     VersionValue_co,
 )
 
 from .canonical import ContentHasher
+from .identity import NodeId
 
 if TYPE_CHECKING:
     from pyverge.core.context import MigrationContext
     from pyverge.core.types import Attachable
 
     from .diff import Diff
-    from .schema import ModelDescriptor
+    from .graph import VersionEdge, VersionNode
+    from .identity import EdgeKey, VersionKey
+    from .schema import ModelDescriptor, ModelRef
 
 T_co = TypeVar("T_co", covariant=True)
 RenderOutput = TypeVar("RenderOutput")
@@ -34,11 +37,16 @@ MaterializedOutput = TypeVar("MaterializedOutput")
 
 
 @runtime_checkable
-class JgfIdentifiable(Protocol):
-    """Stable graph identity: node ``kind@version`` or edge ``source->target``."""
+class KeyRef(Protocol):
+    """Opaque metadata handle attached to a graph key."""
+
+
+@runtime_checkable
+class NodeIdentifiable(Protocol):
+    """Stable graph identity."""
 
     @property
-    def jgf_id(self) -> str: ...
+    def id(self) -> NodeId[Any]: ...
 
 
 @runtime_checkable
@@ -60,6 +68,8 @@ class Orderable(Protocol):
     """Total ordering + hashing + string identity."""
 
     @property
+    def namespace(self) -> str: ...
+    @property
     def kind(self) -> ModelKind: ...
     def __lt__(self, other: object, /) -> bool: ...
     def __gt__(self, other: object, /) -> bool: ...
@@ -69,23 +79,37 @@ class Orderable(Protocol):
 
 
 @runtime_checkable
-class Comparable(JgfIdentifiable, Orderable, Protocol[VersionValue_co]):
+class Comparable(NodeIdentifiable, Orderable, Protocol[VersionValue_co]):
     """Version identity: ``strategy`` + ``version`` plus ordering."""
 
     @property
     def strategy(self) -> type[VersionValue_co]: ...
     @property
-    def version(self) -> tuple[ModelKind, VersionValue_co]: ...
+    def version(self) -> VersionValue_co: ...
 
 
 @runtime_checkable
-class Versionable(Comparable[VersionValue_co], Protocol[VersionValue_co]):
+class ModelRefProvider(Protocol):
+    """A graph value that can expose a provider model reference."""
+
+    @property
+    def modelref(self) -> ModelRef: ...
+
+
+@runtime_checkable
+class Versionable(
+    Comparable[VersionValue_co],
+    ModelRefProvider,
+    Protocol[VersionValue_co],
+):
     """Materialized version with a serializable model descriptor."""
 
     @property
     def descriptor(self) -> ModelDescriptor: ...
     @property
-    def references(self) -> frozenset[ModelVersionKey]: ...
+    def modelref(self) -> ModelRef: ...
+    @property
+    def references(self) -> frozenset[NodeId]: ...
     @property
     def fields(self) -> frozenset[str]: ...
 
@@ -95,11 +119,11 @@ class Transitional(Orderable, Protocol[VersionValue_co]):
     """Directed edge identity: ``source`` -> ``target``."""
 
     @property
-    def edge(self) -> tuple[Comparable, Comparable]: ...
+    def key(self) -> tuple[NodeId, NodeId]: ...
     @property
-    def source(self) -> Comparable: ...
+    def source(self) -> NodeId: ...
     @property
-    def target(self) -> Comparable: ...
+    def target(self) -> NodeId: ...
 
 
 class DiffProvider(Protocol):
@@ -215,10 +239,16 @@ class Diffable(Protocol[VersionValue_co]):
     def is_union_contraction(self, field: str) -> bool: ...
 
 
-MigrationKey: TypeAlias = tuple[Comparable, Comparable]
+MigrationKey: TypeAlias = tuple[NodeId, NodeId]
 VersionPair = tuple[Comparable[VersionValue_co], Comparable[VersionValue_co]]
 LookupKey = Versionable[VersionValue_co] | Migratable[VersionValue_co]
 MigrationHookMap: TypeAlias = dict[Migratable, list["Attachable"]]
+
+#: Normalized node entries accepted by the engine and registry.
+NodeEntry: TypeAlias = Union["VersionKey", "VersionNode"]
+
+#: Normalized edge entries accepted by the engine and registry.
+EdgeEntry: TypeAlias = Union["EdgeKey", "VersionEdge"]
 
 
 __all__ = [
@@ -230,12 +260,16 @@ __all__ = [
     "DiffProvider",
     "DiffRenderer",
     "Diffable",
+    "EdgeEntry",
     "Fingerprintable",
-    "JgfIdentifiable",
+    "KeyRef",
     "LookupKey",
     "Migratable",
     "MigrationHookMap",
     "MigrationKey",
+    "ModelRefProvider",
+    "NodeEntry",
+    "NodeIdentifiable",
     "Orderable",
     "Transitional",
     "VersionPair",

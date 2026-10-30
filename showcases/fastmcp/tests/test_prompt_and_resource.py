@@ -47,7 +47,7 @@ class TestResourceConvergence:
 
 async def test_all_kinds_are_versioned(application) -> None:
     versions = {
-        (str(v.version[0]), str(v.version[1]))
+        (str(v.kind), str(v.version))
         for v in application.service.manager.list_versions()
     }
     assert ("search_weather", V1) in versions

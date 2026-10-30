@@ -5,15 +5,17 @@ from typing import Any, Protocol
 from pyverge.core.types import (
     Attachable,
     ModelKind,
-    ModelVersionKey,
     VersionValue,
+    VersionValue_co,
 )
 from pyverge.versioning import (
+    EdgeEntry,
     EdgeKey,
     Migratable,
     ModelRef,
+    NodeEntry,
+    NodeId,
     Transitional,
-    Versionable,
     VersionEdge,
     VersionNode,
 )
@@ -24,6 +26,8 @@ class ModelCatalog(Protocol[VersionValue]):
 
     @property
     def name(self) -> str: ...
+    @property
+    def namespace(self) -> str: ...
     @property
     def versions(self) -> list[VersionNode[VersionValue]]: ...
     @property
@@ -41,8 +45,8 @@ class ModelCatalog(Protocol[VersionValue]):
     @property
     def latest_version(self) -> VersionNode[VersionValue]: ...
     def missing_references(
-        self, node: Versionable[VersionValue]
-    ) -> frozenset[ModelVersionKey]: ...
+        self, node: VersionNode[VersionValue]
+    ) -> frozenset[NodeId]: ...
 
 
 class PathCatalog(Protocol[VersionValue]):
@@ -50,8 +54,8 @@ class PathCatalog(Protocol[VersionValue]):
 
     def migration_path(
         self,
-        from_version: Versionable[VersionValue],
-        to_version: Versionable[VersionValue],
+        from_version: VersionNode[VersionValue],
+        to_version: VersionNode[VersionValue],
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]: ...
 
 
@@ -61,12 +65,11 @@ class ContentHashLookup(Protocol):
     def find_edge_by_content_hash(self, value: str) -> EdgeKey | None: ...
 
 
-class GraphCatalog(
-    PathCatalog[VersionValue], ModelCatalog[VersionValue], Protocol[VersionValue]
-):
+class GraphCatalog(ModelCatalog[VersionValue], Protocol[VersionValue]):
     """Read-only migration graph surface used by runtime planning."""
 
     def migrations(self, kind: ModelKind) -> list[Migratable[VersionValue]]: ...
+    def edges(self, kind: ModelKind) -> list[EdgeEntry]: ...
     def migrations_of(self, key: Any) -> frozenset[Migratable[VersionValue]]: ...
     def has_migration(self, key: Transitional) -> bool: ...
     def get_migration(self, key: Transitional) -> Migratable[VersionValue]: ...
@@ -76,18 +79,16 @@ class GraphCatalog(
     def has_hooks(self, key: Transitional) -> bool: ...
     def hooks(self, key: Transitional | None = None) -> list[Attachable]: ...
     def get_hooks(self, key: Transitional) -> list[Attachable]: ...
-    def snapshot(self) -> GraphCatalog[VersionValue]: ...
 
 
-class ModelWrite(Protocol[VersionValue]):
+class ModelWrite(Protocol[VersionValue_co]):
     """Write-side model capability."""
 
-    def store_model(
-        self, version: VersionNode[VersionValue]
+    def store(self, entry: NodeEntry) -> NodeEntry: ...
+    def hydrate(
+        self, entry: VersionNode[VersionValue]
     ) -> VersionNode[VersionValue]: ...
-    def reconcile_model(
-        self, version: VersionNode[VersionValue]
-    ) -> VersionNode[VersionValue]: ...
+    def reconcile(self, entry: NodeEntry) -> NodeEntry: ...
     def remove_model(self, key: Any) -> None: ...
     def remove_model_by_ref(self, ref: ModelRef) -> None: ...
     def clear_models(self) -> None: ...
@@ -96,12 +97,13 @@ class ModelWrite(Protocol[VersionValue]):
 class MigrationWrite(Protocol[VersionValue]):
     """Write-side migration capability."""
 
+    def store_edge(self, entry: EdgeEntry) -> EdgeEntry: ...
     def store_migration(self, key: VersionEdge[VersionValue]) -> Any: ...
     def remove_migration(self, key: Transitional) -> None: ...
     def remove_migration_range(
         self,
-        from_version: Versionable[VersionValue],
-        to_version: Versionable[VersionValue],
+        from_version: VersionNode[VersionValue],
+        to_version: VersionNode[VersionValue],
     ) -> None: ...
     def clear_migrations(self) -> None: ...
     def add_hook(self, key: Transitional, hook: Attachable) -> None: ...

@@ -9,23 +9,15 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.engine import Engine
-from pyverge.execution.targets import (
-    earliest_target_resolver,
-    fixed_target_resolver,
-    latest_target_resolver,
-    multi_target_resolver,
-    skip_target_resolver,
-)
+from pyverge.graph.planning.targets import TargetCompiler
 from pyverge.manager.types import (
     TargetPolicy,
     TargetSpec,
 )
-from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.versioning import (
-    VersionKey,
     VersionNode,
 )
 
@@ -43,6 +35,10 @@ class TargetResolutionMixin(Generic[VersionValue]):
     into resolvers, keeping the public facade focused on orchestration.
     """
 
+    @classmethod
+    def _compiler(cls, engine: Engine[VersionValue]) -> TargetCompiler:
+        return TargetCompiler(engine.snapshot(), engine.adapter)
+
     @hybridmethod
     @singledispatchmethod
     @classmethod
@@ -53,7 +49,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
         engine = engine or cls._default_engine
-        return fixed_target_resolver(engine.registry, cast(VersionNode, spec))
+        return cls._compiler(engine).compile(cast(VersionNode, spec))
 
     @compile_target_spec.register(type(None))
     @classmethod
@@ -64,7 +60,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
         engine = engine or cls._default_engine
-        return skip_target_resolver(engine.registry)
+        return cls._compiler(engine).compile(None)
 
     @compile_target_spec.register(str)
     @classmethod
@@ -75,13 +71,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
         engine = engine or cls._default_engine
-        if spec == "skip":
-            return skip_target_resolver(engine.registry)
-        if spec == "latest":
-            return latest_target_resolver(engine.registry)
-        if spec == "earliest":
-            return earliest_target_resolver(engine.registry)
-        return cls._string_resolver(spec, engine=engine)
+        return cls._compiler(engine).compile(spec)
 
     @compile_target_spec.register(type)
     @classmethod
@@ -92,79 +82,7 @@ class TargetResolutionMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
         engine = engine or cls._default_engine
-        return cls._model_resolver(spec, engine=engine)
-
-    @classmethod
-    def _model_resolver(
-        cls: type[Manager[VersionValue]],
-        model_cls: ModelHandle,
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ) -> TargetResolver:
-        engine = engine or cls._default_engine
-        registry = engine.registry
-
-        try:
-            target = engine.get_model_by_class(model_cls)
-        except ModelNotFoundError as exc:
-            raise CatalogError(
-                registry.name,
-                f"Target model {model_cls.__name__} is not registered",
-            ) from exc
-
-        def resolve(
-            current: VersionNode[VersionValue],
-        ) -> VersionNode[VersionValue] | None:
-            if current.kind != target.kind:
-                raise CatalogError(
-                    registry.name,
-                    f"Target model {model_cls.__name__} belongs to kind "
-                    f"{target.kind!r}, but entry kind is {current.kind!r}",
-                )
-            return target
-
-        return resolve
-
-    @classmethod
-    def _string_resolver(
-        cls: type[Manager[VersionValue]],
-        value: str,
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ) -> TargetResolver:
-        engine = engine or cls._default_engine
-        registry = engine.registry
-        adapter = engine.adapter
-
-        try:
-            parsed = adapter.of(value)
-        except ValueError:
-            raise CatalogError(
-                registry.name,
-                f"Could not resolve string target {value!r} to a version",
-            ) from None
-
-        def resolve(
-            current: VersionNode[VersionValue],
-        ) -> VersionNode[VersionValue] | None:
-            key = VersionKey[VersionValue](_value=parsed, _kind=current.kind)
-            return engine.get_model(key)
-
-        return resolve
-
-    @classmethod
-    def _resolve_kind_mapping(
-        cls: type[Manager[VersionValue]],
-        mapping: dict[ModelKind | Literal["*"], TargetSpec],
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ) -> TargetResolver:
-        engine = engine or cls._default_engine
-        resolvers: dict[ModelKind | Literal["*"], TargetResolver] = {
-            kind: cls.compile_target_spec(spec, engine=engine)
-            for kind, spec in mapping.items()
-        }
-        return multi_target_resolver(resolvers)
+        return cls._compiler(engine).compile(spec)
 
     @singledispatchmethod
     @classmethod
@@ -221,8 +139,8 @@ class TargetResolutionMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> TargetResolver:
         engine = engine or cls._default_engine
-        return cls._resolve_kind_mapping(
-            cast(dict[ModelKind | Literal["*"], TargetSpec], target), engine=engine
+        return cls._compiler(engine).compile(
+            cast(dict[ModelKind | Literal["*"], TargetSpec], target)
         )
 
     @_resolve_target_policy.register(str)

@@ -12,11 +12,8 @@ import semver
 from pyverge import types
 from pyverge.core import MigrationContext
 from pyverge.engine import Engine
-from pyverge.execution import (
-    MigrationHook,
-    fixed_target_resolver,
-    latest_target_resolver,
-)
+from pyverge.execution import MigrationHook
+from pyverge.graph import fixed_target_resolver, latest_target_resolver
 from pyverge.migrations import JsonPatchMigration
 from pyverge.registry.errors import (
     CatalogError,
@@ -41,6 +38,7 @@ from tests.examples.json import (
     USER_V0_1_1_DEV_7,
     USER_V1_0_0,
     USER_V1_2_3,
+    USER_V2025_03_10,
 )
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -98,7 +96,11 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [semver.Version, "test", [], []],
                 lambda engine: engine.get_model(
-                    VersionKey(_value=semver.Version(9, 9, 9), _kind="User")
+                    VersionKey(
+                        namespace="",
+                        kind="User",
+                        version=semver.Version(9, 9, 9),
+                    )
                 ),
                 ModelNotFoundError,
                 id="get_missing_pydantic_semver",
@@ -107,7 +109,11 @@ class TestModelManagement:
                 PydanticModelAdapter,
                 [pendulum.Date, "test", [], []],
                 lambda engine: engine.get_model(
-                    VersionKey(_value=pendulum.Date(2099, 1, 1), _kind="User")
+                    VersionKey(
+                        namespace="",
+                        kind="User",
+                        version=pendulum.Date(2099, 1, 1),
+                    )
                 ),
                 ModelNotFoundError,
                 id="get_missing_pydantic_pendulum",
@@ -256,7 +262,7 @@ class TestModelManagement:
         with pytest.raises(MissingReferenceError) as raised:
             engine.validate()
         assert raised.value.absent
-        assert all(kind == "Address" for kind, _ in raised.value.absent)
+        assert all(reference.kind == "Address" for reference in raised.value.absent)
 
     @pytest.mark.parametrize(
         "model_adapter, registry, children",
@@ -373,7 +379,7 @@ class TestModelManagement:
         version = envelope_model(engine.adapter, None, model)
         assert version in engine
         # Typed-only: a raw (kind, version) tuple is manager sugar, not engine.
-        assert (version.kind, version.version[1]) not in engine
+        assert (version.kind, version.version) not in engine
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model",
@@ -416,6 +422,47 @@ class TestModelManagement:
         version = envelope_model(engine.adapter, None, models)
         with pytest.raises(CatalogError):
             engine.remove_model(version)
+
+    @pytest.mark.parametrize(
+        "model_adapter, registry, model",
+        [
+            pytest.param(
+                PydanticModelAdapter,
+                [semver.Version, "store_cases_semver", [], []],
+                UserV1,
+                id="pydantic_store_cases",
+            ),
+            pytest.param(
+                JsonSchemaModelAdapter,
+                [pendulum.Date, "store_cases_chrono", [], []],
+                USER_V2025_03_10,
+                id="json_chrono_store_cases",
+            ),
+        ],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_store_model_key_and_node_cases(
+        self,
+        model_adapter: types.ModelAdapter,
+        migration_settings: MigrationSettings,
+        engine: Engine[types.VersionValue],
+        model: ModelHandle,
+    ) -> None:
+        node = envelope_model(model_adapter, migration_settings, model)
+        key = VersionKey(
+            namespace=node.namespace,
+            kind=node.kind,
+            version=node.version,
+        )
+
+        assert engine.store_model(key) == key
+        assert engine.store_model(key) == key
+        assert engine.registry.find_model(key) is None
+
+        assert engine.store_model(node) == node
+        assert engine.store_model(node) == node
+        assert engine.store_model(model) == node
+        assert engine.registry.get_model(key) == node
 
 
 class TestMigrationManagement:
@@ -523,7 +570,7 @@ class TestMigrationManagement:
     def test_unregistered_chain_reconstructs_to_latest(
         self,
         engine: Engine[types.VersionValue],
-        runner,
+        runner_factory,
         models: list[ModelHandle],
     ) -> None:
         """Unregistered endpoints are reconstructed before the chain is stored."""
@@ -534,15 +581,15 @@ class TestMigrationManagement:
         ]
 
         for src, dst in pairwise([real, *keys]):
-            target = str(dst.version[1])
+            target = str(dst.version)
             engine.store_migration(
                 (src, dst), lambda d, to=target: {**d, "version": to}
             )
 
-        result = runner.run(
+        result = runner_factory().run(
             {
                 "kind": "User",
-                "version": str(real.version[1]),
+                "version": str(real.version),
                 "name": "Alice",
                 "email": "a@b.c",
                 "role": "user",
@@ -570,7 +617,7 @@ class TestMigrationManagement:
     def test_unregistered_chain_missing_edge_raises(
         self,
         engine: Engine[types.VersionValue],
-        runner,
+        runner_factory,
         models: list[ModelHandle],
     ) -> None:
         """A removed edge still breaks an otherwise materialized chain."""
@@ -580,7 +627,7 @@ class TestMigrationManagement:
             for version in ("0.2.0", "0.3.0")
         ]
         for src, dst in pairwise([real, *keys]):
-            target = str(dst.version[1])
+            target = str(dst.version)
             engine.store_migration(
                 (src, dst), lambda d, to=target: {**d, "version": to}
             )
@@ -590,10 +637,10 @@ class TestMigrationManagement:
         engine.remove_migration(EdgeKey.from_pair(first, second), force=True)
 
         with pytest.raises(MigrationPathError):
-            runner.run(
+            runner_factory().run(
                 {
                     "kind": "User",
-                    "version": str(real.version[1]),
+                    "version": str(real.version),
                     "name": "Alice",
                     "email": "a@b.c",
                     "role": "user",
@@ -940,7 +987,7 @@ class TestReflection:
                     "to": "2.0.0",
                     "ops": [{"op": "add", "path": "/age", "value": None}],
                 }
-            ).patch,
+            ),
         )
 
         reconstructed = engine.get_model(meta)

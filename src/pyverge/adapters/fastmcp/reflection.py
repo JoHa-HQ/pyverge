@@ -80,9 +80,11 @@ class ReflectedNode:
         except (AttributeError, TypeError, ValueError):
             pass
 
-        model = JsonSchemaModelAdapter(codec=ModelCodec()).to_pydantic(
-            document, class_name="ReflectedModel"
-        )
+        model = JsonSchemaModelAdapter(
+            codec=ModelCodec(
+                namespace="", version_property="version", kind_property="kind"
+            )
+        ).to_pydantic(document, class_name="ReflectedModel")
         try:
             return adapter.versionable(model)
         except (AttributeError, TypeError, ValueError) as exc:

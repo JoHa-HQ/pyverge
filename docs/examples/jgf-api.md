@@ -8,11 +8,12 @@ from pydantic import BaseModel
 
 from pyverge import Manager
 from pyverge.export import ManifestDiff
+from pyverge.graph import GraphBuilder
 from pyverge.jgf import JgfExporter
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.versioning import default_content_hasher
 
-UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec()))
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
 
 
 @UserManager.model()
@@ -36,16 +37,17 @@ def add_age(data: dict, context=None) -> dict:
 
 
 manager = UserManager()
+graph = GraphBuilder().build(manager.registry)
 exporter = JgfExporter(default_content_hasher())
-document = exporter.export_graph(manager.registry).to_dict()
+document = exporter.export_graph(graph).to_dict()
 
 assert "graph" in document
 assert document["graph"]["nodes"]
 assert document["graph"]["edges"]
-assert exporter.content_hash(manager.registry)
+assert exporter.content_hash(graph)
 
-baseline = exporter.export_graph(manager.registry).to_dict()
-current = exporter.export_graph(manager.registry).to_dict()
+baseline = exporter.export_graph(graph).to_dict()
+current = exporter.export_graph(graph).to_dict()
 diff = ManifestDiff.compare(baseline, current)
 assert not diff.changed
 ```
