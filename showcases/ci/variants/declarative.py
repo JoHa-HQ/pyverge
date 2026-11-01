@@ -38,7 +38,7 @@ def build_declarative_manager() -> Manager[semver.Version]:
     UserManager = Manager[semver.Version].configure(
         PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="",
+                namespace="com.acme",
                 version_property="version",
                 kind_property="kind",
             )

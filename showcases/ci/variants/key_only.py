@@ -24,6 +24,7 @@ def build_key_only_registry() -> tuple[
     registry = Registry(
         namespace="com.acme.widgets",
         hasher=default_content_hasher(),
+        linters=(),
     )
     source = VersionKey.parse("com.acme.widgets", "Widget", "1.0.0")
     target = VersionKey.parse("com.acme.widgets", "Widget", "2.0.0")

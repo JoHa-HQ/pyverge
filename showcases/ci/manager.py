@@ -11,7 +11,7 @@ from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 PersonManager = Manager[semver.Version].configure(
     PydanticModelAdapter(
-        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+        codec=ModelCodec(namespace="com.acme", version_property="version", kind_property="kind")
     )
 )
 

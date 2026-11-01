@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 import copy
@@ -56,8 +59,8 @@ class TestGraphIdentity:
     @pytest.mark.parametrize(
         ("model_adapter", "model", "expected"),
         [
-            (PydanticModelAdapter, UserV123, "User@1.2.3"),
-            (JsonSchemaModelAdapter, USER_V1_2_3, "User@1.2.3"),
+            (PydanticModelAdapter, UserV123, "test:User@1.2.3"),
+            (JsonSchemaModelAdapter, USER_V1_2_3, "test:User@1.2.3"),
         ],
         ids=["pydantic", "json"],
         indirect=["model_adapter"],
@@ -238,6 +241,23 @@ class TestNodeIdentity:
     def test_node_id_rejects_invalid_version(self) -> None:
         with pytest.raises(ValueError):
             NodeId.from_string("orders", "Order", "not-a-version")
+
+    def test_node_id_rejects_empty_namespace(self) -> None:
+        with pytest.raises(ValueError, match="non-empty"):
+            NodeId("", "Order", semver.Version.parse("1.0.0"))
+
+    def test_edge_key_id_is_itself(self) -> None:
+        edge = EdgeKey.from_pair(
+            NodeId.parse("orders", "Order", "1.0.0"),
+            NodeId.parse("orders", "Order", "2.0.0"),
+        )
+        same = EdgeKey.from_pair(
+            NodeId.parse("orders", "Order", "1.0.0"),
+            NodeId.parse("orders", "Order", "2.0.0"),
+        )
+
+        assert edge.id is edge
+        assert edge == same
 
     def test_version_key_ref_is_not_identity(self) -> None:
         left = VersionKey(
@@ -436,7 +456,7 @@ class TestGraphPrimitives:
         assert edge_key.key == (source, target)
         assert edge_key == same
         assert hash(edge_key) == hash(same)
-        assert str(edge_key) == "User@1.0.0->User@2.0.0"
+        assert str(edge_key) == "test:User@1.0.0->test:User@2.0.0"
         assert edge_key < EdgeKey.from_pair(target, source)
         with pytest.raises(NotImplementedError):
             edge_key == "other"
@@ -452,7 +472,7 @@ class TestGraphPrimitives:
         source, target = edge.source, edge.target
         adapter = PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+                namespace="test", version_property="version", kind_property="kind"
             )
         )
         other = edge_from_models(
@@ -473,7 +493,7 @@ class TestGraphPrimitives:
         assert edge.kind == "User"
         assert edge.key == (source, target)
         assert edge.key == (source, target)
-        assert str(edge) == "User@1.0.0->User@2.0.0"
+        assert str(edge) == "test:User@1.0.0->test:User@2.0.0"
         assert edge.content_payload(default_content_hasher())["id"] == str(edge)
         assert len(edge.content_hash(default_content_hasher())) == SHA256_HEX_LENGTH
         assert edge.to_jgf().source == str(source)

@@ -52,7 +52,7 @@ def user_manager() -> Manager[semver.Version]:
     user_manager_cls = Manager[semver.Version].configure(
         PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+                namespace="test", version_property="version", kind_property="kind"
             )
         )
     )

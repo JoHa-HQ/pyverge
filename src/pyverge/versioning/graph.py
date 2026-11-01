@@ -105,7 +105,7 @@ class VersionNode(VersionKey[VersionValue]):
         parse_version: Callable[[str], Any],
     ) -> VersionNode[VersionValue]:
         return cls(
-            namespace=str(value.get("namespace", "")),
+            namespace=str(value["namespace"]),
             kind=str(value["kind"]),
             version=parse_version(str(value["version"])),
             descriptor=ModelDescriptor.from_canonical(

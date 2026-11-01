@@ -33,7 +33,9 @@ def loop() -> Any:
 @pytest.fixture(scope="module")
 def source() -> FastMCPSource:
     adapter = PydanticModelAdapter(
-        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+        codec=ModelCodec(
+            namespace="test", version_property="version", kind_property="kind"
+        )
     )
     server = FastMCP("source-bench")
 

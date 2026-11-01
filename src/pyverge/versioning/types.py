@@ -42,11 +42,54 @@ class KeyRef(Protocol):
 
 
 @runtime_checkable
-class NodeIdentifiable(Protocol):
-    """Stable graph identity."""
+class Identifiable(Protocol):
+    """Stable identity shared by nodes and edges."""
 
     @property
-    def id(self) -> NodeId[Any]: ...
+    def id(self) -> NodeId[Any] | EdgeKey[Any]: ...
+
+
+@runtime_checkable
+class Namespaced(Protocol):
+    """Namespace-qualified graph identity."""
+
+    @property
+    def namespace(self) -> str: ...
+    @property
+    def kind(self) -> ModelKind: ...
+
+
+@runtime_checkable
+class Ordered(Protocol):
+    """Total ordering, hashing, and display identity."""
+
+    def __lt__(self, other: object, /) -> bool: ...
+    def __gt__(self, other: object, /) -> bool: ...
+    def __eq__(self, other: object, /) -> bool: ...
+    def __hash__(self) -> int: ...
+    def __str__(self) -> str: ...
+
+
+@runtime_checkable
+class Versioned(Protocol[VersionValue_co]):
+    """Version strategy and parsed version value."""
+
+    @property
+    def strategy(self) -> type[VersionValue_co]: ...
+    @property
+    def version(self) -> VersionValue_co: ...
+
+
+@runtime_checkable
+class Edged(Protocol):
+    """Directed edge identity."""
+
+    @property
+    def source(self) -> NodeId[Any]: ...
+    @property
+    def target(self) -> NodeId[Any]: ...
+    @property
+    def key(self) -> tuple[NodeId[Any], NodeId[Any]]: ...
 
 
 @runtime_checkable
@@ -64,28 +107,17 @@ class ContentAddressable(Protocol):
 
 
 @runtime_checkable
-class Orderable(Protocol):
-    """Total ordering + hashing + string identity."""
+class Comparable(
+    Identifiable,
+    Namespaced,
+    Ordered,
+    Versioned,
+    Protocol[VersionValue_co],
+):
+    """Version identity: namespace, kind, version, and ordering."""
 
     @property
-    def namespace(self) -> str: ...
-    @property
-    def kind(self) -> ModelKind: ...
-    def __lt__(self, other: object, /) -> bool: ...
-    def __gt__(self, other: object, /) -> bool: ...
-    def __eq__(self, other: object, /) -> bool: ...
-    def __hash__(self) -> int: ...
-    def __str__(self) -> str: ...
-
-
-@runtime_checkable
-class Comparable(NodeIdentifiable, Orderable, Protocol[VersionValue_co]):
-    """Version identity: ``strategy`` + ``version`` plus ordering."""
-
-    @property
-    def strategy(self) -> type[VersionValue_co]: ...
-    @property
-    def version(self) -> VersionValue_co: ...
+    def id(self) -> NodeId[Any]: ...
 
 
 @runtime_checkable
@@ -115,15 +147,17 @@ class Versionable(
 
 
 @runtime_checkable
-class Transitional(Orderable, Protocol[VersionValue_co]):
+class Transitional(
+    Identifiable,
+    Namespaced,
+    Ordered,
+    Edged,
+    Protocol[VersionValue_co],
+):
     """Directed edge identity: ``source`` -> ``target``."""
 
     @property
-    def key(self) -> tuple[NodeId, NodeId]: ...
-    @property
-    def source(self) -> NodeId: ...
-    @property
-    def target(self) -> NodeId: ...
+    def id(self) -> EdgeKey[Any]: ...
 
 
 class DiffProvider(Protocol):
@@ -261,17 +295,20 @@ __all__ = [
     "DiffRenderer",
     "Diffable",
     "EdgeEntry",
+    "Edged",
     "Fingerprintable",
+    "Identifiable",
     "KeyRef",
     "LookupKey",
     "Migratable",
     "MigrationHookMap",
     "MigrationKey",
     "ModelRefProvider",
+    "Namespaced",
     "NodeEntry",
-    "NodeIdentifiable",
-    "Orderable",
+    "Ordered",
     "Transitional",
     "VersionPair",
     "Versionable",
+    "Versioned",
 ]

@@ -82,7 +82,7 @@ class ReflectedNode:
 
         model = JsonSchemaModelAdapter(
             codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+                namespace="default", version_property="version", kind_property="kind"
             )
         ).to_pydantic(document, class_name="ReflectedModel")
         try:

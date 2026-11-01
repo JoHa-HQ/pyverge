@@ -67,7 +67,7 @@ def configure_manager(
     return Manager[semver.Version].configure(
         PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="",
+                namespace="orders",
                 version_property=settings.version_property,
                 kind_property=settings.kind_property,
             )
