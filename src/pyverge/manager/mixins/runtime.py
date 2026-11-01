@@ -100,13 +100,12 @@ class RuntimeMixin(Generic[VersionValue]):
         self: Manager[VersionValue],
     ) -> dict[str, str | int | dict[str, str | int]]:
         engine = self.engine
-        registry = engine.registry
         return {
             "adapter": type(engine.adapter).__name__,
             "registry": {
-                "namespace": registry.namespace,
-                "models": len(registry.versions),
-                "migrations": len(registry.kinds),
+                "namespace": engine.namespace,
+                "models": engine.model_count,
+                "migrations": engine.migration_count,
             },
         }
 

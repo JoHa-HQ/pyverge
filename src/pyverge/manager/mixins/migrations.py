@@ -260,8 +260,4 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> None:
         engine = engine or cls._default_engine
-        registry = engine.registry
-        for kind in registry.kinds:
-            for edge in registry.migrations(kind):
-                for hook in hooks:
-                    registry.add_hook(edge, hook)
+        engine.attach_hooks(hooks)

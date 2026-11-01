@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import Any, Generic, Literal, Self, cast, overload
 
 from pyverge.core.types import (
@@ -44,6 +45,7 @@ from pyverge.versioning import (
     Comparable,
     EdgeKey,
     Migratable,
+    ModelRef,
     NodeEntry,
     Transitional,
     Versionable,
@@ -91,6 +93,39 @@ class Engine(Generic[VersionValue]):
     @property
     def namespace(self: Self) -> str:
         return getattr(self.adapter, "model_codec").namespace
+
+    @property
+    def versions(self: Self) -> list[VersionNode[VersionValue]]:
+        return self.registry.versions
+
+    @property
+    def model_count(self: Self) -> int:
+        return len(self.registry.versions)
+
+    @property
+    def kinds(self: Self) -> list[ModelKind]:
+        return self.registry.kinds
+
+    @property
+    def migration_count(self: Self) -> int:
+        return sum(len(self.registry.migrations(kind)) for kind in self.kinds)
+
+    def list_versions(
+        self: Self,
+        kind: ModelKind | None = None,
+    ) -> list[VersionNode[VersionValue]]:
+        if kind is None:
+            return self.registry.versions
+        return self.registry.kind_versions(kind)
+
+    def get_model_by_ref(self: Self, ref: ModelRef) -> VersionNode[VersionValue]:
+        return self.registry.get_model_by_ref(ref)
+
+    def attach_hooks(self: Self, hooks: Iterable[Attachable]) -> None:
+        for kind in self.registry.kinds:
+            for edge in self.registry.migrations(kind):
+                for hook in hooks:
+                    self.registry.add_hook(edge, hook)
 
     def runner(  # noqa: PLR0913
         self: Self,

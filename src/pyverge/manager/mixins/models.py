@@ -101,10 +101,7 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> list[VersionNode[VersionValue]]:
         engine = engine or cls._default_engine
-        registry = engine.registry
-        if kind is None:
-            return registry.versions
-        return registry.kind_versions(kind)
+        return engine.list_versions(kind)
 
     @hybridmethod
     @classmethod

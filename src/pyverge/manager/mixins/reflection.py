@@ -31,7 +31,7 @@ class ReflectionMixin(Generic[VersionValue]):
     ) -> tuple[RegistrationContext, RegistrationCollector]:
         if getattr(cls, "_reflection_locked", False):
             raise GraphLockedError(
-                cls._default_engine.registry.namespace,
+                cls._default_engine.namespace,
                 "reflect after manager instantiation",
             )
         registration_context = context or RegistrationContext(
@@ -54,14 +54,11 @@ class ReflectionMixin(Generic[VersionValue]):
         engine = cls._default_engine
         if registration_context.validate_references:
             engine.validate()
-        registry = engine.registry
-        migrations_after = sum(
-            len(registry.migrations(kind)) for kind in registry.kinds
-        )
+        migrations_after = engine.migration_count
         return ReflectionReport(
             source_id=registration_context.source_id,
             descriptors=collector.descriptors,
-            registered_models=max(len(registry.versions) - models_before, 0),
+            registered_models=max(engine.model_count - models_before, 0),
             registered_migrations=max(migrations_after - migrations_before, 0),
             skipped=tuple(collector.skipped),
         )
@@ -82,11 +79,8 @@ class ReflectionMixin(Generic[VersionValue]):
             clock=clock,
         )
         engine = cls._default_engine
-        registry = engine.registry
-        models_before = len(registry.versions)
-        migrations_before = sum(
-            len(registry.migrations(kind)) for kind in registry.kinds
-        )
+        models_before = engine.model_count
+        migrations_before = engine.migration_count
         source.accept(collector)
         for descriptor in collector.registrations:
             register_descriptor(descriptor, cls)
@@ -113,11 +107,8 @@ class ReflectionMixin(Generic[VersionValue]):
             clock=clock,
         )
         engine = cls._default_engine
-        registry = engine.registry
-        models_before = len(registry.versions)
-        migrations_before = sum(
-            len(registry.migrations(kind)) for kind in registry.kinds
-        )
+        models_before = engine.model_count
+        migrations_before = engine.migration_count
         await source.accept(collector)
         for descriptor in collector.registrations:
             register_descriptor(descriptor, cls)
