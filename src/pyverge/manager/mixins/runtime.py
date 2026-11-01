@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
@@ -17,7 +18,6 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
-from pyverge.engine import RunnerOptions
 from pyverge.execution import Runner, ThreadedBackend
 from pyverge.execution.context import ExecutionEnvironment
 from pyverge.execution.middleware import BackendMiddleware
@@ -46,6 +46,21 @@ def _direction(strategy: MigrationDirectionStrategy) -> DirectionPolicy:
     return policies[strategy]()
 
 
+@dataclass(frozen=True, slots=True)
+class RunnerOptions(Generic[VersionValue]):
+    """Manager-level runner configuration."""
+
+    backend: BackendPort
+    environment: ExecutionEnvironment
+    direction: DirectionPolicy
+    on_direction_violation: DirectionViolationStrategy
+    on_missing_path: VersionMissingStrategy
+    depth_limit: int
+    on_depth_violation: DepthViolationStrategy
+    validation_mode: Literal["strict", "lax", "none"]
+    middleware: tuple[BackendMiddleware, ...] = ()
+
+
 class RuntimeMixin(Generic[VersionValue]):
     """Manager runtime integration and primitive operations."""
 
@@ -64,35 +79,34 @@ class RuntimeMixin(Generic[VersionValue]):
         validation_mode: Literal["strict", "lax", "none"] = "lax",
     ) -> Runner[VersionValue]:
         return self.engine.runner(
-            RunnerOptions(
-                backend=backend or runtime or ThreadedBackend(max_workers=0),
-                middleware=middleware,
-                environment=environment
-                or ExecutionEnvironment(
-                    clock=SystemClock(),
-                    id_factory=UuidIdFactory(),
-                    logger=None,
-                    tracer=None,
-                ),
-                direction=_direction(direction),
-                on_direction_violation=on_direction_violation,
-                on_missing_path=on_missing_path,
-                depth_limit=depth_limit,
-                on_depth_violation=on_depth_violation,
-                validation_mode=validation_mode,
-            )
+            backend=backend or runtime or ThreadedBackend(max_workers=0),
+            middleware=middleware,
+            environment=environment
+            or ExecutionEnvironment(
+                clock=SystemClock(),
+                id_factory=UuidIdFactory(),
+                logger=None,
+                tracer=None,
+            ),
+            direction=_direction(direction),
+            on_direction_violation=on_direction_violation,
+            on_missing_path=on_missing_path,
+            depth_limit=depth_limit,
+            on_depth_violation=on_depth_violation,
+            validation_mode=validation_mode,
         )
 
     def info(
         self: Manager[VersionValue],
     ) -> dict[str, str | int | dict[str, str | int]]:
         engine = self.engine
+        registry = engine.registry
         return {
             "adapter": type(engine.adapter).__name__,
             "registry": {
-                "name": engine.registry.name,
-                "models": len(engine.registry.versions),
-                "migrations": len(engine.registry.kinds),
+                "namespace": registry.namespace,
+                "models": len(registry.versions),
+                "migrations": len(registry.kinds),
             },
         }
 

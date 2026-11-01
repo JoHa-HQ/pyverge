@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 import pendulum
@@ -131,7 +134,7 @@ def test_key_only_path_forbids_planning_until_hydrated(
 )
 def test_key_only_edge_forbids_planning(model_adapter, edge, registry, graph) -> None:
     edge_key = EdgeKey.from_pair(edge.source, edge.target)
-    registry.store_edge(edge_key)
+    registry.store_migration(edge_key)
 
     snapshot = graph()
     assert snapshot.has_edge(edge_key)
@@ -172,7 +175,7 @@ def test_key_only_edge_upgrades_when_bound(
     model_adapter, edge, registry, graph
 ) -> None:
     edge_key = EdgeKey.from_pair(edge.source, edge.target)
-    registry.store_edge(edge_key)
+    registry.store_migration(edge_key)
     registry.store_migration(edge)
 
     snapshot = graph()
@@ -237,7 +240,7 @@ def test_path_requires_complete_hydration(
 def test_unrelated_key_only_nodes_do_not_block_path(registry, graph) -> None:
     source, target = registry.versions
     unrelated = VersionKey(
-        namespace="",
+        namespace="test",
         kind="User",
         version=semver.Version(3, 0, 0),
     )

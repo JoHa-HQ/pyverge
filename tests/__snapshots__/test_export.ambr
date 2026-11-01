@@ -15,28 +15,30 @@
         'pyverge_version': '0.0-test',
       }),
       'nodes': dict({
-        'User@2025-01-01': dict({
-          'label': 'User@2025-01-01',
+        'test:User@2025-01-01': dict({
+          'label': 'test:User@2025-01-01',
           'metadata': dict({
             'fields': list([
               'name',
             ]),
             'kind': 'User',
             'model': 'Model@736405de6f63',
+            'namespace': 'test',
             'references': list([
             ]),
             'schema_hash': 'fixed-hash',
             'version': '2025-01-01',
           }),
         }),
-        'User@2025-03-10': dict({
-          'label': 'User@2025-03-10',
+        'test:User@2025-03-10': dict({
+          'label': 'test:User@2025-03-10',
           'metadata': dict({
             'fields': list([
               'name',
             ]),
             'kind': 'User',
             'model': 'Model@9b875e1eb7bd',
+            'namespace': 'test',
             'references': list([
             ]),
             'schema_hash': 'fixed-hash',
@@ -64,8 +66,8 @@
         'pyverge_version': '0.0-test',
       }),
       'nodes': dict({
-        'User@1.0.0': dict({
-          'label': 'User@1.0.0',
+        'test:User@1.0.0': dict({
+          'label': 'test:User@1.0.0',
           'metadata': dict({
             'fields': list([
               'email',
@@ -74,14 +76,15 @@
             ]),
             'kind': 'User',
             'model': 'tests.examples.pydantic.semver.UserV1',
+            'namespace': 'test',
             'references': list([
             ]),
             'schema_hash': 'fixed-hash',
             'version': '1.0.0',
           }),
         }),
-        'User@2.0.0': dict({
-          'label': 'User@2.0.0',
+        'test:User@2.0.0': dict({
+          'label': 'test:User@2.0.0',
           'metadata': dict({
             'fields': list([
               'age',
@@ -91,6 +94,7 @@
             ]),
             'kind': 'User',
             'model': 'tests.examples.pydantic.semver.UserV2',
+            'namespace': 'test',
             'references': list([
             ]),
             'schema_hash': 'fixed-hash',

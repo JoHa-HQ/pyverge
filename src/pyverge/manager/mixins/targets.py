@@ -36,7 +36,10 @@ class TargetResolutionMixin(Generic[VersionValue]):
     """
 
     @classmethod
-    def _compiler(cls, engine: Engine[VersionValue]) -> TargetCompiler:
+    def _compiler(
+        cls: type[Manager[VersionValue]],
+        engine: Engine[VersionValue],
+    ) -> TargetCompiler:
         return TargetCompiler(engine.snapshot(), engine.adapter)
 
     @hybridmethod

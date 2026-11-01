@@ -42,7 +42,6 @@ if TYPE_CHECKING:
         RegistrationContext,
     )
     from pyverge.engine import Engine
-    from pyverge.migrations.identity import MigrationIdentityResolver
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
     from pyverge.registry import Registry
@@ -64,7 +63,6 @@ class ManagerClassState(Protocol[VersionValue]):
     """
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
-    _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
     _reflection_locked: ClassVar[bool]
 
@@ -75,7 +73,6 @@ class ManagerClassState(Protocol[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
         hasher: ContentHasher | None = None,
-        identity_resolver: MigrationIdentityResolver | None = None,
         model_materializer: DiffMaterializer[object] | None = None,
         migration_materializer: DiffMaterializer[object] | None = None,
         diff_provider: DiffProvider[VersionValue] | None = None,

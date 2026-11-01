@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -118,9 +121,9 @@ class SyntheticGraphFactory:
             for node in nodes
         )
         registry = Registry(
-            name="synthetic",
             namespace=shape.namespace,
             hasher=default_content_hasher(),
+            linters=(),
         )
         for key in keys:
             registry.store(key)

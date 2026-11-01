@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 import copy
@@ -420,7 +423,7 @@ class TestDiff:
     ) -> None:
         adapter = adapter_cls(
             codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+                namespace="test", version_property="version", kind_property="kind"
             )
         )
         source = envelope_model(adapter, versioning_settings, source_model)

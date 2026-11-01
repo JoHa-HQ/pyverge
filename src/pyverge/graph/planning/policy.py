@@ -86,7 +86,7 @@ class PolicyEngine(Generic[VersionValue]):
         message: str,
     ) -> None:
         if strategy == "raise":
-            raise CatalogError(graph.name, f"{layer} policy: {message}")
+            raise CatalogError(graph.namespace, f"{layer} policy: {message}")
         if strategy != "skip":
             raise ValueError(f"Unknown {layer} policy: {strategy!r}")
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """End-to-end CLI tests using the Typer runner."""
 
 from __future__ import annotations
@@ -398,9 +401,9 @@ class TestCommands:
         assert set(envelope) == {"graph"}
         graph = envelope["graph"]
         assert graph["directed"] is True
-        assert graph["nodes"]["User@1.0.0"]["metadata"]["kind"] == "User"
-        assert graph["edges"][0]["source"] == "User@1.0.0"
-        assert graph["edges"][0]["target"] == "User@2.0.0"
+        assert graph["nodes"]["test:User@1.0.0"]["metadata"]["kind"] == "User"
+        assert graph["edges"][0]["source"] == "test:User@1.0.0"
+        assert graph["edges"][0]["target"] == "test:User@2.0.0"
         assert graph["edges"][0]["metadata"]["strategy"] == "callable"
         assert graph["metadata"]["manifest_version"] == "1.0"
         assert all(c in "0123456789abcdef" for c in graph["metadata"]["content_hash"])
@@ -497,15 +500,15 @@ class TestCommands:
         manifest = json.loads(result.stdout)
         assert "User" in manifest["kinds"]
         first = manifest["kinds"]["User"][0]
-        assert first["id"] == "User@1.0.0"
-        assert first["namespace"] == ""
+        assert first["id"] == "test:User@1.0.0"
+        assert first["namespace"] == "test"
         assert all(
             len(reference) == 3  # noqa: PLR2004
             for reference in first["references"]
         )
         migration = manifest["migrations"][0]
-        assert migration["id"] == "User@1.0.0->User@2.0.0"
-        assert migration["namespace"] == ""
+        assert migration["id"] == "test:User@1.0.0->test:User@2.0.0"
+        assert migration["namespace"] == "test"
         assert migration["kind"] == "User"
 
 

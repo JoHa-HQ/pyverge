@@ -116,10 +116,10 @@ class PayloadWalker(Generic[VersionValue]):
         if not (isinstance(kind, str) and isinstance(version_str, str)):
             return None
         try:
-            key = VersionKey[VersionValue](
-                namespace=self._graph.namespace,
-                kind=kind,
-                version=version_str,
+            key = VersionKey[VersionValue].parse(
+                self._graph.namespace,
+                kind,
+                version_str,
             )
         except Exception:
             return None

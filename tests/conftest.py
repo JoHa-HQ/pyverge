@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 from collections.abc import Callable, Iterator
@@ -17,7 +20,7 @@ from pyverge.discovery.reflection import (
     Reflection,
     Reflector,
 )
-from pyverge.engine import Engine, RunnerOptions
+from pyverge.engine import Engine
 from pyverge.execution import (
     ExecutionCoordinator,
     ExecutionPlanner,
@@ -37,9 +40,12 @@ from pyverge.graph import (
     direction_policy,
 )
 from pyverge.migrations.backend import MigrationMaterializer
-from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.registry import Registry
+from pyverge.registry import (
+    DEFAULT_HEALTH_LINTERS,
+    CompatibilityLinter,
+    Registry,
+)
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.types import (
@@ -89,7 +95,7 @@ def pydantic_model_adapter(
 ) -> PydanticModelAdapter:
     return PydanticModelAdapter(
         codec=ModelCodec(
-            namespace="",
+            namespace="test",
             version_property=versioning_settings.version_property,
             kind_property=versioning_settings.kind_property,
         )
@@ -102,7 +108,7 @@ def json_model_adapter(
 ) -> JsonSchemaModelAdapter:
     return JsonSchemaModelAdapter(
         codec=ModelCodec(
-            namespace="",
+            namespace="test",
             version_property=versioning_settings.version_property,
             kind_property=versioning_settings.kind_property,
         )
@@ -121,7 +127,7 @@ def model_adapter(
     raise ValueError(f"Unknown provider: {provider}")
 
 
-@pytest.fixture(params=[""])
+@pytest.fixture(params=["test"])
 def codec(
     request: pytest.FixtureRequest,
     versioning_settings: VersioningSettings,
@@ -163,17 +169,30 @@ def registry(
     request: pytest.FixtureRequest,
     model_adapter: PydanticModelAdapter,
     migration_settings: MigrationSettings,
+    reflector: Reflector[VersionValue],
 ) -> Registry[VersionValue]:
-    _strategy, name, models, migrations, *rest = request.param
+    _strategy, _name, models, migrations, *rest = request.param
     namespace = rest[0] if rest else model_adapter.model_codec.namespace
-    if namespace and not model_adapter.model_codec.namespace:
+    if namespace and model_adapter.model_codec.namespace != namespace:
         model_adapter.model_codec = replace(
             model_adapter.model_codec, namespace=namespace
         )
     registry = Registry[VersionValue](
-        name=name,
         namespace=namespace,
         hasher=default_content_hasher(),
+        reflection=reflector,
+        linters=(
+            *DEFAULT_HEALTH_LINTERS,
+            CompatibilityLinter(
+                frozenset(
+                    {
+                        model_adapter.kind_property,
+                        model_adapter.version_property,
+                    }
+                )
+            ),
+        ),
+        on_missing=migration_settings.on_missing,
     )
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
@@ -254,17 +273,15 @@ def runner_factory(
 ) -> Callable[[], Runner[VersionValue]]:
     def build() -> Runner[VersionValue]:
         return engine.runner(
-            RunnerOptions(
-                backend=runtime_backend,
-                environment=runtime_environment,
-                direction=direction_policy(migration_settings.direction),
-                on_direction_violation=migration_settings.on_direction_violation,
-                on_missing_path=migration_settings.on_missing_path,
-                depth_limit=migration_settings.max_migration_depth,
-                on_depth_violation="raise",
-                validation_mode=migration_settings.validation_mode,
-                middleware=(),
-            )
+            backend=runtime_backend,
+            environment=runtime_environment,
+            direction=direction_policy(migration_settings.direction),
+            on_direction_violation=migration_settings.on_direction_violation,
+            on_missing_path=migration_settings.on_missing_path,
+            depth_limit=migration_settings.max_migration_depth,
+            on_depth_violation="raise",
+            validation_mode=migration_settings.validation_mode,
+            middleware=(),
         )
 
     return build
@@ -329,14 +346,8 @@ def reflector(
 def engine(
     registry: Registry,
     model_adapter: ModelAdapter,
-    reflector: Reflector[VersionValue],
 ) -> Engine[VersionValue]:
-    return Engine(
-        registry,
-        model_adapter,
-        DefaultMigrationIdentityResolver(),
-        reflector,
-    )
+    return Engine(registry, model_adapter)
 
 
 @pytest.fixture
@@ -352,9 +363,9 @@ def manager(
     engine: Engine[VersionValue],
     migration_settings: MigrationSettings,
 ) -> type[Manager[VersionValue]]:
-    namespace = getattr(request, "param", "")
+    namespace = getattr(request, "param", None)
     codec = getattr(engine.adapter, "model_codec", None)
-    if namespace and codec is not None and not codec.namespace:
+    if namespace and codec is not None and codec.namespace != namespace:
         setattr(engine.adapter, "model_codec", replace(codec, namespace=namespace))
     return Manager[VersionValue].configure(
         engine.adapter,

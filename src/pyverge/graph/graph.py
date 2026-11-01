@@ -144,30 +144,6 @@ class MigrationGraph(Generic[VersionValue]):
             raise CatalogError(self.name, "No versions registered")
         return versions[-1]
 
-    def missing_references(
-        self,
-        node: VersionNode[VersionValue],
-        *,
-        require_registered: bool = True,
-    ) -> frozenset[NodeId]:
-        registered = (
-            self.get_model(node)
-            if require_registered
-            else self.find_model(node) or node
-        )
-        missing = []
-        for reference in registered.references:
-            resolved = reference
-            if not resolved.namespace and self.namespace:
-                resolved = NodeId(
-                    namespace=self.namespace,
-                    kind=resolved.kind,
-                    version=resolved.version,
-                )
-            if not self.has_model(resolved):
-                missing.append(resolved)
-        return frozenset(missing)
-
     def migrations(self, kind: ModelKind) -> list[EdgeKey[VersionValue]]:
         return [
             edge

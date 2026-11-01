@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Schema provider, diff provider, and materializer contract tests."""
 
 from __future__ import annotations
@@ -55,13 +58,15 @@ def _add_age():
     )
 
 
+def _codec() -> ModelCodec:
+    return ModelCodec(
+        namespace="test", version_property="version", kind_property="kind"
+    )
+
+
 ADAPTERS = [
     pytest.param(
-        PydanticModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        ),
+        PydanticModelAdapter(codec=_codec()),
         UserV1,
         UserV2,
         {
@@ -74,22 +79,14 @@ ADAPTERS = [
         id="pydantic",
     ),
     pytest.param(
-        JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        ),
+        JsonSchemaModelAdapter(codec=_codec()),
         USER_V1_0_0,
         USER_V2_0_0,
         {"kind": "User", "version": "1.0.0", "name": "Alice"},
         id="json_schema",
     ),
     pytest.param(
-        DataclassModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        ),
+        DataclassModelAdapter(codec=_codec()),
         DataclassUserV1,
         DataclassUserV2,
         {
@@ -100,6 +97,10 @@ ADAPTERS = [
         },
         id="dataclass",
     ),
+]
+
+DATACLASS_ADAPTERS = [
+    pytest.param(DataclassModelAdapter(codec=_codec()), id="dataclass")
 ]
 
 
@@ -157,13 +158,10 @@ def test_diff_provider(adapter, source_model, target_model, payload):
     assert reflection.diff(source, target).origin == "schema"
 
 
-def test_diff_origin_from_migration():
-    adapter = PydanticModelAdapter(
-        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
-    )
-    reflection = Reflection(adapter, CompositeDiffDiscovery())
-    v1 = envelope_model(adapter, MigrationSettings(), UserV1)
-    v2 = envelope_model(adapter, MigrationSettings(), UserV2)
+def test_diff_origin_from_migration(model_adapter: PydanticModelAdapter):
+    reflection = Reflection(model_adapter, CompositeDiffDiscovery())
+    v1 = envelope_model(model_adapter, MigrationSettings(), UserV1)
+    v2 = envelope_model(model_adapter, MigrationSettings(), UserV2)
     assert reflection.diff(v2, v1, migration=_add_age()).origin == "migration"
 
 
@@ -222,13 +220,6 @@ def test_proposes_migration_from_schema_diff(
     assert engine.registry.migrations_of(anchor) == frozenset()
 
 
-@pytest.fixture
-def dataclass_adapter() -> DataclassModelAdapter:
-    return DataclassModelAdapter(
-        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
-    )
-
-
 @pytest.mark.parametrize(
     ("model", "kind", "version", "fields"),
     [
@@ -241,6 +232,7 @@ def dataclass_adapter() -> DataclassModelAdapter:
         ),
     ],
 )
+@pytest.mark.parametrize("dataclass_adapter", DATACLASS_ADAPTERS)
 def test_dataclass_identity(
     dataclass_adapter: DataclassModelAdapter,
     model: type,
@@ -254,6 +246,7 @@ def test_dataclass_identity(
     assert dataclass_adapter.fields(model) == fields
 
 
+@pytest.mark.parametrize("dataclass_adapter", DATACLASS_ADAPTERS)
 def test_dataclass_dump(dataclass_adapter: DataclassModelAdapter) -> None:
     assert not dataclass_adapter.identify(int)
     assert dataclass_adapter.dump(PersonV1(name="Alice"))["name"] == "Alice"
@@ -270,6 +263,7 @@ def test_dataclass_dump(dataclass_adapter: DataclassModelAdapter) -> None:
         pytest.param("missing", None, id="missing"),
     ],
 )
+@pytest.mark.parametrize("dataclass_adapter", DATACLASS_ADAPTERS)
 def test_dataclass_field_models(
     dataclass_adapter: DataclassModelAdapter,
     field: str,
@@ -291,6 +285,7 @@ def test_dataclass_field_models(
         pytest.param(int, None, id="unsupported"),
     ],
 )
+@pytest.mark.parametrize("dataclass_adapter", DATACLASS_ADAPTERS)
 def test_dataclass_resolve_model(
     dataclass_adapter: DataclassModelAdapter,
     annotation: object,
@@ -309,6 +304,7 @@ def test_dataclass_resolve_model(
         ),
     ],
 )
+@pytest.mark.parametrize("dataclass_adapter", DATACLASS_ADAPTERS)
 def test_dataclass_references(
     dataclass_adapter: DataclassModelAdapter,
     model: type,
@@ -320,6 +316,7 @@ def test_dataclass_references(
     } == expected
 
 
+@pytest.mark.parametrize("dataclass_adapter", DATACLASS_ADAPTERS)
 def test_dataclass_instantiate_nested_lists_defaults_and_errors(
     dataclass_adapter: DataclassModelAdapter,
 ) -> None:
@@ -341,6 +338,7 @@ def test_dataclass_instantiate_nested_lists_defaults_and_errors(
         dataclass_adapter.instantiate(RequiredValue, {})
 
 
+@pytest.mark.parametrize("dataclass_adapter", DATACLASS_ADAPTERS)
 def test_dataclass_describe_fields_and_materialize(
     dataclass_adapter: DataclassModelAdapter,
 ) -> None:
@@ -371,6 +369,7 @@ def test_dataclass_describe_fields_and_materialize(
     assert EdgeKey.from_pair(source, node)
 
 
+@pytest.mark.parametrize("dataclass_adapter", DATACLASS_ADAPTERS)
 def test_dataclass_materialize_with_added_and_defaulted_fields(
     dataclass_adapter: DataclassModelAdapter,
 ) -> None:
@@ -399,7 +398,7 @@ def test_dataclass_materialize_with_added_and_defaulted_fields(
 
 
 def test_model_codec_identity_operations() -> None:
-    codec = ModelCodec(namespace="", version_property="v", kind_property="k")
+    codec = ModelCodec(namespace="test", version_property="v", kind_property="k")
     fields = FrozenMap(
         {
             "v": FieldDescriptor(
@@ -414,9 +413,19 @@ def test_model_codec_identity_operations() -> None:
     assert codec.version(fields) == "1.2.3"
     assert codec.kind(fields) == "User"
     assert parse_version("2024-01-01") == pendulum.Date(2024, 1, 1)
-    assert str(codec.version_key(kind="User", version="1.2.3")) == "User@1.2.3"
+    assert str(codec.version_key(kind="User", version="1.2.3")) == "test:User@1.2.3"
     with pytest.raises(ValueError, match="Cannot parse version"):
         parse_version("not-a-version")
+
+
+def test_model_codec_requires_non_empty_namespace() -> None:
+    with pytest.raises(TypeError):
+        ModelCodec(  # ty: ignore[missing-argument]
+            version_property="v",
+            kind_property="k",
+        )
+    with pytest.raises(ValueError, match="non-empty"):
+        ModelCodec(namespace="", version_property="v", kind_property="k")
 
 
 SIMPLE_JSON_SCHEMA = {

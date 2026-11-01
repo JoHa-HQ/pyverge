@@ -5,10 +5,12 @@ from .descriptors import (
     _ModelDescriptor,
 )
 from .manager import Manager
+from .mixins.runtime import RunnerOptions
 
 __all__ = [
     "Manager",
     "ManagerMeta",
+    "RunnerOptions",
     "_HookDescriptor",
     "_MigrationDescriptor",
     "_ModelDescriptor",

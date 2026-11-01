@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 from pyverge.core.types import (
     Attachable,
@@ -9,23 +11,66 @@ from pyverge.core.types import (
     VersionValue_co,
 )
 from pyverge.versioning import (
+    Comparable,
+    Diff,
+    Diffable,
     EdgeEntry,
     EdgeKey,
+    Identifiable,
     Migratable,
     ModelRef,
     NodeEntry,
-    NodeId,
     Transitional,
-    VersionEdge,
+    Versionable,
+    VersionKey,
     VersionNode,
 )
+
+if TYPE_CHECKING:
+    from pyverge.core.types import MigrationFunc
+    from pyverge.migrations.json_patch import JsonPatch
+    from pyverge.migrations.spec import MigrationSpec
+
+
+@dataclass(frozen=True, slots=True)
+class HealthIssue:
+    """One health finding for a node or edge."""
+
+    code: str
+    severity: Literal["error", "warning", "info"]
+    entity: VersionKey | EdgeKey
+    message: str
+    details: Mapping[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_node(self) -> bool:
+        return isinstance(self.entity, VersionKey)
+
+    @property
+    def is_edge(self) -> bool:
+        return isinstance(self.entity, EdgeKey)
+
+
+@runtime_checkable
+class ReflectionPort(Protocol[VersionValue]):
+    """Diff-based reflection for model and migration artifacts."""
+
+    def diff(
+        self,
+        source: Versionable[VersionValue],
+        target: Comparable[VersionValue],
+        *,
+        migration: JsonPatch | MigrationFunc | None = None,
+    ) -> Diff[VersionValue]: ...
+
+    def reflect(self, diff: Diffable) -> VersionNode[VersionValue]: ...
+
+    def bind(self, diff: Diffable) -> Any: ...
 
 
 class ModelCatalog(Protocol[VersionValue]):
     """Read-only model surface used by discovery and planning."""
 
-    @property
-    def name(self) -> str: ...
     @property
     def namespace(self) -> str: ...
     @property
@@ -37,6 +82,7 @@ class ModelCatalog(Protocol[VersionValue]):
     def models(self, kind: ModelKind | None) -> frozenset[ModelRef]: ...
     def kind_versions(self, kind: ModelKind) -> list[VersionNode[VersionValue]]: ...
     def has_model(self, key: Any) -> bool: ...
+    def has_entry(self, key: Any) -> bool: ...
     def find_model(self, key: Any) -> VersionNode[VersionValue] | None: ...
     def get_model(self, key: Any) -> VersionNode[VersionValue]: ...
     def get_model_by_ref(self, ref: ModelRef) -> VersionNode[VersionValue]: ...
@@ -44,9 +90,6 @@ class ModelCatalog(Protocol[VersionValue]):
     def earliest(self, kind: ModelKind) -> VersionNode[VersionValue]: ...
     @property
     def latest_version(self) -> VersionNode[VersionValue]: ...
-    def missing_references(
-        self, node: VersionNode[VersionValue]
-    ) -> frozenset[NodeId]: ...
 
 
 class PathCatalog(Protocol[VersionValue]):
@@ -97,8 +140,20 @@ class ModelWrite(Protocol[VersionValue_co]):
 class MigrationWrite(Protocol[VersionValue]):
     """Write-side migration capability."""
 
-    def store_edge(self, entry: EdgeEntry) -> EdgeEntry: ...
-    def store_migration(self, key: VersionEdge[VersionValue]) -> Any: ...
+    def store_migration(
+        self, entry: MigrationSpec | EdgeEntry
+    ) -> MigrationFunc | EdgeEntry: ...
+    def reflect(
+        self,
+        anchor: VersionNode[VersionValue],
+        target: Comparable[VersionValue],
+        migration: JsonPatch | MigrationFunc,
+    ) -> VersionNode[VersionValue]: ...
+    def bind(
+        self,
+        source: VersionNode[VersionValue],
+        target: VersionNode[VersionValue],
+    ) -> Any: ...
     def remove_migration(self, key: Transitional) -> None: ...
     def remove_migration_range(
         self,
@@ -128,14 +183,18 @@ class RegistryPort(
 ):
     """Full catalog contract for an in-memory or remote adapter."""
 
+    def health(self, entity: Identifiable) -> tuple[HealthIssue, ...]: ...
+
 
 __all__ = [
     "ContentHashLookup",
     "GraphCatalog",
+    "HealthIssue",
     "KindWrite",
     "MigrationWrite",
     "ModelCatalog",
     "ModelWrite",
     "PathCatalog",
+    "ReflectionPort",
     "RegistryPort",
 ]

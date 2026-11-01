@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """End-to-end FastStream adapter: convergence through the public broker surface.
 
 Each case publishes a payload at a registered version and asserts the subscriber
@@ -258,7 +261,7 @@ def test_source_reflects_subscriber_models(manager, source) -> None:
 
     assert report.registered_models == 1
     assert [str(version) for version in manager._default_engine.registry.versions] == [
-        "User@2.0.0"
+        "test:User@2.0.0"
     ]
 
 
@@ -267,5 +270,5 @@ def test_source_reflects_publisher_models(manager, publisher_source) -> None:
 
     assert report.registered_models == 1
     assert [str(version) for version in manager._default_engine.registry.versions] == [
-        "User@2.0.0"
+        "test:User@2.0.0"
     ]

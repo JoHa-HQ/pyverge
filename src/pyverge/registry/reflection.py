@@ -4,9 +4,10 @@ from typing import TYPE_CHECKING, Any, Generic, Protocol, runtime_checkable
 
 from pyverge.core.types import MigrationFunc, VersionValue
 from pyverge.migrations.json_patch import JsonPatch
-from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import ModelAdapter
-from pyverge.versioning import Comparable, Diff, DiffMaterializer, VersionNode
+from pyverge.versioning import Comparable, Diff, Diffable, DiffMaterializer, VersionNode
+
+from .errors import CatalogError
 
 if TYPE_CHECKING:
     from pyverge.versioning import Versionable
@@ -52,19 +53,14 @@ class Reflector(Generic[VersionValue]):
     ) -> Any:
         return self._diff_provider.diff(source, target, migration=migration)
 
-    def materialize_missing(
-        self,
-        anchor: VersionNode[VersionValue],
-        target: Comparable[VersionValue],
-        func: MigrationFunc,
-    ) -> VersionNode[VersionValue]:
-        if self._on_missing != "reconstruct_model":
-            raise ModelNotFoundError("registry", target.version)
-        diff = self.diff(anchor, target, migration=func)
+    def reflect(self, diff: Diffable) -> VersionNode[VersionValue]:
         node = self._model_materializer.materialize(diff)
         if not isinstance(node, VersionNode):
-            raise ModelNotFoundError("registry", target.version)
+            raise TypeError("model reflection must return a VersionNode")
         return node
+
+    def bind(self, diff: Diffable) -> Any:
+        return self._migration_materializer.materialize(diff)
 
     def propose(
         self,

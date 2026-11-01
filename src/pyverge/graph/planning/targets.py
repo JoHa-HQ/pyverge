@@ -68,7 +68,7 @@ def fixed_target_resolver(
 ) -> TargetResolver:
     if not registry.has_model(target):
         raise CatalogError(
-            registry.name,
+            registry.namespace,
             f"Target {target} is not registered",
         )
 
@@ -77,7 +77,7 @@ def fixed_target_resolver(
     ) -> VersionNode[VersionValue] | None:
         if current.kind != target.kind:
             raise CatalogError(
-                registry.name,
+                registry.namespace,
                 f"Target {target} belongs to kind {target.kind!r}, "
                 f"but entry kind is {current.kind!r}",
             )
@@ -140,7 +140,7 @@ class TargetCompiler(Generic[VersionValue]):
             target = self.graph.get_model_by_ref(self.adapter.ref(model))
         except ModelNotFoundError as error:
             raise CatalogError(
-                self.graph.name,
+                self.graph.namespace,
                 f"Target model {model.__name__} is not registered",
             ) from error
 
@@ -149,7 +149,7 @@ class TargetCompiler(Generic[VersionValue]):
         ) -> VersionNode[VersionValue] | None:
             if current.kind != target.kind:
                 raise CatalogError(
-                    self.graph.name,
+                    self.graph.namespace,
                     f"Target model {model.__name__} belongs to kind "
                     f"{target.kind!r}, but entry kind is {current.kind!r}",
                 )
@@ -162,7 +162,7 @@ class TargetCompiler(Generic[VersionValue]):
             parsed = parse_version(value)
         except ValueError:
             raise CatalogError(
-                self.graph.name,
+                self.graph.namespace,
                 f"Could not resolve string target {value!r} to a version",
             ) from None
 

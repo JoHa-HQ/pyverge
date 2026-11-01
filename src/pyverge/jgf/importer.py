@@ -37,7 +37,7 @@ class JgfImporter:
                 if resolved.is_executable:
                     migrations.store_migration(cast("Any", resolved))
                 else:
-                    migrations.store_edge(resolved)
+                    migrations.store_migration(resolved)
         return graph
 
 

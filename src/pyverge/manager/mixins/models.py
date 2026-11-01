@@ -16,7 +16,6 @@ from pyverge.versioning import (
     Comparable,
     NodeId,
     Versionable,
-    VersionKey,
     VersionNode,
     parse_version,
 )
@@ -41,9 +40,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        namespace = engine.registry.namespace
-        if isinstance(key, VersionKey) and not key.namespace and namespace:
-            key = key.with_namespace(namespace)
         return cast(Versionable[VersionValue], engine.store_model(key))
 
     @store_model.register(VersionNode)
@@ -55,9 +51,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        namespace = engine.registry.namespace
-        if not version.namespace and namespace:
-            version = version.with_namespace(namespace)
         return cast(Versionable[VersionValue], engine.store_model(version))
 
     @hybridmethod
@@ -70,9 +63,6 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        namespace = engine.registry.namespace
-        if isinstance(key, VersionKey) and not key.namespace and namespace:
-            key = key.with_namespace(namespace)
         return cast(Versionable[VersionValue], engine.reconcile_model(key))
 
     @reconcile_model.register(VersionNode)
@@ -84,16 +74,17 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> Versionable[VersionValue]:
         engine = engine or cls._default_engine
-        namespace = engine.registry.namespace
-        if not version.namespace and namespace:
-            version = version.with_namespace(namespace)
         return cast(Versionable[VersionValue], engine.reconcile_model(version))
 
     def missing_references(
         self: Manager[VersionValue],
         version: Versionable[VersionValue],
     ) -> frozenset[NodeId]:
-        return self.engine.registry.missing_references(version)
+        return frozenset(
+            issue.details["reference"]
+            for issue in self.engine.health(version)
+            if issue.code.startswith("reference.missing.")
+        )
 
     def validate_graph(
         self: Manager[VersionValue],
@@ -110,9 +101,10 @@ class ModelStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> list[VersionNode[VersionValue]]:
         engine = engine or cls._default_engine
+        registry = engine.registry
         if kind is None:
-            return engine.registry.versions
-        return engine.registry.kind_versions(kind)
+            return registry.versions
+        return registry.kind_versions(kind)
 
     @hybridmethod
     @classmethod

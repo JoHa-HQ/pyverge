@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 import asyncio
@@ -105,7 +108,7 @@ class TestClassLevelRegistration:
             age: int | None = None
 
         versions = [str(v) for v in manager().registry.versions]
-        assert versions == ["User@1.0.0", "User@2.0.0"]
+        assert versions == ["test:User@1.0.0", "test:User@2.0.0"]
 
     def test_jsonata_strategy_requires_expression(
         self, manager: type[Manager[semver.Version]]
@@ -630,7 +633,7 @@ class TestSharedEngine:
         manager_instance = manager()
         manager_instance.store_model(model)
 
-        expected = f"User@{version}"
+        expected = f"test:User@{version}"
         assert [str(v) for v in manager_instance.registry.versions] == [expected]
         assert manager().registry.versions == []
 
@@ -704,7 +707,7 @@ class TestSharedEngine:
         instance.store_model(UserV1)
 
         assert instance.get_model(UserV1).version == "1.0.0"
-        assert [str(v) for v in instance.list_versions("User")] == ["User@1.0.0"]
+        assert [str(v) for v in instance.list_versions("User")] == ["test:User@1.0.0"]
         assert cast("Any", instance[UserV1]).version == "1.0.0"
         assert manager._default_engine.registry.versions == []
 
@@ -871,7 +874,7 @@ def test_configured_manager_satisfies_class_state_contract(
     configured: type[ManagerClassState[semver.Version]] = manager_cls.configure(
         model_adapter, **manager_kwargs(migration_settings)
     )
-    assert configured._default_adapter is model_adapter
+    assert configured._default_engine.adapter is model_adapter
     assert configured._default_engine is not None
     assert configured._strategy is semver.Version
     assert callable(configured.configure)
@@ -979,7 +982,7 @@ def test_manager_runner_sync_and_async_handles(
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_manager_defaults_empty_namespace(
+def test_manager_applies_codec_namespace(
     model_adapter: ModelAdapter,
     manager: type[Manager[semver.Version]],
 ) -> None:
@@ -996,12 +999,12 @@ def test_manager_defaults_empty_namespace(
     [[PydanticModelAdapter, [semver.Version, "test", [], [], "orders"]]],
     indirect=["model_adapter", "registry"],
 )
-def test_manager_defaults_namespace_for_key_only(
+def test_manager_stores_key_only_with_namespace(
     manager: type[Manager[semver.Version]],
 ) -> None:
     instance = manager()
     key = VersionKey(
-        namespace="",
+        namespace="orders",
         kind="User",
         version=semver.Version(1, 0, 0),
     )

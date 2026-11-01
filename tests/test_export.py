@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Export domain: JGF projection, manifest spec, and injected hashing."""
 
 from __future__ import annotations
@@ -102,6 +105,7 @@ def test_manifest_ids_are_namespace_prefixed() -> None:
     registry = Registry[semver.Version](
         namespace="orders",
         hasher=default_content_hasher(),
+        linters=(),
     )
     registry.store(adapter.versionable(UserV1))
     registry.store(adapter.versionable(UserV2))

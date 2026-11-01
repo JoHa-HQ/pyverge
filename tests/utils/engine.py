@@ -15,7 +15,7 @@ from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import Diff, VersionEdge, VersionKey, VersionNode
+from pyverge.versioning import Diff, VersionEdge, VersionKey, VersionNode, parse_version
 
 
 def envelope_model(
@@ -40,7 +40,7 @@ def meta_versionable(
     return VersionKey[VersionValue](
         namespace=getattr(adapter, "model_codec").namespace,
         kind=kind,
-        version=cast("VersionValue", version),
+        version=parse_version(version),
     )
 
 

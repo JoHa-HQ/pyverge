@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """End-to-end: one physical tool serves every registered version of its kind.
 
 Each adapter carries its own tool case, because the materialized model surface
@@ -233,7 +236,10 @@ async def test_register_updates_instance_engine(manager: type) -> None:
     await discovery.search(server)
     await discovery.register(server)
 
-    assert {str(v) for v in instance.registry.versions} == {"User@1.0.0", "User@2.0.0"}
+    assert {str(v) for v in instance.registry.versions} == {
+        "test:User@1.0.0",
+        "test:User@2.0.0",
+    }
     assert cast("Any", manager)._default_engine.registry.versions == []
 
 

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 from itertools import pairwise
@@ -19,11 +22,9 @@ from pyverge.graph import (
     TargetCompiler,
     direction_policy,
 )
-from pyverge.registry import Registry
 from pyverge.registry.errors import CatalogError
-from pyverge.schemas import ModelCodec, PydanticModelAdapter
-from pyverge.settings import VersioningSettings
-from pyverge.versioning import EdgeKey, default_content_hasher, parse_version
+from pyverge.schemas import PydanticModelAdapter
+from pyverge.versioning import EdgeKey, parse_version
 from tests.examples.migrations import USER_JSONATA_V2_TO_V3, USER_JSONPATCH_V1_TO_V2
 from tests.examples.pydantic.semver import (
     UserV1,
@@ -33,7 +34,6 @@ from tests.examples.pydantic.semver import (
     migrate_v2_to_v3,
 )
 from tests.graph.factories import PolicyCase, make_path_entry
-from tests.utils.engine import edge_from_models
 
 
 @pytest.mark.parametrize(
@@ -280,13 +280,27 @@ def test_path_finder_resolves_hooks_per_step(
 
 
 @pytest.mark.parametrize(
-    "migration, source_model, target_model, strategy",
+    (
+        "migration",
+        "source_model",
+        "target_model",
+        "strategy",
+        "model_adapter",
+        "registry",
+    ),
     [
         pytest.param(
             USER_JSONPATCH_V1_TO_V2,
             UserV1,
             UserV2,
             "jsonpatch",
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), USER_JSONPATCH_V1_TO_V2)],
+            ],
             id="jsonpatch",
         ),
         pytest.param(
@@ -294,38 +308,32 @@ def test_path_finder_resolves_hooks_per_step(
             UserV2,
             UserV3,
             "jsonata",
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV2, UserV3],
+                [((UserV2, UserV3), USER_JSONATA_V2_TO_V3)],
+            ],
             id="jsonata",
         ),
     ],
+    indirect=["model_adapter", "registry"],
 )
-def test_path_finder_resolves_declarative_migrations(
-    migration, source_model, target_model, strategy
+def test_path_finder_resolves_declarative_migrations(  # noqa: PLR0913, PLR0917
+    migration,
+    source_model,
+    target_model,
+    strategy,
+    model_adapter,
+    registry,
 ) -> None:
-    adapter = PydanticModelAdapter(
-        codec=ModelCodec(
-            namespace="",
-            version_property="version",
-            kind_property="kind",
-        )
-    )
-    registry = Registry(namespace="", hasher=default_content_hasher())
-    source = adapter.versionable(source_model)
-    target = adapter.versionable(target_model)
-    registry.store(source)
-    registry.store(target)
-    registry.store_migration(
-        edge_from_models(
-            adapter,
-            VersioningSettings(),
-            source_model,
-            target_model,
-            func=migration,
-        )
-    )
+    source = model_adapter.versionable(source_model)
+    target = model_adapter.versionable(target_model)
     snapshot = GraphBuilder().build(registry)
     finder = PathFinder(
         graph=snapshot,
-        targets=TargetCompiler(snapshot, adapter),
+        targets=TargetCompiler(snapshot, model_adapter),
         migrations=MigrationBindings.from_catalog(registry),
         policy=PolicyEngine(
             direction=AnyDirection(),

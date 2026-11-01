@@ -10,28 +10,39 @@ from .errors import (
     ModelAlreadyRegisteredError,
     ModelConflictError,
     ModelNotFoundError,
+    NamespaceMismatchError,
 )
-from .health import CatalogHealth, HealthReport
-from .memory import InMemoryCatalog, Registry
+from .linters import (
+    DEFAULT_HEALTH_LINTERS,
+    CompatibilityLinter,
+    HealthLinter,
+    MissingEdgeEndpointsLinter,
+    MissingMigrationsLinter,
+    MissingReferencesLinter,
+)
+from .memory import Registry
 from .types import (
     ContentHashLookup,
     GraphCatalog,
+    HealthIssue,
     KindWrite,
     MigrationWrite,
     ModelCatalog,
     ModelWrite,
     PathCatalog,
+    ReflectionPort,
     RegistryPort,
 )
 
 __all__ = [
+    "DEFAULT_HEALTH_LINTERS",
     "CatalogError",
-    "CatalogHealth",
+    "CompatibilityLinter",
     "ContentHashLookup",
     "GraphCatalog",
     "GraphLockedError",
-    "HealthReport",
-    "InMemoryCatalog",
+    "HealthIssue",
+    "HealthLinter",
     "KindWrite",
     "MigrationAlreadyRegisteredError",
     "MigrationConflictError",
@@ -39,13 +50,18 @@ __all__ = [
     "MigrationPathError",
     "MigrationPathIntegrityError",
     "MigrationWrite",
+    "MissingEdgeEndpointsLinter",
+    "MissingMigrationsLinter",
     "MissingReferenceError",
+    "MissingReferencesLinter",
     "ModelAlreadyRegisteredError",
     "ModelCatalog",
     "ModelConflictError",
     "ModelNotFoundError",
     "ModelWrite",
+    "NamespaceMismatchError",
     "PathCatalog",
+    "ReflectionPort",
     "Registry",
     "RegistryPort",
 ]
