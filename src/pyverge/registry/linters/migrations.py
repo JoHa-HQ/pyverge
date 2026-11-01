@@ -22,7 +22,8 @@ class MissingMigrationsLinter:
             entity: Candidate model version.
 
         Returns:
-            Missing-migration issues for the next adjacent version.
+            tuple[HealthIssue, ...]: Missing-migration issues for the next
+                adjacent version.
         """
         if not isinstance(entity, VersionKey):
             return ()

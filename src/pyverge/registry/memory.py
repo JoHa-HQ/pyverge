@@ -71,7 +71,7 @@ class Registry(Generic[VersionValue]):
     ...     name: str
     ...     age: int | None = None
     >>> registry = Registry[semver.Version](
-    ...     namespace="default", hasher=default_content_hasher()
+    ...     namespace="default", hasher=default_content_hasher(), linters=()
     ... )
     >>> v1 = adapter.versionable(UserV1)
     >>> v2 = adapter.versionable(UserV2)
@@ -81,6 +81,20 @@ class Registry(Generic[VersionValue]):
     True
     >>> registry.latest("User").model_id == "tests.UserV2"
     True
+
+    Args:
+        namespace: Non-empty namespace owned by this registry.
+        hasher: Content-hash strategy used to compare migration content and to
+            populate the optional content-hash index.
+        reflection: Diff-based model reflection and migration binding.
+        linters: Callable health rules locked for this registry instance.
+        on_missing: Missing-endpoint policy. ``reconstruct_model`` enables
+            reflection; ``raise`` is the default.
+        index_content_hashes: Build a content-address lookup for migration
+            edges. Leave disabled unless reverse content-hash lookup is needed.
+
+    Raises:
+        ValueError: The namespace is empty.
     """
 
     def __init__(  # noqa: PLR0913
@@ -93,20 +107,6 @@ class Registry(Generic[VersionValue]):
         on_missing: str = "raise",
         index_content_hashes: bool = False,
     ) -> None:
-        """Create an in-memory registry bound to one namespace.
-
-        Args:
-            namespace: Non-empty namespace owned by this registry.
-            hasher: Content-hash strategy used to compare migration content
-                and to populate the optional content-hash index.
-            reflection: Diff-based model reflection and migration binding.
-            linters: Callable health rules locked for this registry instance.
-            on_missing: Missing-endpoint policy. ``reconstruct_model`` enables
-                reflection; ``raise`` is the default.
-            index_content_hashes: Build a content-address lookup for migration
-                edges. Leave disabled unless reverse content-hash lookup is
-                needed.
-        """
         if not namespace:
             raise ValueError("Registry namespace must be non-empty")
         self._namespace = namespace
@@ -242,7 +242,8 @@ class Registry(Generic[VersionValue]):
             entity: Node or edge identity to inspect.
 
         Returns:
-            Issues produced by this registry's locked health linters.
+            tuple[HealthIssue, ...]: Issues produced by this registry's
+                locked health linters.
         """
         return self._health_issues.get(entity, ())
 
@@ -506,7 +507,7 @@ class Registry(Generic[VersionValue]):
             key: Comparable identity to look up.
 
         Returns:
-            The matching node entry, or ``None`` when absent.
+            NodeEntry | None: The matching node entry, or ``None`` when absent.
         """
         idx = bisect.bisect_left(self._by_versions, key)
         if idx < len(self._by_versions) and self._by_versions[idx] == key:
@@ -564,7 +565,8 @@ class Registry(Generic[VersionValue]):
             key: Comparable identity to look up.
 
         Returns:
-            The matching version node, or ``None`` when absent or key-only.
+            VersionNode[VersionValue] | None: The matching version node, or
+                ``None`` when absent or key-only.
         """
         entry = self.find_entry(key)
         return entry if isinstance(entry, VersionNode) else None
@@ -662,8 +664,14 @@ class Registry(Generic[VersionValue]):
             entry: A registration request or an explicit graph edge.
 
         Returns:
-            The registered callable for an executable migration, otherwise the
-            stored edge entry.
+            MigrationFunc | EdgeEntry: The registered callable for an
+                executable migration, otherwise the stored edge entry.
+
+        Raises:
+            CatalogError: The migration is invalid or non-adjacent.
+            MigrationConflictError: Existing migration content differs.
+            MigrationNotFoundError: An endpoint is missing.
+            ModelNotFoundError: Missing endpoints cannot be reconstructed.
         """
         spec = entry if isinstance(entry, MigrationSpec) else None
         if spec is not None:
@@ -766,7 +774,10 @@ class Registry(Generic[VersionValue]):
             migration: Migration callable describing the transition.
 
         Returns:
-            The reflected version node.
+            VersionNode[VersionValue]: The reflected version node.
+
+        Raises:
+            ModelNotFoundError: Missing-model reflection is disabled.
         """
         if self._on_missing != "reconstruct_model":
             raise ModelNotFoundError(self._namespace, target.version)
@@ -786,7 +797,10 @@ class Registry(Generic[VersionValue]):
             target: Target model.
 
         Returns:
-            The bound migration artifact.
+            Any: The bound migration artifact.
+
+        Raises:
+            CatalogError: The endpoints are incompatible for binding.
         """
         if source.kind != target.kind:
             raise CatalogError(

@@ -85,12 +85,6 @@ class Engine(Generic[VersionValue]):
         registry: Registry[VersionValue],
         adapter: ModelAdapter,
     ) -> None:
-        """Create an Engine over one registry and one adapter.
-
-        Args:
-            registry: Mutable registry owned by this Engine.
-            adapter: Provider adapter for model identity and materialization.
-        """
         self.registry = registry
         self.adapter = adapter
 
@@ -157,7 +151,8 @@ class Engine(Generic[VersionValue]):
             index: Model key, edge key, or another registry index.
 
         Returns:
-            ``True`` when the registry contains the index, otherwise ``False``.
+            bool: ``True`` when the registry contains the index, otherwise
+                ``False``.
         """
         try:
             return index in self.registry
@@ -214,7 +209,7 @@ class Engine(Generic[VersionValue]):
             entity: Node or edge identity to inspect.
 
         Returns:
-            Health issues for the entity.
+            tuple[HealthIssue, ...]: Health issues for the entity.
         """
         return self.registry.health(entity)
 

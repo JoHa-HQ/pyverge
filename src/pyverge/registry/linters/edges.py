@@ -20,7 +20,7 @@ class MissingEdgeEndpointsLinter:
             entity: Candidate edge identity.
 
         Returns:
-            Endpoint and namespace issues.
+            tuple[HealthIssue, ...]: Endpoint and namespace issues.
         """
         if not isinstance(entity, EdgeKey):
             return ()

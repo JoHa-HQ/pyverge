@@ -20,7 +20,7 @@ class MissingReferencesLinter:
             entity: Candidate node identity.
 
         Returns:
-            Missing-reference issues.
+            tuple[HealthIssue, ...]: Missing-reference issues.
         """
         if not isinstance(entity, VersionKey):
             return ()

@@ -30,7 +30,7 @@ class CompatibilityLinter:
             entity: Candidate graph entity.
 
         Returns:
-            Compatibility issues for the edge.
+            tuple[HealthIssue, ...]: Compatibility issues for the edge.
         """
         if not isinstance(entity, VersionEdge):
             return ()
