@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """End-to-end: a tool whose registered model references versioned kinds.
 
 A per-kind policy on the tool's ``meta`` drives nested convergence; a

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Shared fixtures for the FastStream adapter suites.
 
 The version graph comes from the shared ``registry`` fixture in
