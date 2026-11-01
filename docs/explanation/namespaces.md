@@ -11,7 +11,9 @@ A `MigrationGraph` snapshot is single-namespace:
 - cross-namespace edges are rejected by `EdgeKey`;
 - JGF and manifest IDs render as `namespace:kind@version`.
 
-The empty namespace is valid and is the default for a single application.
+A namespace is always non-empty. `NodeId` rejects an empty namespace. If a
+model adapter is configured without one, its codec applies a non-empty default
+before identity creation.
 
 ## Where the namespace lives
 
@@ -29,8 +31,31 @@ adapter = PydanticModelAdapter(
 )
 ```
 
-The manager derives its registry namespace from that codec. There is no separate
-manager namespace setting.
+The manager derives and locks its registry namespace from that codec. There is
+no separate manager namespace setting.
+
+A registry requires a non-empty namespace. The OSS `Engine` binds exactly one
+registry, and its namespace comes from the adapter codec:
+
+```python
+from pyverge.engine import Engine
+from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
+from pyverge.versioning import default_content_hasher
+
+registry = Registry(
+    namespace="com.acme.orders",
+    hasher=default_content_hasher(),
+    reflection=reflection,
+    linters=DEFAULT_HEALTH_LINTERS,
+)
+
+engine = Engine(registry=registry, adapter=adapter)
+
+assert engine.namespace == "com.acme.orders"
+```
+
+Multi-namespace composition is intentionally deferred to a separate entity; the
+manager and OSS Engine keep one namespace for now.
 
 Adapters use the codec namespace when they create nodes, keys, and references.
 That is why the namespace belongs on the codec even when a manager is used.
@@ -68,7 +93,8 @@ Descriptor references are `NodeId` values and therefore carry namespace through:
 - missing-reference checks;
 - JGF and manifest export.
 
-An empty reference namespace resolves against the owning registry namespace.
+A reference always carries a non-empty namespace. `NodeId` rejects an empty
+reference namespace, so there is no implicit empty-namespace fallback.
 An explicit foreign namespace remains unresolved unless that identity exists in
 the same registry. Cross-namespace edges are never allowed.
 

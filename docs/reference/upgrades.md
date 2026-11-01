@@ -34,7 +34,7 @@ Adapters now require an explicit `ModelCodec`:
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 adapter = PydanticModelAdapter(
-    codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")
 )
 ```
 
@@ -50,7 +50,7 @@ from pyverge.settings import MigrationSettings, manager_kwargs
 
 settings = MigrationSettings(on_missing="reconstruct_model")
 UserManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")),
+    PydanticModelAdapter(codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")),
     **manager_kwargs(settings),
 )
 ```
@@ -159,15 +159,15 @@ edge = EdgeKey(
 )
 ```
 
-One registry owns one namespace. The manager defaults an empty namespace.
-Cross-namespace edges are forbidden. Identity objects no longer expose
+One registry owns one namespace. The manager derives a non-empty namespace
+from the adapter codec. Cross-namespace edges are forbidden. Identity objects no longer expose
 `jgf_id`; JGF/export renders namespace-prefixed external IDs.
 
 Descriptor references are `NodeId` values and therefore carry their namespace
 through canonical serialization, missing-reference checks, and JGF/manifest
-export. A registry resolves an empty reference namespace against its own
-namespace. Explicit foreign-namespace references remain unresolved unless that
-identity is present in the same registry; cross-namespace edges are rejected.
+export. A reference always carries a non-empty namespace. Explicit
+foreign-namespace references remain unresolved unless that identity is present
+in the same registry; cross-namespace edges are rejected.
 
 ## Compatibility boundary
 
@@ -209,7 +209,7 @@ compares its configured namespace with the graph namespace when the graph has
 one.
 
 Path resolution moved out of the registry. Use `GraphBuilder` plus
-`MigrationGraph.migration_path` or `PathFinder`; `InMemoryCatalog.migration_path`
+`MigrationGraph.migration_path` or `PathFinder`; `Registry.migration_path`
 no longer exists.
 
 ## Import moves
@@ -251,7 +251,7 @@ migrations before constructing the runtime manager:
 ```python
 from pyverge.types import ManagerMigrationKey
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
+OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")))
 OrderManager.store_model(Order)
 OrderManager.store_migration(
     ManagerMigrationKey("Order", "1.0.0", "2.0.0"),

@@ -11,7 +11,6 @@ Manager.configure(
     *,
     engine=None,
     hasher=None,
-    identity_resolver=None,
     model_materializer=None,
     migration_materializer=None,
     diff_provider=None,
@@ -19,9 +18,10 @@ Manager.configure(
 )
 ```
 
-All configuration is passed directly as keyword arguments. Namespace comes from
-the adapter's `ModelCodec`; the manager derives its registry namespace from it.
-There is no separate manager namespace option.
+All configuration is passed directly as keyword arguments. The adapter must
+expose a `ModelCodec`; its namespace is the only namespace source for the
+manager and registry. There is no fallback namespace and no separate manager
+namespace option.
 
 ## Registration decorators
 

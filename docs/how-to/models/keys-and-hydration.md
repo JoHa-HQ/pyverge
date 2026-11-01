@@ -6,12 +6,13 @@ model is available.
 ## Store a key-only placeholder
 
 ```python
-from pyverge.registry import Registry
+from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
 from pyverge.versioning import VersionKey, default_content_hasher
 
 registry = Registry(
     namespace="com.acme.users",
     hasher=default_content_hasher(),
+    linters=DEFAULT_HEALTH_LINTERS,
 )
 key = VersionKey.parse("com.acme.users", "User", "1.0.0")
 registry.store(key)

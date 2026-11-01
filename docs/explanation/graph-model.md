@@ -77,10 +77,14 @@ Key-only entries are valid graph content. They let discovery and routing record
 topology before models are loaded.
 
 ```python
-from pyverge.registry import Registry
+from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
 from pyverge.versioning import default_content_hasher
 
-registry = Registry(namespace="com.acme.users", hasher=default_content_hasher())
+registry = Registry(
+    namespace="com.acme.users",
+    hasher=default_content_hasher(),
+    linters=DEFAULT_HEALTH_LINTERS,
+)
 registry.store(key)          # key-only placeholder
 registry.hydrate(node)       # upgrade with a full node
 ```

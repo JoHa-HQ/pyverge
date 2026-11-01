@@ -13,7 +13,7 @@ from pyverge.jgf import JgfExporter
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.versioning import default_content_hasher
 
-UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")))
 
 
 @UserManager.model()
