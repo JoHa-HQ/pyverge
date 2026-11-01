@@ -1,3 +1,3 @@
-from .engine import Engine, RunnerOptions
+from .engine import Engine
 
-__all__ = ["Engine", "RunnerOptions"]
+__all__ = ["Engine"]

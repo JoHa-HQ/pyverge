@@ -7,13 +7,17 @@ from pyverge.core.types import VersionValue
 from pyverge.versioning import FieldDescriptor, NoDefault, VersionKey
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class ModelCodec:
     """Identity policy shared by model adapters."""
 
-    namespace: str
     version_property: str
     kind_property: str
+    namespace: str
+
+    def __post_init__(self) -> None:
+        if not self.namespace:
+            raise ValueError("ModelCodec namespace must be non-empty")
 
     def version(self, fields: Mapping[str, FieldDescriptor]) -> str:
         return self._default(fields, self.version_property)

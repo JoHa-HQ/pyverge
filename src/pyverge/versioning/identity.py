@@ -57,12 +57,12 @@ class NodeId(Generic[VersionValue]):
     version: VersionValue
 
     def __post_init__(self) -> None:
-        if not isinstance(self.namespace, str):
-            raise TypeError("NodeId namespace must be a string")
+        if not self.namespace:
+            raise ValueError("NodeId namespace must be non-empty")
         if not isinstance(self.kind, str):
             raise TypeError("NodeId kind must be a string")
         if isinstance(self.version, str):
-            object.__setattr__(self, "version", parse_version(self.version))
+            raise TypeError("NodeId version must be parsed; use NodeId.parse(...)")
 
     @classmethod
     def parse(
@@ -227,6 +227,10 @@ class EdgeKey(Generic[VersionValue]):
         ref: KeyRef | None = None,
     ) -> Self:
         return cls(source=edge.source, target=edge.target, ref=ref)
+
+    @property
+    def id(self) -> Self:
+        return self
 
     @property
     def namespace(self) -> str:

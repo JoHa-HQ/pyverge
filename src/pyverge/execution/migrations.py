@@ -36,7 +36,7 @@ class MigrationBindings(Generic[VersionValue]):
                 if hooks:
                     hooks_by_edge[key] = tuple(hooks)
         return cls(
-            name=catalog.name,
+            name=catalog.namespace,
             definitions=MappingProxyType(definitions),
             hooks_by_edge=MappingProxyType(hooks_by_edge),
         )

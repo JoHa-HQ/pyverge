@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Runtime planning, execution, policies, and backend adapters."""
 
 from __future__ import annotations
@@ -938,7 +941,7 @@ def test_step_context_layers_bindings(execution_environment) -> None:
     source = envelope_model(
         PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+                namespace="test", version_property="version", kind_property="kind"
             )
         ),
         None,
@@ -947,7 +950,7 @@ def test_step_context_layers_bindings(execution_environment) -> None:
     target = envelope_model(
         PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+                namespace="test", version_property="version", kind_property="kind"
             )
         ),
         None,

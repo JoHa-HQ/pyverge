@@ -3,9 +3,10 @@
     "id": "pyverge",
     "directed": true,
     "nodes": {
-      "Address@1.0.0": {
-        "label": "Address@1.0.0",
+      "com.acme:Address@1.0.0": {
+        "label": "com.acme:Address@1.0.0",
         "metadata": {
+          "namespace": "com.acme",
           "kind": "Address",
           "version": "1.0.0",
           "model": "models.AddressV1",
@@ -14,12 +15,13 @@
             "street"
           ],
           "references": [],
-          "schema_hash": "243e98d46b06796435739583cd0a5a794972cfae65493d49a0ded1c8727b481b"
+          "schema_hash": "8e7e00b7158d50f45721cbf8f8f008af49ba914dab1fb91a3fd60c66b4037275"
         }
       },
-      "Address@2.0.0": {
-        "label": "Address@2.0.0",
+      "com.acme:Address@2.0.0": {
+        "label": "com.acme:Address@2.0.0",
         "metadata": {
+          "namespace": "com.acme",
           "kind": "Address",
           "version": "2.0.0",
           "model": "models.AddressV2",
@@ -29,12 +31,13 @@
             "street"
           ],
           "references": [],
-          "schema_hash": "5e09731fc96a823359d0dde73794ad75a2302eda71dca47527ebc5aa601af3e4"
+          "schema_hash": "2daa11d7b368c2dcc574562f32d9fc8d979601fe22562cc909de18598667bdbe"
         }
       },
-      "Person@1.0.0": {
-        "label": "Person@1.0.0",
+      "com.acme:Person@1.0.0": {
+        "label": "com.acme:Person@1.0.0",
         "metadata": {
+          "namespace": "com.acme",
           "kind": "Person",
           "version": "1.0.0",
           "model": "models.PersonV1",
@@ -43,15 +46,16 @@
             "name"
           ],
           "references": [
-            "Address@1.0.0",
-            "Address@2.0.0"
+            "com.acme:Address@1.0.0",
+            "com.acme:Address@2.0.0"
           ],
-          "schema_hash": "112cf0ecf885ffcd98d8253f18a0fa12826283f5a70bcc1576e66e395de40bf4"
+          "schema_hash": "7a27d06ddded4b4bdc2333a4e787449d642f97e0e920bf66f8653cca04217df7"
         }
       },
-      "Person@2.0.0": {
-        "label": "Person@2.0.0",
+      "com.acme:Person@2.0.0": {
+        "label": "com.acme:Person@2.0.0",
         "metadata": {
+          "namespace": "com.acme",
           "kind": "Person",
           "version": "2.0.0",
           "model": "models.PersonV2",
@@ -61,20 +65,21 @@
             "name"
           ],
           "references": [
-            "Address@1.0.0",
-            "Address@2.0.0"
+            "com.acme:Address@1.0.0",
+            "com.acme:Address@2.0.0"
           ],
-          "schema_hash": "15aed6d71dacced5a4002cbaea7c0b35247703f9eb0ece49322d905c9234b36b"
+          "schema_hash": "519006a454a070577c9af55394d24428803a4104f47fb366dd184131ebb4cde6"
         }
       }
     },
     "edges": [
       {
-        "id": "Address@1.0.0->Address@2.0.0",
-        "source": "Address@1.0.0",
-        "target": "Address@2.0.0",
+        "id": "com.acme:Address@1.0.0->com.acme:Address@2.0.0",
+        "source": "com.acme:Address@1.0.0",
+        "target": "com.acme:Address@2.0.0",
         "directed": true,
         "metadata": {
+          "namespace": "com.acme",
           "kind": "Address",
           "source_version": "1.0.0",
           "target_version": "2.0.0",
@@ -83,11 +88,12 @@
         }
       },
       {
-        "id": "Person@1.0.0->Person@2.0.0",
-        "source": "Person@1.0.0",
-        "target": "Person@2.0.0",
+        "id": "com.acme:Person@1.0.0->com.acme:Person@2.0.0",
+        "source": "com.acme:Person@1.0.0",
+        "target": "com.acme:Person@2.0.0",
         "directed": true,
         "metadata": {
+          "namespace": "com.acme",
           "kind": "Person",
           "source_version": "1.0.0",
           "target_version": "2.0.0",
@@ -102,7 +108,7 @@
       "manifest_version": "1.0",
       "pyverge_version": "0.14.1.dev4",
       "manager": "manager:manager",
-      "content_hash": "d147250c9a59390f704afa98d4886993165846b41cd8dcad00a15e359dc03664"
+      "content_hash": "3b304d57e5e85198a0c9dffe0cee5449f274192d1e84a9de00c27fedd9e6e7cd"
     }
   }
 }

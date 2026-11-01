@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -29,7 +32,12 @@ from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.settings import MigrationSettings
-from pyverge.versioning import EdgeKey, FieldDescriptor, TypeRef, VersionKey
+from pyverge.versioning import (
+    EdgeKey,
+    FieldDescriptor,
+    TypeRef,
+    VersionKey,
+)
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -97,7 +105,7 @@ class TestModelManagement:
                 [semver.Version, "test", [], []],
                 lambda engine: engine.get_model(
                     VersionKey(
-                        namespace="",
+                        namespace="test",
                         kind="User",
                         version=semver.Version(9, 9, 9),
                     )
@@ -110,7 +118,7 @@ class TestModelManagement:
                 [pendulum.Date, "test", [], []],
                 lambda engine: engine.get_model(
                     VersionKey(
-                        namespace="",
+                        namespace="test",
                         kind="User",
                         version=pendulum.Date(2099, 1, 1),
                     )
@@ -1068,3 +1076,16 @@ class TestLookupTyped:
         versions = [envelope_model(engine.adapter, None, m) for m in models]
         key = EdgeKey.from_pair(versions[0], versions[1])
         assert engine[key].func is not None
+
+
+class TestNamespaceGateway:
+    def test_engine_uses_codec_namespace(self, engine: Engine) -> None:
+        assert engine.registry.namespace == engine.namespace
+
+    def test_engine_preserves_foreign_entries(self, engine: Engine) -> None:
+        node = engine.adapter.versionable(UserV1).with_namespace("billing")
+        key = VersionKey.parse("billing", "User", "1.0.0")
+
+        engine.store_model(node)
+
+        assert engine.get_model(key).namespace == "billing"

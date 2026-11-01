@@ -13,7 +13,7 @@ from pyverge import Manager
 from pyverge.execution import OTELHook
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
-UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind")))
+UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")))
 
 
 @UserManager.model()

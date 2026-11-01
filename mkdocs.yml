@@ -71,6 +71,7 @@ nav:
       - reference/index.md
       - API reference: reference/api.md
       - Graph and identity: reference/graph.md
+      - Registry API: reference/registry.md
       - Manager API: reference/manager.md
       - Runtime and execution: reference/runtime.md
       - Migration formats: reference/migration-formats.md

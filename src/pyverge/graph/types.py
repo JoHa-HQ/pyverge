@@ -35,7 +35,7 @@ class GraphExportSource(Protocol[VersionValue]):
     """Native graph surface needed to project a JGF document."""
 
     @property
-    def name(self) -> str: ...
+    def namespace(self) -> str: ...
 
     @property
     def versions(self) -> Sequence[VersionNode[VersionValue]]: ...
@@ -80,9 +80,6 @@ class MigrationResolver(Protocol[VersionValue]):
 @runtime_checkable
 class GraphSnapshotSource(Protocol):
     """Read-only source used to compile an immutable migration graph."""
-
-    @property
-    def name(self) -> str: ...
 
     @property
     def namespace(self) -> str: ...

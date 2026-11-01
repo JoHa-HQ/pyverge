@@ -56,11 +56,11 @@ class GraphBuilder(Generic[VersionValue]):
         )
         if len(namespaces) > 1:
             raise CatalogError(
-                source.name,
+                source.namespace,
                 f"Graph cannot mix namespaces: {sorted(namespaces)}",
             )
         return MigrationGraph(
-            name=source.name,
+            name=source.namespace,
             namespace=source.namespace,
             nodes=nodes,
             nodes_by_kind=_freeze(nodes_by_kind),

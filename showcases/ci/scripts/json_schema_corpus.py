@@ -66,7 +66,7 @@ def main(suite_root: str) -> int:  # noqa: C901
     root = Path(suite_root) / "tests" / "draft2020-12"
     adapter = JsonSchemaModelAdapter(
         codec=ModelCodec(
-            namespace="",
+            namespace="corpus",
             version_property="version",
             kind_property="kind",
         )

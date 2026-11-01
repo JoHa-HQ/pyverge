@@ -57,7 +57,7 @@ def build_chain_manager() -> Manager[semver.Version]:
     ItemManager = Manager[semver.Version].configure(
         PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="",
+                namespace="com.acme",
                 version_property="version",
                 kind_property="kind",
             )

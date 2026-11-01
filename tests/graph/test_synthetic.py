@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 import pytest
@@ -93,7 +96,7 @@ def _assert_graph_paths(built, shape) -> None:
                     )
 
 
-@pytest.mark.parametrize("namespace", ("", "orders", "billing"))
+@pytest.mark.parametrize("namespace", ("test", "orders", "billing"))
 @settings(max_examples=10, deadline=None)
 @given(data=st.data())
 def test_synthetic_graph_paths(namespace: str, data) -> None:
@@ -103,7 +106,7 @@ def test_synthetic_graph_paths(namespace: str, data) -> None:
     _assert_graph_paths(built, shape)
 
 
-@pytest.mark.parametrize("namespace", ("", "orders", "billing"))
+@pytest.mark.parametrize("namespace", ("test", "orders", "billing"))
 @settings(max_examples=10, deadline=None)
 @given(data=st.data())
 def test_synthetic_key_only_and_hydrated_entries(namespace: str, data) -> None:
@@ -119,7 +122,7 @@ def test_synthetic_key_only_and_hydrated_entries(namespace: str, data) -> None:
         assert (built.graph.find_model(key) is not None) is (index in shape.hydrated)
 
 
-@pytest.mark.parametrize("namespace", ("",))
+@pytest.mark.parametrize("namespace", ("test",))
 @settings(max_examples=5, deadline=None)
 @given(data=st.data())
 def test_synthetic_long_chain(namespace: str, data) -> None:

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """FastStream source descriptor traversal."""
 
 from __future__ import annotations
@@ -28,7 +31,7 @@ def source() -> FastStreamSource:
         FastStream(broker),
         adapter=PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+                namespace="test", version_property="version", kind_property="kind"
             )
         ),
     )

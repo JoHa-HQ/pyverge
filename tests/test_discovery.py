@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Build discovery and manager source reflection."""
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
 from tests.utils.source import StaticSource
 
 _ADAPTER = PydanticModelAdapter(
-    codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    codec=ModelCodec(namespace="test", version_property="version", kind_property="kind")
 )
 _MIGRATION = MigrationDescriptor(
     MigrationSpec(
@@ -107,9 +110,8 @@ def test_reflect_registers_migration_edge(
     assert engine.registry.has_migration(edge)
 
 
-@pytest.mark.parametrize("namespace", ["", "orders"])
-def test_register_descriptor_accepts_key_only(engine: Engine, namespace: str) -> None:
-    node = engine.adapter.versionable(UserV1).with_namespace(namespace)
+def test_register_descriptor_accepts_key_only(engine: Engine) -> None:
+    node = engine.adapter.versionable(UserV1).with_namespace(engine.registry.namespace)
     key = VersionKey(
         namespace=node.namespace,
         kind=node.kind,
@@ -169,7 +171,7 @@ def test_areflect_async_source(manager: type[Manager]) -> None:
 
     assert report.registered_models == 1
     assert [str(version) for version in manager._default_engine.registry.versions] == [
-        "User@1.0.0"
+        "test:User@1.0.0"
     ]
 
 
@@ -213,14 +215,13 @@ def _callable_migration(data: dict, context=None) -> dict:
         ),
     ],
 )
-def test_diff_discovery(discovery, migration, added, removed, modified) -> None:
-    adapter = PydanticModelAdapter(
-        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
-    )
+def test_diff_discovery(  # noqa: PLR0913, PLR0917
+    discovery, migration, added, removed, modified, model_adapter
+) -> None:
     diff = discovery.discover(
         migration,
-        adapter.versionable(UserV1),
-        adapter.versionable(UserV2),
+        model_adapter.versionable(UserV1),
+        model_adapter.versionable(UserV2),
     )
 
     assert diff.origin == "migration"

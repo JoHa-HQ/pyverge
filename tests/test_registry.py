@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Tests for Registry: model and migration registration.
 
 Most behaviors are exercised for both the semver (pydantic) and chrono/JSON
@@ -30,7 +33,7 @@ from pyverge.execution.extractors import (
 from pyverge.export import ManifestDiff
 from pyverge.graph import GraphBuilder
 from pyverge.jgf import JgfExporter, JgfImporter
-from pyverge.registry import InMemoryCatalog, Registry
+from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
 from pyverge.registry.errors import (
     CatalogError,
     MigrationConflictError,
@@ -266,11 +269,7 @@ class TestModel:
     ) -> None:
         with pytest.raises(ModelNotFoundError, match="not found"):
             registry.get_model(
-                VersionKey(
-                    namespace="",
-                    kind=key[0],
-                    version=cast("types.VersionValue", key[1]),
-                )
+                VersionKey.parse("test", key[0], cast("types.VersionValue", key[1]))
             )
 
     @pytest.mark.parametrize(
@@ -310,7 +309,7 @@ class TestModel:
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV1], []],
                 VersionKey(
-                    namespace="",
+                    namespace="test",
                     kind="User",
                     version=semver.Version.parse("1.0.0"),
                 ),
@@ -320,7 +319,7 @@ class TestModel:
                 PydanticModelAdapter,
                 [semver.Version, "semver_test", [UserV011Dev7], []],
                 VersionKey(
-                    namespace="",
+                    namespace="test",
                     kind="User",
                     version=semver.Version.parse("0.1.1+dev.7"),
                 ),
@@ -330,7 +329,7 @@ class TestModel:
                 JsonSchemaModelAdapter,
                 [pendulum.Date, "json_chrono_test", [USER_V2025_03_10], []],
                 VersionKey(
-                    namespace="",
+                    namespace="test",
                     kind="User",
                     version=pendulum.Date(2025, 3, 10),
                 ),
@@ -1787,12 +1786,16 @@ class TestEdgePairLookup:
             backward_compatible=True,
         )
 
-        with pytest.raises(BackwardCompatibilityError):
-            engine.store_migration(
-                (versions[1], versions[0]),
-                lambda d, _: d,
-                backward_compatible=True,
-            )
+        engine.store_migration(
+            (versions[1], versions[0]),
+            lambda d, _: d,
+            backward_compatible=True,
+        )
+
+        assert any(
+            issue.code == "migration.structural_breaking"
+            for issue in engine.registry.health_issues
+        )
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -2076,6 +2079,17 @@ class TestMigrationHookGuard:
             registry.get_migration(EdgeKey.from_version_edge(edge))
 
 
+def _missing_references(
+    registry: Registry[types.VersionValue],
+    node: types.Comparable,
+) -> frozenset[NodeId]:
+    return frozenset(
+        issue.details["reference"]
+        for issue in registry.health(node)
+        if issue.code.startswith("reference.missing.")
+    )
+
+
 class TestReferences:
     """A registered model's declared references to other versioned kinds.
 
@@ -2098,9 +2112,9 @@ class TestReferences:
     #: The three Address versions a Person references, parsed.
     ADDRESS_VERSIONS = frozenset(
         {
-            NodeId("", "Address", semver.Version(1, 0, 0)),
-            NodeId("", "Address", semver.Version(2, 0, 0)),
-            NodeId("", "Address", semver.Version(3, 0, 0)),
+            NodeId("test", "Address", semver.Version(1, 0, 0)),
+            NodeId("test", "Address", semver.Version(2, 0, 0)),
+            NodeId("test", "Address", semver.Version(3, 0, 0)),
         }
     )
 
@@ -2127,8 +2141,8 @@ class TestReferences:
                 PersonV2,
                 ADDRESS_VERSIONS
                 | {
-                    NodeId("", "Contact", semver.Version(1, 0, 0)),
-                    NodeId("", "Contact", semver.Version(2, 0, 0)),
+                    NodeId("test", "Contact", semver.Version(1, 0, 0)),
+                    NodeId("test", "Contact", semver.Version(2, 0, 0)),
                 },
                 id="pydantic_list_of_union",
             ),
@@ -2216,7 +2230,7 @@ class TestReferences:
         model: ModelHandle,
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
-        copied = registry.copy(name="copy")
+        copied = registry.copy()
         assert copied.get_model(node).references == node.references
 
     # -- missing_references: the convenience the consumer actually wants -----
@@ -2252,7 +2266,7 @@ class TestReferences:
         node = envelope_model(model_adapter, versioning_settings, model)
         for child in children:
             registry.store(model_adapter.versionable(child))
-        assert registry.missing_references(node) == frozenset()
+        assert _missing_references(registry, node) == frozenset()
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model",
@@ -2280,7 +2294,7 @@ class TestReferences:
         model: ModelHandle,
     ) -> None:
         node = envelope_model(model_adapter, versioning_settings, model)
-        assert registry.missing_references(node) == self.ADDRESS_VERSIONS
+        assert _missing_references(registry, node) == self.ADDRESS_VERSIONS
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model, one_child",
@@ -2313,21 +2327,104 @@ class TestReferences:
         """Registering one ``Address`` version leaves the other two missing."""
         node = envelope_model(model_adapter, versioning_settings, model)
         registry.store(model_adapter.versionable(one_child))
-        assert registry.missing_references(cast(types.Comparable, node)) == frozenset(
+        assert _missing_references(registry, cast(types.Comparable, node)) == frozenset(
             {
-                NodeId("", "Address", semver.Version(2, 0, 0)),
-                NodeId("", "Address", semver.Version(3, 0, 0)),
+                NodeId("test", "Address", semver.Version(2, 0, 0)),
+                NodeId("test", "Address", semver.Version(3, 0, 0)),
             }
         )
 
-    def test_missing_references_unknown_node_raises(
+    def test_health_unknown_node_returns_no_issues(
         self,
         model_adapter: types.ModelAdapter,
         registry: Registry[types.VersionValue],
     ) -> None:
         unregistered = meta_versionable(model_adapter, "User", "9.9.9")
-        with pytest.raises(ModelNotFoundError):
-            registry.missing_references(unregistered)
+        assert registry.health(unregistered) == ()
+
+    def test_health_reports_local_reference_issues(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, PersonV1)
+        registry.store(node)
+
+        issues = registry.health(node)
+
+        assert {issue.code for issue in issues} == {"reference.missing.local"}
+        assert all(issue.is_node for issue in issues)
+        assert all(not issue.is_edge for issue in issues)
+        assert _missing_references(registry, node) == self.ADDRESS_VERSIONS
+
+    def test_health_reports_namespaced_reference_issues(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+    ) -> None:
+        registry = Registry[semver.Version](
+            namespace="orders",
+            hasher=default_content_hasher(),
+            linters=DEFAULT_HEALTH_LINTERS,
+        )
+        node = envelope_model(
+            model_adapter,
+            versioning_settings,
+            PersonV1,
+        )
+        registry.store(node)
+
+        issues = registry.health(node)
+
+        assert {issue.code for issue in issues} == {"reference.missing.namespaced"}
+
+    def test_health_reports_missing_edge_endpoints(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+    ) -> None:
+        source = envelope_model(model_adapter, versioning_settings, UserV1)
+        target = envelope_model(model_adapter, versioning_settings, UserV2)
+        edge = EdgeKey.from_pair(source, target)
+        registry.store_migration(edge)
+
+        issues = registry.health(edge)
+
+        assert {issue.code for issue in issues} == {"edge.endpoint.missing"}
+        assert all(issue.is_edge for issue in issues)
+        assert all(not issue.is_node for issue in issues)
+
+        registry.store(source)
+        registry.store(target)
+        assert registry.health(edge) == ()
+
+    def test_health_indexes_track_referrers_and_namespaces(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, PersonV1)
+        registry.store(node)
+
+        for reference in node.references:
+            assert node in registry.references_to[reference]
+
+        issues = registry.health(node)
+        assert issues
+        assert node in registry.issues_by_entity
+        assert node in registry.issues_by_namespace[node.namespace]
+
+        child = model_adapter.versionable(AddressV1)
+        registry.store(child)
+        assert node in registry.references_to[child]
+        registry.remove_model(child)
+        assert node in registry.references_to[child]
+        assert any(
+            issue.details["reference"] == child for issue in registry.health(node)
+        )
 
     def test_references_and_missing_references_carry_namespace(self) -> None:
         adapter = PydanticModelAdapter(
@@ -2340,6 +2437,7 @@ class TestReferences:
         registry = Registry[semver.Version](
             namespace="orders",
             hasher=default_content_hasher(),
+            linters=DEFAULT_HEALTH_LINTERS,
         )
         node = adapter.versionable(PersonV1)
         registry.store(node)
@@ -2350,7 +2448,7 @@ class TestReferences:
             NodeId("orders", "Address", semver.Version(3, 0, 0)),
         }
         assert node.references == expected
-        assert registry.missing_references(node) == expected
+        assert _missing_references(registry, node) == expected
 
 
 class TestNeutralGraphOps:
@@ -2560,10 +2658,10 @@ def test_catalog_exports_jgf_and_imports_nodes(
         def resolve(self, node: JgfNode) -> types.VersionNode:
             return nodes_by_id[node.id]
 
-    imported = InMemoryCatalog(
-        name="imported",
+    imported = Registry(
         namespace=registry.namespace,
         hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     node_document = {"graph": dict(document["graph"])}
     node_document["graph"].pop("edges")
@@ -2601,10 +2699,10 @@ def test_jgf_imports_key_only_edge(model_adapter, registry) -> None:
         def resolve(self, edge) -> EdgeKey:
             return EdgeKey.from_pair(nodes_by_id[edge.source], nodes_by_id[edge.target])
 
-    imported = InMemoryCatalog(
-        name="imported",
+    imported = Registry(
         namespace=registry.namespace,
         hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     JgfImporter(_NodeResolver()).import_graph(
         document,
@@ -2678,10 +2776,11 @@ def test_content_hash_index_tracks_registration(
     versioning_settings: VersioningSettings,
     models: list[ModelHandle],
 ) -> None:
-    catalog = InMemoryCatalog(
-        name="indexed",
+    catalog = Registry(
+        namespace=getattr(model_adapter, "model_codec").namespace,
         hasher=default_content_hasher(),
         index_content_hashes=True,
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     nodes = [model_adapter.versionable(model) for model in models]
     for node in nodes:
@@ -2776,9 +2875,15 @@ def _extractor() -> tuple[
     PayloadWalker[semver.Version],
 ]:
     adapter = PydanticModelAdapter(
-        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+        codec=ModelCodec(
+            namespace="test", version_property="version", kind_property="kind"
+        )
     )
-    registry = Registry[semver.Version](hasher=default_content_hasher())
+    registry = Registry[semver.Version](
+        namespace="test",
+        hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
+    )
     registry.store(adapter.versionable(Leaf))
     return registry, adapter, PayloadWalker(registry, adapter=adapter)
 
@@ -2949,6 +3054,7 @@ def test_hydration_uses_entry_namespace(
     registry = Registry[semver.Version](
         namespace="orders",
         hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     node = envelope_model(
         model_adapter,
@@ -2968,10 +3074,20 @@ def test_hydration_uses_entry_namespace(
     assert GraphBuilder().build(registry).get_model(key) == node
 
 
+def test_registry_requires_non_empty_namespace() -> None:
+    with pytest.raises(ValueError, match="non-empty"):
+        Registry[semver.Version](
+            namespace="",
+            hasher=default_content_hasher(),
+            linters=DEFAULT_HEALTH_LINTERS,
+        )
+
+
 def test_registry_requires_bound_namespace() -> None:
     registry = Registry[semver.Version](
         namespace="orders",
         hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     adapter = PydanticModelAdapter(
         codec=ModelCodec(
@@ -2992,6 +3108,7 @@ def test_registry_accepts_foreign_namespace_entry(
     registry = Registry[semver.Version](
         namespace="orders",
         hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     foreign = envelope_model(
         model_adapter,
@@ -3010,10 +3127,12 @@ def test_registries_isolate_identical_kind_versions() -> None:
     first = Registry[semver.Version](
         namespace="orders",
         hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     second = Registry[semver.Version](
         namespace="billing",
         hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     adapter = PydanticModelAdapter(
         codec=ModelCodec(
@@ -3031,6 +3150,7 @@ def test_jgf_export_prefixes_namespace() -> None:
     registry = Registry[semver.Version](
         namespace="orders",
         hasher=default_content_hasher(),
+        linters=DEFAULT_HEALTH_LINTERS,
     )
     adapter = PydanticModelAdapter(
         codec=ModelCodec(

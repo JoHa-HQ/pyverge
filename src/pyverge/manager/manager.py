@@ -11,12 +11,12 @@ from pyverge.discovery.reflection import (
 )
 from pyverge.engine import Engine
 from pyverge.migrations.backend import MigrationMaterializer
-from pyverge.migrations.identity import (
-    DefaultMigrationIdentityResolver,
-    MigrationIdentityResolver,
-)
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.registry import Registry
+from pyverge.registry import (
+    DEFAULT_HEALTH_LINTERS,
+    CompatibilityLinter,
+    Registry,
+)
 from pyverge.schemas.types import (
     ModelAdapter,
 )
@@ -57,7 +57,6 @@ class Manager(
     """
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
-    _default_adapter: ClassVar[ModelAdapter]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
     _reflection_locked: ClassVar[bool] = False
 
@@ -69,7 +68,6 @@ class Manager(
             (cls,),
             {
                 "_strategy": strategy,
-                "_default_adapter": None,
                 "_default_engine": None,
                 "_reflection_locked": False,
                 "__module__": cls.__module__,
@@ -94,19 +92,16 @@ class Manager(
         *,
         engine: Engine[VersionValue] | None = None,
         hasher: ContentHasher | None = None,
-        identity_resolver: MigrationIdentityResolver | None = None,
         model_materializer: DiffMaterializer[object] | None = None,
         migration_materializer: DiffMaterializer[object] | None = None,
         diff_provider: DiffProvider[VersionValue] | None = None,
         on_missing: str = "raise",
     ) -> type[Manager[VersionValue]]:
         codec = getattr(adapter, "model_codec", None)
-        namespace = codec.namespace if codec is not None else ""
-        registry = Registry[VersionValue](
-            namespace=namespace,
-            hasher=hasher or default_content_hasher(),
-        )
-        reflector = Reflector[VersionValue](
+        if codec is None:
+            raise ValueError("Adapter must expose a ModelCodec")
+        namespace = codec.namespace
+        reflection = Reflector[VersionValue](
             adapter,
             diff_provider or Reflection(adapter, CompositeDiffDiscovery()),
             model_materializer=model_materializer or adapter,
@@ -116,12 +111,24 @@ class Manager(
             ),
             on_missing=on_missing,
         )
-        engine = engine or Engine[VersionValue](
-            registry=registry,
-            adapter=adapter,
-            identity_resolver=(identity_resolver or DefaultMigrationIdentityResolver()),
-            reflector=reflector,
-        )
+        if engine is None:
+            registry = Registry[VersionValue](
+                namespace=namespace,
+                hasher=hasher or default_content_hasher(),
+                reflection=reflection,
+                linters=(
+                    *DEFAULT_HEALTH_LINTERS,
+                    CompatibilityLinter(
+                        frozenset(
+                            {
+                                adapter.kind_property,
+                                adapter.version_property,
+                            }
+                        )
+                    ),
+                ),
+                on_missing=on_missing,
+            )
+            engine = Engine[VersionValue](registry=registry, adapter=adapter)
         cls._default_engine = engine
-        cls._default_adapter = adapter
         return cls

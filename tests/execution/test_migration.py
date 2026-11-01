@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """Migration-format tests: RFC 6902 ops, diff adapters, and adapter primitives."""
 
 from __future__ import annotations
@@ -14,7 +17,7 @@ from pyverge.core import MigrationContext
 from pyverge.discovery.reflection import JsonPatchRenderer
 from pyverge.migrations import JsonataMigration, JsonPatchMigration
 from pyverge.registry import Registry
-from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
+from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.types import (
     ModelHandle,
 )
@@ -36,6 +39,12 @@ from pyverge.versioning import (
     parse_version,
 )
 from pyverge.versioning.errors import MigrationApplicationError
+from tests.examples.json import (
+    PERSON_V1_0_0,
+    USER_V1_0_0,
+    USER_V2_0_0,
+    USER_V3_0_0,
+)
 from tests.examples.pydantic.chrono import (
     UserV20250310,
     UserV20251231,
@@ -388,8 +397,22 @@ class TestDiff:
     @pytest.mark.parametrize(
         "registry, version",
         [
-            [Registry[semver.Version](hasher=default_content_hasher()), "0.1.0"],
-            [Registry[pendulum.Date](hasher=default_content_hasher()), "2024-01-01"],
+            [
+                Registry[semver.Version](
+                    namespace="test",
+                    hasher=default_content_hasher(),
+                    linters=(),
+                ),
+                "0.1.0",
+            ],
+            [
+                Registry[pendulum.Date](
+                    namespace="test",
+                    hasher=default_content_hasher(),
+                    linters=(),
+                ),
+                "2024-01-01",
+            ],
         ],
     )
     def test_meta_endpoint_produces_empty_diff(
@@ -432,98 +455,54 @@ class TestOfIdempotency:
         assert parse_version(parsed) is parsed
 
 
-def _schema(version: str, props: dict, required: list[str] | None = None) -> dict:
-    return {
-        "kind": "User",
-        "version": version,
-        "type": "object",
-        "properties": {
-            "kind": {"type": "string", "default": "User"},
-            "version": {"type": "string", "default": version},
-            **props,
-        },
-        "required": required or [],
-    }
-
-
 class TestJsonSchemaModelAdapter:
-    def test_version_and_kind(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        )
-        schema = _schema("1.0.0", {"name": {"type": "string"}})
-        model = adapter.to_pydantic(schema)
-        assert adapter.version(model) == "1.0.0"
-        assert adapter.kind(model) == "User"
+    def test_version_and_kind(self, json_model_adapter: JsonSchemaModelAdapter) -> None:
+        model = json_model_adapter.to_pydantic(USER_V1_0_0)
+        assert json_model_adapter.version(model) == "1.0.0"
+        assert json_model_adapter.kind(model) == "User"
 
-    def test_versionable(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        )
-        schema = _schema("1.0.0", {"name": {"type": "string"}})
-        model = adapter.to_pydantic(schema)
-        versionable = adapter.versionable(model)
-        assert adapter.resolve(versionable.descriptor.ref) is model
+    def test_versionable(self, json_model_adapter: JsonSchemaModelAdapter) -> None:
+        model = json_model_adapter.to_pydantic(USER_V1_0_0)
+        versionable = json_model_adapter.versionable(model)
+        assert json_model_adapter.resolve(versionable.descriptor.ref) is model
         assert str(versionable.version) == "1.0.0"
 
-    def test_validate_valid_payload(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        )
-        schema = _schema("1.0.0", {"name": {"type": "string"}}, required=["name"])
-        model = adapter.to_pydantic(schema)
-        result = adapter.validate({"name": "Alice"}, model)
+    def test_validate_valid_payload(
+        self, json_model_adapter: JsonSchemaModelAdapter
+    ) -> None:
+        model = json_model_adapter.to_pydantic(USER_V1_0_0)
+        result = json_model_adapter.validate({"name": "Alice"}, model)
         assert result["name"] == "Alice"
 
-    def test_validate_invalid_payload_raises(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        )
-        schema = _schema("1.0.0", {"name": {"type": "string"}}, required=["name"])
-        model = adapter.to_pydantic(schema)
+    def test_validate_invalid_payload_raises(
+        self, json_model_adapter: JsonSchemaModelAdapter
+    ) -> None:
+        model = json_model_adapter.to_pydantic(PERSON_V1_0_0)
         try:
-            adapter.validate({}, model)
+            json_model_adapter.validate({}, model)
         except Exception as exc:
             assert "name" in str(exc)
         else:
             raise AssertionError("expected validation error")
 
-    def test_finalize_applies_defaults(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        )
-        schema = _schema(
-            "1.0.0",
-            {"name": {"type": "string"}, "age": {"type": "integer", "default": 0}},
-        )
-        model = adapter.to_pydantic(schema)
-        result = adapter.finalize(model, {"name": "Alice"})
+    def test_finalize_applies_defaults(
+        self, json_model_adapter: JsonSchemaModelAdapter
+    ) -> None:
+        model = json_model_adapter.to_pydantic(USER_V3_0_0)
+        result = json_model_adapter.finalize(model, {"name": "Alice"})
         assert result["name"] == "Alice"
-        assert result["age"] == 0
+        assert result["status"] == "active"
 
-    def test_meta_endpoint_empty_diff(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
-        )
+    def test_meta_endpoint_empty_diff(
+        self, json_model_adapter: JsonSchemaModelAdapter
+    ) -> None:
         meta_node = VersionKey(
-            namespace="", kind="User", version=semver.Version(0, 1, 0)
+            namespace="test", kind="User", version=semver.Version(0, 1, 0)
         )
-        real = adapter.versionable(
-            adapter.to_pydantic(_schema("1.0.0", {"name": {"type": "string"}}))
+        real = json_model_adapter.versionable(
+            json_model_adapter.to_pydantic(USER_V1_0_0)
         )
-        diff = adapter.diff(real, meta_node)
+        diff = json_model_adapter.diff(real, meta_node)
         assert isinstance(diff, Diff)
         assert not diff.has_additions
         assert not diff.has_removals
@@ -531,52 +510,51 @@ class TestJsonSchemaModelAdapter:
 
 
 class TestJsonSchemaDiff:
-    def test_detects_added_and_removed(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
+    def test_detects_added_and_removed(
+        self, json_model_adapter: JsonSchemaModelAdapter
+    ) -> None:
+        source = json_model_adapter.versionable(
+            json_model_adapter.to_pydantic(USER_V1_0_0)
         )
-        source = adapter.versionable(
-            adapter.to_pydantic(_schema("1.0.0", {"name": {"type": "string"}}))
+        target = json_model_adapter.versionable(
+            json_model_adapter.to_pydantic(USER_V2_0_0)
         )
-        target = adapter.versionable(
-            adapter.to_pydantic(
-                _schema(
-                    "2.0.0",
-                    {"name": {"type": "string"}, "age": {"type": "integer"}},
-                )
-            )
-        )
-        diff = adapter.diff(source, target)
+        diff = json_model_adapter.diff(source, target)
         assert "age" in diff.added_fields
         assert diff.has_additions
 
-    def test_detects_modified_type(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+    def test_detects_modified_type(
+        self, json_model_adapter: JsonSchemaModelAdapter
+    ) -> None:
+        source = json_model_adapter.versionable(
+            json_model_adapter.to_pydantic(USER_V1_0_0)
+        )
+        target = json_model_adapter.versionable(
+            json_model_adapter.to_pydantic(
+                {
+                    "kind": "User",
+                    "version": "2.0.0",
+                    "type": "object",
+                    "properties": {
+                        "kind": {"type": "string", "default": "User"},
+                        "version": {"type": "string", "default": "2.0.0"},
+                        "name": {"type": "integer"},
+                    },
+                }
             )
         )
-        source = adapter.versionable(
-            adapter.to_pydantic(_schema("1.0.0", {"age": {"type": "string"}}))
-        )
-        target = adapter.versionable(
-            adapter.to_pydantic(_schema("2.0.0", {"age": {"type": "integer"}}))
-        )
-        diff = adapter.diff(source, target)
+        diff = json_model_adapter.diff(source, target)
         assert diff.has_modifications
-        assert "type_changed" in diff.modified_fields["age"]
+        assert "type_changed" in diff.modified_fields["name"]
 
-    def test_cross_kind_raises(self) -> None:
-        adapter = JsonSchemaModelAdapter(
-            codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
-            )
+    def test_cross_kind_raises(
+        self, json_model_adapter: JsonSchemaModelAdapter
+    ) -> None:
+        source = json_model_adapter.versionable(
+            json_model_adapter.to_pydantic(USER_V1_0_0)
         )
-        source = adapter.versionable(adapter.to_pydantic(_schema("1.0.0", {})))
-        target = adapter.versionable(
-            adapter.to_pydantic(
+        target = json_model_adapter.versionable(
+            json_model_adapter.to_pydantic(
                 {
                     "kind": "Other",
                     "version": "2.0.0",
@@ -589,7 +567,7 @@ class TestJsonSchemaDiff:
             )
         )
         try:
-            adapter.diff(source, target)
+            json_model_adapter.diff(source, target)
         except ValueError:
             pass
         else:
@@ -606,7 +584,7 @@ class TestCompatibilityReport:
         added_info: dict[str, dict[str, Any]] | None = None,
     ) -> CompatibilityReport:
         source = VersionNode[semver.Version](
-            namespace="",
+            namespace="test",
             kind="User",
             version=semver.Version.parse("1.0.0"),
             descriptor=ModelDescriptor(
@@ -615,7 +593,7 @@ class TestCompatibilityReport:
             ),
         )
         target = VersionKey(
-            namespace="",
+            namespace="test",
             kind="User",
             version=semver.Version.parse("2.0.0"),
         )
@@ -731,12 +709,11 @@ class TestJsonataMigration:
             migration({"kind": "User", "version": "1.0.0"})
 
 
-def test_version_edge_wraps_migration_failure() -> None:
-    adapter = PydanticModelAdapter(
-        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
-    )
-    source = adapter.versionable(UserV1)
-    target = adapter.versionable(UserV2)
+def test_version_edge_wraps_migration_failure(
+    model_adapter: PydanticModelAdapter,
+) -> None:
+    source = model_adapter.versionable(UserV1)
+    target = model_adapter.versionable(UserV2)
 
     def fail(data, context=None):
         raise RuntimeError("boom")
@@ -744,7 +721,7 @@ def test_version_edge_wraps_migration_failure() -> None:
     edge = VersionEdge(
         source=source,
         target=target,
-        diff=adapter.diff(source, target),
+        diff=model_adapter.diff(source, target),
         func=fail,
         migration=MigrationDescriptor("callable", "fail"),
     )

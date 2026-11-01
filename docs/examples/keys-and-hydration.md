@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from pyverge.graph import GraphBuilder
-from pyverge.registry import Registry
+from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.versioning import VersionKey, default_content_hasher
 
@@ -27,6 +27,7 @@ adapter = PydanticModelAdapter(
 registry = Registry(
     namespace="com.acme.users",
     hasher=default_content_hasher(),
+    linters=DEFAULT_HEALTH_LINTERS,
 )
 key = VersionKey.parse("com.acme.users", "User", "1.0.0")
 

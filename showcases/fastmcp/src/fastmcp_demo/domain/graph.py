@@ -68,7 +68,7 @@ def build_manager(graph: GraphSettings) -> Manager[semver.Version]:
     ToolManager = Manager[semver.Version].configure(
         PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="",
+                namespace="fastmcp.demo",
                 version_property=graph.version_property,
                 kind_property=graph.kind_property,
             )

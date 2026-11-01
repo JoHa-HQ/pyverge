@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 """End-to-end fixtures for the FastMCP adapter suites.
 
 Registration and model shapes come from the shared fixtures in

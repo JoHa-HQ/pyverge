@@ -21,6 +21,26 @@ class GraphLockedError(CatalogError):
         )
 
 
+class NamespaceMismatchError(CatalogError):
+    """Raised when an entity does not belong to the target namespace."""
+
+    def __init__(
+        self: Self,
+        namespace: str,
+        allowed: frozenset[str],
+        entity: Any | None = None,
+    ) -> None:
+        self.namespace = namespace
+        self.allowed = allowed
+        self.entity = entity
+        subject = f" for {entity}" if entity is not None else ""
+        super().__init__(
+            namespace,
+            f"Namespace {namespace!r}{subject} is not allowed; "
+            f"expected one of {sorted(allowed)}",
+        )
+
+
 class ModelNotFoundError(CatalogError):
     """Raised when a model or version cannot be found in the catalog."""
 

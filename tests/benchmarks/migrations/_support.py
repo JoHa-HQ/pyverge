@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 from typing import Any
@@ -14,7 +17,7 @@ def build_chain(versions: int = 10, fields: int = 5) -> Manager[semver.Version]:
     manager_cls = Manager[semver.Version].configure(
         PydanticModelAdapter(
             codec=ModelCodec(
-                namespace="", version_property="version", kind_property="kind"
+                namespace="test", version_property="version", kind_property="kind"
             )
         )
     )

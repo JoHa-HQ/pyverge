@@ -46,12 +46,8 @@ class LookupMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
     ) -> VersionKey[VersionValue]:
         engine = engine or cls._default_engine
-        namespace = getattr(key, "namespace", engine.registry.namespace)
-        return VersionKey[VersionValue](
-            namespace=namespace,
-            kind=key.kind,
-            version=key.version,
-        )
+        namespace = getattr(key, "namespace", engine.namespace)
+        return VersionKey[VersionValue].parse(namespace, key.kind, key.version)
 
     @_resolve_model_key.register(tuple)
     @classmethod
@@ -63,11 +59,7 @@ class LookupMixin(Generic[VersionValue]):
     ) -> VersionKey[VersionValue]:
         engine = engine or cls._default_engine
         kind, value = key
-        return VersionKey[VersionValue](
-            namespace=engine.registry.namespace,
-            kind=kind,
-            version=value,
-        )
+        return VersionKey[VersionValue].parse(engine.namespace, kind, value)
 
     @_resolve_model_key.register(VersionNode)
     @classmethod
@@ -93,8 +85,8 @@ class LookupMixin(Generic[VersionValue]):
     ) -> VersionKey[VersionValue]:
         engine = engine or cls._default_engine
         if not engine.adapter.identify(key):
-            raise ModelNotFoundError(engine.registry.name, key)
-        versionable = engine.registry.get_model_by_ref(engine.adapter.ref(key))
+            raise ModelNotFoundError(engine.namespace, key)
+        versionable = engine.get_model_by_ref(engine.adapter.ref(key))
         return VersionKey[VersionValue](
             namespace=versionable.namespace,
             kind=versionable.kind,
@@ -111,9 +103,8 @@ class LookupMixin(Generic[VersionValue]):
     ) -> Any:
         if isinstance(index, (Comparable, Transitional, EdgeKey, VersionEdge)):
             return index
-        engine = engine or cls._default_engine
         raise CatalogError(
-            engine.registry.name,
+            (engine or cls._default_engine).namespace,
             f"Unsupported index type: {type(index)}",
         )
 
@@ -161,7 +152,7 @@ class LookupMixin(Generic[VersionValue]):
                 return False
 
         try:
-            return type(self)._normalize_index(index, engine=engine) in engine.registry
+            return type(self)._normalize_index(index, engine=engine) in engine
         except (
             CatalogError,
             MigrationApplicationError,
@@ -184,12 +175,11 @@ class LookupMixin(Generic[VersionValue]):
             )
             path = engine.find_migration_path(from_v, to_v)
             return [
-                engine.registry.get_migration_by_edge(EdgeKey.from_pair(src, dst))
-                for src, dst in path
+                engine.get_migration(EdgeKey.from_pair(src, dst)) for src, dst in path
             ]
         return cast(
             "VersionNode[VersionValue] | Migratable | list[Migratable]",
-            engine.registry[type(self)._normalize_index(index, engine=engine)],
+            engine[type(self)._normalize_index(index, engine=engine)],
         )
 
     def migration_path(

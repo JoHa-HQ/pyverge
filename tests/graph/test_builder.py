@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
+# SPDX-License-Identifier: GPL-3.0-or-later
+
 from __future__ import annotations
 
 import pytest
@@ -41,7 +44,7 @@ def test_graph_snapshots_catalog(model_adapter, registry, graph) -> None:
 
 
 def test_graph_snapshots_key_only_entries(registry, graph) -> None:
-    key = VersionKey(namespace="", kind="User", version=semver.Version(1, 0, 0))
+    key = VersionKey(namespace="test", kind="User", version=semver.Version(1, 0, 0))
     registry.store(key)
     snapshot = graph()
 

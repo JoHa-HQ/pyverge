@@ -36,7 +36,7 @@ class JgfExporter:
             catalog.versions,
             edges,
             hasher=self._content_hasher,
-            id=id or catalog.name,
+            id=id or catalog.namespace,
             directed=True,
             edge_metadata=edge_metadata,
         )
