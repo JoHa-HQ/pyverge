@@ -60,3 +60,11 @@ Generated from the public Python API.
 ::: pyverge.adapters.celery.PyvergeTask
 
 ::: pyverge.adapters.celery.task
+
+## httpx transport
+
+::: pyverge.adapters.httpx.HttpPolicy
+
+::: pyverge.adapters.httpx.PyvergeTransport
+
+::: pyverge.adapters.httpx.PyvergeAsyncTransport
