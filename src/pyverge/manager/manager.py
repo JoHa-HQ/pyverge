@@ -32,7 +32,6 @@ from .mixins import (
     LookupMixin,
     MigrationStoreMixin,
     ModelStoreMixin,
-    ReflectionMixin,
     RuntimeMixin,
     TargetResolutionMixin,
 )
@@ -44,7 +43,6 @@ class Manager(
     ModelStoreMixin[VersionValue],
     MigrationStoreMixin[VersionValue],
     LookupMixin[VersionValue],
-    ReflectionMixin[VersionValue],
     RuntimeMixin[VersionValue],
     metaclass=ManagerMeta,
 ):
@@ -58,7 +56,6 @@ class Manager(
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
-    _reflection_locked: ClassVar[bool] = False
 
     def __class_getitem__(
         cls, strategy: type[VersionValue]
@@ -69,7 +66,6 @@ class Manager(
             {
                 "_strategy": strategy,
                 "_default_engine": None,
-                "_reflection_locked": False,
                 "__module__": cls.__module__,
                 "__qualname__": cls.__name__,
             },

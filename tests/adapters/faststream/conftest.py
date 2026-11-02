@@ -14,12 +14,9 @@ from __future__ import annotations
 from typing import Any, cast
 
 import pytest
-import semver
-from faststream import FastStream
 from faststream.kafka import KafkaBroker
 
-from pyverge import Manager
-from pyverge.adapters.faststream import FastStreamSource, subscriber
+from pyverge.adapters.faststream import subscriber
 from tests.examples.pydantic.semver import UserV2
 
 KAFKA_BROKER: tuple[type[Any], dict[str, Any], str | dict[str, str]] = (
@@ -46,27 +43,3 @@ def broker(request, manager) -> KafkaBroker:
         broker.payloads.append(user.model_dump())
 
     return broker
-
-
-@pytest.fixture
-def source(model_adapter) -> FastStreamSource:
-    subscriber_manager = Manager[semver.Version].configure(model_adapter)
-    subscriber_manager.store_model(UserV2)
-    instance = subscriber_manager()
-    broker = KafkaBroker("localhost:9092")
-
-    @subscriber(broker, "source-users", manager=instance)
-    async def handle(user: UserV2) -> None: ...
-
-    return FastStreamSource(FastStream(broker), adapter=model_adapter)
-
-
-@pytest.fixture
-def publisher_source(model_adapter) -> FastStreamSource:
-    broker = KafkaBroker("localhost:9092")
-
-    @broker.publisher("source-out")
-    def emit(user: UserV2) -> UserV2:
-        return user
-
-    return FastStreamSource(FastStream(broker), adapter=model_adapter)

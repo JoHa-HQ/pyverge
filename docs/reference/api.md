@@ -27,28 +27,16 @@ Generated from the public Python API.
 
 ::: pyverge.execution.Runner
 
-## Discovery
+## Discovery reflection
 
-::: pyverge.discovery.SourcePort
+::: pyverge.discovery.reflection.DiffDiscovery
 
-::: pyverge.discovery.AsyncSourcePort
+::: pyverge.discovery.reflection.DiffProvider
 
-::: pyverge.discovery.SourceDescriptor
+::: pyverge.discovery.reflection.Reflection
 
-::: pyverge.discovery.ModelDescriptor
-
-::: pyverge.discovery.MigrationDescriptor
-
-::: pyverge.discovery.MigrationSpec
-
-::: pyverge.discovery.SourceVisitor
-
-::: pyverge.discovery.RegistrationSink
+::: pyverge.discovery.reflection.JsonPatchRenderer
 
 ## Sources
 
-::: pyverge.adapters.fastmcp.FastMCPSource
-
 ::: pyverge.adapters.fastmcp.FastMCPDiscovery
-
-::: pyverge.adapters.faststream.FastStreamSource
