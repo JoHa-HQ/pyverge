@@ -17,13 +17,25 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.graph.planning.targets import (
+    DefaultTarget as DefaultTarget,  # noqa: PLC0414
+)
+from pyverge.graph.planning.targets import (
+    FirstMatch as FirstMatch,  # noqa: PLC0414
+)
+from pyverge.graph.planning.targets import (
     TargetPolicy as TargetPolicy,  # noqa: PLC0414
+)
+from pyverge.graph.planning.targets import (
+    TargetSelector as TargetSelector,  # noqa: PLC0414
 )
 from pyverge.graph.planning.targets import (
     TargetSpec as TargetSpec,  # noqa: PLC0414
 )
 from pyverge.graph.planning.targets import (
     TargetStrategy as TargetStrategy,  # noqa: PLC0414
+)
+from pyverge.graph.planning.targets import (
+    VersionRange as VersionRange,  # noqa: PLC0414
 )
 from pyverge.schemas.types import (
     ModelAdapter,

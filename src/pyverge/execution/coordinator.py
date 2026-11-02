@@ -23,14 +23,14 @@ class ExecutionCoordinator(Generic[VersionValue]):
         self,
         payload: dict[str, Any],
         *,
-        container: type[Any] | None,
+        source_model: type[Any] | None,
         max_depth: int,
     ) -> list[ExtractedEntry[VersionValue]]:
         return [
             ExtractedEntry[VersionValue](path, node)
             for path, _depth, node in self.extractor.extract(
                 payload,
-                container=container,
+                source_model=source_model,
                 max_depth=max_depth,
             )
         ]
@@ -40,19 +40,18 @@ class ExecutionCoordinator(Generic[VersionValue]):
         payload: dict[str, Any],
         target: TargetPolicy,
         *,
-        container: type[Any] | None,
+        source_model: type[Any] | None,
         max_depth: int,
     ) -> ExecutionPlan[VersionValue]:
         entries = self.extract(
             payload,
-            container=container,
+            source_model=source_model,
             max_depth=max_depth,
         )
         path_plan = self.finder.find(
             entries,
             target,
-            container=container,
-            target_fields=frozenset(),
+            source_model=source_model,
         )
         return self.planner.build(path_plan, payload)
 

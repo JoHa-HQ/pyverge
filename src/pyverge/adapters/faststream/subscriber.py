@@ -80,7 +80,6 @@ def subscriber(  # noqa: PLR0913
             migrated = active_runner.run(
                 payload,
                 target,
-                container=None,
                 max_depth=-1,
                 context=None,
             )

@@ -46,7 +46,6 @@ class ReturnConverger:
             migrated = self._runner.run(
                 self._dump(result),
                 self._target,
-                container=None,
                 max_depth=-1,
                 context=None,
             )
@@ -114,7 +113,6 @@ def publish_to(
                 migrated = active_runner.run(
                     payload,
                     target,
-                    container=None,
                     max_depth=-1,
                     context=None,
                 )

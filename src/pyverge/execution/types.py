@@ -29,7 +29,7 @@ class EntryExtractor(Protocol[VersionValue]):
         self,
         data: dict[str, Any],
         *,
-        container: type[Any] | None = None,
+        source_model: type[Any] | None = None,
         max_depth: int = -1,
     ) -> Iterator[Entry]: ...
 

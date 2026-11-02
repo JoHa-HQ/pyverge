@@ -32,8 +32,7 @@ class PathPlan(Generic[VersionValue]):
     """Graph-level migration plan independent of execution strategy."""
 
     entries: tuple[PathPlanEntry[VersionValue], ...]
-    container: ModelHandle | None
-    target_fields: frozenset[str]
+    source_model: ModelHandle | None
 
     @property
     def levels(self) -> tuple[tuple[PathPlanEntry[VersionValue], ...], ...]:

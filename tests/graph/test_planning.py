@@ -77,8 +77,7 @@ def test_path_finder(  # noqa: PLR0913, PLR0917
     plan = path_finder.find(
         [entry],
         target,
-        container=None,
-        target_fields=frozenset(),
+        source_model=None,
     )
 
     if expected_version is None:
@@ -170,7 +169,7 @@ def test_path_finder_target_forms(
 ) -> None:
     entry = ExtractedEntry(path=("document",), node=nodes[0])
 
-    plan = path_finder.find([entry], target, container=None, target_fields=frozenset())
+    plan = path_finder.find([entry], target, source_model=None)
 
     if expected_version is None:
         assert plan.entries == ()
@@ -200,15 +199,9 @@ def test_path_finder_target_forms(
 def test_path_finder_cache_reuses_resolved_steps(path_finder, nodes) -> None:
     entry = ExtractedEntry(path=("document",), node=nodes[0])
 
-    latest_once = path_finder.find(
-        [entry], "latest", container=None, target_fields=frozenset()
-    )
-    latest_twice = path_finder.find(
-        [entry], "latest", container=None, target_fields=frozenset()
-    )
-    earliest = path_finder.find(
-        [entry], "earliest", container=None, target_fields=frozenset()
-    )
+    latest_once = path_finder.find([entry], "latest", source_model=None)
+    latest_twice = path_finder.find([entry], "latest", source_model=None)
+    earliest = path_finder.find([entry], "earliest", source_model=None)
 
     assert latest_once.entries[0].steps == latest_twice.entries[0].steps
     assert latest_once.entries[0].migrations == latest_twice.entries[0].migrations
@@ -272,8 +265,7 @@ def test_path_finder_resolves_hooks_per_step(
     plan = finder.find(
         [ExtractedEntry(path=("document",), node=nodes[0])],
         "latest",
-        container=None,
-        target_fields=frozenset(),
+        source_model=None,
     )
 
     assert plan.entries[0].hooks == ((hook,), (hook,))
@@ -347,8 +339,7 @@ def test_path_finder_resolves_declarative_migrations(  # noqa: PLR0913, PLR0917
     plan = finder.find(
         [ExtractedEntry(path=("document",), node=source)],
         target,
-        container=None,
-        target_fields=frozenset(),
+        source_model=None,
     )
 
     assert plan.entries[0].migrations == (migration,)
@@ -486,7 +477,7 @@ def test_policy_engine(nodes, graph, case: PolicyCase) -> None:
             for source_index, target_index in case.steps
         ),
     )
-    plan = PathPlan(entries=(entry,), container=None, target_fields=frozenset())
+    plan = PathPlan(entries=(entry,), source_model=None)
     policy = PolicyEngine(
         direction=case.direction,
         on_direction_violation=case.on_direction_violation,

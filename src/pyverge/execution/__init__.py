@@ -5,6 +5,7 @@ from .errors import (
     ExecutionError,
     ExecutionModeError,
     SyncExecutionRequired,
+    TargetValidationError,
 )
 from .extractors import ContainerExtractor, PayloadWalker, SchemaFieldsExtractor
 from .hooks import MigrationHook, OpenLineageHook, OTELHook
@@ -24,7 +25,7 @@ from .middleware import (
     TransactionMiddleware,
 )
 from .migrations import MigrationBindings
-from .plan import ExecutionPlan, ExtractedEntry, PlanningOptions
+from .plan import ExecutionPlan, ExtractedEntry
 from .planner import ExecutionPlanner
 from .runner import Runner
 from .types import (
@@ -61,13 +62,13 @@ __all__ = [
     "OpenLineageMiddleware",
     "OtelMiddleware",
     "PayloadWalker",
-    "PlanningOptions",
     "ProcessBackend",
     "RetryMiddleware",
     "Runner",
     "RuntimePort",
     "SchemaFieldsExtractor",
     "SyncExecutionRequired",
+    "TargetValidationError",
     "ThreadedBackend",
     "Transaction",
     "TransactionManager",
