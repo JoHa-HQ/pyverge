@@ -54,7 +54,9 @@ from pyverge.execution import ThreadedBackend
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 CustomerManager = Manager[semver.Version].configure(
-    PydanticModelAdapter(codec=ModelCodec(namespace="", version_property="version", kind_property="kind"))
+    PydanticModelAdapter(
+        codec=ModelCodec(namespace="", version_property="version", kind_property="kind")
+    )
 )
 
 

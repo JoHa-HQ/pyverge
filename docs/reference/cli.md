@@ -1,4 +1,4 @@
-# CLI Reference
+# CLI reference
 
 Install the CLI extra:
 
@@ -17,6 +17,15 @@ pyverge doctor --manager myapp.models:create_manager
 Runtime schemas work when the module exposes a factory that builds the manager
 from its runtime source (config file, database, feature flags, etc.). `doctor`
 inspects the already-built registry; it does not load schemas itself.
+
+## Example session
+
+```bash
+pyverge info demo_manager:UserManager
+pyverge doctor --manager demo_manager:UserManager
+pyverge manifest --manager demo_manager:UserManager --output manifest.json
+pyverge benchmark --manager demo_manager:UserManager --payload data.json --format json
+```
 
 ## Commands
 

@@ -85,5 +85,5 @@ assert manager.get("User", "1.0.0").model is not None
 ## See also
 
 - [Reconstruct missing migrations](reconstruct-missing-migrations.md)
-- [Migration strategies](../../explanation/migrations.md)
+- [Migrations](../../explanation/migrations.md)
 - [Author migrations](author-migrations.md)

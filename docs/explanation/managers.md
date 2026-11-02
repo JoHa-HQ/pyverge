@@ -80,7 +80,7 @@ B().runner().run(user_payload, "latest")   # user converges; nested location sil
 | Parent migrated but children stale | missing containment edge -> wrong order |
 | Fields vanish after migration | nested entry not in the target model -> dropped at finalize |
 
-The FastMCP adapter follows this invariant directly: `FastMCPDiscovery` binds
+The FastMCP adapter follows this invariant directly: `PyvergeProvider` binds
 **one** manager, so there is no routing to do — the manager owns the whole graph
 and every tool kind resolves within it.
 

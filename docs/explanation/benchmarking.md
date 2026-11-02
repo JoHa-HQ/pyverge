@@ -78,10 +78,5 @@ sizes. Track graph size, path depth, and payload shape as benchmark metadata.
 
 ## Running
 
-```bash
-# adapter benchmarks
-uv run pytest benchmarks/adapters -o addopts="--benchmark-only"
-
-# schema migration graph benchmarks
-uv run pytest benchmarks/migrations -o addopts="--benchmark-only"
-```
+See [Benchmark adapters](../how-to/operations/benchmark-adapters.md#running) for
+the commands and CI guidance.

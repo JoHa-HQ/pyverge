@@ -5,7 +5,113 @@
 Both seams are decorators at the endpoint. Subscribers use `targets=`; publishers
 use `target=`. Targets are resolved by the adapter, never by the core manager.
 
-### `subscriber(broker, *topics, manager=..., targets=..., header=...)`
+A target may be `"latest"`, `"earliest"`, a pinned version, a per-kind mapping,
+or a `VersionRange`. A range resolves to the highest matching version:
+
+```python
+from pyverge.adapters.faststream import FastStreamRuntime
+from pyverge.manager.types import VersionRange
+
+runtime = FastStreamRuntime(manager, manager.runner())
+
+@subscriber(broker, "orders", runtime=runtime, targets=VersionRange(gte="1.0.0", lt="2.0.0"))
+async def handle(order: OrderV2) -> None: ...
+```
+
+The negotiated header form is `{"gte": "1.0.0", "lt": "2.0.0"}` (or `eq`).
+
+### `PyvergeBroker(broker, manager=None, *, runtime=None, runner=None, binder=None)`
+
+Composition facade over any FastStream broker. It exposes `subscriber`,
+`publisher`, and `publish_to`; owns one runtime and one binder; and records
+decoration-time `Binding` metadata.
+
+```python
+from pyverge.adapters.faststream import PyvergeBroker
+
+raw_broker = ...  # any FastStream broker
+broker = PyvergeBroker(
+    raw_broker,
+    manager=manager,
+    runner=manager.runner(),
+)
+
+@broker.subscriber("orders", target="latest")
+async def on_order(order: OrderV2) -> None: ...
+
+@broker.subscriber("orders.in")
+@broker.publisher("orders.v1", target="1.0.0")
+async def relay(order: OrderV2) -> OrderV2: ...
+```
+
+- `broker.underlying` is the wrapped broker.
+- Unknown attributes proxy to it (`publish`, `start`, `publishers`, …).
+- `broker.bindings` exposes the recorded `Binding` values.
+- FastStream's in-memory test broker works unchanged.
+
+### Runtime lifecycle
+
+The runtime never creates a runner implicitly. Build the runner with the host
+application's execution environment and bind it during startup:
+
+```python
+from pyverge.adapters.faststream import FastStreamRuntime
+
+runtime = FastStreamRuntime(manager)
+broker = PyvergeBroker(broker, runtime=runtime)
+
+async def start() -> None:
+    runtime.bind(
+        manager.runner(
+            backend=backend,
+            environment=execution_environment,
+            middleware=middleware,
+        )
+    )
+```
+
+`converge()` raises if no runner is bound. Pass `manager=...` (and optionally
+`runner=...`) to the facade to create its runtime, or pass `runtime=...` to share
+one. The facade derives the manager from the runtime when `runtime=` is used.
+Use `runtime.bind(...)` when the runner depends on the FastStream application
+lifespan (telemetry, transport constraints, middleware).
+
+`bind()` validates the registry before the app starts and raises FastStream's
+`StartupValidationError` when an issue meets the fail level. The default is
+`"error"`; `FastStreamRuntime(..., health_fail_level="warning")` or
+`PyvergeBroker(..., health_fail_level=...)` raises earlier. If you bind before
+all models are registered, pass `validate_health=False` and call
+`runtime.validate_health()` after registration.
+
+The runtime also forwards migration context and a run ID:
+
+```python
+from pyverge.core import MigrationContext
+
+runtime = FastStreamRuntime(
+    manager,
+    context_factory=lambda msg: MigrationContext.create(
+        {"topic": msg.topic, "headers": dict(msg.headers or {})}
+    ),
+)
+```
+
+`converge(..., context=..., run_id=...)` accepts per-call overrides. Subscriber
+decoders use `context_for(msg)`; publisher and route bindings use the runtime's
+default context.
+
+### Explicit selector
+
+`subscriber(..., selector=...)` accepts a `TargetSelector` and overrides the
+default header → topic → default chain. With an explicit selector the adapter
+does not rewrite the handler annotation, so annotate the payload for every model
+the selector may return.
+
+The explicit decorators below remain available for multiple managers or
+existing code. They take a `FastStreamRuntime`; the runtime owns the manager, so
+there is no separate `manager=` argument.
+
+### `subscriber(broker, *topics, runtime=..., targets=..., header=...)`
 
 Registers one subscriber per topic with a convergence `decoder` and binds the
 handler's typed payload parameter to the served version — or to a union when the
@@ -21,7 +127,7 @@ from pyverge.adapters.faststream import TopicTargets
     broker,
     "orders.v1",
     "orders.v2",
-    manager=manager,
+    runtime=runtime,
     targets=TopicTargets({
         "orders.v1": "1.0.0",
         "orders.v2": "latest",
@@ -39,7 +145,7 @@ Set `header="accept-version"` (or another name) to let a message override the
 topic target:
 
 ```python
-@subscriber(broker, "orders.v1", manager=manager, header="accept-version")
+@subscriber(broker, "orders.v1", runtime=runtime, header="accept-version")
 async def handle(order: Order) -> None:
     ...
 ```
@@ -54,7 +160,7 @@ message header > topic target > endpoint target
 A union annotation is bound automatically when the target can vary across topics
 or headers.
 
-### `publisher(broker, *topics, manager=..., target=...)`
+### `publisher(broker, *topics, runtime=..., target=...)`
 
 Registers a FastStream publisher and converges the handler's **return** to
 `target` before publish. A handler that returns a bound model is dumped to a
@@ -64,27 +170,27 @@ and passed through unchanged.
 Stacking `@subscriber(...)` over `@publisher(...)` gives an in/out bridge; the
 in-target and out-target may differ.
 
-### `publish_to(broker, routes={...}, manager=...)`
+### `publish_to(broker, routes={...}, runtime=...)`
 
 For different targets per destination, `publish_to` converges the handler's
 return once per route and publishes separately. The handler returns the model
 unchanged; the adapter owns dumping, convergence, and publishing:
 
 ```python
-@subscriber(broker, "orders.v1", "orders.v2", manager=manager)
+@subscriber(broker, "orders.v1", "orders.v2", runtime=runtime)
 @publish_to(
     broker,
     routes={
         "orders.legacy": "1.0.0",
         "orders.current": "2.0.0",
     },
-    manager=manager,
+    runtime=runtime,
 )
 async def handle(order: Order) -> Order:
     return order
 ```
 
-`manager.dump` runs once; each route then converges independently. The wrapper
+`runtime.dump` runs once; each route then converges independently. The wrapper
 publishes a `content-version` header with the served version.
 
 ## Routing
@@ -101,7 +207,7 @@ once, converges once per route, and publishes each result.
     broker,
     "orders.v1",
     "orders.v2",
-    manager=manager,
+    runtime=runtime,
     targets="latest",
 )
 @publish_to(
@@ -110,7 +216,7 @@ once, converges once per route, and publishes each result.
         "orders.legacy": "1.0.0",
         "orders.current": "2.0.0",
     },
-    manager=manager,
+    runtime=runtime,
 )
 async def handle_order(order: Order) -> Order:
     return order

@@ -5,7 +5,7 @@ pyverge plugs into a [FastMCP](https://github.com/jlowin/fastmcp) server as an a
 The adapter lives in `pyverge.adapters.fastmcp`. pyverge core and its ports never import FastMCP — everything here is an adapter-local composition over one `Manager` and one server.
 
 ```bash
-pip install "pyverge[cli]" fastmcp
+pip install "pyverge[fastmcp]"
 ```
 
 ## The model

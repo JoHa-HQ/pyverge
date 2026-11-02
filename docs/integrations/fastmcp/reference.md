@@ -1,74 +1,125 @@
 # FastMCP reference
 
-## Reflection providers
+## Component kinds
 
-A provider is the factory bridging one FastMCP primitive type to the graph. Bind
-one per type you expose; it traverses that type, emits a normalized node per
-versioned primitive, and materializes virtuals of the same type.
+Each FastMCP primitive family is a `ComponentKind` adapter: it lists its
+components, normalizes them into an `Entrance`, and materializes a
+`VirtualComponent` back into the host. The provider depends only on the port and
+defaults to all three adapters.
 
 ```python
-from pyverge.adapters.fastmcp import PromptReflection, ResourceReflection
+from pyverge.adapters.fastmcp import (
+    PromptKind,
+    ResourceKind,
+    ToolKind,
+)
 
-providers = [
-    ToolReflection(manager.adapter),
-    PromptReflection(manager.adapter),
-    ResourceReflection(manager.adapter, uri_scheme="weather://"),
-]
+PyvergeProvider(manager, kinds=(ToolKind(), PromptKind()))
+PyvergeProvider(
+    manager,
+    kinds=(ToolKind(), PromptKind(), ResourceKind(uri_scheme="weather://")),
+)
 ```
 
-- A primitive is indexed only if it declares a `version` and its kind is
-  registered in the manager. Unversioned primitives pass through untouched.
-- A kind's **policy** (its convergence target) comes from the primitive's own
-  declaration — `meta={"policy": ...}` — or the discovery's
-  `policies={kind: policy}` map. Every exposed kind needs one; there is no silent
-  default, and all versions of a kind must agree. `"latest"`/`"earliest"` pick
-  the chain ends; any other value is a pinned version, resolved by the manager at
-  migrate time.
+Pass `kinds=` when only some primitive families should be indexed, for example
+when a prompt and a resource share a graph kind and version.
+
+Attach the provider to run the startup lifecycle:
+
+```python
+server = FastMCP("Weather", providers=[discovery], tools=[search_weather])
+```
+
+FastMCP enters the provider lifespan once, after user lifespans, and the
+provider indexes server-owned components, materializes virtuals, attaches
+hooks, and validates registry health before serving.
+
+- A primitive is indexed only if it declares a `version`. Unversioned
+  primitives pass through untouched.
+- A kind's **policy** (its convergence target) is declared per component:
+  `meta={"policy": ...}`. The `policies={kind: policy}` map is only a fallback for
+  components that cannot declare one. Every exposed kind needs a policy; there is
+  no silent default, and all versions of a kind must agree. The resolved policy
+  is stored on each `Entrance`, so the component is the source of truth.
+  `"latest"`/`"earliest"` pick the chain ends; a pinned value selects that
+  version. A **bounded range** resolves to the highest matching version:
+
+  ```python
+  from pyverge.adapters.fastmcp import VersionRange
+
+  PyvergeProvider(
+      manager,
+      policies={"User": VersionRange(gte="1.0.0", lt="3.0.0")},
+  )
+  ```
+
+  In `meta`, the same range is `{"gte": "1.0.0", "lt": "3.0.0"}` (or `eq`).
 - A policy may be **per-kind** — `{"*": "latest", "Address": "earliest"}` — which
   also steers the **nested** kinds embedded in the payload: each converts to its
   own target while the outer kind converges to the `"*"` target.
-- `ResourceReflection` takes the URI `scheme`/prefix so virtual templates match the
-  physical ones (e.g. `weather://{city}{?units}`).
-- A provider also hides **injected** parameters (wiring, not payload) from the
-  reflected contract. The `tool`/`prompt`/`resource` decorators apply the same
-  rule to a physical function's signature — see
-  [Injected parameters#injected-parameters
+- `ResourceKind(uri_scheme=...)` prefixes virtual resource templates so they
+  match the physical ones (e.g. `weather://{city}{?units}`).
+- `transforms=(...)` are applied after `sync` and `enrich`, so a listing
+  transform such as `VersionFilter` cannot hide physical components from
+  indexing.
+- FastMCP native `Depends` parameters are wiring, not payload. FastMCP excludes
+  them from the reflected contract — see [Injected parameters](#injected-parameters).
+
+## Migration context
+
+`PyvergeProvider` forwards a migration context and run ID to the runner:
+
+```python
+from pyverge.core import MigrationContext
+
+discovery = PyvergeProvider(
+    manager,
+    context=MigrationContext.create({"tenant": "acme"}),
+    run_id="startup",
+)
+```
+
+For per-request context, use a factory. It receives the active FastMCP
+`Context` when one is available:
+
+```python
+discovery = PyvergeProvider(
+    manager,
+    context_factory=lambda ctx: MigrationContext.create(
+        {"session": ctx.session_id}
+    ),
+)
+```
+
+The provider also accepts `validate_target=True` to validate each converged
+entry against its target model. Context and run ID reach migrations, hooks, and
+middleware unchanged.
 
 ## Injected parameters
 
-A dependency-injected parameter (e.g. `Provide[...]`, `Depends(...)`) is wiring,
-not payload, and must not appear in the reflected schema. Wrap each physical
-function with the matching decorator — `tool`, `prompt`, or `resource` — which
-builds the FastMCP component with its injected parameters hidden:
+Use FastMCP's native `Depends` for wiring, not payload:
 
 ```python
-from pyverge.adapters.fastmcp import prompt, resource, tool
+from fastmcp.dependencies import Depends
+from fastmcp.tools import tool
+
+
+def get_weather_service() -> WeatherService: ...
 
 
 @tool(name="search_weather", version="2.0.0")
-@inject
-def search_weather(city: str, weather: WeatherService = Provide[...]) -> dict: ...
-
-
-@prompt(name="weather_briefing", version="2.0.0")
-@inject
-def weather_briefing(city: str, weather: WeatherService = Provide[...]) -> str: ...
-
-
-@resource(uri_template="weather://{city}", name="weather_reading", version="2.0.0")
-@inject
-def weather_reading(city: str, weather: WeatherService = Provide[...]) -> str: ...
+def search_weather(
+    city: str,
+    weather: WeatherService = Depends(get_weather_service),
+) -> dict: ...
 ```
 
-Apply the decorator **outside** `@inject` so it sees the raw signature (the
-injected parameter is hidden, then `@inject` still fills it at call time). Each
-decorator also works as a plain factory: `tool(fn, name=..., version=...)`.
+FastMCP excludes dependency parameters from the tool, prompt, or resource
+schema and resolves them at call time. Pyverge no longer rewrites signatures for
+dependency injection.
 
-`hide_injected(fn)` is the underlying helper if you only want to rewrite a
-signature in place. The default detector recognizes `dependency_injector`'s
-`Provide` and FastMCP's `Depends`; `never_injected` disables detection,
-`marker_detector(*types)` matches your own, and the reflection providers apply
-the same detector when reflecting.
+Virtual components also resolve native FastMCP dependencies before invoking
+the anchor handler.
 
 ## See also
 

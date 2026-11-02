@@ -15,6 +15,7 @@ Manager.configure(
     migration_materializer=None,
     diff_provider=None,
     on_missing="raise",
+    linters=(),
 )
 ```
 
@@ -22,6 +23,20 @@ All configuration is passed directly as keyword arguments. The adapter must
 expose a `ModelCodec`; its namespace is the only namespace source for the
 manager and registry. There is no fallback namespace and no separate manager
 namespace option.
+
+`linters` appends custom `HealthLinter` rules to the registry's defaults, such
+as adapter-specific graph invariants. The configured `fail_level` still decides
+whether a finding blocks startup.
+
+## Health
+
+```python
+Manager.health(entity=None, *, fail_level=None)
+```
+
+`fail_level` is a logging-style threshold over `info` < `warning` < `error`;
+`"never"` disables blocking. The registry raises `HealthValidationError` when a
+finding meets the level.
 
 ## Registration decorators
 

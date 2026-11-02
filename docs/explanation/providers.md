@@ -72,13 +72,6 @@ reflection stays adapter-local.
 Migration backends live in `pyverge.migrations`. Import schema adapters
 from `pyverge.schemas`.
 
-## Planned adapters
-
-- Avro (`pyverge-avro`)
-- Protobuf (`pyverge-protobuf`)
-
-These are roadmap items, not shipped. Do not assume their APIs are stable.
-
 ## Adding a provider
 
 Subclass `AbstractModelAdapter`, inject `ModelCodec`, and implement the

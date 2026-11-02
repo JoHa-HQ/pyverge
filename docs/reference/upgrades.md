@@ -22,8 +22,8 @@ Compatibility notes for the execution/registration architecture change.
 | `MigrationSettings(execution_mode=...)` | choose `ThreadedBackend`, `AsyncBackend`, or `ProcessBackend` |
 | `MigrationSettings(parallel_workers=...)` | backend `max_workers` |
 | `pyverge.migration.*` | `pyverge.engine`, `pyverge.registry`, `pyverge.schemas`, `pyverge.migrations`, `pyverge.versioning` |
-| `ToolDiscovery` | `FastMCPDiscovery` |
-| `discovery.register()` | `await discovery.register(server)` |
+| `ToolDiscovery` | `PyvergeProvider` |
+| `discovery.register()` | `await discovery.sync(server)` |
 | `Reflector(manager)` FastStream startup hook | explicit model/migration registration before runtime |
 
 ## Model codec
@@ -226,21 +226,23 @@ from pyverge.versioning import EdgeKey, NodeId, VersionKey, VersionNode
 ## FastMCP
 
 ```text
-ToolDiscovery -> FastMCPDiscovery
+ToolDiscovery -> PyvergeProvider
 ```
 
 ```python
-from pyverge.adapters.fastmcp import FastMCPDiscovery, ToolReflection
+from pyverge.adapters.fastmcp import PyvergeProvider
 
-discovery = FastMCPDiscovery(manager, [ToolReflection(manager.adapter)])
+discovery = PyvergeProvider(manager)
+server = FastMCP("App", providers=[discovery], tools=[search_weather])
 ```
 
-Lifecycle:
+Attaching the provider runs `sync`, `enrich`, and health validation at
+startup. The phases remain available for hosts that own their ordering:
 
 ```python
-await discovery.search(server)
-await discovery.register(server)
+await discovery.sync(server)
 await discovery.enrich(server)
+discovery.validate_health()
 ```
 
 ## FastStream
@@ -311,8 +313,8 @@ Manager.configure(
 
 ### FastMCP startup fails after upgrade
 
-Replace `ToolDiscovery` with `FastMCPDiscovery` and call
-`await discovery.register(server)`.
+Replace `ToolDiscovery` with `PyvergeProvider` and call
+`await discovery.sync(server)`.
 
 ### FastStream subscriber receives the old version
 

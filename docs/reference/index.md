@@ -13,3 +13,5 @@ Information-oriented API and format descriptions.
 - [CLI](cli.md)
 - [FastMCP](../integrations/fastmcp/reference.md)
 - [FastStream](../integrations/faststream/reference.md)
+- [Celery](../integrations/celery/reference.md)
+- [httpx](../integrations/httpx/reference.md)

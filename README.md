@@ -335,7 +335,7 @@ Development: `uv sync --group dev`.
 - [API reference](docs/reference/api.md) · [Glossary](docs/explanation/glossary.md)
 - [Upgrade guide](docs/reference/upgrades.md)
 - [CLI reference](docs/reference/cli.md) · [Telemetry and hooks](docs/how-to/operations/instrument-migrations.md)
-- [FastMCP](docs/integrations/fastmcp/index.md) · [FastStream](docs/integrations/faststream/index.md)
+- [FastMCP](docs/integrations/fastmcp/index.md) · [FastStream](docs/integrations/faststream/index.md) · [Celery](docs/integrations/celery/index.md) · [httpx](docs/integrations/httpx/index.md)
 - [Testing](docs/how-to/operations/test-migrations.md) · [Benchmarking](docs/how-to/operations/benchmark-adapters.md)
 - [Manager API](docs/reference/manager.md) · [Use the manager](docs/how-to/models/use-manager.md)
 - [Run payloads](docs/how-to/runtime/run-payloads.md) · [Migrate nested payloads](docs/how-to/runtime/migrate-nested-payloads.md)
