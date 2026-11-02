@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3"
+]
+
+[project]
+name = "celery-demo"
+version = "0.0.0"
+description = "Celery task orchestration showcase for pyverge"
+requires-python = ">=3.11"
+dependencies = [
+  "pyverge",
+  "pyverge[celery]",
+  "celery[redis]>=5.4",
+  "opentelemetry-exporter-otlp>=1.20",
+  "opentelemetry-sdk>=1.20"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/celery_demo"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+
+[tool.uv.sources]
+pyverge = { path = "../../", editable = true }

@@ -18,7 +18,8 @@ involved, wrap a real driver in a thin adapter.
 
 ## HTTP APIs & LLM tools
 
-- HTTP APIs (httpx transport) — projected; no standalone showcase yet.
+- [httpx transport](httpx/README.md) — versioned request/response convergence
+  through an `httpx` transport, with one policy per client.
 - LLM tool schemas — see the [FastMCP integration](../docs/integrations/fastmcp/index.md).
 
 ## Runnable examples
@@ -32,6 +33,12 @@ involved, wrap a real driver in a thin adapter.
 - [FastStream](faststream/README.md) — the FastStream adapter: converge versioned
   message bodies before a subscriber handler runs, over Kafka, RabbitMQ, NATS, or
   Redis (broker chosen by config). Shipped and runnable.
+- [Celery](celery/README.md) — the Celery adapter: chain tasks that declare
+  different payload versions, with one shared runtime and process-isolated
+  migrations. Opt-in OpenTelemetry. Shipped and runnable.
+- [httpx transport](httpx/README.md) — the client-side HTTP adapter: converge
+  request and response bodies through one policy per transport. Shipped and
+  runnable.
 
 ## What's glue vs. engine
 
