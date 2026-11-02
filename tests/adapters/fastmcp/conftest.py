@@ -23,9 +23,6 @@ from fastmcp import Client, FastMCP
 
 from pyverge.adapters.fastmcp import (
     FastMCPDiscovery,
-    FastMCPSource,
-    PromptReflection,
-    ResourceReflection,
     ToolReflection,
 )
 
@@ -78,12 +75,7 @@ def app(request: pytest.FixtureRequest, manager: type, case: Case) -> FastMCP:
     The physical tool and its policy come from *case*; FastMCP enters the
     lifespan when the ``client`` fixture opens its session.
     """
-    runtime_manager = type(
-        "RuntimeManager",
-        (manager,),
-        {"_reflection_locked": False},
-    )
-    instance = runtime_manager()
+    instance = manager()
     discovery = FastMCPDiscovery(
         instance, [ToolReflection(instance.adapter)], policies=case.policies
     )
@@ -106,15 +98,3 @@ async def client(app: FastMCP) -> AsyncIterator[Client]:
     """A live client session over *app*, so the lifespan runs per test."""
     async with Client(app) as active:
         yield active
-
-
-@pytest.fixture
-def source(app, model_adapter) -> FastMCPSource:
-    return FastMCPSource(
-        app,
-        providers=(
-            ToolReflection(model_adapter),
-            PromptReflection(model_adapter),
-            ResourceReflection(model_adapter),
-        ),
-    )

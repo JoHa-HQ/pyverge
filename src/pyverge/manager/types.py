@@ -7,7 +7,6 @@ from typing import (
     Protocol,
     Self,
     TypeAlias,
-    runtime_checkable,
 )
 
 from pyverge.core.types import (
@@ -35,12 +34,7 @@ if TYPE_CHECKING:
     from pyverge.core.types import (
         Attachable,
     )
-    from pyverge.discovery import SourcePort
     from pyverge.discovery.reflection import DiffProvider
-    from pyverge.discovery.types import (
-        ReflectionReport,
-        RegistrationContext,
-    )
     from pyverge.engine import Engine
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
@@ -64,7 +58,6 @@ class ManagerClassState(Protocol[VersionValue]):
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
-    _reflection_locked: ClassVar[bool]
 
     @classmethod
     def configure(  # noqa: PLR0913
@@ -118,16 +111,3 @@ class ManagerInstanceState(Protocol[VersionValue]):
 
     @property
     def adapter(self) -> ModelAdapter: ...
-
-
-@runtime_checkable
-class Reflectable(Protocol):
-    """Build-time source reflection surface."""
-
-    @classmethod
-    def reflect(
-        cls,
-        source: SourcePort,
-        *,
-        context: RegistrationContext | None = None,
-    ) -> ReflectionReport: ...

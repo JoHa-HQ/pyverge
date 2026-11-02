@@ -262,12 +262,8 @@ manager = OrderManager()
 
 ## Descriptor registration
 
-`SourceDescriptor` string strategies were replaced by typed descriptors:
-
-```text
-ModelDescriptor      -> register_descriptor(descriptor, sink)
-MigrationDescriptor  -> register_descriptor(descriptor, sink)
-```
+The intermediate source-descriptor layer was removed. Framework adapters now
+register models and migrations directly through `Manager`.
 
 Sources emit descriptors. Discovery adapters apply them through the
 manager/application registration port. The removed command layer is not part of

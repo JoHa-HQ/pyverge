@@ -63,7 +63,6 @@ from pyverge.types import VersionEdge
 from pyverge.versioning import default_content_hasher
 from tests.utils import edge_from_nodes, envelope_model, register_models
 from tests.utils.engine import register_migrations
-from tests.utils.source import StaticSource
 
 # Example model modules are imported by tests, not collected as tests.  With
 # ``--doctest-modules`` their basenames (e.g. ``semver.py``) collide with
@@ -348,13 +347,6 @@ def engine(
     model_adapter: ModelAdapter,
 ) -> Engine[VersionValue]:
     return Engine(registry, model_adapter)
-
-
-@pytest.fixture
-def source(request: pytest.FixtureRequest) -> StaticSource:
-    """Build a static source from ``(descriptors, source_id)`` params."""
-    descriptors, source_id = request.param
-    return StaticSource(tuple(descriptors), source_id)
 
 
 @pytest.fixture()

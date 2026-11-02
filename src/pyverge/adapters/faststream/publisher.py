@@ -77,11 +77,10 @@ def publisher(
 
     def decorate(fn: Fn) -> Any:
         declared = HandlerView(fn).return_model
-        out_model = (
-            manager.resolve_target_model(declared, target)
-            if declared is not None and manager.identifies(declared)
-            else None
-        )
+        out_model = None
+        if declared is not None and manager.identifies(declared):
+            manager.reconcile_model(declared)
+            out_model = manager.resolve_target_model(declared, target)
         result = result_converger or ReturnConverger(
             runner or manager.runner(),
             manager.dump,

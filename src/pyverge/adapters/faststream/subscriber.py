@@ -91,6 +91,7 @@ def subscriber(  # noqa: PLR0913
     def decorate(fn: Fn) -> Fn:
         declared = HandlerView(fn).input_model
         if declared is not None and manager.identifies(declared):
+            manager.reconcile_model(declared)
             models = _candidate_models(manager, declared, targets, topics, header)
             annotation = _model_union(models)
             if annotation is not None:

@@ -6,17 +6,11 @@ from typing import TYPE_CHECKING, Any, cast
 from pyverge.core.types import (
     Attachable,
 )
-from pyverge.discovery import (
-    ModelDescriptor,
-    RegistrationCollector,
-    register_descriptor,
-)
 from pyverge.manager import Manager
 from pyverge.registry.errors import MissingReferenceError, ModelConflictError
 
 from .converge import Converger
 from .reflection import ComponentReflection, Policy, ReflectedNode
-from .source import FastMCPSource
 
 if TYPE_CHECKING:
     from pyverge.manager.types import (
@@ -28,8 +22,8 @@ class FastMCPDiscovery:
     """Index a server's versioned primitives against one manager's graph.
 
     The lifecycle phases: :meth:`search` traverses the providers and indexes
-    the nodes the manager owns; :meth:`register` reflects those nodes through
-    ``FastMCPSource`` and validates the graph; :meth:`enrich` materializes the
+    the nodes the manager owns; :meth:`register` stores those nodes through the
+    manager and validates the graph; :meth:`enrich` materializes the
     virtual surface and attaches hooks. The caller owns the ordering.
     """
 
@@ -78,30 +72,17 @@ class FastMCPDiscovery:
         self._declared[node.kind] = policy
         self._nodes[(node.kind, node.version)] = node
 
-    def source(self, server: Any) -> FastMCPSource:
-        return FastMCPSource(server, nodes=self._nodes.values())
-
     async def register(self, server: Any) -> None:
-        collector = RegistrationCollector()
-        await self.source(server).accept(collector)
-        for descriptor in collector.registrations:
+        for node in self._nodes.values():
             try:
-                register_descriptor(descriptor, self._manager)
+                self._manager.reconcile_model(node.versionable())
             except ModelConflictError as error:
-                if not isinstance(descriptor, ModelDescriptor):
-                    raise
-                payload = descriptor.payload
-                subject = (
-                    f"primitive {payload.kind!r}@{payload.version}"
-                    if hasattr(payload, "kind")
-                    else f"primitive {error.version}"
-                )
                 raise ModelConflictError(
                     error.catalog_name,
                     error.version,
                     error.registered,
                     error.incoming,
-                    subject=subject,
+                    subject=f"primitive {node.kind!r}@{node.version}",
                 ) from error
         self._reconcile()
 
