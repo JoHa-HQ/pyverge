@@ -24,7 +24,7 @@ V2 = {
 }
 
 
-async def test_v1_event_reaches_both_targets(app, broker, test_broker) -> None:
+async def test_v1_event_reaches_both_targets(running_app, broker, test_broker) -> None:
     seen: dict[str, dict] = {}
 
     @broker.subscriber("orders.legacy")
@@ -44,7 +44,7 @@ async def test_v1_event_reaches_both_targets(app, broker, test_broker) -> None:
     assert seen["current"]["currency"] == "USD"
 
 
-async def test_v2_event_keeps_its_currency(app, broker, test_broker) -> None:
+async def test_v2_event_keeps_its_currency(running_app, broker, test_broker) -> None:
     seen: dict[str, dict] = {}
 
     @broker.subscriber("orders.legacy")
@@ -68,7 +68,9 @@ async def test_lifespan_reflects_the_registered_graph(app, manager) -> None:
         assert len(manager.list_versions("Order")) == expected_versions
 
 
-async def test_one_handler_consumes_both_channels(app, broker, test_broker) -> None:
+async def test_one_handler_consumes_both_channels(
+    running_app, broker, test_broker
+) -> None:
     seen: dict[str, list[dict]] = {"legacy": [], "current": []}
 
     @broker.subscriber("orders.legacy")
@@ -95,3 +97,30 @@ async def test_one_handler_consumes_both_channels(app, broker, test_broker) -> N
     assert current_by_id["1"]["currency"] == "USD"
     assert current_by_id["2"]["version"] == "2.0.0"
     assert current_by_id["2"]["currency"] == "EUR"
+
+
+async def test_header_negotiation_selects_older_target(
+    running_app, broker, test_broker
+) -> None:
+    """A negotiated header converges the inbound event before the handler."""
+    seen: dict[str, dict] = {}
+
+    @broker.subscriber("orders.legacy")
+    async def legacy(payload: dict) -> None:
+        seen["legacy"] = payload
+
+    @broker.subscriber("orders.current")
+    async def current(payload: dict) -> None:
+        seen["current"] = payload
+
+    async with test_broker(broker) as br:
+        await br.publish(
+            V2,
+            "orders.v2",
+            headers={"accept-version": "1.0.0"},
+        )
+
+    assert seen["legacy"]["version"] == "1.0.0"
+    assert "currency" not in seen["legacy"]
+    assert seen["current"]["version"] == "2.0.0"
+    assert seen["current"]["currency"] == "USD"

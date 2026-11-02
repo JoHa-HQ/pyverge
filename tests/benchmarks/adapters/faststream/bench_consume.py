@@ -20,7 +20,7 @@ from typing import Any
 import pytest
 from faststream.kafka import KafkaBroker, TestKafkaBroker
 
-from pyverge.adapters.faststream import subscriber
+from pyverge.adapters.faststream import FastStreamRuntime, subscriber
 from tests.benchmarks.adapters.faststream._support import new_loop, run
 from tests.benchmarks.factories import payloads
 from tests.benchmarks.graphs import user_manager
@@ -55,9 +55,11 @@ def _bench_publish(
 
 
 def test_consume_with_pyverge(benchmark: Any, loop: Any, payload: dict) -> None:
+    manager = user_manager()
+    runtime = FastStreamRuntime(manager, manager.runner())
     broker = KafkaBroker("localhost:9092")
 
-    @subscriber(broker, TOPIC, manager=user_manager(), targets="latest")
+    @subscriber(broker, TOPIC, runtime=runtime, targets="latest")
     async def handle(user: UserV3) -> None: ...
 
     _bench_publish(benchmark, loop, broker, payload)

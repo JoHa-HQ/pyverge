@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 from faststream.kafka import KafkaBroker, TestKafkaBroker
 
-from pyverge.adapters.faststream import publisher, subscriber
+from pyverge.adapters.faststream import FastStreamRuntime, publisher, subscriber
 from tests.benchmarks.adapters.faststream._support import new_loop, run
 from tests.benchmarks.factories import payloads
 from tests.benchmarks.graphs import user_manager
@@ -36,10 +36,11 @@ def payload() -> dict[str, Any]:
 
 def test_bridge(benchmark: Any, loop: Any, payload: dict) -> None:
     manager = user_manager()
+    runtime = FastStreamRuntime(manager, manager.runner())
     broker = KafkaBroker("localhost:9092")
 
-    @subscriber(broker, IN_TOPIC, manager=manager, targets="latest")
-    @publisher(broker, OUT_TOPIC, manager=manager, target="1.0.0")
+    @subscriber(broker, IN_TOPIC, runtime=runtime, targets="latest")
+    @publisher(broker, OUT_TOPIC, runtime=runtime, target="1.0.0")
     async def handle(user: UserV3) -> UserV3:
         return user
 

@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from pyverge import Manager
-from pyverge.adapters.faststream import publish_to, subscriber
+from pyverge.adapters.faststream import PyvergeBroker
 from pyverge.types import ManagerMigrationKey, TargetPolicy
 
 from .domain import Order, add_currency, drop_currency
@@ -33,8 +33,9 @@ class OrdersFeature:
     target: TargetPolicy = "latest"
     version_header: str | None = "accept-version"
 
-    def wire(self, broker: object, manager: Manager) -> None:
+    def wire(self, broker: PyvergeBroker) -> None:
         """Register the Order graph and the routing handler."""
+        manager: Manager = broker.manager
         manager.store_model(Order)
         manager.store_migration(
             ManagerMigrationKey("Order", "1.0.0", "2.0.0"), add_currency
@@ -42,19 +43,15 @@ class OrdersFeature:
         manager.store_migration(
             ManagerMigrationKey("Order", "2.0.0", "1.0.0"), drop_currency
         )
-        routed = publish_to(
-            broker,
+        routed = broker.publish_to(
             routes={
                 LEGACY_TOPIC: LEGACY_TARGET,
                 CURRENT_TOPIC: CURRENT_TARGET,
             },
-            manager=manager,
         )(handle_order)
-        subscriber(
-            broker,
+        broker.subscriber(
             *self.topics,
-            manager=manager,
-            targets=self.target,
+            target=self.target,
             header=self.version_header,
         )(routed)
 
