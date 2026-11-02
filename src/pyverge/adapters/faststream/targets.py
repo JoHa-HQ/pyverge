@@ -1,14 +1,75 @@
+"""Target selection and negotiated-header parsing."""
+
 from __future__ import annotations
 
-from pyverge.manager.types import TargetPolicy
+import json
+from functools import singledispatchmethod
+from typing import Any, cast
 
-from .types import (
-    HeaderParser,
+from pyverge.graph.planning.targets import DefaultTarget
+from pyverge.graph.planning.targets import FirstMatch as _FirstMatch
+from pyverge.manager.types import TargetPolicy, VersionRange
+
+from .domain import (
     MessageHeaders,
+    NegotiationError,
     TargetContext,
-    TargetSelector,
     TopicTargets,
 )
+
+
+class HeaderParser:
+    """Parse a negotiated target header.
+
+    Scalar values are target policies; JSON objects are per-kind mappings or
+    bounded version ranges.
+    """
+
+    @singledispatchmethod
+    def parse(self, value: Any) -> TargetPolicy:
+        raise NegotiationError("version header must be a string")
+
+    @parse.register
+    def _(self, value: bytes) -> TargetPolicy:
+        return self.parse(value.decode())
+
+    @parse.register
+    def _(self, value: str) -> TargetPolicy:
+        raw = value.strip()
+        if not raw:
+            raise NegotiationError("version header must be a non-empty string")
+        if raw.startswith("{"):
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise NegotiationError(f"invalid version header JSON: {exc}") from exc
+            return self._mapping(parsed)
+        return raw
+
+    @singledispatchmethod
+    def _mapping(self, value: Any) -> TargetPolicy:
+        raise NegotiationError(
+            "version header mapping must contain string keys and values"
+        )
+
+    @_mapping.register
+    def _(self, value: dict) -> TargetPolicy:
+        if value and set(value) <= {"gte", "lt", "eq"}:
+            if not all(isinstance(item, str) for item in value.values()):
+                raise NegotiationError("version header range bounds must be strings")
+            return VersionRange(
+                gte=value.get("gte"),
+                lt=value.get("lt"),
+                eq=value.get("eq"),
+            )
+        if not all(
+            isinstance(key, str) and isinstance(item, str)
+            for key, item in value.items()
+        ):
+            raise NegotiationError(
+                "version header mapping must contain string keys and values"
+            )
+        return cast("TargetPolicy", value)
 
 
 class HeaderTarget:
@@ -35,21 +96,8 @@ class TopicTarget:
         return self._targets.get(context.topic)
 
 
-class DefaultTarget:
-    """Always select the fallback target."""
-
-    def __init__(self, target: TargetPolicy) -> None:
-        self._target = target
-
-    def select(self, context: TargetContext) -> TargetPolicy | None:
-        return self._target
-
-
-class FirstMatch:
-    """Return the first non-``None`` selection from the configured selectors."""
-
-    def __init__(self, *selectors: TargetSelector) -> None:
-        self._selectors = selectors
+class FirstMatch(_FirstMatch[TargetContext]):
+    """FastStream selector chain with topic-aware construction."""
 
     @classmethod
     def for_topics(
@@ -67,17 +115,11 @@ class FirstMatch:
             DefaultTarget(default_target),
         )
 
-    def select(self, context: TargetContext) -> TargetPolicy | None:
-        for selector in self._selectors:
-            target = selector.select(context)
-            if target is not None:
-                return target
-        return None
-
 
 __all__ = [
     "DefaultTarget",
     "FirstMatch",
+    "HeaderParser",
     "HeaderTarget",
     "TopicTarget",
 ]

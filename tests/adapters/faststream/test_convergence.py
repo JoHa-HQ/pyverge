@@ -18,6 +18,7 @@ import semver
 from faststream.kafka import KafkaBroker, TestKafkaBroker
 
 from pyverge.adapters.faststream import (
+    FastStreamRuntime,
     TopicTargets,
     publish_to,
     publisher,
@@ -112,10 +113,21 @@ async def test_converges_to_target(broker, payload, expected) -> None:
 class TestProduce:
     async def test_in_out_bridge(self, manager, broker) -> None:
         instance = manager()
+        runtime = FastStreamRuntime(instance, instance.runner())
         out: list[dict[str, Any]] = []
 
-        @subscriber(broker, "in-topic", manager=instance, targets="latest")
-        @publisher(broker, "out-topic", manager=instance, target="1.0.0")
+        @subscriber(
+            broker,
+            "in-topic",
+            runtime=runtime,
+            targets="latest",
+        )
+        @publisher(
+            broker,
+            "out-topic",
+            runtime=runtime,
+            target="1.0.0",
+        )
         async def handle(user: UserV2) -> UserV2:
             return user
 
@@ -129,10 +141,21 @@ class TestProduce:
 
     async def test_out_passthrough(self, manager, broker) -> None:
         instance = manager()
+        runtime = FastStreamRuntime(instance, instance.runner())
         out: list[dict[str, Any]] = []
 
-        @subscriber(broker, "in-topic", manager=instance, targets="latest")
-        @publisher(broker, "out-topic", manager=instance, target="latest")
+        @subscriber(
+            broker,
+            "in-topic",
+            runtime=runtime,
+            targets="latest",
+        )
+        @publisher(
+            broker,
+            "out-topic",
+            runtime=runtime,
+            target="latest",
+        )
         async def handle(user: UserV2) -> UserV2:
             return user
 
@@ -154,10 +177,16 @@ class TestProduce:
 class TestNegotiation:
     async def test_header_selects_version(self, manager) -> None:
         instance = manager()
+        runtime = FastStreamRuntime(instance, instance.runner())
         broker = KafkaBroker("localhost:9092")
         seen: list[dict[str, Any]] = []
 
-        @subscriber(broker, "users", manager=instance, header="accept-version")
+        @subscriber(
+            broker,
+            "users",
+            runtime=runtime,
+            header="accept-version",
+        )
         async def handle(user: UserV2) -> None:
             seen.append(user.model_dump())
 
@@ -171,6 +200,7 @@ class TestNegotiation:
 
     async def test_per_topic_targets(self, manager) -> None:
         instance = manager()
+        runtime = FastStreamRuntime(instance, instance.runner())
         broker = KafkaBroker("localhost:9092")
         seen: list[dict[str, Any]] = []
 
@@ -178,7 +208,7 @@ class TestNegotiation:
             broker,
             "users",
             "users-latest",
-            manager=instance,
+            runtime=runtime,
             targets=TopicTargets({"users": "1.0.0", "users-latest": "latest"}),
         )
         async def handle(user: UserV2) -> None:
@@ -191,15 +221,16 @@ class TestNegotiation:
 
     async def test_publish_to_converges_each_route(self, manager) -> None:
         instance = manager()
+        runtime = FastStreamRuntime(instance, instance.runner())
         broker = KafkaBroker("localhost:9092")
         out_v1: list[dict[str, Any]] = []
         out_v2: list[dict[str, Any]] = []
 
-        @subscriber(broker, "in-topic", manager=instance)
+        @subscriber(broker, "in-topic", runtime=runtime)
         @publish_to(
             broker,
             routes={"out-v1": "1.0.0", "out-v2": "latest"},
-            manager=instance,
+            runtime=runtime,
         )
         async def handle(user: UserV2) -> UserV2:
             return user
@@ -224,11 +255,21 @@ class TestNegotiation:
     indirect=True,
 )
 class TestFailures:
-    def test_no_migration_path_raises(self, manager) -> None:
-        with pytest.raises(MigrationPathError):
-            manager().runner().run(
-                V2_PAYLOAD,
-                "1.0.0",
-                max_depth=-1,
-                context=None,
-            )
+    @pytest.mark.anyio
+    async def test_no_migration_path_raises(self, manager) -> None:
+        instance = manager()
+        runtime = FastStreamRuntime(instance, instance.runner())
+        broker = KafkaBroker("localhost:9092")
+
+        @subscriber(
+            broker,
+            "users",
+            runtime=runtime,
+            targets="1.0.0",
+        )
+        async def handle(user: UserV2) -> None:
+            raise AssertionError("handler must not run")
+
+        async with TestKafkaBroker(broker) as br:
+            with pytest.raises(MigrationPathError):
+                await br.publish(V2_PAYLOAD, "users")

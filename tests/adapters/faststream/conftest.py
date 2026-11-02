@@ -16,7 +16,7 @@ from typing import Any, cast
 import pytest
 from faststream.kafka import KafkaBroker
 
-from pyverge.adapters.faststream import subscriber
+from pyverge.adapters.faststream import FastStreamRuntime, subscriber
 from tests.examples.pydantic.semver import UserV2
 
 KAFKA_BROKER: tuple[type[Any], dict[str, Any], str | dict[str, str]] = (
@@ -35,10 +35,11 @@ def broker(request, manager) -> KafkaBroker:
     """
     broker_cls, settings, target = request.param
     instance = manager()
+    runtime = FastStreamRuntime(instance, instance.runner())
     broker = cast(Any, broker_cls(**settings))
     broker.payloads = []
 
-    @subscriber(broker, "users", manager=instance, targets=target)
+    @subscriber(broker, "users", runtime=runtime, targets=target)
     async def handle(user: UserV2) -> None:
         broker.payloads.append(user.model_dump())
 

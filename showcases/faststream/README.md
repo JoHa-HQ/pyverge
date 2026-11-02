@@ -6,6 +6,38 @@ subscriber runs. One graph, any broker.
 `Order`: v1 `total` → v2 `+currency`. Each event is routed to `orders.legacy`
 (`1.0.0`) and `orders.current` (`2.0.0`).
 
+## What it demonstrates
+
+| Use case | Where |
+| --- | --- |
+| Inbound convergence | every subscriber converges before the handler |
+| Outbound convergence | `publish_to` converges the handler return per route |
+| Multi-channel subscribe | one handler on `orders.v1` and `orders.v2` |
+| Multi-route publish | the same event on `orders.legacy` and `orders.current` |
+| Header negotiation | `accept-version` selects the inbound target |
+| Per-message policy | `--policy latest|earliest|<version>` |
+| Target validation | the shared runtime validates converged entries |
+| Telemetry | per-migration OTEL spans + FastStream middleware |
+| Brokers | Kafka, RabbitMQ, NATS, Redis through one assembly |
+| Microcks | generated AsyncAPI destinations via `--microcks` |
+
+## Architecture
+
+`build_faststream` creates one `FastStreamRuntime`, binds the manager runner in
+the FastStream lifespan, and wraps the broker in `PyvergeBroker`. Features wire
+their handlers through the facade, so they do not create runtimes or repeat the
+manager:
+
+```python
+runtime = FastStreamRuntime(manager, validate_target=True)
+broker = PyvergeBroker(raw_broker, runtime=runtime)
+feature.wire(broker)
+```
+
+`PyvergeBroker` owns the runtime and exposes `subscriber`, `publisher`, and
+`publish_to`. The raw broker remains available as `broker.underlying` for
+FastStream tooling and test brokers.
+
 ## Try it
 
 ```bash
@@ -156,5 +188,7 @@ docker compose run --rm microcks-import
 ## Scope
 
 JSON bodies, one convergence per message. Batching remains out of scope.
-Header negotiation and per-topic/per-route targets are supported by the
-FastStream adapter.
+Header negotiation, per-topic/per-route targets, range targets, and explicit
+selectors are supported by the FastStream adapter. The showcase uses header
+negotiation, per-route publishing, and target validation; the adapter reference
+document shows range and selector configuration.

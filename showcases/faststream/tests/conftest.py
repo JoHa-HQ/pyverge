@@ -128,6 +128,13 @@ async def app(container: Container) -> FastStream:
 
 
 @pytest.fixture
+async def running_app(app: FastStream) -> AsyncIterator[FastStream]:
+    """Run the app lifespan so the FastStream runtime binds its runner."""
+    async with app.lifespan_context():
+        yield app
+
+
+@pytest.fixture
 def broker(app: FastStream) -> Any:
     return app.context.context["broker"]
 
