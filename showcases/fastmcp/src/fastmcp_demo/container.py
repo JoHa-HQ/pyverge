@@ -2,56 +2,31 @@
 
 ``DemoContainer`` is a ``dependency-injector`` ``DeclarativeContainer`` wiring
 the whole application: settings, the domain service, the version-graph manager,
-the FastMCP discovery and server, and the OpenTelemetry tracer. The FastMCP tool
-in :mod:`fastmcp_demo.adapters.tools` receives the domain service through
-wiring (``@inject`` + ``Provide``), so no component reaches for its own
-dependencies.
+the FastMCP server, and the OpenTelemetry tracer. The FastMCP tool in
+:mod:`fastmcp_demo.adapters.tools` receives the domain service through FastMCP
+native ``Depends``, resolved from the active container.
 
-``prepared`` is an :class:`~dependency_injector.resources.AsyncResource` that
-runs the reflection lifecycle once, so callers only need
-``await container.init_resources()`` to get a ready server.
+The server owns its discovery lifecycle: FastMCP enters its lifespan once when
+the server is served or driven through a client, so initializing the container
+only assembles the app.
 """
 
 from __future__ import annotations
 
 import inspect
 
-from dependency_injector import containers, providers, resources
+from dependency_injector import containers, providers
 
 from .adapters import (
     CallLoggingMiddleware,
-    build_discovery,
-    build_lifespan,
-    build_search_transform,
     build_server,
     make_call_span_middleware,
     make_migration_hooks,
     make_tracer,
 )
-from .adapters import tools as tools_module
 from .application.service import DemoService
 from .domain import WeatherClient, WeatherService, build_manager
 from .settings import DemoSettings
-
-
-class _Prepared(resources.AsyncResource[DemoService]):
-    """Async resource yielding the ready service.
-
-    The discovery lifecycle is the server's lifespan, entered by FastMCP when the
-    server is served or driven through a client — not here. Initializing the
-    container only assembles the app; the first client session (or the HTTP
-    transport) runs ``search -> register -> enrich``.
-    """
-
-    def __init__(self, service: DemoService) -> None:
-        super().__init__()
-        self._service = service
-
-    async def init(self) -> DemoService:
-        return self._service
-
-    async def shutdown(self, resource: DemoService | None) -> None:
-        return None
 
 
 def _call_middleware(span_middleware):
@@ -68,8 +43,6 @@ def _call_middleware(span_middleware):
 
 class DemoContainer(containers.DeclarativeContainer):
     """Composition root for the showcase application."""
-
-    wiring_config = containers.WiringConfiguration(modules=[tools_module])
 
     settings: providers.Singleton[DemoSettings] = providers.Singleton(DemoSettings)
 
@@ -91,25 +64,15 @@ class DemoContainer(containers.DeclarativeContainer):
         make_tracer,
         settings=settings.provided.telemetry,
     )
-    discovery = providers.Singleton(
-        build_discovery,
+    server = providers.Singleton(
+        build_server,
         manager=manager,
         graph=settings.provided.graph,
+        server_settings=settings.provided.server,
         hooks=providers.Callable(
             make_migration_hooks,
             tracer=tracer,
             service=settings.provided.telemetry.provided.service_name,
-        ),
-    )
-    server = providers.Singleton(
-        build_server,
-        lifespan=providers.Callable(
-            build_lifespan,
-            discovery=discovery,
-            transforms=providers.Callable(
-                build_search_transform,
-                settings=settings.provided.server,
-            ),
         ),
         middleware=providers.Callable(
             _call_middleware,
@@ -125,37 +88,36 @@ class DemoContainer(containers.DeclarativeContainer):
         DemoService,
         settings=settings,
         manager=manager,
-        discovery=discovery,
         server=server,
     )
-    prepared: providers.Resource[DemoService] = providers.Resource(
-        _Prepared,
-        service=demo_service,
-    )
+
+
+_active_container: DemoContainer | None = None
+
+
+def current_weather_service() -> WeatherService:
+    """Resolve the weather service from the active container."""
+    if _active_container is None:
+        raise RuntimeError("demo container has not been built")
+    return _active_container.weather_service()
 
 
 def build_container(settings: DemoSettings | None = None) -> DemoContainer:
     """Assemble the container, optionally binding an explicit settings tree."""
+    global _active_container  # noqa: PLW0603
     container = DemoContainer()
     if settings is not None:
         container.settings.override(settings)
+    _active_container = container
     return container
 
 
 async def resolve_prepared(container: DemoContainer) -> DemoService:
-    """Initialize the container and return the prepared ``DemoService``.
-
-    Async resources expose their value as an awaitable once
-    ``init_resources()`` has run; this collapses the two steps into one call
-    for the CLI and tests.
-    """
+    """Initialize the container and return its ready service."""
     init = container.init_resources()
     if inspect.isawaitable(init):
         await init
-    prepared = container.prepared()
-    if inspect.isawaitable(prepared):
-        return await prepared
-    return prepared
+    return container.demo_service()
 
 
 async def shutdown_container(container: DemoContainer) -> None:

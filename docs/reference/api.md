@@ -39,4 +39,14 @@ Generated from the public Python API.
 
 ## Sources
 
-::: pyverge.adapters.fastmcp.FastMCPDiscovery
+::: pyverge.adapters.fastmcp.PyvergeProvider
+
+::: pyverge.adapters.fastmcp.PyvergeExtension
+
+::: pyverge.adapters.fastmcp.ComponentKind
+
+::: pyverge.adapters.fastmcp.ToolKind
+
+::: pyverge.adapters.fastmcp.PromptKind
+
+::: pyverge.adapters.fastmcp.ResourceKind

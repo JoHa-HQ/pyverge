@@ -7,18 +7,17 @@ version of its kind:
 * ``weather_briefing`` — the prompt that words the reading (v2),
 * ``weather_reading`` — the resource template that serves the reading (v2).
 
-The service arrives through dependency-injector wiring (``@inject`` +
-``Provide``). Each function is wrapped by the adapter's ``tool``/``prompt``/
-``resource`` decorator, applied **outside** ``@inject``, so the injected
-``weather`` parameter is hidden before FastMCP reflects the signature — a
-caller never sees it, but the handler still receives it at call time.
+The service arrives through FastMCP's native ``Depends``. The dependency
+factory resolves the active demo container lazily, so the injected ``weather``
+parameter is excluded from the reflected schema by FastMCP itself.
 """
 
 from __future__ import annotations
 
-from dependency_injector.wiring import Provide, inject
-
-from pyverge.adapters.fastmcp import prompt, resource, tool
+from fastmcp.dependencies import Depends
+from fastmcp.prompts import prompt
+from fastmcp.resources.template import FunctionResourceTemplate
+from fastmcp.tools import tool
 
 from ..domain import ANCHOR_VERSION
 from ..domain.weather import WeatherService
@@ -27,8 +26,14 @@ PROMPT_VERSION = "2.0.0"
 RESOURCE_VERSION = "2.0.0"
 
 
+def weather_service() -> WeatherService:
+    """Resolve the active container's weather service for FastMCP Depends."""
+    from ..container import current_weather_service  # noqa: PLC0415
+
+    return current_weather_service()
+
+
 @tool(name="search_weather", version=ANCHOR_VERSION)
-@inject
 def search_weather(  # noqa: PLR0913, PLR0917
     city: str,
     units: str = "celsius",
@@ -36,7 +41,7 @@ def search_weather(  # noqa: PLR0913, PLR0917
     humidity: int = 0,
     wind: float = 0.0,
     coordinates: dict | None = None,
-    weather: WeatherService = Provide["weather_service"],
+    weather: WeatherService = Depends(weather_service),
 ) -> dict:
     """Search weather for a city (anchor: v4).
 
@@ -58,11 +63,10 @@ def search_weather(  # noqa: PLR0913, PLR0917
 
 
 @prompt(name="weather_briefing", version=PROMPT_VERSION)
-@inject
 def weather_briefing(
     city: str,
     style: str = "short",
-    weather: WeatherService = Provide["weather_service"],
+    weather: WeatherService = Depends(weather_service),
 ) -> str:
     """A natural-language briefing for a city (anchor: v2).
 
@@ -78,16 +82,10 @@ def weather_briefing(
     return f"{city}: {reading['temperature']:.1f}°"
 
 
-@resource(
-    uri_template="weather://{city}{?units}",
-    name="weather_reading",
-    version=RESOURCE_VERSION,
-)
-@inject
-def weather_reading(
+def _weather_reading(
     city: str,
     units: str = "celsius",
-    weather: WeatherService = Provide["weather_service"],
+    weather: WeatherService = Depends(weather_service),
 ) -> str:
     """The current reading for a city, as a resource (anchor: v2).
 
@@ -96,3 +94,11 @@ def weather_reading(
     """
     reading = weather.forecast(city=city, units=units)
     return f"{city}: {reading['temperature']:.1f}° ({units})"
+
+
+weather_reading = FunctionResourceTemplate.from_function(
+    _weather_reading,
+    uri_template="weather://{city}{?units}",
+    name="weather_reading",
+    version=RESOURCE_VERSION,
+)
