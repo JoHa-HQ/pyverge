@@ -27,7 +27,9 @@ dev = [
   "typer>=0.21",
   "rich>=13",
   "mkdocstrings[python]>=1.0.8",
-  "pytest-codeblocks>=0.18.0"
+  "pytest-codeblocks>=0.18.0",
+  "celery>=5.4",
+  "httpx>=0.27"
 ]
 
 [project]

@@ -1,4 +1,4 @@
-# Migration Formats
+# Migration formats
 
 Choose the simplest format that expresses the edge.
 

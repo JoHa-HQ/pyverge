@@ -8,7 +8,9 @@ Task examples for sync, async, process-isolated, and context-aware execution.
 - A target policy.
 - A backend matching sync, async, or process execution needs.
 
-## Before execution
+## Steps
+
+### Before execution
 
 Planning validates the complete selected path against the graph snapshot:
 
@@ -19,7 +21,7 @@ Planning validates the complete selected path against the graph snapshot:
 Key-only nodes and unbound edges are valid graph content, but they forbid
 execution until completed.
 
-## Sync
+### Sync
 
 ```python
 runner = manager.runner()

@@ -13,14 +13,11 @@ Runnable examples, grouped by the problem they solve.
 
 - [Target policies](target-policies.md)
 - [Async execution](async-runner.md)
-- [Reconstruct a missing model](reconstruct-missing-model.md)
-- [Generate a migration from models](generate-migration.md)
+- [Fill missing schema pieces](missing-schemas.md)
 
 ## Operations and integrations
 
-- [CLI](cli.md)
 - [CI manifest comparison](ci-manifest.md)
 - [JGF API](jgf-api.md)
-- [OTel hooks](otel-hooks.md)
-- [OpenLineage hooks](openlineage-hooks.md)
+- [Observability hooks](observability-hooks.md)
 - [Benchmark latency](benchmark.md)

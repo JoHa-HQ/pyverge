@@ -16,7 +16,7 @@ version graph: models, migrations, target policy, and an execution backend.
 | Write a migration | [Author migrations](how-to/migrations/author-migrations.md) |
 | Run a payload | [Run payloads](how-to/runtime/run-payloads.md) |
 | Reconstruct missing data | [Reconstruct missing models](how-to/migrations/reconstruct-missing-models.md) |
-| Use FastMCP or FastStream | [FastMCP](integrations/fastmcp/how-to.md) · [FastStream](integrations/faststream/how-to.md) |
+| Use an adapter | [FastMCP](integrations/fastmcp/how-to.md) · [FastStream](integrations/faststream/how-to.md) · [Celery](integrations/celery/how-to.md) · [httpx](integrations/httpx/how-to.md) |
 | Upgrade old API | [Upgrade guide](reference/upgrades.md) |
 
 ## Start here
@@ -29,8 +29,10 @@ version graph: models, migrations, target policy, and an execution backend.
 
 ## Integrations
 
-- [FastMCP](integrations/fastmcp/how-to.md) — versioned tools, prompts, resources
-- [FastStream](integrations/faststream/how-to.md) — subscriber/publisher convergence
+- [FastMCP](integrations/fastmcp/index.md) — versioned tools, prompts, resources
+- [FastStream](integrations/faststream/index.md) — subscriber/publisher convergence
+- [Celery](integrations/celery/index.md) — versioned task payloads and multi-version chains
+- [httpx](integrations/httpx/index.md) — client-side request and response convergence
 
 ## Contribute
 

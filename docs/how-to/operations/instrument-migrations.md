@@ -9,67 +9,16 @@ distributed tracing.
 - A registered migration edge.
 - A hook implementing the desired callbacks.
 
-## Hook contract
+## Steps
 
-Hooks receive the step name, `NodeId` endpoints, migration descriptor, and a
-backend-provided `HookState`:
+### Implement the callbacks
 
-```python
-from typing import Any
+Implement `before_migrate`, `after_migrate`, and `on_error` on a
+`MigrationHook`. The full callback contract, the `state` lifecycle, the worked
+`AuditHook`, and async-hook rules live in
+[Runtime reference → Hooks](../../reference/runtime.md#hooks).
 
-from pyverge.core.types import HookState
-from pyverge.execution import MigrationHook
-from pyverge.versioning import MigrationDescriptor, NodeId
-
-
-class AuditHook(MigrationHook):
-    def before_migrate(
-        self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
-        data: dict[str, Any],
-        *,
-        migration: MigrationDescriptor | None = None,
-        state: HookState,
-    ) -> None:
-        print(
-            f"migrating {migration.strategy if migration else name} "
-            f"{from_version} -> {to_version}"
-        )
-
-    def after_migrate(
-        self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
-        original_data: dict[str, Any],
-        migrated_data: dict[str, Any],
-        *,
-        migration: MigrationDescriptor | None = None,
-        state: HookState,
-    ) -> None:
-        print(f"migrated {from_version} -> {to_version}")
-
-    def on_error(
-        self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
-        data: dict[str, Any],
-        error: Exception,
-        *,
-        migration: MigrationDescriptor | None = None,
-        state: HookState,
-    ) -> None:
-        print(f"failed {from_version} -> {to_version}: {error}")
-```
-
-`state` is not global and should not be stored on the hook instance. The
-execution backend creates one `ContextVar` per run and adapts it per async task
-or thread. Store per-step state in it by hook instance key when needed.
-
-Register a hook on a specific migration edge:
+### Register the hook
 
 ```python
 from pyverge.core import ManagerMigrationKey
@@ -83,29 +32,7 @@ manager.add_hook(
 An instance hook applies only to that manager instance. Register on the manager
 class before instantiating if every instance should inherit the hook.
 
-### Async hooks
-
-Define async callbacks directly on the hook. The async backend awaits them:
-
-```python
-class AsyncAuditHook(MigrationHook):
-    async def before_migrate(
-        self,
-        name,
-        from_version,
-        to_version,
-        data,
-        *,
-        migration=None,
-        state,
-    ):
-        await audit_write(migration, from_version, to_version)
-```
-
-There are no separate `abefore_migrate` / `aafter_migrate` methods. The sync
-backend rejects awaitable hook results with `AsyncExecutionRequired`.
-
-### OpenTelemetry
+### Configure OpenTelemetry
 
 `OTELHook` creates a span per migration step. Wire it to your tracer provider:
 
@@ -138,7 +65,7 @@ migration.identity       # when available
 migration.duration_seconds
 ```
 
-### OpenLineage
+### Configure OpenLineage
 
 `OpenLineageHook` emits edge-level START/COMPLETE/FAIL events. Use
 `OpenLineageMiddleware` when you also want run-level lineage and namespace
@@ -187,5 +114,5 @@ result = manager.runner().run(payload, "latest")
 ## See also
 
 - [Test migrations](test-migrations.md)
-- [Runtime reference](../../reference/runtime.md)
+- [Runtime reference → Hooks](../../reference/runtime.md#hooks)
 - [Run payloads](../runtime/run-payloads.md)

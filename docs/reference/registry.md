@@ -76,7 +76,8 @@ Use this when registering migrations and reconstructing missing endpoints.
 ### Manager-owned registry
 
 `Manager.configure(adapter)` builds this configuration automatically from the
-adapter codec, reflection stack, health linters, and `on_missing` policy.
+adapter codec, reflection stack, default health linters, and `on_missing`
+policy. Pass `linters=(...)` to append adapter-specific health rules.
 
 ## Model storage
 
@@ -142,7 +143,9 @@ Built-ins:
 - `CompatibilityLinter`
 
 `DEFAULT_HEALTH_LINTERS` contains the first three. Add `CompatibilityLinter`
-when structural compatibility should be reported.
+when structural compatibility should be reported. It reports
+`migration.structural_breaking` as a `warning`, so it is visible in the health
+index without failing a startup policy that raises on `error`.
 
 ### Custom linter
 
@@ -181,6 +184,19 @@ all_issues = registry.health_issues
 
 `health(entity)` is a cached lookup. Linters run during registry mutations, not
 on every health read.
+
+Pass `fail_level` to turn the lookup into a startup gate. The threshold follows
+logging severity: an issue blocks when its severity is at or above the level.
+`"never"` disables the gate.
+
+```python
+from pyverge.registry.errors import HealthValidationError
+
+registry.health(node_or_edge, fail_level="error")
+registry.health(fail_level="warning")   # every cached entity
+```
+
+`HealthValidationError.issues` carries the blocking findings.
 
 Indexes:
 

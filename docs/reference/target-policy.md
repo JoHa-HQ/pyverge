@@ -1,4 +1,4 @@
-# Target Policy
+# Target policy
 
 A target policy answers one question for every discovered entry: *"what version
 should this entry converge to?"* The policy is compiled into a lightweight

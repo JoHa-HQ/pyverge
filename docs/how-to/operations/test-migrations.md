@@ -2,95 +2,25 @@
 
 A version graph has failure modes that per-migration unit tests miss: a missing
 reverse edge, a forward migration that is not idempotent, or a finalize step
-that silently drops a field. This page covers the testing patterns that catch
-them.
+that silently drops a field.
+
+Use the smallest test that catches the failure:
+
+| Test | Catches |
+| --- | --- |
+| [Round trip](test-migrations.md#run-the-round-trip) | missing edges and broken hop validation |
+| [Schema evolution](test-schema-evolution.md) | drifted field surfaces, callable discoverability, snapshots |
+| [Property-based tests](property-based-tests.md) | model-contract and graph-shape regressions |
 
 ## Prerequisites
 
 - A test manager fixture.
 - Registered models and migrations for the topology under test.
+- Reverse edges when the round trip travels backward.
 
 ## Steps
 
-## Time-travel topology test
-
-The highest-value test for a version graph is a **round trip**: start from a
-newest-shaped payload, migrate down to the oldest version, then back up to
-newest, asserting every hop yields the correctly-typed container.
-
-```python
-def test_migration_topology(manager, kind, versions):
-    newest, oldest = versions[-1], versions[0]
-    newest_node = manager.get(kind, newest)
-    newest_cls = manager.adapter.resolve(newest_node.descriptor.ref)
-
-    data = newest_cls.model_validate(
-        {"kind": kind, "version": newest, "city": "Berlin"}
-    )
-
-    # Down-walk: newest -> oldest, validating each hop against its model.
-    for version in reversed(versions):
-        node = manager.get(kind, version)
-        cls = manager.adapter.resolve(node.descriptor.ref)
-        result = manager.runner().run(
-            data.model_dump(mode="json"), target=version, container=cls
-        )
-        assert isinstance(result, cls)
-
-    # Return trip: oldest -> newest.
-    back = manager.runner().run(
-        result.model_dump(mode="json"), target=newest, container=newest_cls
-    )
-    assert isinstance(back, newest_cls)
-```
-
-Why it works: `container=` validates the migrated payload against the target
-version's model, so a schema mismatch **raises** instead of passing silently
-(silent field drops are the classic bug). It is fully data-driven — parametrize
-over every registered kind and run it against your whole registry.
-
-```python
-@pytest.mark.parametrize("kind", ["cv", "jd", "application"])
-def test_topology(kind, manager):
-    versions = [str(n.version[1]) for n in manager.list_versions(kind)]
-    if len(versions) < 2:
-        pytest.skip("single version")
-    ...  # round trip as above
-```
-
-### Parametrize per version
-
-A whole-chain assertion points at the chain, not the version that drifted. Make
-each version a named case: assert the **field surface** the converged payload
-exposes, driven by a table that doubles as documentation of the schema
-evolution.
-
-```python
-SURFACE = {
-    "1.0.0": {"kind", "version", "city", "temperature"},
-    "2.0.0": {"kind", "version", "city", "temperature", "humidity"},
-    "3.0.0": {"kind", "version", "city", "temperature", "humidity", "wind"},
-}
-
-@pytest.mark.parametrize(("version", "surface"), SURFACE.items(), ids=SURFACE)
-def test_version_field_surface(manager, version, surface):
-    hop = next(h for h in walk_topology(manager, kind, versions) if h.version == version)
-    assert set(hop.payload) == surface
-```
-
-Adding a version adds one row; the diff documents the change.
-
-The round trip needs **both directions**. Register reverse edges (or run with
-`direction="any"`) before asserting, or the down-walk fails with
-`MigrationNotFoundError` — which is itself a useful guard test:
-
-```python
-def test_forward_only_chain_cannot_travel_back(manager):
-    with pytest.raises(MigrationNotFoundError):
-        walk_down_to_oldest(manager)
-```
-
-### Registering the graph in tests
+### Register the graph in tests
 
 Build the manager through the same factory the application uses, so the test
 mirrors production wiring:
@@ -102,152 +32,80 @@ def manager():
 ```
 
 Prefer registering **only the anchor** and letting the engine reconstruct older
-versions (`on_missing="reconstruct_model"`). Then the graph test doubles as a
-check that reconstruction produced the intended schemas — assert field presence
-per version:
+versions (`on_missing="reconstruct_model"`). The topology test then also checks
+that reconstruction produced the intended schemas.
+
+### Run the round trip
+
+The highest-value test for a version graph is a **round trip**: start from the
+newest shape, migrate down to the oldest version, then back up, validating every
+hop against its model.
 
 ```python
-def test_older_models_were_reconstructed(manager):
-    v1 = manager.get(kind, "1.0.0")
-    model = manager.adapter.resolve(v1.descriptor.ref)
-    assert "wind" not in model.model_fields
+def test_migration_topology(manager, kind, versions):
+    newest, oldest = versions[-1], versions[0]
+    newest_cls = manager.adapter.resolve(
+        manager.get(kind, newest).descriptor.ref
+    )
+
+    data = newest_cls.model_validate(
+        {"kind": kind, "version": newest, "city": "Berlin"}
+    )
+
+    for version in reversed(versions):
+        cls = manager.adapter.resolve(manager.get(kind, version).descriptor.ref)
+        result = manager.runner().run(
+            data.model_dump(mode="json"), target=version, container=cls
+        )
+        assert isinstance(result, cls)
+
+    back = manager.runner().run(
+        result.model_dump(mode="json"), target=newest, container=newest_cls
+    )
+    assert isinstance(back, newest_cls)
 ```
 
-### Testing callable migrations
+`container=` validates the migrated payload against the target model, so a
+schema mismatch raises instead of passing silently.
 
-A Python-callable migration is executed as-is, but the engine also reconstructs
-missing models by **parsing its source AST**. That parser only recognizes a
-narrow set of shapes:
-
-- ``return {**data, "field": value}`` → the field is an addition
-- ``data["field"] = value`` → addition
-- ``del data["field"]`` → removal
-
-A callable written in an unrecognized shape reconstructs the wrong schema
-silently. Keep the two concerns apart: assert **discoverability** on the
-callable, and assert **behaviour** through the topology walk.
+### Parametrize over kinds
 
 ```python
-EDGE_EFFECTS = {
-    migrations.add_wind: ("wind", None),
-    migrations.drop_wind: (None, "wind"),
-}
-
-@pytest.mark.parametrize(("func", "effect"), list(EDGE_EFFECTS.items()), ids=...)
-def test_callable_is_ast_discoverable(func, effect):
-    added, removed = effect
-    diff = CallableDiffDiscovery().discover(func, source=meta, target=meta)
-    if added:
-        assert added in diff.added_fields
-    if removed:
-        assert removed in diff.removed_fields
+@pytest.mark.parametrize("kind", ["cv", "jd", "application"])
+def test_topology(kind, manager):
+    versions = [str(n.version[1]) for n in manager.list_versions(kind)]
+    if len(versions) < 2:
+        pytest.skip("single version")
+    ...  # round trip as above
 ```
 
-Write removals as ``del data["field"]`` (not ``del some_copy["field"]``) so the
-parser sees them; additions as ``{**data, "field": value}``.
-
-### Property-based payloads
-
-Generate valid payloads for the **latest** model with Hypothesis, then assert
-the container validates. This guards the model contract independently of
-migrations:
+The round trip needs **both directions**. Register reverse edges, or run with
+`direction="any"`, before asserting. A forward-only chain should fail:
 
 ```python
-@given(instance=model_strategy(kind))
-def test_latest_models(kind, instance):
-    Doc.model_validate({"container": instance.model_dump(mode="json")})
+def test_forward_only_chain_cannot_travel_back(manager):
+    with pytest.raises(MigrationNotFoundError):
+        walk_down_to_oldest(manager)
 ```
-
-Compose strategies per nested model and combine them (see joha's
-`tests/strategies/` for a worked example). Keep generators aligned with the
-model fields — a drifted generator is a false failure, not a real one.
-
-### Snapshotting a version chain
-
-Snapshot every version's validated dump in one parametrized test, so a schema
-change is a visible diff rather than a silent break:
-
-```python
-def test_all_versions_match_snapshot(manager, snapshot, subtests):
-    for node in manager.list_versions(kind):
-        version = str(node.version[1])
-        with subtests.test(version=version):
-            # Build a valid payload for this version from your model factory.
-            model = manager.adapter.resolve(node.descriptor.ref)
-            payload = model(**valid_payload_for(version))
-            document = {"container": payload.model_dump(mode="json")}
-            assert Doc.model_validate(document).model_dump(mode="json") == snapshot(
-                name=version
-            )
-```
-
-`pytest-subtests` keeps each version a distinct pass/fail; `syrupy` stores the
-expected dumps next to the test.
-
-A lighter variant snapshots the **field surface** per version — one snapshot
-per version, parametrized — which pins the structural evolution of the chain
-without depending on sample data:
-
-```python
-def _field_surface(model: type[BaseModel]) -> dict[str, str]:
-    return {n: str(f.annotation) for n, f in sorted(model.model_fields.items())}
-
-
-@pytest.mark.parametrize("version", ALL_VERSIONS)
-def test_version_field_surface_matches_snapshot(manager, version, snapshot):
-    node = manager.get(kind, version)
-    model = manager.adapter.resolve(node.descriptor.ref)
-    assert _field_surface(model) == snapshot(name=f"{kind}@{version}")
-```
-
-`pytest --snapshot-update` then rewrites only the version whose schema changed.
-
-### Asserting on hooks and tracing
-
-Hooks are observable, so assert them directly. Swap the OTLP exporter for an
-in-memory one and check the spans a migration emits:
-
-```python
-def test_one_span_per_step(manager, span_exporter):
-    manager.runner().run(payload, "latest")
-    spans = span_exporter.get_finished_spans()
-    assert all(s.name.endswith(".migrate") for s in spans)
-    assert span_exporter.get_finished_spans()[0].attributes["migration.kind"] == kind
-```
-
-### Graph and synthetic coverage
-
-The repository separates graph tests into `tests/graph/`:
-
-- `test_identity.py` — `NodeId`, `VersionKey`, `EdgeKey`, digests;
-- `test_builder.py` — snapshot construction and key-only entries;
-- `test_paths.py` — complete-path hydration and binding;
-- `test_planning.py` — `PathFinder`, target policy, policy engine;
-- `test_synthetic.py` — Hypothesis-generated graph shapes.
-
-Prefer behavior-level assertions through the public graph API. Reuse the shared
-`registry`, `graph`, `nodes`, and `path_finder` fixtures instead of rebuilding
-adapters in each test.
-
-```python
-@pytest.mark.parametrize("nodes", [[UserV1, UserV2]], indirect=True)
-def test_graph_path(graph, nodes):
-    assert graph().migration_path(nodes[0], nodes[1]) == [(nodes[0], nodes[1])]
-```
-
-See [testing approach](../../explanation/testing.md) for layering and end-to-end test strategy.
 
 ## Verify
 
-Run the topology and round-trip assertions in the examples above.
+Run the round trip for every registered kind and assert every hop validates.
 
 ## Troubleshooting
 
-- Version mismatch: target model differs from the asserted model.
-- Nested entry missing: register the child kind in the same manager.
+- **Version mismatch:** the target model differs from the asserted model.
+- **Nested entry missing:** register the child kind in the same manager.
+- **Down-walk fails:** register the reverse edges or use `direction="any"`.
 
 ## See also
 
-- [Execution Flow](../../explanation/execution-flow.md) — discovery, ordering, and finalize.
-- [Migrations](../../explanation/migrations.md) — reconstruct missing models or migrations.
-- [Telemetry & Hooks](instrument-migrations.md) — observability for assertions.
+- [Test schema evolution](test-schema-evolution.md) — field surfaces, callable
+  discoverability, snapshots, and hook assertions.
+- [Property-based tests](property-based-tests.md) — generated payloads and graph
+  shapes.
+- [Execution flow](../../explanation/execution-flow.md) — discovery, ordering, and
+  finalize.
+- [Migrations](../../explanation/migrations.md) — reconstruct missing models or
+  migrations.
+- [Telemetry & hooks](instrument-migrations.md) — observability for assertions.

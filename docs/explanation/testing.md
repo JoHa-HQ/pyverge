@@ -1,56 +1,46 @@
 # Testing approach
 
-## Layering for testability
+## Layer the graph
 
-Keep the version graph (domain) free of framework imports. Then tests build the
-graph **without** a server, an adapter, or a collector:
+Keep the version graph free of framework imports. Build it without a server, an
+adapter, or a collector, then test convergence through the graph and manager
+surfaces.
 
-```python
-manager = build_manager(settings)   # no FastMCP, no OpenTelemetry
-for hop in walk_topology(manager, kind, versions):
-    ...
-```
-
-Graph-specific fixtures live in `tests/graph/conftest.py`:
-
-- `registry` — configured storage;
-- `graph` — an `engine.snapshot` factory;
-- `nodes` — materialized nodes from parametrized models;
-- `path_finder` — a planner facade configured through `request.param`.
-
-Prefer behavior-level graph tests over internal reassembly. The graph suite is
-split into identity, builder, paths, planning, and synthetic Hypothesis-driven
-scenarios. Use `GraphBuilder`, `PathFinder`, and public registry operations
-rather than reaching into private indexes.
-
-Framework wiring (servers, tracing) lives behind adapters and is exercised by
-its own thin suite. Dependency injection keeps the graph construction testable:
-wire the version graph as a provider and override it in tests. See
-`showcases/fastmcp/` in the repository for a worked layered example with
-`dependency-injector`.
+Prefer behavior-level graph tests over internal reassembly. Use `GraphBuilder`,
+`PathFinder`, and public registry operations rather than reaching into private
+indexes.
 
 ## Prefer end-to-end over internal reassembly
 
-Build the application through its **composition root** and drive it through
-public interfaces only — the server (`server.call_tool`) and the manager
-(`manager.runner().run`). A test that reassembles internal wiring couples itself to
-the implementation and breaks on every refactor; a test that calls the public
+Build the application through its composition root and drive it through public
+interfaces only. A test that reassembles internal wiring couples itself to the
+implementation and breaks on every refactor; a test that calls the public
 surface survives it.
 
-```python
-@pytest.fixture
-async def app(container):
-    return await resolve_prepared(container)   # the real lifecycle, once
+The same rule applies to adapters: exercise the public server, broker, task, or
+transport surface instead of constructing adapter internals.
 
-async def test_call_any_version_converges(app):
-    for version in ALL_VERSIONS:               # public call surface
-        result = await app.server.call_tool(
-            kind, {"city": "Berlin", "version": version}
-        )
-        assert result.structured_content == expected_anchor_shape
-```
+## Keep the test suite small
 
-Reserve unit-style tests for pure layers, and keep the end-to-end suite small:
-one convergence suite plus the topology round trip is usually enough. For graph
-topology use Hypothesis to generate namespace, node count, hydration, and edge
-connectivity combinations, then assert observable path behavior only.
+- One convergence suite per adapter.
+- One topology round trip per manager.
+- Schema-evolution checks for field surfaces and callable discoverability.
+- Property-based generation for model contracts and graph shapes.
+
+Reserve unit-style tests for pure layers. If a test needs private attributes or
+a reconstructed adapter, move the assertion to a public surface.
+
+## Choose the test
+
+- Round-trip topology: [Test migrations](../how-to/operations/test-migrations.md)
+- Field surfaces, callable discoverability, snapshots, hooks:
+  [Test schema evolution](../how-to/operations/test-schema-evolution.md)
+- Generated payloads and graph shapes:
+  [Test with property-based payloads](../how-to/operations/property-based-tests.md)
+- Adapter behavior: the adapter's own how-to and showcase.
+
+## See also
+
+- [Test migrations](../how-to/operations/test-migrations.md)
+- [Test schema evolution](../how-to/operations/test-schema-evolution.md)
+- [Test with property-based payloads](../how-to/operations/property-based-tests.md)

@@ -45,5 +45,5 @@ Review the proposed patch before registering it, then validate the resulting edg
 ## See also
 
 - [Reconstruct missing models](reconstruct-missing-models.md)
-- [Migration strategies](../../explanation/migrations.md)
+- [Migrations](../../explanation/migrations.md)
 - [Migration format reference](../../reference/migration-formats.md)

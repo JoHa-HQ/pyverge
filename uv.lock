@@ -3012,10 +3012,12 @@ httpx = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "celery" },
     { name = "commitizen" },
     { name = "fastmcp" },
     { name = "faststream", extra = ["kafka"] },
     { name = "hatch" },
+    { name = "httpx" },
     { name = "hypothesis" },
     { name = "json-graph-lite" },
     { name = "mkdocs-material" },
@@ -3064,10 +3066,12 @@ provides-extras = ["celery", "cli", "fastmcp", "faststream", "httpx"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "celery", specifier = ">=5.4" },
     { name = "commitizen", specifier = ">=4.16.2" },
     { name = "fastmcp", specifier = ">=4" },
     { name = "faststream", extras = ["kafka"], specifier = ">=0.7.7" },
     { name = "hatch", specifier = ">=1.16.5" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "hypothesis", specifier = ">=6.130" },
     { name = "json-graph-lite", specifier = ">=0.8a0" },
     { name = "mkdocs-material", specifier = ">=9.8.0" },

@@ -11,7 +11,7 @@
 
 ## Steps
 
-## End-to-end example
+### End-to-end example
 
 ```python
 import asyncio
@@ -19,15 +19,10 @@ from typing import Literal, TypedDict, cast
 
 import semver
 from faststream import FastStream
-from faststream.kafka import KafkaBroker, TestKafkaBroker
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.adapters.faststream import (
-    publish_to,
-    publisher,
-    subscriber,
-)
+from pyverge.adapters.faststream import PyvergeBroker
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 
@@ -67,48 +62,81 @@ def drop_currency(data: OrderV2Data, context=None) -> OrderV1Data:
     return cast(OrderV1Data, data)
 
 
-OrderManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")))
+OrderManager = Manager[semver.Version].configure(
+    PydanticModelAdapter(
+        codec=ModelCodec(
+            namespace="default", version_property="version", kind_property="kind"
+        )
+    )
+)
 OrderManager.store_model(Order)
-OrderManager.store_migration(ManagerMigrationKey("Order", "1.0.0", "2.0.0"), add_currency)
-OrderManager.store_migration(ManagerMigrationKey("Order", "2.0.0", "1.0.0"), drop_currency)
+OrderManager.store_migration(
+    ManagerMigrationKey("Order", "1.0.0", "2.0.0"), add_currency
+)
+OrderManager.store_migration(
+    ManagerMigrationKey("Order", "2.0.0", "1.0.0"), drop_currency
+)
 manager = OrderManager()
 
-broker = KafkaBroker("localhost:9092")
+# 3. Wrap the broker once. Every decorator shares one manager and runtime.
+#    Use any FastStream broker; the showcase wires a concrete transport.
+raw_broker = ...
+broker = PyvergeBroker(raw_broker, manager=manager)
 
 
-# 3. One handler on multiple topics: consume at `latest`, produce at `1.0.0`.
-@subscriber(
-    broker,
-    "orders.v1",
-    "orders.v2",
-    manager=manager,
-    targets="latest",
-)
-@publisher(broker, "out-topic", manager=manager, target="1.0.0")
+# 4. One handler on multiple topics: consume at `latest`, produce at `1.0.0`.
+@broker.subscriber("orders.v1", "orders.v2", target="latest")
+@broker.publisher("out-topic", target="1.0.0")
 async def handle(order: Order) -> Order:
     return order
 
 
-app = FastStream(broker)
+app = FastStream(broker.underlying)
 
 
 async def main() -> None:
-    async with TestKafkaBroker(broker) as br:
-        # Either versioned topic reaches the same handler.
-        await br.publish(
-            {"kind": "Order", "version": "1.0.0", "order_id": "1", "total": 9.9},
-            "orders.v1",
-        )
-    # handle() received the v2 shape (currency filled in) and published a v1
+    # Bind the runner once, when the application starts.
+    broker.bind(manager.runner())
+    # Drive `broker.underlying` with the in-memory test broker for your
+    # transport. Either versioned topic reaches the same handler.
+    # handle() receives the v2 shape (currency filled in) and publishes a v1
     # payload on `out-topic`.
 
 
 asyncio.run(main())
 ```
 
+`PyvergeBroker` owns one runtime, so the runner is built once and every
+subscriber/publisher shares it. Build the runner with the host application's
+execution environment and bind it during startup (`broker.bind(runner)`);
+`converge` raises until a runner is bound. Unknown attributes proxy to the wrapped broker,
+so `broker.underlying`, `broker.publishers`, FastStream's test broker, and
+`FastStream(broker.underlying)` keep working.
+
+### Explicit decorators
+
+For multiple managers or existing code, use the decorators directly:
+
+```python
+from pyverge.adapters.faststream import (
+    FastStreamRuntime,
+    publisher,
+    subscriber,
+)
+
+inbound = FastStreamRuntime(inbound_manager, inbound_manager.runner())
+outbound = FastStreamRuntime(outbound_manager, outbound_manager.runner())
+
+
+@subscriber(broker, "orders", runtime=inbound, targets="latest")
+@publisher(broker, "orders-out", runtime=outbound, target="1.0.0")
+async def handle(order: Order) -> Order:
+    return order
+```
+
 The `TypedDict`s are a documentation/IDE aid; migrations still receive and return
 plain dicts at runtime. See
-[Migrations → Type the payload shapes](../../explanation/migration-authoring.md#type-the-payload-shapes).
+[Migrations → Type the payload shapes](../../explanation/migrations.md#type-the-payload-shapes).
 
 ### Telemetry
 
@@ -118,10 +146,10 @@ middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
 spans **as current**, so each step nests under the consume span:
 
 ```python
-from faststream.kafka.opentelemetry import KafkaTelemetryMiddleware
 from pyverge.execution import OTELHook
 
-broker.add_middleware(KafkaTelemetryMiddleware(tracer_provider=provider))
+# FastStream's transport-specific telemetry middleware carries the consume span.
+broker.underlying.add_middleware(telemetry_middleware)
 manager.attach_hooks((OTELHook(tracer=provider.get_tracer("my-service")),))
 ```
 
@@ -129,14 +157,14 @@ See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for th
 
 ### Testing
 
-Drive the adapter through FastStream's in-memory `TestKafkaBroker` — no broker
-container. See the worked
+Drive the adapter through FastStream's in-memory test broker for your transport —
+no broker container. See the worked
 [`showcases/faststream`](https://github.com/JoHa-HQ/pyverge/tree/main/showcases/faststream)
-project (broker selection across Kafka/RabbitMQ/NATS/Redis, Jaeger + OTLP).
+project for broker selection and telemetry wiring.
 
 ## Verify
 
-Publish through `TestKafkaBroker` and assert the handler received the target shape.
+Publish through the in-memory test broker and assert the handler received the target shape.
 
 ## Troubleshooting
 

@@ -8,7 +8,7 @@
 
 ## Steps
 
-See [migration authoring rules](../../explanation/migration-authoring.md) for totality, typed payloads, and property-based guards.
+See [Migrations → Authoring migrations](../../explanation/migrations.md#authoring-migrations) for totality, typed payloads, and property-based guards.
 
 ### Add backward migration
 
@@ -45,5 +45,5 @@ manager.runner().run(payload, "2.0.0")
 ## See also
 
 - [Reconstruct missing models](reconstruct-missing-models.md)
-- [Migration strategies](../../explanation/migrations.md)
+- [Migrations](../../explanation/migrations.md)
 - [Migration format reference](../../reference/migration-formats.md)

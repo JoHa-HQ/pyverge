@@ -1,4 +1,4 @@
-# Real-World Scenarios
+# Real-world scenarios
 
 ## Multi-tenant and multi-package graphs
 
@@ -30,15 +30,15 @@ analysis.
 
 **Existing approaches:**
 
-- Schema registry with backward-compatible changes only (Avro, Protobuf)
+- A schema registry with backward-compatible changes only
 
 - Manual version branching in tool handlers
 
-- Ad-hoc coercion in the LLM layer
+- Ad-hoc coercion in the application layer
 
 ## Message brokers
 
-An event-driven system publishes `OrderCreated` events to Kafka. The event
+An event-driven system publishes `OrderCreated` events to a message broker. The event
 schema evolves: `price` changes from integer cents to a decimal object,
 `items` becomes a nested structure. Consumers must read old events and
 interpret them at the current schema. The broker holds a mixed population
@@ -46,9 +46,9 @@ across partitions and retention windows.
 
 **Existing approaches:**
 
-- Schema Registry (Confluent) with compatibility rules
+- A schema registry with compatibility rules
 
-- Event upcasting (Axon, EventStoreDB)
+- Event upcasting
 
 - Consumer-side version branching
 
@@ -63,7 +63,7 @@ configs must converge to the current schema without losing data.
 
 **Existing approaches:**
 
-- Migration scripts per tenant (Flyway, Liquibase)
+- Migration scripts per tenant
 
 - Default-value coercion at read time
 
@@ -80,11 +80,11 @@ before loading.
 
 **Existing approaches:**
 
-- Source-specific transformers (dbt, Airbyte)
+- Source-specific transformers
 
 - Staging tables with manual normalization
 
-- Schema-on-read (Delta Lake, Iceberg)
+- Schema-on-read
 
 - Custom ETL scripts per source
 

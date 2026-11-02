@@ -22,25 +22,24 @@ nav:
   - How-to:
       - how-to/index.md
       - Models:
-          - how-to/models/index.md
           - Register models and migrations: how-to/models/register-models.md
-          - Keys and hydration: how-to/models/keys-and-hydration.md
+          - Hydrate key-only entries: how-to/models/keys-and-hydration.md
           - Use the manager: how-to/models/use-manager.md
       - Migrations:
-          - how-to/migrations/index.md
           - Author migrations: how-to/migrations/author-migrations.md
           - Reconstruct missing models: how-to/migrations/reconstruct-missing-models.md
           - Reconstruct missing migrations: how-to/migrations/reconstruct-missing-migrations.md
           - Use runtime context in migrations: how-to/migrations/migration-context.md
       - Runtime:
-          - how-to/runtime/index.md
           - Run payloads: how-to/runtime/run-payloads.md
           - Migrate nested payloads: how-to/runtime/migrate-nested-payloads.md
       - Operations:
-          - how-to/operations/index.md
           - Test migrations: how-to/operations/test-migrations.md
+          - Test schema evolution: how-to/operations/test-schema-evolution.md
+          - Test with property-based payloads: how-to/operations/property-based-tests.md
           - Instrument migrations with hooks: how-to/operations/instrument-migrations.md
           - Benchmark adapters: how-to/operations/benchmark-adapters.md
+          - Profile execution memory: how-to/operations/profile-execution.md
   - Examples:
       - examples/index.md
       - Executable quickstart: examples/quickstart.md
@@ -49,11 +48,8 @@ nav:
       - Graph snapshots: examples/graph-snapshot.md
       - Target policies: examples/target-policies.md
       - Async execution: examples/async-runner.md
-      - Reconstruct a missing model: examples/reconstruct-missing-model.md
-      - Generate a migration from models: examples/generate-migration.md
-      - OTel hooks: examples/otel-hooks.md
-      - OpenLineage hooks: examples/openlineage-hooks.md
-      - CLI: examples/cli.md
+      - Fill missing schema pieces: examples/missing-schemas.md
+      - Observability hooks: examples/observability-hooks.md
       - Benchmark latency: examples/benchmark.md
       - JGF API: examples/jgf-api.md
       - CI manifest comparison: examples/ci-manifest.md
@@ -67,6 +63,14 @@ nav:
           - integrations/faststream/index.md
           - How-to: integrations/faststream/how-to.md
           - Reference: integrations/faststream/reference.md
+      - Celery:
+          - integrations/celery/index.md
+          - How-to: integrations/celery/how-to.md
+          - Reference: integrations/celery/reference.md
+      - httpx transport:
+          - integrations/httpx/index.md
+          - How-to: integrations/httpx/how-to.md
+          - Reference: integrations/httpx/reference.md
   - Reference:
       - reference/index.md
       - API reference: reference/api.md
@@ -87,8 +91,7 @@ nav:
       - Glossary: explanation/glossary.md
       - Managers: explanation/managers.md
       - Providers: explanation/providers.md
-      - Migration strategies: explanation/migrations.md
-      - Migration authoring: explanation/migration-authoring.md
+      - Migrations: explanation/migrations.md
       - Execution flow: explanation/execution-flow.md
       - Scenarios: explanation/scenarios.md
       - Testing approach: explanation/testing.md

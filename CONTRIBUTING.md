@@ -99,6 +99,8 @@ docs/
   how-to/        # task-oriented instructions
   reference/     # API, formats, CLI
   explanation/   # concepts, architecture, trade-offs
+  examples/      # runnable, tested examples
+  integrations/  # adapter guides, each with index/how-to/reference
 ```
 
 Guidelines:
@@ -115,6 +117,50 @@ Validate the docs before committing:
 ```bash
 uv run mkdocs build --strict
 ```
+
+### External references
+
+Name an external library or product only when the page teaches how it works
+directly with pyverge.
+
+Allowed:
+
+- pyverge adapters, providers, formats, and shipped observability integrations;
+- test tools used by the project suite;
+- infrastructure directly exercised by a supported adapter example;
+- tools used by pyverge CI and operations.
+
+Not allowed:
+
+- general-purpose frameworks, DI containers, ORMs, data tools, and vendor
+  products that are not pyverge integrations;
+- external libraries used only as analogies or “existing approaches”;
+- showcase-only tools named in conceptual or core pages.
+
+For background context, describe the category instead of the product: “a message
+broker”, “a schema registry”, “an ETL tool”, “a DI container”. Link to the
+showcase when a concrete infrastructure example matters.
+
+### Docs review checklist
+
+- Every integration has an `index.md`, `how-to.md`, and `reference.md`.
+- Every integration appears in the root, integrations, explanation, and
+  reference indexes.
+- Every page is in `mkdocs.yml` and one Diátaxis type.
+- How-to pages start with a verb and follow the template.
+- No disallowed external references remain.
+- Links resolve and `mkdocs build --strict` passes.
+
+### Docs map
+
+| Topic | Explanation | How-to | Reference | Example |
+| --- | --- | --- | --- | --- |
+| Models | `explanation/providers.md` | `how-to/models/register-models.md` | `reference/manager.md` | `examples/quickstart.md` |
+| Migrations | `explanation/migration-authoring.md` | `how-to/migrations/author-migrations.md` | `reference/migration-formats.md` | `examples/generate-migration.md` |
+| Testing | `explanation/testing.md` | `how-to/operations/test-*.md`, `property-based-tests.md` | `reference/runtime.md#hooks` | — |
+| Benchmarking | `explanation/benchmarking.md` | `how-to/operations/benchmark-adapters.md` | — | `examples/benchmark.md` |
+| Profiling | — | `how-to/operations/profile-execution.md` | — | — |
+| Adapters | `integrations/<adapter>/index.md` | `integrations/<adapter>/how-to.md` | `integrations/<adapter>/reference.md` | `showcases/<adapter>/` |
 
 ### How-to page template
 

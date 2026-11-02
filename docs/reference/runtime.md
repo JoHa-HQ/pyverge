@@ -51,32 +51,79 @@ The backend determines whether `run()` returns a result or an awaitable.
 
 ## Hooks
 
-`MigrationHook` callbacks observe each migration step:
+`MigrationHook` callbacks observe each migration step.
 
 ```python
+from typing import Any
+
+from pyverge.core.types import HookState
+from pyverge.execution import MigrationHook
+from pyverge.versioning import MigrationDescriptor, NodeId
+
+
 class AuditHook(MigrationHook):
+    def before_migrate(
+        self,
+        name: str,
+        from_version: NodeId,
+        to_version: NodeId,
+        data: dict[str, Any],
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
+    ) -> None:
+        print(f"migrating {from_version} -> {to_version}")
+
     def after_migrate(
         self,
-        name,
-        from_version,
-        to_version,
-        original,
-        migrated,
+        name: str,
+        from_version: NodeId,
+        to_version: NodeId,
+        original_data: dict[str, Any],
+        migrated_data: dict[str, Any],
         *,
-        migration=None,
-        state,
-    ):
-        ...
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
+    ) -> None:
+        print(f"migrated {from_version} -> {to_version}")
+
+    def on_error(
+        self,
+        name: str,
+        from_version: NodeId,
+        to_version: NodeId,
+        data: dict[str, Any],
+        error: Exception,
+        *,
+        migration: MigrationDescriptor | None = None,
+        state: HookState,
+    ) -> None:
+        print(f"failed {from_version} -> {to_version}: {error}")
 ```
 
 `from_version` and `to_version` are `NodeId` values. `migration` is the
 `MigrationDescriptor` (`strategy`, `identity`) when available. `state` is a
 backend-provided `ContextVar`; do not store per-step state on the hook instance.
+Store it in `state` by hook instance key when needed.
+
+Register a hook on a specific edge:
+
+```python
+from pyverge.core import ManagerMigrationKey
+
+manager.add_hook(
+    ManagerMigrationKey("User", "1.0.0", "2.0.0"),
+    AuditHook(),
+)
+```
+
+An instance hook applies only to that manager instance. Register on the manager
+class before instantiating if every instance should inherit the hook.
 
 There are no separate `abefore_migrate` / `aafter_migrate` methods. An async hook
 is a `before_migrate` / `after_migrate` / `on_error` method declared with
 `async def`; the async backend awaits it. The sync backend rejects awaitable
-hook results.
+hook results with `AsyncExecutionRequired`.
 
 ## Middleware
 
