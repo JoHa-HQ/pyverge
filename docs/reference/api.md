@@ -50,3 +50,13 @@ Generated from the public Python API.
 ::: pyverge.adapters.fastmcp.PromptKind
 
 ::: pyverge.adapters.fastmcp.ResourceKind
+
+## Celery
+
+::: pyverge.adapters.celery.CeleryLifecycle
+
+::: pyverge.adapters.celery.CeleryRuntime
+
+::: pyverge.adapters.celery.PyvergeTask
+
+::: pyverge.adapters.celery.task
