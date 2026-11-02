@@ -118,13 +118,13 @@ def benchmark(
                 return runner.plan(
                     data,
                     target,
-                    container=None,
+                    source_model=None,
                     max_depth=-1,
                 )
             result = runner.run(
                 data,
                 target,
-                container=None,
+                source_model=None,
                 max_depth=-1,
                 context=runtime_context,
             )

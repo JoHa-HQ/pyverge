@@ -16,6 +16,7 @@ from pyverge.migrations.json_patch import JsonPatch
 from pyverge.migrations.spec import MigrationSpec
 from pyverge.registry.errors import (
     CatalogError,
+    HealthValidationError,
     MigrationConflictError,
     MigrationNotFoundError,
     ModelAlreadyRegisteredError,
@@ -39,7 +40,7 @@ from pyverge.versioning import (
 from pyverge.versioning.errors import NodeConflictError
 
 from .linters import HealthLinter
-from .types import HealthIssue, ReflectionPort
+from .types import HealthFailLevel, HealthIssue, ReflectionPort
 
 
 class Registry(Generic[VersionValue]):
@@ -234,18 +235,37 @@ class Registry(Generic[VersionValue]):
 
     def health(
         self: Self,
-        entity: Identifiable,
+        entity: Identifiable | None = None,
+        *,
+        fail_level: HealthFailLevel | None = None,
     ) -> tuple[HealthIssue, ...]:
-        """Return health issues for one node or edge.
+        """Return health issues for one node or edge, or for the registry.
 
         Args:
-            entity: Node or edge identity to inspect.
+            entity: Node or edge identity to inspect. ``None`` inspects every
+                cached entity.
+            fail_level: When set, raise :class:`HealthValidationError` if any
+                returned issue is at or above this severity. ``"never"``
+                disables the check.
 
         Returns:
             tuple[HealthIssue, ...]: Issues produced by this registry's
                 locked health linters.
+
+        Raises:
+            HealthValidationError: If ``fail_level`` is set and at least one
+                issue meets or exceeds it.
         """
-        return self._health_issues.get(entity, ())
+        issues = (
+            self.health_issues
+            if entity is None
+            else self._health_issues.get(entity, ())
+        )
+        if fail_level is not None:
+            blocking = tuple(issue for issue in issues if issue.blocks(fail_level))
+            if blocking:
+                raise HealthValidationError(self._namespace, blocking)
+        return issues
 
     @property
     def issues_by_entity(self: Self) -> Mapping[Any, tuple[HealthIssue, ...]]:

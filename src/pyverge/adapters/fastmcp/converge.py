@@ -39,7 +39,6 @@ class Converger:
             result = self._manager.runner().run(
                 payload,
                 target,
-                container=None,
                 max_depth=-1,
                 context=None,
             )

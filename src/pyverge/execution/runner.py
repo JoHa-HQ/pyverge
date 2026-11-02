@@ -8,10 +8,11 @@ from pyverge.core.context import MigrationContext
 from pyverge.core.types import VersionValue
 from pyverge.execution.context import ExecutionEnvironment, RunContext
 from pyverge.execution.coordinator import ExecutionCoordinator
-from pyverge.execution.errors import UnknownModelError
+from pyverge.execution.errors import TargetValidationError, UnknownModelError
 from pyverge.execution.middleware import BackendMiddleware
 from pyverge.execution.plan import ExecutionPlan
 from pyverge.execution.types import BackendPort
+from pyverge.graph.planning.path import Path
 from pyverge.graph.planning.targets import TargetPolicy
 from pyverge.schemas.types import ModelAdapter
 
@@ -20,7 +21,7 @@ RunResult: TypeAlias = Any
 
 @dataclass(frozen=True, slots=True)
 class Runner(Generic[VersionValue]):
-    """Coordinate planning and backend execution."""
+    """Coordinate planning, execution, and target validation."""
 
     coordinator: ExecutionCoordinator[VersionValue]
     adapter: ModelAdapter
@@ -33,13 +34,13 @@ class Runner(Generic[VersionValue]):
         payload: dict[str, Any],
         target: TargetPolicy,
         *,
-        container: type[Any] | None,
-        max_depth: int,
+        source_model: type[Any] | None = None,
+        max_depth: int = -1,
     ) -> ExecutionPlan[VersionValue]:
         plan = self.coordinator.plan(
             payload,
             target,
-            container=container,
+            source_model=source_model,
             max_depth=max_depth,
         )
         for entry in plan.path.entries:
@@ -54,18 +55,22 @@ class Runner(Generic[VersionValue]):
         payload: dict[str, Any],
         target: TargetPolicy,
         *,
-        container: type[Any] | None = None,
+        source_model: type[Any] | None = None,
         max_depth: int = -1,
         context: MigrationContext | None = None,
         run_id: str | None = None,
+        validate_target: bool = False,
     ) -> RunResult:
         plan = self.plan(
             payload,
             target,
-            container=container,
+            source_model=source_model,
             max_depth=max_depth,
         )
-        return self.execute(plan, context=context, run_id=run_id)
+        data = self.execute(plan, context=context, run_id=run_id)
+        if validate_target:
+            self._validate_target(plan, data)
+        return data
 
     def execute(
         self,
@@ -85,6 +90,28 @@ class Runner(Generic[VersionValue]):
         for layer in reversed(self.middleware):
             backend = layer.wrap(backend)
         return backend.execute(plan, data, run, self.adapter)
+
+    def _validate_target(
+        self, plan: ExecutionPlan[VersionValue], data: dict[str, Any]
+    ) -> None:
+        for entry in plan.path.entries:
+            path = Path(*entry.path)
+            value = path.get(data)
+            if not isinstance(value, dict):
+                raise TargetValidationError(
+                    path=entry.path,
+                    target_model=entry.target_model,
+                    error=TypeError("target payload is not a mapping"),
+                )
+            resolved = self.adapter.resolve(entry.target_model)
+            try:
+                path.set(data, self.adapter.finalize(resolved, value))
+            except Exception as error:
+                raise TargetValidationError(
+                    path=entry.path,
+                    target_model=entry.target_model,
+                    error=error,
+                ) from error
 
 
 __all__ = ["RunResult", "Runner"]

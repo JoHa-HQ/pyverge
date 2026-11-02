@@ -48,13 +48,10 @@ class PathFinder(Generic[VersionValue]):
         entries: Sequence[ExtractedEntry[VersionValue]],
         target: TargetPolicy,
         *,
-        container: ModelHandle | None,
-        target_fields: frozenset[str],
+        source_model: ModelHandle | None,
     ) -> PathPlan[VersionValue]:
         resolver = self.targets.compile(target)
-        plan = self._plan(
-            entries, resolver, container=container, target_fields=target_fields
-        )
+        plan = self._plan(entries, resolver, source_model=source_model)
         return self.policy.apply(plan, graph=self.graph)
 
     def _plan(
@@ -62,8 +59,7 @@ class PathFinder(Generic[VersionValue]):
         entries: Sequence[ExtractedEntry[VersionValue]],
         target_resolver: TargetResolver,
         *,
-        container: ModelHandle | None,
-        target_fields: frozenset[str],
+        source_model: ModelHandle | None,
     ) -> PathPlan[VersionValue]:
         resolved: list[PathPlanEntry[VersionValue]] = []
         for entry in entries:
@@ -73,8 +69,7 @@ class PathFinder(Generic[VersionValue]):
             resolved.append(self._resolve(entry, target))
         return PathPlan(
             entries=tuple(resolved),
-            container=container,
-            target_fields=target_fields,
+            source_model=source_model,
         )
 
     def _resolve(

@@ -33,7 +33,7 @@ from pyverge.graph import (
 )
 from pyverge.migrations import MigrationSpec
 from pyverge.migrations.json_patch import JsonPatch
-from pyverge.registry import HealthIssue, Registry
+from pyverge.registry import HealthFailLevel, HealthIssue, Registry
 from pyverge.registry.errors import (
     CatalogError,
     MigrationNotFoundError,
@@ -44,6 +44,7 @@ from pyverge.schemas.types import ModelAdapter
 from pyverge.versioning import (
     Comparable,
     EdgeKey,
+    Identifiable,
     Migratable,
     ModelRef,
     NodeEntry,
@@ -236,17 +237,22 @@ class Engine(Generic[VersionValue]):
 
     def health(
         self: Self,
-        entity: Comparable[VersionValue] | Transitional[VersionValue],
+        entity: Identifiable | None = None,
+        *,
+        fail_level: HealthFailLevel | None = None,
     ) -> tuple[HealthIssue, ...]:
         """Return health issues from the owning registry.
 
         Args:
-            entity: Node or edge identity to inspect.
+            entity: Node or edge identity to inspect. ``None`` inspects every
+                cached entity.
+            fail_level: When set, raise when an issue meets or exceeds this
+                severity.
 
         Returns:
-            tuple[HealthIssue, ...]: Health issues for the entity.
+            tuple[HealthIssue, ...]: Health issues for the entity or registry.
         """
-        return self.registry.health(entity)
+        return self.registry.health(entity, fail_level=fail_level)
 
     def validate(self: Self, key: Comparable[VersionValue] | None = None) -> None:
         if key is None:

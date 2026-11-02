@@ -15,7 +15,7 @@ from tests.utils.middleware import AsyncScriptedBackend, ScriptedBackend
 def plan(request: pytest.FixtureRequest) -> ExecutionPlan:
     entries = request.param
     return ExecutionPlan(
-        path=PathPlan(entries=entries, container=None, target_fields=frozenset()),
+        path=PathPlan(entries=entries, source_model=None),
         payload={},
         levels=(),
     )

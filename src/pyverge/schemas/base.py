@@ -118,6 +118,32 @@ class AbstractModelAdapter(Generic[VersionValue]):
             descriptor=self.model_descriptor(model_cls),
         )
 
+    def versionable_from_schema(
+        self,
+        document: Mapping[str, Any],
+        *,
+        kind: str,
+        version: str,
+    ) -> VersionNode[VersionValue]:
+        """Materialize a graph node from a JSON Schema document.
+
+        The identity properties are injected before generation so the resulting
+        model carries the same shape as a concretely registered model.
+        """
+        # Local import avoids a base <-> json_schema.adapter module cycle.
+        from pyverge.schemas.json_schema.adapter import JsonSchemaModelAdapter  # noqa: PLC0415
+
+        properties = dict(document.get("properties", {}))
+        properties.setdefault(self.kind_property, {"type": "string", "default": kind})
+        properties.setdefault(
+            self.version_property, {"type": "string", "default": version}
+        )
+        prepared = {**document, "properties": properties}
+        model = JsonSchemaModelAdapter(codec=self.model_codec).to_pydantic(
+            prepared, class_name="ReflectedModel"
+        )
+        return self.versionable(model, kind=kind, version=version)
+
     def version_key(
         self,
         *,
