@@ -1,36 +1,14 @@
-from .converge import Converger
-from .discovery import FastMCPDiscovery
-from .injection import (
-    InjectionDetector,
-    default_injection_detector,
-    injected_names,
-    marker_detector,
-    never_injected,
-)
-from .reflection import (
-    ComponentReflection,
-    PromptReflection,
-    ReflectedNode,
-    ResourceReflection,
-    ToolReflection,
-)
-from .tools import hide_injected, prompt, resource, tool
+from .components import DEFAULT_KINDS, PromptKind, ResourceKind, ToolKind
+from .extension import PyvergeExtension
+from .ports import ComponentKind
+from .provider import PyvergeProvider
 
 __all__ = [
-    "ComponentReflection",
-    "Converger",
-    "FastMCPDiscovery",
-    "InjectionDetector",
-    "PromptReflection",
-    "ReflectedNode",
-    "ResourceReflection",
-    "ToolReflection",
-    "default_injection_detector",
-    "hide_injected",
-    "injected_names",
-    "marker_detector",
-    "never_injected",
-    "prompt",
-    "resource",
-    "tool",
+    "DEFAULT_KINDS",
+    "ComponentKind",
+    "PromptKind",
+    "PyvergeExtension",
+    "PyvergeProvider",
+    "ResourceKind",
+    "ToolKind",
 ]

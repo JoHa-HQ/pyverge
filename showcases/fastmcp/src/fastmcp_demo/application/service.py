@@ -1,10 +1,10 @@
 """Application layer: the demo use case.
 
-``DemoService`` receives its collaborators (manager, discovery, server) from the
-DI container and exposes the runnable surface. The discovery lifecycle runs as
-the server's **lifespan** — FastMCP enters it when the server is served or
-driven through a client. Tracing is wired at the composition root, so this
-service knows nothing of OpenTelemetry.
+``DemoService`` receives its collaborators (manager, server) from the DI
+container and exposes the runnable surface. The discovery lifecycle runs inside
+the server's **lifespan** — FastMCP enters it when the server is served or driven
+through a client. Tracing is wired at the composition root, so this service
+knows nothing of OpenTelemetry.
 """
 
 from __future__ import annotations
@@ -28,12 +28,10 @@ class DemoService:
         self,
         settings: DemoSettings,
         manager: Any,
-        discovery: Any,
         server: Any,
     ) -> None:
         self._settings = settings
         self.manager = manager
-        self.discovery = discovery
         self.server = server
 
     @property

@@ -5,16 +5,14 @@ resource) in :mod:`fastmcp_demo.adapters.tools` to the domain manager. This is
 the only module that imports FastMCP.
 
 The discovery lifecycle is wired as the server's **lifespan** — the user's
-concern, per FastMCP's model. :func:`build_lifespan` runs the tool discovery's
-phases once at startup; FastMCP enters it whenever the server is run through a
-transport or client.
+concern, per FastMCP's model. :func:`build_server` keeps the provider private and
+runs ``sync -> enrich -> validate -> transforms`` once at startup; FastMCP enters
+it whenever the server is run through a transport or client.
 """
 
 from __future__ import annotations
 
-import logging
-from collections.abc import AsyncIterator, Sequence
-from contextlib import asynccontextmanager
+from collections.abc import Sequence
 from typing import Annotated, Any
 
 from fastmcp import FastMCP
@@ -26,17 +24,15 @@ from fastmcp.tools.base import Tool, ToolResult
 from fastmcp.utilities.versions import VersionSpec
 
 from pyverge.adapters.fastmcp import (
-    FastMCPDiscovery,
-    PromptReflection,
-    ResourceReflection,
-    ToolReflection,
+    PromptKind,
+    PyvergeProvider,
+    ResourceKind,
+    ToolKind,
 )
 from pyverge.types import Attachable
 
 from ..settings import GraphSettings, ServerSettings
 from .tools import search_weather, weather_briefing, weather_reading
-
-logger = logging.getLogger(__name__)
 
 
 class VersionAliasTransform(Transform):
@@ -125,37 +121,12 @@ class VersionedSearchTransform(BM25SearchTransform):
         return Tool.from_function(fn=call_tool, name=self._call_tool_name)
 
 
-def build_discovery(
-    manager: Any,
-    graph: GraphSettings,
-    *,
-    hooks: Sequence[Attachable] = (),
-) -> FastMCPDiscovery:
-    """Return the discovery owning *manager*'s kinds.
-
-    One manager per source: the discovery binds exactly one bounded context and
-    one reflection provider per primitive type. ``hooks`` are attached to every
-    migration edge, so each step is observable.
-    """
-    adapter = manager.adapter
-    return FastMCPDiscovery(
-        manager,
-        providers=[
-            ToolReflection(adapter),
-            PromptReflection(adapter),
-            ResourceReflection(adapter, uri_scheme="weather://"),
-        ],
-        policies=graph.policies,
-        hooks=hooks,
-    )
-
-
 def build_search_transform(settings: ServerSettings) -> list[Any]:
     """Return the server transforms, or an empty list when search is disabled.
 
     The BM25 transform replaces the tool listing with a ``search_tools`` meta
     tool plus a ``call_tool`` proxy, so a client discovers tools on demand.
-    Attached after the discovery lifecycle (see :func:`build_lifespan`).
+    Attached after the discovery lifecycle (see :func:`build_server`).
     """
     if not settings.search_enabled:
         return [VersionAliasTransform()]
@@ -168,47 +139,38 @@ def build_search_transform(settings: ServerSettings) -> list[Any]:
     ]
 
 
-def build_lifespan(discovery: FastMCPDiscovery, *, transforms: Sequence[Any] = ()):
-    """Return the server lifespan that drives the discovery lifecycle.
-
-    The user owns the ordering: ``search`` -> ``register`` -> ``enrich``, once at
-    startup. Re-running would re-materialize the virtual primitives.
-
-    ``transforms`` are attached only *after* ``enrich``: a search transform
-    replaces ``list_tools`` output with its synthetic surface, which would
-    starve the discovery's ``search`` phase if attached first.
-    """
-
-    @asynccontextmanager
-    async def app_lifespan(server: FastMCP) -> AsyncIterator[dict[str, Any]]:
-        logger.info("discovery lifecycle: search -> register -> enrich")
-        await discovery.search(server)
-        await discovery.register(server)
-        await discovery.enrich(server)
-        for transform in transforms:
-            server.add_transform(transform)
-        logger.info("discovery lifecycle complete")
-        yield {"discovery": discovery}
-
-    return app_lifespan
-
-
-def build_server(
-    tool: Any = search_weather,
+def build_server(  # noqa: PLR0913
+    manager: Any,
+    graph: GraphSettings,
+    server_settings: ServerSettings,
     *,
-    lifespan: Any = None,
+    hooks: Sequence[Attachable] = (),
     middleware: Sequence[Any] = (),
+    tool: Any = search_weather,
 ) -> FastMCP:
-    """Return a FastMCP server exposing one physical anchor per kind.
+    """Return a FastMCP server driving the discovery lifecycle.
 
-    Each decorated primitive *is* its kind's anchor; older versions are served by
-    virtual primitives materialized during ``enrich``. ``lifespan`` drives the
-    discovery lifecycle; ``middleware`` are host-supplied observers (e.g.
-    tracing).
+    The provider is internal to the server. Each decorated primitive *is* its
+    kind's anchor; older versions are served by virtual primitives materialized
+    during ``enrich``. The provider applies ``transforms`` after enrichment, so a
+    search transform cannot hide physical components from ``sync``.
     """
+    discovery = PyvergeProvider(
+        manager,
+        kinds=(
+            ToolKind(),
+            PromptKind(),
+            ResourceKind(uri_scheme="weather://"),
+        ),
+        policies=graph.policies,
+        hooks=hooks,
+        virtual_versions=True,
+        transforms=build_search_transform(server_settings),
+    )
+
     server = FastMCP(
         "WeatherServer",
-        lifespan=lifespan,
+        providers=[discovery],
         middleware=[*middleware],
         tools=[tool],
     )
