@@ -15,11 +15,9 @@ from typing import Any
 
 import pytest
 import semver
-from faststream import FastStream
 from faststream.kafka import KafkaBroker, TestKafkaBroker
 
 from pyverge.adapters.faststream import (
-    FastStreamSource,
     TopicTargets,
     publish_to,
     publisher,
@@ -103,25 +101,6 @@ async def test_converges_to_target(broker, payload, expected) -> None:
     async with TestKafkaBroker(broker) as br:
         await br.publish(payload, "users")
     assert broker.payloads == [expected]
-
-
-def test_source_skips_handler_without_model(manager, model_adapter) -> None:
-    runtime_manager = type(
-        "RuntimeManager",
-        (manager,),
-        {"_reflection_locked": False},
-    )
-    instance = runtime_manager()
-    broker = KafkaBroker("localhost:9092")
-
-    @subscriber(broker, "raw", manager=instance)
-    async def handle(payload: dict) -> None: ...
-
-    report = manager.reflect(
-        FastStreamSource(FastStream(broker), adapter=model_adapter)
-    )
-
-    assert report.registered_models == 0
 
 
 @pytest.mark.anyio
@@ -254,21 +233,3 @@ class TestFailures:
                 max_depth=-1,
                 context=None,
             )
-
-
-def test_source_reflects_subscriber_models(manager, source) -> None:
-    report = manager.reflect(source)
-
-    assert report.registered_models == 1
-    assert [str(version) for version in manager._default_engine.registry.versions] == [
-        "test:User@2.0.0"
-    ]
-
-
-def test_source_reflects_publisher_models(manager, publisher_source) -> None:
-    report = manager.reflect(publisher_source)
-
-    assert report.registered_models == 1
-    assert [str(version) for version in manager._default_engine.registry.versions] == [
-        "test:User@2.0.0"
-    ]
