@@ -26,7 +26,11 @@ from pyverge.execution import (
 )
 from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from pyverge.execution.context import LayeredView, RunContext, StepContext
-from pyverge.execution.errors import AsyncExecutionRequired, UnknownModelError
+from pyverge.execution.errors import (
+    AsyncExecutionRequired,
+    TargetValidationError,
+    UnknownModelError,
+)
 from pyverge.graph import (
     PathPlan,
     PathPlanEntry,
@@ -110,7 +114,7 @@ def test_runner_plans_and_executes(
         runner,
         payload,
         latest_target_resolver(registry),
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )
@@ -150,7 +154,7 @@ def test_runner_preserves_generated_payload(
         runner,
         payload,
         latest_target_resolver(registry),
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )
@@ -188,12 +192,12 @@ def test_runner_migrates_with_target_container(
     plan = runner.plan(
         _payload(),
         latest_target_resolver(registry),
-        container=UserContainer,
+        source_model=UserContainer,
         max_depth=-1,
     )
     result = _sync(runner.execute(plan, context=None))
 
-    assert plan.path.container is UserContainer
+    assert plan.path.source_model is UserContainer
     assert result == snapshot
 
 
@@ -225,7 +229,7 @@ def test_runner_noop_when_target_equals_source(
     plan = runner.plan(
         _payload(),
         fixed_target_resolver(registry, source),
-        container=UserContainer,
+        source_model=UserContainer,
         max_depth=-1,
     )
 
@@ -289,8 +293,7 @@ def test_execution_planner_builds_levels(
     sibling = _path_entry(low, high, path=("other",))
     plan = PathPlan(
         entries=(parent, child, sibling),
-        container=None,
-        target_fields=frozenset(),
+        source_model=None,
     )
     planner = ExecutionPlanner()
 
@@ -326,7 +329,7 @@ def test_runner_process_backend(manager, registry: Registry, model_adapter) -> N
             manager().runner(runtime=backend),
             _payload(),
             latest_target_resolver(registry),
-            container=None,
+            source_model=None,
             max_depth=-1,
             context=None,
         )
@@ -386,6 +389,66 @@ def test_runner_target_policy_forms(
     result = manager().runner().run(_payload(), target)
 
     assert result["document"]["version"] == expected
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "user_test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+            id="pydantic",
+        ),
+    ],
+    indirect=True,
+)
+def test_validate_target_rejects_invalid_payload(manager) -> None:
+    invalid = _payload()
+    invalid["document"]["version"] = "2.0.0"
+    del invalid["document"]["name"]
+
+    with pytest.raises(TargetValidationError):
+        manager().runner().run(invalid, "2.0.0", validate_target=True)
+
+    result = manager().runner().run(invalid, "2.0.0")
+    assert result["document"]["version"] == "2.0.0"
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "user_test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+            id="pydantic",
+        ),
+    ],
+    indirect=True,
+)
+def test_run_carries_source_and_target_contracts(manager) -> None:
+    result = (
+        manager()
+        .runner()
+        .run(
+            _payload(),
+            "2.0.0",
+            source_model=None,
+            validate_target=True,
+        )
+    )
+
+    assert result["document"]["version"] == "2.0.0"
+    assert result["document"]["age"] is None
 
 
 def _payload() -> dict:
@@ -453,7 +516,7 @@ def test_extractor_finds_registered_versioned_dict(
         validation_mode=discovery_settings.validation_mode,
         adapter=model_adapter,
     )
-    entries = list(extractor.extract(_payload(), container=container, max_depth=-1))
+    entries = list(extractor.extract(_payload(), source_model=container, max_depth=-1))
 
     assert len(entries) == 1
     assert entries[0][0] == ("document",)
@@ -543,7 +606,7 @@ def test_extractor_incompatible_container_fails_fast(
     )
 
     with pytest.raises(PayloadValidationError, match="recognized model type"):
-        list(extractor.extract({}, container=dict))
+        list(extractor.extract({}, source_model=dict))
 
 
 def test_extractor_containerless_when_none(
@@ -599,7 +662,7 @@ def test_extractor_invalid_payload_raises(
     }
 
     with pytest.raises(PayloadValidationError):
-        list(extractor.extract(payload, container=UserContainer))
+        list(extractor.extract(payload, source_model=UserContainer))
 
 
 @pytest.mark.parametrize(
@@ -634,7 +697,7 @@ def test_extractor_validation_mode_none_skips_validate(
         }
     }
 
-    assert len(list(extractor.extract(payload, container=UserContainer))) == 1
+    assert len(list(extractor.extract(payload, source_model=UserContainer))) == 1
 
 
 @pytest.mark.parametrize(
@@ -688,7 +751,7 @@ def test_runner_migrates_to_latest(
         runner,
         _payload(),
         latest_target_resolver(registry),
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )
@@ -726,7 +789,7 @@ def test_runner_container_guided_migration(
     plan = runner.plan(
         _payload(),
         latest_target_resolver(registry),
-        container=UserContainer,
+        source_model=UserContainer,
         max_depth=-1,
     )
     result = _sync(runner.execute(plan, context=None))
@@ -766,7 +829,7 @@ def test_runner_explicit_target_versionable(
     target = fixed_target_resolver(registry, target_model)
 
     result = _run(
-        runner, _payload(), target, container=None, max_depth=-1, context=None
+        runner, _payload(), target, source_model=None, max_depth=-1, context=None
     )
 
     assert result["document"]["version"] == "2.0.0"
@@ -822,7 +885,7 @@ def test_runner_target_policy(
         runner,
         _payload(),
         resolver_factory(registry),
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )
@@ -871,7 +934,7 @@ def test_runner_no_op_when_source_equals_target(
         runner,
         payload,
         latest_target_resolver(registry),
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )
@@ -915,7 +978,7 @@ def test_chrono_runner_migrates_to_latest(
         runner,
         payload,
         latest_target_resolver(registry),
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )
@@ -980,8 +1043,7 @@ def test_plan_generics_enforce_version_value(
     entry = _path_entry(low, high, path=())
     plan: PathPlan[semver.Version] = PathPlan(
         entries=(entry,),
-        container=None,
-        target_fields=frozenset(),
+        source_model=None,
     )
     resolved = plan.entries[0]
 
@@ -1030,8 +1092,7 @@ def test_plan_preserves_version_value(
     )
     plan = PathPlan(
         entries=(entry,),
-        container=None,
-        target_fields=frozenset(),
+        source_model=None,
     )
     resolved = plan.entries[0]
 
@@ -1070,7 +1131,7 @@ def test_runner_rejects_unknown_target_model(
         runner.plan(
             _payload(),
             latest_target_resolver(registry),
-            container=None,
+            source_model=None,
             max_depth=-1,
         )
 
@@ -1114,7 +1175,7 @@ def test_runner_async_backend_runs_sync_migration(
         runner.run(
             payload,
             latest_target_resolver(registry),
-            container=None,
+            source_model=None,
             max_depth=-1,
             context=None,
         )
@@ -1151,7 +1212,7 @@ def test_runner_async_backend_runs_coroutine_migration(
         runner.run(
             _payload(),
             latest_target_resolver(registry),
-            container=None,
+            source_model=None,
             max_depth=-1,
             context=None,
         )
@@ -1187,7 +1248,7 @@ def test_runner_sync_backend_rejects_coroutine_migration(
         runner.run(
             _payload(),
             latest_target_resolver(registry),
-            container=None,
+            source_model=None,
             max_depth=-1,
             context=None,
         )
@@ -1258,7 +1319,7 @@ def test_runner_calls_sync_hooks(
         runner_factory(),
         _payload(),
         latest_target_resolver(registry),
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )
@@ -1333,7 +1394,7 @@ def test_runner_awaits_async_hooks(
         runner_factory().run(
             _payload(),
             latest_target_resolver(registry),
-            container=None,
+            source_model=None,
             max_depth=-1,
             context=None,
         )

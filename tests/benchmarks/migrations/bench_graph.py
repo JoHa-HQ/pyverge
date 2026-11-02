@@ -25,7 +25,7 @@ def test_plan_chain(benchmark, versions: int) -> None:
         runner.plan,
         data,
         "latest",
-        container=None,
+        source_model=None,
         max_depth=-1,
     )
     assert len(plan.path.entries) == 1

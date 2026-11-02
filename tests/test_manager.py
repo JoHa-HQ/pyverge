@@ -27,8 +27,10 @@ from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
 )
+from pyverge.registry import HealthIssue
 from pyverge.registry.errors import (
     CatalogError,
+    HealthValidationError,
     ModelNotFoundError,
 )
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
@@ -880,6 +882,52 @@ def test_configured_manager_satisfies_class_state_contract(
     assert callable(configured.configure)
 
 
+def test_configure_appends_custom_health_linters(
+    migration_settings: MigrationSettings,
+    model_adapter: ModelAdapter,
+) -> None:
+    class AlwaysWarns:
+        def __call__(self, catalog: Any, entity: Any) -> tuple[HealthIssue, ...]:
+            return (
+                HealthIssue(
+                    code="custom.warning",
+                    severity="warning",
+                    entity=entity,
+                    message="always warns",
+                ),
+            )
+
+    configured = Manager[semver.Version].configure(
+        model_adapter,
+        linters=(AlwaysWarns(),),
+        **manager_kwargs(migration_settings),
+    )
+    instance = configured()
+    instance.store_model(UserV1)
+    node = instance.list_versions("User")[0]
+
+    assert any(issue.code == "custom.warning" for issue in instance.health(node))
+
+    with pytest.raises(HealthValidationError):
+        instance.health(node, fail_level="warning")
+
+
+def test_configure_rejects_linters_with_prebuilt_engine(
+    migration_settings: MigrationSettings,
+    model_adapter: ModelAdapter,
+) -> None:
+    configured = Manager[semver.Version].configure(
+        model_adapter, **manager_kwargs(migration_settings)
+    )
+
+    with pytest.raises(ValueError, match="pre-built engine"):
+        Manager[semver.Version].configure(
+            model_adapter,
+            engine=configured._default_engine,
+            linters=(lambda catalog, entity: (),),
+        )
+
+
 def test_instantiated_manager_satisfies_instance_state_contract(
     migration_settings: MigrationSettings,
     model_adapter: ModelAdapter,
@@ -941,7 +989,7 @@ def test_manager_runner_sync_and_async_handles(
     sync_result = instance.runner().run(
         _payload("1.0.0"),
         "latest",
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )
@@ -956,7 +1004,7 @@ def test_manager_runner_sync_and_async_handles(
     ).run(
         _payload("1.0.0"),
         "latest",
-        container=None,
+        source_model=None,
         max_depth=-1,
         context=None,
     )

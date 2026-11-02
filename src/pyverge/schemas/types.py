@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from pyverge.core.types import (
@@ -111,6 +112,14 @@ class ModelMaterializationPort(Protocol[VersionValue]):
         *,
         kind: str | None = None,
         version: str | None = None,
+    ) -> VersionNode[VersionValue]: ...
+
+    def versionable_from_schema(
+        self,
+        document: Mapping[str, Any],
+        *,
+        kind: str,
+        version: str,
     ) -> VersionNode[VersionValue]: ...
 
     def version_key(

@@ -229,7 +229,6 @@ class TestFailures:
             manager().runner().run(
                 V2_PAYLOAD,
                 "1.0.0",
-                container=None,
                 max_depth=-1,
                 context=None,
             )

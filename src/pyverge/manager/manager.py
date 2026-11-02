@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import ClassVar
 
 from pyverge.core.types import VersionValue
@@ -15,6 +16,7 @@ from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.registry import (
     DEFAULT_HEALTH_LINTERS,
     CompatibilityLinter,
+    HealthLinter,
     Registry,
 )
 from pyverge.schemas.types import (
@@ -92,10 +94,16 @@ class Manager(
         migration_materializer: DiffMaterializer[object] | None = None,
         diff_provider: DiffProvider[VersionValue] | None = None,
         on_missing: str = "raise",
+        linters: Sequence[HealthLinter] = (),
     ) -> type[Manager[VersionValue]]:
         codec = getattr(adapter, "model_codec", None)
         if codec is None:
             raise ValueError("Adapter must expose a ModelCodec")
+        if engine is not None and linters:
+            raise ValueError(
+                "linters cannot be added to a pre-built engine; configure the "
+                "engine's registry instead"
+            )
         namespace = codec.namespace
         reflection = Reflector[VersionValue](
             adapter,
@@ -122,6 +130,7 @@ class Manager(
                             }
                         )
                     ),
+                    *linters,
                 ),
                 on_missing=on_missing,
             )

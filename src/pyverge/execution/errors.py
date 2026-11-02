@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import Any, Self
 
 from pyverge.core.errors import PyvergeError
 
@@ -25,6 +25,20 @@ class SyncExecutionRequired(ExecutionModeError):
     """Raised when an async entrypoint is used with sync execution."""
 
 
+class TargetValidationError(ExecutionError):
+    """A converged target payload failed validation against its model."""
+
+    def __init__(
+        self, path: tuple[str | int, ...], target_model: Any, error: Exception
+    ) -> None:
+        self.path = path
+        self.target_model = target_model
+        self.error = error
+        super().__init__(
+            f"Target validation failed at {path!r} for {target_model!r}: {error}"
+        )
+
+
 class UnknownModelError(ExecutionError):
     """A plan entry targets a model the runner cannot identify."""
 
@@ -39,5 +53,6 @@ __all__ = [
     "ExecutionError",
     "ExecutionModeError",
     "SyncExecutionRequired",
+    "TargetValidationError",
     "UnknownModelError",
 ]

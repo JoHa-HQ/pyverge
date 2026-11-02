@@ -603,7 +603,7 @@ class TestMigrationManagement:
                 "role": "user",
             },
             latest_target_resolver(engine.registry),
-            container=None,
+            source_model=None,
             max_depth=-1,
             context=None,
         )
@@ -654,7 +654,7 @@ class TestMigrationManagement:
                     "role": "user",
                 },
                 fixed_target_resolver(engine.registry, second),
-                container=None,
+                source_model=None,
                 max_depth=-1,
                 context=None,
             )

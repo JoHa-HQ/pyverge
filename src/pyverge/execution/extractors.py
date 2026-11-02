@@ -29,14 +29,14 @@ class _WalkContext:
 
 
 class PayloadWalker(Generic[VersionValue]):
-    """One container-aware walker for both discovery modes.
+    """One source-model-aware walker for both discovery modes.
 
-    - ``container is None``: dict scanning — every dict is checked for a
+    - ``source_model is None``: dict scanning — every dict is checked for a
       registered ``(kind, version)`` pair (containerless semantics).
-    - ``container`` the adapter can handle: the payload is validated against
-      the container and descent follows the container's field models
-      (container-guided semantics).
-    - ``container`` the adapter cannot handle: fail fast with
+    - ``source_model`` the adapter can handle: the payload is validated against
+      the source model and descent follows the source model's field models
+      (source_model-guided semantics).
+    - ``source_model`` the adapter cannot handle: fail fast with
       :class:`PayloadValidationError` before any migration runs.
     """
 
@@ -59,13 +59,13 @@ class PayloadWalker(Generic[VersionValue]):
         self,
         data: dict[str, Any],
         *,
-        container: type[Any] | None = None,
+        source_model: type[Any] | None = None,
         max_depth: int = -1,
     ) -> Iterator[Entry]:
         kp = self._adapter.kind_property
         vp = self._adapter.version_property
 
-        if container is None:
+        if source_model is None:
             yield from self._walk_containerless(
                 data,
                 (),
@@ -74,10 +74,10 @@ class PayloadWalker(Generic[VersionValue]):
             )
             return
 
-        if not self._adapter.can_handle(container):
+        if not self._adapter.can_handle(source_model):
             raise PayloadValidationError(
                 path=(),
-                message="container is not a recognized model type",
+                message="source model is not a recognized model type",
             )
 
         validation_mode = self._validation_mode
@@ -87,20 +87,20 @@ class PayloadWalker(Generic[VersionValue]):
             try:
                 validated = self._adapter.validate(
                     data,
-                    container,
+                    source_model,
                     strict=(validation_mode == "strict"),
                 )
             except Exception as exc:
                 raise PayloadValidationError(
                     path=(),
-                    message=f"Payload failed container validation: {exc}",
+                    message=f"Payload failed source model validation: {exc}",
                 ) from exc
 
         yield from self._walk_guided(
             validated,
             (),
             0,
-            _WalkContext(kp, vp, max_depth, parent_model=container),
+            _WalkContext(kp, vp, max_depth, parent_model=source_model),
         )
 
     def _match(
@@ -235,11 +235,11 @@ class SchemaFieldsExtractor(PayloadWalker[VersionValue]):
         self,
         data: dict[str, Any],
         *,
-        container: type[Any] | None = None,
+        source_model: type[Any] | None = None,
         max_depth: int = -1,
     ) -> Iterator[Entry]:
-        if container is not None:
-            raise ValueError("SchemaFieldsExtractor does not accept a container")
+        if source_model is not None:
+            raise ValueError("SchemaFieldsExtractor does not accept a source model")
         kp = self._adapter.kind_property
         vp = self._adapter.version_property
         yield from self._walk_containerless(
@@ -251,21 +251,21 @@ class SchemaFieldsExtractor(PayloadWalker[VersionValue]):
 
 
 class ContainerExtractor(PayloadWalker[VersionValue]):
-    """Extract entries by following a typed container's field models."""
+    """Extract entries by following a typed source_model's field models."""
 
     def extract(
         self,
         data: dict[str, Any],
         *,
-        container: type[Any] | None = None,
+        source_model: type[Any] | None = None,
         max_depth: int = -1,
     ) -> Iterator[Entry]:
-        if container is None:
-            raise ValueError("ContainerExtractor requires a container")
-        if not self._adapter.can_handle(container):
+        if source_model is None:
+            raise ValueError("ContainerExtractor requires a source model")
+        if not self._adapter.can_handle(source_model):
             raise PayloadValidationError(
                 path=(),
-                message="container is not a recognized model type",
+                message="source model is not a recognized model type",
             )
         validation_mode = self._validation_mode
         if validation_mode == "none":
@@ -274,13 +274,13 @@ class ContainerExtractor(PayloadWalker[VersionValue]):
             try:
                 validated = self._adapter.validate(
                     data,
-                    container,
+                    source_model,
                     strict=(validation_mode == "strict"),
                 )
             except Exception as exc:
                 raise PayloadValidationError(
                     path=(),
-                    message=f"Payload failed container validation: {exc}",
+                    message=f"Payload failed source model validation: {exc}",
                 ) from exc
         kp = self._adapter.kind_property
         vp = self._adapter.version_property
@@ -288,7 +288,7 @@ class ContainerExtractor(PayloadWalker[VersionValue]):
             validated,
             (),
             0,
-            _WalkContext(kp, vp, max_depth, parent_model=container),
+            _WalkContext(kp, vp, max_depth, parent_model=source_model),
         )
 
 

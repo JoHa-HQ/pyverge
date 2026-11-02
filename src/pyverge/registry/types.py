@@ -32,15 +32,44 @@ if TYPE_CHECKING:
     from pyverge.migrations.spec import MigrationSpec
 
 
+HealthSeverity = Literal["info", "warning", "error"]
+"""Severity carried by a :class:`HealthIssue`."""
+
+HealthFailLevel = Literal["info", "warning", "error", "never"]
+"""Threshold at which a health check raises.
+
+Ordering is ``info`` < ``warning`` < ``error``. An issue blocks when its
+severity is at or above the configured level. ``"never"`` disables the check.
+"""
+
+HEALTH_SEVERITY_ORDER: tuple[HealthSeverity, ...] = ("info", "warning", "error")
+"""Severity ordering, lowest first."""
+
+
 @dataclass(frozen=True, slots=True)
 class HealthIssue:
     """One health finding for a node or edge."""
 
     code: str
-    severity: Literal["error", "warning", "info"]
+    severity: HealthSeverity
     entity: VersionKey | EdgeKey
     message: str
     details: Mapping[str, Any] = field(default_factory=dict)
+
+    def blocks(self, fail_level: HealthFailLevel) -> bool:
+        """Return whether this issue meets or exceeds *fail_level*.
+
+        Args:
+            fail_level: Threshold to compare against. ``"never"`` never blocks.
+
+        Returns:
+            bool: ``True`` when this issue is at or above the threshold.
+        """
+        if fail_level == "never":
+            return False
+        return HEALTH_SEVERITY_ORDER.index(self.severity) >= (
+            HEALTH_SEVERITY_ORDER.index(fail_level)
+        )
 
     @property
     def is_node(self) -> bool:
@@ -183,13 +212,21 @@ class RegistryPort(
 ):
     """Full catalog contract for an in-memory or remote adapter."""
 
-    def health(self, entity: Identifiable) -> tuple[HealthIssue, ...]: ...
+    def health(
+        self,
+        entity: Identifiable | None = None,
+        *,
+        fail_level: HealthFailLevel | None = None,
+    ) -> tuple[HealthIssue, ...]: ...
 
 
 __all__ = [
+    "HEALTH_SEVERITY_ORDER",
     "ContentHashLookup",
     "GraphCatalog",
+    "HealthFailLevel",
     "HealthIssue",
+    "HealthSeverity",
     "KindWrite",
     "MigrationWrite",
     "ModelCatalog",

@@ -28,7 +28,8 @@ from pyverge.graph import (
     DirectionPolicy,
     ForwardDirection,
 )
-from pyverge.versioning import Diffable
+from pyverge.registry import HealthFailLevel, HealthIssue
+from pyverge.versioning import Diffable, Identifiable
 
 from ..descriptors import hybridmethod
 
@@ -119,6 +120,25 @@ class RuntimeMixin(Generic[VersionValue]):
         self.engine.adapter.validate(
             data, self.engine.adapter.resolve(versionable.descriptor.ref)
         )
+
+    def health(
+        self: Manager[VersionValue],
+        entity: Identifiable | None = None,
+        *,
+        fail_level: HealthFailLevel | None = None,
+    ) -> tuple[HealthIssue, ...]:
+        """Return registry health, optionally raising at a severity threshold.
+
+        Args:
+            entity: Node or edge identity to inspect. ``None`` inspects every
+                cached entity.
+            fail_level: When set, raise when an issue meets or exceeds this
+                severity. ``"never"`` disables the check.
+
+        Returns:
+            tuple[HealthIssue, ...]: Health issues for the entity or registry.
+        """
+        return self.engine.health(entity, fail_level=fail_level)
 
     @hybridmethod
     @singledispatchmethod

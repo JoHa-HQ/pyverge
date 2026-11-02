@@ -14,7 +14,12 @@ from ..types import GraphCatalog, HealthIssue
 
 @dataclass(frozen=True, slots=True)
 class CompatibilityLinter:
-    """Report structurally breaking migrations."""
+    """Report structurally breaking migrations.
+
+    Structural breaks are reported as ``warning``: they are a deliberate
+    migration choice, so they appear in the health index without blocking a
+    startup validation policy that raises on ``error``.
+    """
 
     identity_fields: frozenset[str]
 
@@ -42,7 +47,7 @@ class CompatibilityLinter:
         return (
             HealthIssue(
                 code="migration.structural_breaking",
-                severity="error",
+                severity="warning",
                 entity=EdgeKey.from_version_edge(entity),
                 message=(f"{entity.source} → {entity.target} is structurally breaking"),
                 details={

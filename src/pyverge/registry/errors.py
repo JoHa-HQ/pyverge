@@ -41,6 +41,22 @@ class NamespaceMismatchError(CatalogError):
         )
 
 
+class HealthValidationError(CatalogError):
+    """Raised when registry health fails the startup validation policy."""
+
+    def __init__(
+        self: Self,
+        namespace: str,
+        issues: tuple[Any, ...],
+    ) -> None:
+        self.issues = issues
+        rendered = ", ".join(issue.code for issue in issues)
+        super().__init__(
+            namespace,
+            f"Registry health validation failed: {rendered}",
+        )
+
+
 class ModelNotFoundError(CatalogError):
     """Raised when a model or version cannot be found in the catalog."""
 

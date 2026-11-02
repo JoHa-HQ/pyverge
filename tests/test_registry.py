@@ -36,6 +36,7 @@ from pyverge.jgf import JgfExporter, JgfImporter
 from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
 from pyverge.registry.errors import (
     CatalogError,
+    HealthValidationError,
     MigrationConflictError,
     MigrationNotFoundError,
     ModelAlreadyRegisteredError,
@@ -1792,10 +1793,13 @@ class TestEdgePairLookup:
             backward_compatible=True,
         )
 
-        assert any(
-            issue.code == "migration.structural_breaking"
+        breaking = [
+            issue
             for issue in engine.registry.health_issues
-        )
+            if issue.code == "migration.structural_breaking"
+        ]
+        assert breaking
+        assert all(issue.severity == "warning" for issue in breaking)
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -2358,6 +2362,46 @@ class TestReferences:
         assert all(not issue.is_edge for issue in issues)
         assert _missing_references(registry, node) == self.ADDRESS_VERSIONS
 
+    def test_health_raises_at_error_fail_level(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, PersonV1)
+        registry.store(node)
+
+        assert registry.health(node)
+
+        with pytest.raises(HealthValidationError) as raised:
+            registry.health(node, fail_level="error")
+
+        assert raised.value.issues
+        assert all(issue.severity == "error" for issue in raised.value.issues)
+
+    def test_health_fail_level_below_issue_severity_does_not_raise(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, PersonV1)
+        registry.store(node)
+
+        assert registry.health(node, fail_level="never") == registry.health(node)
+
+    def test_health_whole_registry_applies_fail_level(
+        self,
+        model_adapter: types.ModelAdapter,
+        versioning_settings: VersioningSettings,
+        registry: Registry[types.VersionValue],
+    ) -> None:
+        node = envelope_model(model_adapter, versioning_settings, PersonV1)
+        registry.store(node)
+
+        with pytest.raises(HealthValidationError):
+            registry.health(fail_level="error")
+
     def test_health_reports_namespaced_reference_issues(
         self,
         model_adapter: types.ModelAdapter,
@@ -2910,11 +2954,11 @@ def test_containerless_list_and_depth() -> None:
 def test_guided_container_and_list() -> None:
     _, _, extractor = _extractor()
     envelope = Envelope(item={"kind": "Leaf", "version": "1.0.0", "name": "a"})
-    entries = list(extractor.extract(envelope.model_dump(), container=Envelope))
+    entries = list(extractor.extract(envelope.model_dump(), source_model=Envelope))
     assert len(entries) == 1
     list_envelope = ListEnvelope(items=[{"kind": "Leaf", "version": "1.0.0"}])
     entries = list(
-        extractor.extract(list_envelope.model_dump(), container=ListEnvelope)
+        extractor.extract(list_envelope.model_dump(), source_model=ListEnvelope)
     )
     assert len(entries) == 1
 
@@ -2923,11 +2967,13 @@ def test_guided_depth_and_validation_errors() -> None:
     _, _, extractor = _extractor()
     envelope = Envelope(item={"kind": "Leaf", "version": "1.0.0"})
     with pytest.raises(MaxDepthExceededError):
-        list(extractor.extract(envelope.model_dump(), container=Envelope, max_depth=0))
-    with pytest.raises(PayloadValidationError, match="container validation"):
-        list(extractor.extract({"item": "bad"}, container=Envelope))
+        list(
+            extractor.extract(envelope.model_dump(), source_model=Envelope, max_depth=0)
+        )
+    with pytest.raises(PayloadValidationError, match="source model validation"):
+        list(extractor.extract({"item": "bad"}, source_model=Envelope))
     with pytest.raises(PayloadValidationError, match="not a recognized"):
-        list(extractor.extract({}, container=dict))
+        list(extractor.extract({}, source_model=dict))
 
 
 def test_specialized_extractor_modes() -> None:
@@ -2936,8 +2982,8 @@ def test_specialized_extractor_modes() -> None:
     assert list(schema.extract({})) == []
 
     container = ContainerExtractor(registry, adapter=adapter)
-    with pytest.raises(PayloadValidationError, match="container validation"):
-        list(container.extract({"item": "bad"}, container=Envelope))
+    with pytest.raises(PayloadValidationError, match="source model validation"):
+        list(container.extract({"item": "bad"}, source_model=Envelope))
 
     permissive = ContainerExtractor(
         registry,
@@ -2945,7 +2991,7 @@ def test_specialized_extractor_modes() -> None:
         validation_mode="none",
     )
     payload = {"item": {"kind": "Leaf", "version": "1.0.0"}}
-    assert len(list(permissive.extract(payload, container=Envelope))) == 1
+    assert len(list(permissive.extract(payload, source_model=Envelope))) == 1
 
 
 def test_public_registry_error_paths(
