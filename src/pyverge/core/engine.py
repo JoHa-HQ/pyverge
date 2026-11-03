@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, Generic, Self, cast, overload
 
-from pyverge.core.graph import GraphBuilder, MigrationGraph
+from pyverge.core.graph import GraphBuilder, MigrationGraph, Revision
 from pyverge.core.registry import HealthFailLevel, HealthIssue, Registry
 from pyverge.core.registry.errors import (
     CatalogError,
@@ -114,8 +114,14 @@ class Engine(Generic[VersionValue]):
     def copy_registry(self) -> Registry[VersionValue]:
         return self.registry.copy()
 
-    def snapshot(self) -> MigrationGraph[VersionValue]:
-        return GraphBuilder[VersionValue]().build(self.registry)
+    def snapshot(
+        self,
+        revision: Revision | None = None,
+    ) -> MigrationGraph[VersionValue]:
+        return GraphBuilder[VersionValue]().build(
+            self.registry,
+            revision=revision,
+        )
 
     def __contains__(self, index: Any) -> bool:
         """Return whether the registry recognizes an index.

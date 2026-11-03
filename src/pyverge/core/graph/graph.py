@@ -25,6 +25,7 @@ from pyverge.core.versioning import (
 )
 
 from .backend import GraphBackend
+from .revision import Revision
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +38,20 @@ class MigrationGraph(Generic[VersionValue]):
     """
 
     backend: GraphBackend[VersionValue]
+    revision: Revision
+    _manifest_digest: str
+
+    def content_digest(self) -> str:
+        return self.revision.content_digest
+
+    def manifest_digest(self) -> str:
+        return self._manifest_digest
+
+    def same_content(self, other: MigrationGraph[VersionValue]) -> bool:
+        return self.revision.same_content(other.revision)
+
+    def same_manifest(self, other: MigrationGraph[VersionValue]) -> bool:
+        return self._manifest_digest == other._manifest_digest
 
     @property
     def name(self) -> str:

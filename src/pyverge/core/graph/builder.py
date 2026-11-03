@@ -5,7 +5,14 @@ from types import MappingProxyType
 from typing import Any, Generic
 
 from pyverge.core.graph.backend import IndexedBackend
+from pyverge.core.graph.errors import RevisionMismatchError
 from pyverge.core.graph.graph import MigrationGraph
+from pyverge.core.graph.revision import (
+    Revision,
+    VersionVectorRevisionPolicy,
+    manifest_digest,
+    version_strategy,
+)
 from pyverge.core.graph.types import GraphSnapshotSource
 from pyverge.core.registry.errors import CatalogError
 from pyverge.core.types import VersionValue
@@ -26,9 +33,13 @@ class GraphBuilder(Generic[VersionValue]):
     def build(
         self,
         source: GraphSnapshotSource,
+        *,
+        revision: Revision | None = None,
     ) -> MigrationGraph[VersionValue]:
         hasher = source.hasher
-        nodes = tuple(sorted(source.entries))
+        entries = tuple(source.entries)
+        version_strategy(entry.version for entry in entries)
+        nodes = tuple(sorted(entries))
         node_digests = {node.id: node.digest(hasher) for node in nodes}
         kinds = set(source.entities) | set(source.kinds)
         edges_by_id: dict[EdgeId, EdgeKey] = {}
@@ -94,7 +105,21 @@ class GraphBuilder(Generic[VersionValue]):
             edge_digests=_freeze(edge_digests),
             hook_specs=_freeze(hook_specs),
         )
-        return MigrationGraph(backend=backend)
+        derived = VersionVectorRevisionPolicy[VersionValue]().derive(
+            backend,
+            hasher=hasher,
+        )
+        if revision is not None and revision != derived:
+            raise RevisionMismatchError(expected=revision, actual=derived)
+        return MigrationGraph(
+            backend=backend,
+            revision=derived,
+            _manifest_digest=manifest_digest(
+                backend,
+                derived,
+                hasher=hasher,
+            ),
+        )
 
 
 __all__ = ["GraphBuilder"]

@@ -6,6 +6,7 @@ from .backend import (
     IndexedBackend,
 )
 from .builder import GraphBuilder
+from .errors import RevisionMismatchError, VersionStrategyMismatchError
 from .graph import MigrationGraph
 from .planning import (
     AnyDirection,
@@ -32,6 +33,13 @@ from .planning import (
     multi_target_resolver,
     range_target_resolver,
     skip_target_resolver,
+)
+from .revision import (
+    Revision,
+    VersionVectorRevisionPolicy,
+    content_digest,
+    manifest_digest,
+    version_strategy,
 )
 from .types import (
     GraphExportSource,
@@ -63,17 +71,24 @@ __all__ = [
     "PathPlan",
     "PathPlanEntry",
     "PolicyEngine",
+    "Revision",
+    "RevisionMismatchError",
     "TargetCompiler",
     "TargetPolicy",
     "TargetSelector",
     "TargetSpec",
     "TargetStrategy",
     "VersionRange",
+    "VersionStrategyMismatchError",
+    "VersionVectorRevisionPolicy",
+    "content_digest",
     "direction_policy",
     "earliest_target_resolver",
     "fixed_target_resolver",
     "latest_target_resolver",
+    "manifest_digest",
     "multi_target_resolver",
     "range_target_resolver",
     "skip_target_resolver",
+    "version_strategy",
 ]
