@@ -54,12 +54,12 @@ def test_migration_topology(manager, kind, versions):
 
     for version in reversed(versions):
         cls = manager.adapter.resolve(manager.get(kind, version).descriptor.ref)
-        result = manager.runner().run(
+        result = manager.runtime().runner.run(
             data.model_dump(mode="json"), target=version, container=cls
         )
         assert isinstance(result, cls)
 
-    back = manager.runner().run(
+    back = manager.runtime().runner.run(
         result.model_dump(mode="json"), target=newest, container=newest_cls
     )
     assert isinstance(back, newest_cls)

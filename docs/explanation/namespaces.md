@@ -38,9 +38,9 @@ A registry requires a non-empty namespace. The OSS `Engine` binds exactly one
 registry, and its namespace comes from the adapter codec:
 
 ```python
-from pyverge.engine import Engine
-from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
-from pyverge.versioning import default_content_hasher
+from pyverge.core.engine import Engine
+from pyverge.core.registry import DEFAULT_HEALTH_LINTERS, Registry
+from pyverge.core.versioning import default_content_hasher
 
 registry = Registry(
     namespace="com.acme.orders",

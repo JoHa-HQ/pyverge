@@ -126,7 +126,7 @@ sees the v2 result converged to v3.
 
 ```python
 def make_runner():
-    return manager.runner()
+    return manager.runtime().runner
 
 
 def close() -> None:
@@ -150,7 +150,7 @@ result = process_order.delay(order_v1).get()
 ```
 
 For eager tests, call `lifecycle.startup()` directly or bind the runtime with
-`runtime.bind(manager.runner())`.
+`runtime.bind(manager.runtime().runner)`.
 
 ## Verify
 

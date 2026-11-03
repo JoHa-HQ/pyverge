@@ -90,7 +90,7 @@ manager.add_hook(key, hook)      # affects only this instance
 ```python
 manager = Manager()
 manager.validate(data, kind, version)
-runner = manager.runner(
+runtime = manager.runtime(
     *,
     runtime=None,
     direction="any",
@@ -100,6 +100,8 @@ runner = manager.runner(
     on_depth_violation="skip",
     validation_mode="lax",
 )
+runner = runtime.runner
+graph = runtime.graph
 result = runner.run(payload, target, *, container=None, max_depth=-1, context=None)
 ```
 

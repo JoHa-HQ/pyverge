@@ -22,7 +22,7 @@ response target.
 from pyverge.adapters.httpx import HttpPolicy
 from pyverge.adapters.runtime import ConvergenceRuntime
 
-runtime = ConvergenceRuntime(manager, manager.runner())
+runtime = ConvergenceRuntime(manager, manager.runtime().runner)
 policy = HttpPolicy(target="latest", response_target="1.0.0")
 ```
 
@@ -104,7 +104,7 @@ async with httpx.AsyncClient(transport=transport) as client:
 ### Bind startup health
 
 ```python
-transport.bind(manager.runner())
+transport.bind(manager.runtime().runner)
 ```
 
 `bind` binds the runtime runner and validates registry health. Pass

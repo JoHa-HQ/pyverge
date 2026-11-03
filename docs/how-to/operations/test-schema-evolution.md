@@ -108,7 +108,7 @@ spans a migration emits:
 
 ```python
 def test_one_span_per_step(manager, span_exporter):
-    manager.runner().run(payload, "latest")
+    manager.runtime().runner.run(payload, "latest")
     spans = span_exporter.get_finished_spans()
     assert all(s.name.endswith(".migrate") for s in spans)
     assert spans[0].attributes["migration.kind"] == kind

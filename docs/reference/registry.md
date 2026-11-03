@@ -12,13 +12,13 @@
 ## Construction
 
 ```python
-from pyverge.engine import Engine
-from pyverge.registry import (
+from pyverge.core.engine import Engine
+from pyverge.core.registry import (
     DEFAULT_HEALTH_LINTERS,
     CompatibilityLinter,
     Registry,
 )
-from pyverge.versioning import default_content_hasher
+from pyverge.core.versioning import default_content_hasher
 
 registry = Registry(
     namespace="com.acme.orders",
@@ -150,7 +150,7 @@ index without failing a startup policy that raises on `error`.
 ### Custom linter
 
 ```python
-from pyverge.registry import DEFAULT_HEALTH_LINTERS, HealthIssue, Registry
+from pyverge.core.registry import DEFAULT_HEALTH_LINTERS, HealthIssue, Registry
 
 class NoDeprecatedKinds:
     def __call__(self, catalog, entity):
@@ -190,7 +190,7 @@ logging severity: an issue blocks when its severity is at or above the level.
 `"never"` disables the gate.
 
 ```python
-from pyverge.registry.errors import HealthValidationError
+from pyverge.core.registry.errors import HealthValidationError
 
 registry.health(node_or_edge, fail_level="error")
 registry.health(fail_level="warning")   # every cached entity

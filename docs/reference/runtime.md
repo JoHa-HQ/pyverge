@@ -1,7 +1,8 @@
 # Runtime reference
 
-A runtime is a `Runner` bound to one immutable manager graph snapshot, adapter,
-backend, middleware chain, and execution environment.
+A runtime owns one immutable manager graph snapshot, adapter, backend,
+middleware chain, and execution environment. `Runtime.runner` is the bound
+execution surface.
 
 Planning is graph-side: `PayloadWalker` discovers entries, and `PathFinder`
 compiles target policy, resolves migration paths, applies policy, and checks
@@ -10,7 +11,7 @@ that every selected path is fully hydrated and bound before execution.
 ## Runner
 
 ```python
-manager.runner(
+runtime = manager.runtime(
     *,
     runtime=None,
     backend=None,
@@ -22,7 +23,25 @@ manager.runner(
     depth_limit=-1,
     on_depth_violation="skip",
     validation_mode="lax",
+    discriminator="default",
 )
+runner = runtime.runner
+graph = runtime.graph
+```
+
+`Manager.runner(...)` remains as a deprecated shim.
+
+`discriminator` selects the parallel edge used for every step. The default is
+`"default"`; graph-level selection is:
+
+```python
+graph.edge_path(source, target, discriminator="canary")
+```
+
+Runtime-level selection is:
+
+```python
+manager.runtime(discriminator="canary").runner.run(payload, "latest")
 ```
 
 `Runner.run`:
@@ -41,11 +60,15 @@ runner.run(
 
 ## Backends
 
-| Backend | Behavior |
-| --- | --- |
-| `ThreadedBackend(max_workers=0)` | default; sequential, or thread-pool execution when workers > 0 |
-| `AsyncBackend(backend, backend_options, max_workers)` | native coroutine execution with threaded sync fallback |
-| `ProcessBackend(max_workers)` | process-isolated execution |
+| Backend | Strategy | Behavior |
+| --- | --- | --- |
+| `ThreadedBackend(max_workers=0)` | `ThreadedStrategy` | default; sequential, or thread-pool execution when workers > 0 |
+| `AsyncBackend(backend, backend_options, max_workers)` | `AsyncStrategy` | native coroutine execution; sync callables run in the event loop |
+| `ProcessBackend(max_workers)` | `ProcessStrategy` | process-isolated callable execution |
+
+Backends own scheduling and callable invocation only. Entry payload read/write,
+step contexts, version stamping, and hook scope lifecycles live in the
+execution plan and step invoker, so every backend behaves the same way.
 
 The backend determines whether `run()` returns a result or an awaitable.
 
@@ -57,54 +80,54 @@ The backend determines whether `run()` returns a result or an awaitable.
 from typing import Any
 
 from pyverge.core.types import HookState
-from pyverge.execution import MigrationHook
-from pyverge.versioning import MigrationDescriptor, NodeId
+from pyverge.runtime import MigrationHook
+from pyverge.runtime.context import StepContext
 
 
 class AuditHook(MigrationHook):
     def before_migrate(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         data: dict[str, Any],
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
     ) -> None:
-        print(f"migrating {from_version} -> {to_version}")
+        print(
+            f"migrating {step.source} -> {step.target} "
+            f"[{step.edge.discriminator}]"
+        )
 
     def after_migrate(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         original_data: dict[str, Any],
         migrated_data: dict[str, Any],
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
     ) -> None:
-        print(f"migrated {from_version} -> {to_version}")
+        print(f"migrated {step.source} -> {step.target}")
 
     def on_error(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         data: dict[str, Any],
         error: Exception,
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
     ) -> None:
-        print(f"failed {from_version} -> {to_version}: {error}")
+        print(f"failed {step.source} -> {step.target}: {error}")
 ```
 
-`from_version` and `to_version` are `NodeId` values. `migration` is the
-`MigrationDescriptor` (`strategy`, `identity`) when available. `state` is a
-backend-provided `ContextVar`; do not store per-step state on the hook instance.
-Store it in `state` by hook instance key when needed.
+`step` is the execution step context: `name`, source/target nodes, `edge`
+(including `discriminator`), `migration` descriptor, payload `path`, and
+`index`. `state` is a backend-provided `ContextVar`; do not store per-step state
+on the hook instance. Store it in `state` by hook instance key when needed.
+
+`before_migrate` may return a per-step context manager. Sync scopes implement
+`HookScope` and are entered with `ExitStack`; async scopes implement
+`AsyncHookScope` and are entered with `AsyncExitStack` by the async backend.
+Resources are closed on success, error, or cancellation. `OTELHook` and
+`OpenLineageHook` use this to scope spans and run events.
 
 Register a hook on a specific edge:
 
@@ -127,7 +150,7 @@ hook results with `AsyncExecutionRequired`.
 
 ## Middleware
 
-`manager.runner(middleware=(...))` accepts backend middleware for retry,
+`manager.runtime(middleware=(...))` accepts backend middleware for retry,
 idempotency, transactions, audit, OpenTelemetry, and OpenLineage. Middleware
 wraps the backend execution seam, not individual migrations.
 

@@ -47,7 +47,7 @@ UserManager.attach_hooks(
 )
 
 manager = UserManager()
-result = manager.runner().run(
+result = manager.runtime().runner.run(
     {"kind": "User", "version": "1.0.0", "name": "Alice"},
     "latest",
 )
@@ -118,7 +118,7 @@ LineageUserManager.attach_hooks(
 )
 
 lineage_manager = LineageUserManager()
-lineage_result = lineage_manager.runner().run(
+lineage_result = lineage_manager.runtime().runner.run(
     {"kind": "User", "version": "1.0.0", "name": "Alice"},
     "latest",
 )
