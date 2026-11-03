@@ -6,9 +6,9 @@ from collections.abc import Callable, Mapping
 from typing import Any, TypeVar
 
 from pyverge import Manager
-from pyverge.execution import Runner
 from pyverge.manager.types import TargetPolicy
 from pyverge.registry import HealthFailLevel
+from pyverge.runtime import Runner
 
 from .domain import Binding, TopicTargets
 from .handlers import HandlerView, SignatureBinder

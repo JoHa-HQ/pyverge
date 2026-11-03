@@ -10,8 +10,8 @@ from typing import Any, cast
 
 import pytest
 
-from pyverge.execution.context import MigrationContext
-from pyverge.execution.middleware import (
+from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.middleware import (
     AuditMiddleware,
     IdempotencyMiddleware,
     OpenLineageMiddleware,

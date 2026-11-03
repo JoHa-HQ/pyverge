@@ -18,7 +18,7 @@ from pyverge.graph.planning.targets import TargetCompiler, TargetPolicy
 from pyverge.graph.types import MigrationResolver, PathGraphView
 
 if TYPE_CHECKING:
-    from pyverge.execution.plan import ExtractedEntry
+    from pyverge.runtime.plan import ExtractedEntry
 
 
 @dataclass(frozen=True, slots=True)

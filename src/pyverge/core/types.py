@@ -27,7 +27,7 @@ if TYPE_CHECKING:
         VersionKey,
         VersionNode,
     )
-    from pyverge.execution.context import MigrationContext
+    from pyverge.runtime.context import MigrationContext
 else:
     MigrationContext = Any
 

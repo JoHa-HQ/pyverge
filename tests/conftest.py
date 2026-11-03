@@ -21,17 +21,6 @@ from pyverge.discovery.reflection import (
     Reflection,
     Reflector,
 )
-from pyverge.execution import (
-    ExecutionCoordinator,
-    ExecutionPlanner,
-    PayloadWalker,
-    Runner,
-)
-from pyverge.execution.backends import ThreadedBackend
-from pyverge.execution.clock import SystemClock
-from pyverge.execution.context import ExecutionEnvironment
-from pyverge.execution.migrations import MigrationBindings
-from pyverge.execution.types import BackendPort
 from pyverge.graph import (
     AnyDirection,
     GraphBuilder,
@@ -47,6 +36,17 @@ from pyverge.registry import (
     CompatibilityLinter,
     Registry,
 )
+from pyverge.runtime import (
+    ExecutionCoordinator,
+    ExecutionPlanner,
+    PayloadWalker,
+    Runner,
+)
+from pyverge.runtime.backends import ThreadedBackend
+from pyverge.runtime.clock import SystemClock
+from pyverge.runtime.context import ExecutionEnvironment
+from pyverge.runtime.migrations import MigrationBindings
+from pyverge.runtime.types import BackendPort
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.types import (

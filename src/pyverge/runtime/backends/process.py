@@ -7,11 +7,11 @@ from typing import Any
 
 from pyverge.core.types import VersionValue
 from pyverge.core.versioning import EdgeKey
-from pyverge.execution.context import MigrationContext, RunContext, StepContext
-from pyverge.execution.errors import AsyncExecutionRequired
-from pyverge.execution.hooks.state import new_hook_state
-from pyverge.execution.plan import ExecutionPlan, PathPlanEntry
 from pyverge.graph.planning.path import Path
+from pyverge.runtime.context import MigrationContext, RunContext, StepContext
+from pyverge.runtime.errors import AsyncExecutionRequired
+from pyverge.runtime.hooks.state import new_hook_state
+from pyverge.runtime.plan import ExecutionPlan, PathPlanEntry
 from pyverge.schemas.types import ModelIdentityPort
 
 

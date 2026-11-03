@@ -22,8 +22,6 @@ from pyverge.core import (
 )
 from pyverge.core.engine import Engine
 from pyverge.core.versioning import Migratable, NodeRef, Versionable, VersionKey
-from pyverge.execution.backends import AsyncBackend
-from pyverge.execution.context import MigrationContext
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
@@ -34,6 +32,8 @@ from pyverge.registry.errors import (
     HealthValidationError,
     ModelNotFoundError,
 )
+from pyverge.runtime.backends import AsyncBackend
+from pyverge.runtime.context import MigrationContext
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.schemas.types import (
     ModelAdapter,

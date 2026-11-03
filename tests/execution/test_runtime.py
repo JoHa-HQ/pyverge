@@ -19,23 +19,6 @@ from hypothesis import strategies as st
 from pyverge.core import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.engine import Engine
 from pyverge.core.versioning import EdgeKey, VersionNode
-from pyverge.execution import (
-    ExecutionPlanner,
-    PayloadWalker,
-    Runner,
-)
-from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
-from pyverge.execution.context import (
-    LayeredView,
-    MigrationContext,
-    RunContext,
-    StepContext,
-)
-from pyverge.execution.errors import (
-    AsyncExecutionRequired,
-    TargetValidationError,
-    UnknownModelError,
-)
 from pyverge.graph import (
     PathPlan,
     PathPlanEntry,
@@ -45,6 +28,23 @@ from pyverge.graph import (
     skip_target_resolver,
 )
 from pyverge.registry import Registry
+from pyverge.runtime import (
+    ExecutionPlanner,
+    PayloadWalker,
+    Runner,
+)
+from pyverge.runtime.backends import AsyncBackend, ProcessBackend, ThreadedBackend
+from pyverge.runtime.context import (
+    LayeredView,
+    MigrationContext,
+    RunContext,
+    StepContext,
+)
+from pyverge.runtime.errors import (
+    AsyncExecutionRequired,
+    TargetValidationError,
+    UnknownModelError,
+)
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (

@@ -5,14 +5,14 @@ from dataclasses import dataclass
 from typing import Any, Generic, TypeAlias
 
 from pyverge.core.types import VersionValue
-from pyverge.execution.context import ExecutionEnvironment, MigrationContext, RunContext
-from pyverge.execution.coordinator import ExecutionCoordinator
-from pyverge.execution.errors import TargetValidationError, UnknownModelError
-from pyverge.execution.middleware import BackendMiddleware
-from pyverge.execution.plan import ExecutionPlan
-from pyverge.execution.types import BackendPort
 from pyverge.graph.planning.path import Path
 from pyverge.graph.planning.targets import TargetPolicy
+from pyverge.runtime.context import ExecutionEnvironment, MigrationContext, RunContext
+from pyverge.runtime.coordinator import ExecutionCoordinator
+from pyverge.runtime.errors import TargetValidationError, UnknownModelError
+from pyverge.runtime.middleware import BackendMiddleware
+from pyverge.runtime.plan import ExecutionPlan
+from pyverge.runtime.types import BackendPort
 from pyverge.schemas.types import ModelAdapter
 
 RunResult: TypeAlias = Any

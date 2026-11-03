@@ -10,7 +10,7 @@ from pyverge.adapters.runtime import ConvergenceRuntime
 from pyverge.registry.errors import HealthValidationError
 
 if TYPE_CHECKING:
-    from pyverge.execution import Runner
+    from pyverge.runtime import Runner
 
 
 class FastStreamRuntime(ConvergenceRuntime):

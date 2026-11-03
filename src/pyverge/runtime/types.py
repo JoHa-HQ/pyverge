@@ -4,8 +4,8 @@ from collections.abc import Awaitable, Iterator
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
 from pyverge.core.types import TargetResolver, VersionValue
-from pyverge.execution.context import MigrationContext, RunContext
-from pyverge.execution.plan import ExecutionPlan
+from pyverge.runtime.context import MigrationContext, RunContext
+from pyverge.runtime.plan import ExecutionPlan
 from pyverge.schemas.types import ModelIdentityPort
 
 if TYPE_CHECKING:

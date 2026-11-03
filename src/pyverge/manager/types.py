@@ -55,7 +55,7 @@ if TYPE_CHECKING:
 
 
 #: A callable that binds a registry to a :data:`TargetResolver`; the shape of
-#: the ``*_target_resolver`` factories in :mod:`pyverge.execution.targets`.
+#: the ``*_target_resolver`` factories in :mod:`pyverge.runtime.targets`.
 ResolverFactory: TypeAlias = Callable[
     ["Registry[VersionValue]"], TargetResolver[VersionValue]
 ]

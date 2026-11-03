@@ -9,7 +9,7 @@ from jsonata import Jsonata
 
 from pyverge.core.types import ModelData
 from pyverge.core.versioning import MigrationDescriptor
-from pyverge.execution.context import EMPTY_CONTEXT, MigrationContext
+from pyverge.runtime.context import EMPTY_CONTEXT, MigrationContext
 
 
 class JsonataTransform:

@@ -16,8 +16,8 @@ from openlineage.client.event_v2 import (
 
 from pyverge.core.types import HookState
 from pyverge.core.versioning import MigrationDescriptor, NodeId
-from pyverge.execution.hooks.state import pop_state, push_state
-from pyverge.execution.hooks.types import MigrationHook
+from pyverge.runtime.hooks.state import pop_state, push_state
+from pyverge.runtime.hooks.types import MigrationHook
 
 
 @dataclass(frozen=True, slots=True)

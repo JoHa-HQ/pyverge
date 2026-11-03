@@ -7,13 +7,13 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from pyverge.core.types import ModelData
-from pyverge.execution.context import MigrationContext
 from pyverge.manager import Manager
 from pyverge.manager.types import TargetPolicy
 from pyverge.registry import HealthFailLevel
+from pyverge.runtime.context import MigrationContext
 
 if TYPE_CHECKING:
-    from pyverge.execution import Runner
+    from pyverge.runtime import Runner
 
 
 class ConvergenceRuntime:

@@ -10,8 +10,6 @@ import semver
 
 from pyverge.core.types import MigrationDirectionStrategy
 from pyverge.core.versioning import EdgeKey, parse_version
-from pyverge.execution.migrations import MigrationBindings
-from pyverge.execution.plan import ExtractedEntry
 from pyverge.graph import (
     AnyDirection,
     BackwardDirection,
@@ -24,6 +22,8 @@ from pyverge.graph import (
     direction_policy,
 )
 from pyverge.registry.errors import CatalogError
+from pyverge.runtime.migrations import MigrationBindings
+from pyverge.runtime.plan import ExtractedEntry
 from pyverge.schemas import PydanticModelAdapter
 from tests.examples.migrations import USER_JSONATA_V2_TO_V3, USER_JSONPATCH_V1_TO_V2
 from tests.examples.pydantic.semver import (

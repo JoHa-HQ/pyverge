@@ -2,37 +2,26 @@ from __future__ import annotations
 
 import copy
 import inspect
-from collections.abc import Mapping
-from dataclasses import dataclass
-from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
-
-import anyio
 
 from pyverge.core.types import VersionValue
 from pyverge.core.versioning import EdgeKey
-from pyverge.execution.context import MigrationContext, RunContext, StepContext
-from pyverge.execution.hooks.state import new_hook_state
-from pyverge.execution.plan import ExecutionPlan, PathPlanEntry
 from pyverge.graph.planning.path import Path
+from pyverge.runtime.context import MigrationContext, RunContext, StepContext
+from pyverge.runtime.errors import AsyncExecutionRequired
+from pyverge.runtime.hooks.state import new_hook_state
+from pyverge.runtime.plan import ExecutionPlan, PathPlanEntry
 from pyverge.schemas.types import ModelIdentityPort
 
 
-@dataclass(frozen=True, slots=True)
-class AsyncBackend:
-    """Run sync migrations in threads and coroutines natively."""
+class ThreadedBackend:
+    """Run migrations directly, or in a thread pool when workers > 1."""
 
-    backend: str
-    backend_options: Mapping[str, Any]
-    max_workers: int = 0
+    def __init__(self, max_workers: int) -> None:
+        self._max_workers = max_workers
 
-    async def __aenter__(self) -> AsyncBackend:
-        return self
-
-    async def __aexit__(self, *exc_info: Any) -> None:
-        return None
-
-    async def execute(
+    def execute(
         self,
         plan: ExecutionPlan[VersionValue],
         payload: dict[str, Any],
@@ -42,31 +31,22 @@ class AsyncBackend:
         data = copy.deepcopy(payload)
         hook_state = new_hook_state()
         for level in plan.levels:
-            if self.max_workers > 1:
-                limiter = anyio.CapacityLimiter(self.max_workers)
-                async with anyio.create_task_group() as group:
-                    for entry in level:
-                        group.start_soon(
-                            self._execute_entry_limited,
-                            entry,
-                            data,
-                            run,
-                            adapter,
-                            hook_state,
-                            limiter,
+            if self._max_workers > 1:
+                with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
+                    list(
+                        pool.map(
+                            lambda entry: self._execute_entry(
+                                entry, data, run, adapter, hook_state
+                            ),
+                            level,
                         )
+                    )
             else:
                 for entry in level:
-                    await self._execute_entry(entry, data, run, adapter, hook_state)
+                    self._execute_entry(entry, data, run, adapter, hook_state)
         return data
 
-    async def _execute_entry_limited(  # noqa: PLR0913, PLR0917
-        self, entry, data, run, adapter, hook_state, limiter
-    ) -> None:
-        async with limiter:
-            await self._execute_entry(entry, data, run, adapter, hook_state)
-
-    async def _execute_entry(
+    def _execute_entry(  # noqa: C901, PLR0912
         self,
         entry: PathPlanEntry[VersionValue],
         data: dict[str, Any],
@@ -94,10 +74,18 @@ class AsyncBackend:
                     state=hook_state,
                 )
                 if inspect.isawaitable(result):
-                    await result
+                    if inspect.iscoroutine(result):
+                        result.close()
+                    raise AsyncExecutionRequired("async hook requires async backend")
             step = self._step(entry, index, source, target, run)
             try:
-                migrated = await self._invoke(func, current, step.view)
+                migrated = func(current, step.view)
+                if inspect.isawaitable(migrated):
+                    if inspect.iscoroutine(migrated):
+                        migrated.close()
+                    raise AsyncExecutionRequired(
+                        "coroutine migration requires async backend"
+                    )
             except Exception as error:
                 for hook in hooks:
                     result = hook.on_error(
@@ -110,7 +98,11 @@ class AsyncBackend:
                         state=hook_state,
                     )
                     if inspect.isawaitable(result):
-                        await result
+                        if inspect.iscoroutine(result):
+                            result.close()
+                        raise AsyncExecutionRequired(
+                            "async hook requires async backend"
+                        )
                 raise
             for hook in hooks:
                 result = hook.after_migrate(
@@ -123,16 +115,13 @@ class AsyncBackend:
                     state=hook_state,
                 )
                 if inspect.isawaitable(result):
-                    await result
+                    if inspect.iscoroutine(result):
+                        result.close()
+                    raise AsyncExecutionRequired("async hook requires async backend")
             if isinstance(migrated, dict):
                 migrated[adapter.version_property] = str(target.version)
             current = migrated
         Path(*entry.path).set(data, current)
-
-    async def _invoke(self, func: Any, data: Any, context: Any) -> Any:
-        if inspect.iscoroutinefunction(func):
-            return await func(data, context)
-        return await anyio.to_thread.run_sync(partial(func, data, context))
 
     def _step(
         self,
@@ -153,4 +142,4 @@ class AsyncBackend:
         )
 
 
-__all__ = ["AsyncBackend"]
+__all__ = ["ThreadedBackend"]

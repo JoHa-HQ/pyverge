@@ -18,11 +18,6 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import Diffable, Identifiable
-from pyverge.execution import Runner, ThreadedBackend
-from pyverge.execution.clock import SystemClock
-from pyverge.execution.context import ExecutionEnvironment
-from pyverge.execution.middleware import BackendMiddleware
-from pyverge.execution.types import BackendPort
 from pyverge.graph import (
     AnyDirection,
     BackwardDirection,
@@ -30,6 +25,11 @@ from pyverge.graph import (
     ForwardDirection,
 )
 from pyverge.registry import HealthFailLevel, HealthIssue
+from pyverge.runtime import Runner, ThreadedBackend
+from pyverge.runtime.clock import SystemClock
+from pyverge.runtime.context import ExecutionEnvironment
+from pyverge.runtime.middleware import BackendMiddleware
+from pyverge.runtime.types import BackendPort
 
 from ..descriptors import hybridmethod
 

@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from typing import Any, Generic
 
 from pyverge.core.types import VersionValue
-from pyverge.execution.plan import ExecutionPlan, ExtractedEntry
-from pyverge.execution.planner import ExecutionPlanner
-from pyverge.execution.types import EntryExtractor
 from pyverge.graph.planning.finder import PathFinder
 from pyverge.graph.planning.targets import TargetPolicy
+from pyverge.runtime.plan import ExecutionPlan, ExtractedEntry
+from pyverge.runtime.planner import ExecutionPlanner
+from pyverge.runtime.types import EntryExtractor
 
 
 @dataclass(frozen=True, slots=True)

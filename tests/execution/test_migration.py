@@ -32,9 +32,9 @@ from pyverge.core.versioning import (
 )
 from pyverge.core.versioning.errors import MigrationApplicationError
 from pyverge.discovery.reflection import JsonPatchRenderer
-from pyverge.execution.context import MigrationContext
 from pyverge.migrations import JsonataMigration, JsonPatchMigration
 from pyverge.registry import CompatibilityReport, Registry
+from pyverge.runtime.context import MigrationContext
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.types import (
     ModelHandle,

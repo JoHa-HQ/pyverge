@@ -13,10 +13,10 @@ from pyverge.adapters.runtime import ConvergenceRuntime
 from pyverge.core.types import (
     Attachable,
 )
-from pyverge.execution.context import MigrationContext
 from pyverge.manager import Manager
 from pyverge.registry import HealthFailLevel
 from pyverge.registry.errors import HealthValidationError
+from pyverge.runtime.context import MigrationContext
 
 from .builder import ComponentBuilder
 from .components import DEFAULT_KINDS

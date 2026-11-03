@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from pyverge.adapters.runtime import ConvergenceRuntime
-from pyverge.execution.context import MigrationContext
 from pyverge.manager.types import TargetPolicy
+from pyverge.runtime.context import MigrationContext
 
 from .policy import HttpPolicy
 
 if TYPE_CHECKING:
-    from pyverge.execution import Runner
+    from pyverge.runtime import Runner
 
 _BODY_HEADERS = frozenset({"content-length", "content-encoding", "transfer-encoding"})
 _VERSION_HEADER = "content-version"

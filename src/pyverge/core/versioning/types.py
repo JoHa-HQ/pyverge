@@ -25,7 +25,7 @@ from .identity.metadata import KeyRef
 
 if TYPE_CHECKING:
     from pyverge.core.types import Attachable
-    from pyverge.execution.context import MigrationContext
+    from pyverge.runtime.context import MigrationContext
 
     from .diff import Diff
     from .identity import EdgeKey, VersionEdge, VersionKey, VersionNode

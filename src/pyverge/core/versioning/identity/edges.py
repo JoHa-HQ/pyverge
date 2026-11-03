@@ -13,7 +13,7 @@ from .metadata import EdgeRef, MigrationDescriptor, MigrationRef
 from .nodes import NodeId, VersionNode
 
 if TYPE_CHECKING:
-    from pyverge.execution.context import MigrationContext
+    from pyverge.runtime.context import MigrationContext
 
     from ..jgf import JgfEdge
 

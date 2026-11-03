@@ -11,7 +11,7 @@ from pyverge.core.versioning import (
     MigrationDescriptor,
     default_canonicalizer,
 )
-from pyverge.execution.context import MigrationContext
+from pyverge.runtime.context import MigrationContext
 
 
 class SetDefaultOperation(jsonpatch.PatchOperation):

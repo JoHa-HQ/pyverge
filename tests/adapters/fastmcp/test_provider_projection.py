@@ -20,7 +20,7 @@ from pyverge.adapters.fastmcp import (
     PyvergeProvider,
     ResourceKind,
 )
-from pyverge.execution.context import MigrationContext
+from pyverge.runtime.context import MigrationContext
 from pyverge.schemas import PydanticModelAdapter
 from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
 

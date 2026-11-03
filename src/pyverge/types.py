@@ -65,7 +65,6 @@ from pyverge.core.versioning import (
     VersionNode,
     VersionPair,
 )
-from pyverge.execution.types import Entry, EntryExtractor
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
@@ -73,6 +72,7 @@ from pyverge.manager.types import (
     TargetPolicy,
     TargetSpec,
 )
+from pyverge.runtime.types import Entry, EntryExtractor
 from pyverge.schemas.types import (
     ModelAdapter,
 )

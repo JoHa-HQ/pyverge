@@ -8,7 +8,7 @@ from typing import Any
 from pyverge.core.types import (
     ModelData,
 )
-from pyverge.execution.context import MigrationContext
+from pyverge.runtime.context import MigrationContext
 
 
 def _schema(kind: str, version: str, props: dict[str, Any]) -> dict[str, Any]:

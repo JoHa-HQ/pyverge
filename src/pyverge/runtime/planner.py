@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from typing import Generic
 
 from pyverge.core.types import VersionValue
-from pyverge.execution.plan import ExecutionPlan
 from pyverge.graph.planning.plan import PathPlan
+from pyverge.runtime.plan import ExecutionPlan
 
 
 @dataclass(frozen=True, slots=True)

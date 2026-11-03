@@ -26,16 +26,6 @@ from pyverge.core.versioning import (
     VersionNode,
     VersionPair,
 )
-from pyverge.execution import (
-    ExecutionCoordinator,
-    ExecutionPlanner,
-    PayloadWalker,
-    Runner,
-)
-from pyverge.execution.context import ExecutionEnvironment
-from pyverge.execution.middleware import BackendMiddleware
-from pyverge.execution.migrations import MigrationBindings
-from pyverge.execution.types import BackendPort
 from pyverge.graph import (
     DirectionPolicy,
     GraphBuilder,
@@ -53,6 +43,16 @@ from pyverge.registry.errors import (
     MissingReferenceError,
     ModelNotFoundError,
 )
+from pyverge.runtime import (
+    ExecutionCoordinator,
+    ExecutionPlanner,
+    PayloadWalker,
+    Runner,
+)
+from pyverge.runtime.context import ExecutionEnvironment
+from pyverge.runtime.middleware import BackendMiddleware
+from pyverge.runtime.migrations import MigrationBindings
+from pyverge.runtime.types import BackendPort
 from pyverge.schemas.types import ModelAdapter
 
 
@@ -74,7 +74,7 @@ class Engine(Generic[VersionValue]):
     - building immutable graph snapshots;
     - resolving executable migration bindings and constructing runtime runners.
 
-    It does not execute migrations; :class:`~pyverge.execution.Runner` does.
+    It does not execute migrations; :class:`~pyverge.runtime.Runner` does.
     Migration registration, reflection, identity assignment, and compatibility
     linting belong to :class:`~pyverge.registry.Registry`.
 

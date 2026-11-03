@@ -10,10 +10,10 @@ from pyverge.core.versioning import (
     VersionKey,
     VersionNode,
 )
-from pyverge.execution.types import (
+from pyverge.graph.types import GraphView
+from pyverge.runtime.types import (
     Entry,
 )
-from pyverge.graph.types import GraphView
 from pyverge.schemas.types import (
     ModelAdapter,
 )

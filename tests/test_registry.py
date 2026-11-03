@@ -35,13 +35,6 @@ from pyverge.core.versioning import (
     default_content_hasher,
 )
 from pyverge.core.versioning.errors import BackwardCompatibilityError
-from pyverge.execution import MigrationHook
-from pyverge.execution.context import MigrationContext
-from pyverge.execution.extractors import (
-    ContainerExtractor,
-    PayloadWalker,
-    SchemaFieldsExtractor,
-)
 from pyverge.export import ManifestDiff
 from pyverge.graph import GraphBuilder
 from pyverge.jgf import JgfExporter, JgfImporter
@@ -56,6 +49,13 @@ from pyverge.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.registry.types import PathCatalog
+from pyverge.runtime import MigrationHook
+from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.extractors import (
+    ContainerExtractor,
+    PayloadWalker,
+    SchemaFieldsExtractor,
+)
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.schemas.types import (
     ModelHandle,

@@ -4,7 +4,7 @@
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pyverge.execution.context import MigrationContext
+from pyverge.runtime.context import MigrationContext
 
 from .base import BaseModel, Field, UserBaseModel
 
