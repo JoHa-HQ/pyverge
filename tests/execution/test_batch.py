@@ -67,9 +67,7 @@ def test_run_many_uses_independent_runs(registry: Registry, runner_factory) -> N
         "2.0.0",
     ]
     run_ids = [
-        event.run.run_id
-        for event in recorder.events
-        if isinstance(event, RunStarted)
+        event.run.run_id for event in recorder.events if isinstance(event, RunStarted)
     ]
     assert len(run_ids) == 2  # noqa: PLR2004
     assert len(set(run_ids)) == 2  # noqa: PLR2004
