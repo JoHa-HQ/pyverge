@@ -86,11 +86,7 @@ class RecordingLineageClient:
         self.events.append(event)
 
 
-def _node(version: str) -> NodeId:
-    return NodeId.parse("com.acme.orders", "User", version)
-
-
-def _version_node(version: str, *fields: tuple[str, TypeKind]) -> VersionNode:
+def _node(version: str, *fields: tuple[str, TypeKind]) -> VersionNode:
     ref = ModelRef(provider_id="test", entity_id="tests.User")
     return VersionNode(
         namespace="com.acme.orders",
@@ -307,8 +303,8 @@ def test_openlineage_hook_emits_data_and_migration_facets() -> None:
         producer="tests",
     )
     state = new_hook_state()
-    source = _version_node("1.0.0", ("name", TypeKind.STRING))
-    target = _version_node(
+    source = _node("1.0.0", ("name", TypeKind.STRING))
+    target = _node(
         "2.0.0",
         ("name", TypeKind.STRING),
         ("age", TypeKind.INTEGER),
