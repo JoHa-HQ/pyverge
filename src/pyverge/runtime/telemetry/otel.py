@@ -8,7 +8,8 @@ from typing import Any
 from opentelemetry.trace import SpanKind, StatusCode, Tracer
 
 from pyverge.runtime.context import StepContext
-from pyverge.runtime.telemetry import (
+
+from . import (
     RunCompleted,
     RunFailed,
     RunStarted,
