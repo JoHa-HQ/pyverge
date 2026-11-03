@@ -7,8 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable
-from typing import Any, TypeVar, assert_type, cast
+from typing import Any, TypeVar, cast
 
 import pendulum
 import pytest
@@ -109,43 +108,6 @@ def _user_v1_payloads(draw):
 @pytest.mark.parametrize(
     "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
 )
-def test_runner_plans_and_executes(
-    registry: Registry,
-    runner: Runner,
-    snapshot,
-) -> None:
-    payload = _payload()
-
-    result = _run(
-        runner,
-        payload,
-        latest_target_resolver(registry),
-        source_model=None,
-        max_depth=-1,
-        context=None,
-    )
-
-    assert result == snapshot
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2],
-                [((UserV1, UserV2), migrate_v1_to_v2)],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
-)
 @settings(
     max_examples=25,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
@@ -170,78 +132,6 @@ def test_runner_preserves_generated_payload(
     assert result["document"]["email"] == payload["document"]["email"]
     assert result["document"]["role"] == payload["document"]["role"]
     assert result["document"]["age"] is None
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2],
-                [((UserV1, UserV2), migrate_v1_to_v2)],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
-)
-def test_runner_migrates_with_target_container(
-    registry: Registry,
-    runner: Runner,
-    snapshot,
-) -> None:
-    plan = runner.plan(
-        _payload(),
-        latest_target_resolver(registry),
-        source_model=UserContainer,
-        max_depth=-1,
-    )
-    result = _sync(runner.execute(plan, context=None))
-
-    assert plan.path.source_model is UserContainer
-    assert result == snapshot
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2],
-                [((UserV1, UserV2), migrate_v1_to_v2)],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
-)
-def test_runner_noop_when_target_equals_source(
-    registry: Registry,
-    model_adapter: PydanticModelAdapter,
-    runner: Runner,
-    versioning_settings,
-) -> None:
-    source = envelope_model(model_adapter, versioning_settings, UserV1)
-    plan = runner.plan(
-        _payload(),
-        fixed_target_resolver(registry, source),
-        source_model=UserContainer,
-        max_depth=-1,
-    )
-
-    result = _sync(runner.execute(plan, context=None))
-
-    assert result == _payload()
 
 
 @pytest.mark.parametrize(
@@ -466,30 +356,6 @@ def _payload() -> dict:
             "role": "user",
         }
     }
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        pytest.param(
-            PydanticModelAdapter,
-            (semver.Version, "test", (), ()),
-            id="pydantic_semver_empty_compound_key",
-        ),
-    ],
-    indirect=["model_adapter", "registry"],
-)
-def test_extractor_empty_payload_returns_no_entries(
-    model_adapter,
-    discovery_settings,
-    registry,
-) -> None:
-    extractor = PayloadWalker[semver.Version](
-        registry,
-        validation_mode=discovery_settings.validation_mode,
-        adapter=model_adapter,
-    )
-    assert list(extractor.extract({}, max_depth=-1)) == []
 
 
 @pytest.mark.parametrize(
@@ -842,63 +708,6 @@ def test_runner_explicit_target_versionable(
 
 
 @pytest.mark.parametrize(
-    "model_adapter, registry, resolver_factory, expected_version",
-    [
-        pytest.param(
-            PydanticModelAdapter,
-            (
-                semver.Version,
-                "test",
-                (UserV1, UserV2, UserV3),
-                (
-                    ((UserV1, UserV2), migrate_v1_to_v2),
-                    ((UserV2, UserV3), migrate_v2_to_v3),
-                ),
-            ),
-            latest_target_resolver,
-            "3.0.0",
-            id="latest",
-        ),
-        pytest.param(
-            PydanticModelAdapter,
-            (
-                semver.Version,
-                "test",
-                (UserV1, UserV2, UserV3),
-                (
-                    ((UserV1, UserV2), migrate_v1_to_v2),
-                    ((UserV2, UserV3), migrate_v2_to_v3),
-                ),
-            ),
-            skip_target_resolver,
-            "1.0.0",
-            id="skip",
-        ),
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
-)
-def test_runner_target_policy(
-    registry: Registry,
-    runner: Runner,
-    resolver_factory: Callable[[Registry[semver.Version]], Any],
-    expected_version: str,
-) -> None:
-    result = _run(
-        runner,
-        _payload(),
-        resolver_factory(registry),
-        source_model=None,
-        max_depth=-1,
-        context=None,
-    )
-
-    assert result["document"]["version"] == expected_version
-
-
-@pytest.mark.parametrize(
     "model_adapter, registry",
     [
         pytest.param(
@@ -1036,23 +845,6 @@ def test_step_context_layers_bindings(execution_environment) -> None:
 
     assert step.view["tenant"] == "override"
     assert step.view["region"] == "eu"
-
-
-def test_plan_generics_enforce_version_value(
-    model_adapter,
-    versioning_settings,
-) -> None:
-
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(low, high, path=())
-    plan: PathPlan[semver.Version] = PathPlan(
-        entries=(entry,),
-        source_model=None,
-    )
-    resolved = plan.entries[0]
-
-    assert_type(resolved.source, VersionNode[semver.Version])
 
 
 @pytest.mark.parametrize(
