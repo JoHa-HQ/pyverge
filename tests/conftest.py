@@ -276,8 +276,8 @@ def runner_factory(
     runtime_backend: BackendPort,
     runtime_environment: ExecutionEnvironment,
     migration_settings: MigrationSettings,
-) -> Callable[[], Runner[VersionValue]]:
-    def build() -> Runner[VersionValue]:
+) -> Callable[..., Runner[VersionValue]]:
+    def build(*, telemetry: tuple[Any, ...] = ()) -> Runner[VersionValue]:
         bindings = getattr(
             registry, "bindings", MigrationBindings(name=registry.namespace)
         )
@@ -294,6 +294,7 @@ def runner_factory(
             on_depth_violation="raise",
             validation_mode=migration_settings.validation_mode,
             middleware=(),
+            telemetry=telemetry,
         )
 
     return build

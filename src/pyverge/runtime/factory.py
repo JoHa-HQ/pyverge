@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from pyverge.core.graph import (
@@ -29,6 +29,7 @@ from .middleware import BackendMiddleware
 from .migrations import MigrationBindings
 from .planner import ExecutionPlanner
 from .runner import Runner
+from .telemetry import TelemetryAdapter, TelemetryPublisher
 from .types import BackendPort
 
 
@@ -46,6 +47,7 @@ class RunnerOptions:
     validation_mode: Literal["strict", "lax", "none"]
     discriminator: str = "default"
     middleware: tuple[BackendMiddleware, ...] = field(default_factory=tuple)
+    telemetry: tuple[TelemetryAdapter, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +71,7 @@ class RunnerFactory:
         validation_mode: Literal["strict", "lax", "none"] = "lax",
         discriminator: str = "default",
         middleware: tuple[BackendMiddleware, ...] = (),
+        telemetry: tuple[TelemetryAdapter, ...] = (),
     ) -> Runner[VersionValue]:
         resolved = options or RunnerOptions(
             backend=backend or ThreadedBackend(max_workers=0),
@@ -87,6 +90,15 @@ class RunnerFactory:
             validation_mode=validation_mode,
             discriminator=discriminator,
             middleware=middleware,
+            telemetry=telemetry,
+        )
+        environment = (
+            replace(
+                resolved.environment,
+                telemetry=TelemetryPublisher(adapters=resolved.telemetry),
+            )
+            if resolved.telemetry
+            else resolved.environment
         )
         coordinator = ExecutionCoordinator[VersionValue](
             extractor=PayloadWalker[VersionValue](
@@ -113,7 +125,7 @@ class RunnerFactory:
             adapter=adapter,
             backend=resolved.backend,
             middleware=resolved.middleware,
-            environment=resolved.environment,
+            environment=environment,
         )
 
 
