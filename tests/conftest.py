@@ -282,6 +282,7 @@ def runner_factory(
         *,
         telemetry: tuple[Any, ...] = (),
         telemetry_mode: TelemetryMode = "all",
+        telemetry_sample_rate: float = 1.0,
         plan_cache_size: int = 0,
         copy: CopyPolicy = "deep",
     ) -> Runner[VersionValue]:
@@ -303,6 +304,7 @@ def runner_factory(
             middleware=(),
             telemetry=telemetry,
             telemetry_mode=telemetry_mode,
+            telemetry_sample_rate=telemetry_sample_rate,
             plan_cache_size=plan_cache_size,
             copy=copy,
         )

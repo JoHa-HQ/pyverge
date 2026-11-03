@@ -18,6 +18,7 @@ runtime = manager.runtime(
     middleware=(),
     telemetry=(),
     telemetry_mode="all",
+    telemetry_sample_rate=1.0,
     environment=None,
     direction="any",
     on_direction_violation="skip",
@@ -271,13 +272,16 @@ through `RunContext`; the adapter does not configure it separately.
 `telemetry_mode` controls event construction:
 
 ```text
-all     run and step lifecycle events
-errors  only failed run and step events
-off     no telemetry events
+all      run and step lifecycle events
+errors   only failed run and step events
+sampled  deterministic run-level sampling
+off      no telemetry events
 ```
 
-Use `errors` or `off` on high-throughput paths. Event objects are not constructed
-when telemetry is disabled.
+`sampled` uses `telemetry_sample_rate` between `0` and `1`. Sampling is stable
+per run ID: all events for a sampled run are emitted and unsampled runs emit
+nothing. Use `errors`, `sampled`, or `off` on high-throughput paths. Event
+objects are not constructed when telemetry is disabled.
 
 ## Middleware
 

@@ -50,6 +50,7 @@ class RunnerOptions:
     middleware: tuple[BackendMiddleware, ...] = field(default_factory=tuple)
     telemetry: tuple[TelemetryAdapter, ...] = field(default_factory=tuple)
     telemetry_mode: TelemetryMode = "all"
+    telemetry_sample_rate: float = 1.0
     plan_cache_size: int = 0
     copy: CopyPolicy = "deep"
 
@@ -77,6 +78,7 @@ class RunnerFactory:
         middleware: tuple[BackendMiddleware, ...] = (),
         telemetry: tuple[TelemetryAdapter, ...] = (),
         telemetry_mode: TelemetryMode = "all",
+        telemetry_sample_rate: float = 1.0,
         plan_cache_size: int = 0,
         copy: CopyPolicy = "deep",
     ) -> Runner[VersionValue]:
@@ -99,6 +101,7 @@ class RunnerFactory:
             middleware=middleware,
             telemetry=telemetry,
             telemetry_mode=telemetry_mode,
+            telemetry_sample_rate=telemetry_sample_rate,
             plan_cache_size=plan_cache_size,
             copy=copy,
         )
@@ -108,6 +111,7 @@ class RunnerFactory:
                 telemetry=TelemetryPublisher(
                     adapters=resolved.telemetry,
                     mode=resolved.telemetry_mode,
+                    sample_rate=resolved.telemetry_sample_rate,
                 ),
             )
             if resolved.telemetry

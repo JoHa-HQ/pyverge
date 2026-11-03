@@ -97,6 +97,7 @@ runtime = manager.runtime(
     middleware=(),
     telemetry=(),
     telemetry_mode="all",
+    telemetry_sample_rate=1.0,
     direction="any",
     on_direction_violation="skip",
     on_missing_path="raise",

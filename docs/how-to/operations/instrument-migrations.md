@@ -108,11 +108,13 @@ Control event volume with `telemetry_mode`:
 ```python
 runner = manager.runtime(
     telemetry=(adapter,),
-    telemetry_mode="errors",   # all | errors | off
+    telemetry_mode="errors",   # all | errors | sampled | off
+    telemetry_sample_rate=0.01,
 ).runner
 ```
 
-`errors` emits only failed run and step events. `off` constructs no events.
+`errors` emits only failed run and step events. `sampled` emits a stable sample
+of complete runs. `off` constructs no events.
 
 ## Verify
 

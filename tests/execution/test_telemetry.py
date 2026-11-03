@@ -22,6 +22,7 @@ from pyverge.runtime.telemetry import (
     StepCompleted,
     StepStarted,
     TelemetryEvent,
+    TelemetryPublisher,
 )
 from pyverge.runtime.telemetry.openlineage import OpenLineageAdapter
 from pyverge.runtime.telemetry.otel import OtelAdapter
@@ -400,3 +401,36 @@ def test_telemetry_errors_mode_emits_only_failures(
         )
 
     assert _types(recorder.events) == ["StepFailed", "RunFailed"]
+
+
+@pytest.mark.parametrize("sample_rate, expected", [(0.0, 0), (1.0, 4)])
+@pytest.mark.parametrize(
+    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
+)
+def test_telemetry_sampled_mode(
+    registry: Registry,
+    runner_factory,
+    sample_rate: float,
+    expected: int,
+) -> None:
+    recorder = RecordingTelemetry()
+
+    _run(
+        runner_factory(
+            telemetry=(recorder,),
+            telemetry_mode="sampled",
+            telemetry_sample_rate=sample_rate,
+        ),
+        registry,
+    )
+
+    assert len(recorder.events) == expected
+
+
+def test_telemetry_rejects_invalid_sample_rate() -> None:
+    with pytest.raises(ValueError, match="sample_rate"):
+        TelemetryPublisher(
+            adapters=(RecordingTelemetry(),),
+            mode="sampled",
+            sample_rate=1.5,
+        )

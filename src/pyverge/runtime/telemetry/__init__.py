@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Protocol, TypeAlias
@@ -66,7 +67,13 @@ TelemetryEvent: TypeAlias = (
     RunStarted | RunCompleted | RunFailed | StepStarted | StepCompleted | StepFailed
 )
 
-TelemetryMode: TypeAlias = Literal["all", "errors", "off"]
+TelemetryMode: TypeAlias = Literal["all", "errors", "sampled", "off"]
+
+
+def _event_run_id(event: TelemetryEvent) -> str:
+    if isinstance(event, (RunStarted, RunCompleted, RunFailed)):
+        return event.run.run_id
+    return event.step.run.run_id
 
 
 class TelemetryAdapter(Protocol):
@@ -81,6 +88,11 @@ class TelemetryPublisher:
 
     adapters: tuple[TelemetryAdapter, ...] = field(default_factory=tuple)
     mode: TelemetryMode = "all"
+    sample_rate: float = 1.0
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.sample_rate <= 1.0:
+            raise ValueError("telemetry sample_rate must be between 0 and 1")
 
     @property
     def enabled(self) -> bool:
@@ -90,7 +102,11 @@ class TelemetryPublisher:
     @property
     def emits_success(self) -> bool:
         """Whether successful lifecycle events should be constructed."""
-        return self.enabled and self.mode == "all"
+        if self.mode == "all":
+            return self.enabled
+        if self.mode == "sampled":
+            return self.enabled and self.sample_rate > 0.0
+        return False
 
     @property
     def emits_failure(self) -> bool:
@@ -102,6 +118,8 @@ class TelemetryPublisher:
             return
         if self.mode == "errors" and not isinstance(event, (RunFailed, StepFailed)):
             return
+        if self.mode == "sampled" and not self._sampled(event):
+            return
         for adapter in self.adapters:
             try:
                 adapter.emit(event)
@@ -111,6 +129,15 @@ class TelemetryPublisher:
                     type(adapter).__name__,
                     type(event).__name__,
                 )
+
+    def _sampled(self, event: TelemetryEvent) -> bool:
+        if self.sample_rate <= 0.0:
+            return False
+        if self.sample_rate >= 1.0:
+            return True
+        run_id = _event_run_id(event)
+        digest = hashlib.blake2b(run_id.encode(), digest_size=8).digest()
+        return int.from_bytes(digest, "big") / 2**64 < self.sample_rate
 
 
 EMPTY_TELEMETRY = TelemetryPublisher()
