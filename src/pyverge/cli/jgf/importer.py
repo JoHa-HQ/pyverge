@@ -4,8 +4,8 @@ from collections.abc import Mapping
 from typing import Any, cast
 
 from pyverge.core.registry.types import MigrationWrite, ModelWrite
-from pyverge.core.versioning import JgfGraph
 
+from .model import JgfGraph
 from .types import EdgeResolver, NodeResolver
 
 

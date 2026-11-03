@@ -44,7 +44,7 @@ class IndexedBackend(Generic[VersionValue]):
     models_by_ref: Mapping[ModelRef, VersionNode[VersionValue]]
     executable_edge_ids: frozenset[EdgeId]
     edge_metadata: Mapping[EdgeId, Mapping[str, str]]
-    content_hashes: Mapping[str, EdgeId]
+    digests: Mapping[str, EdgeId]
     node_digests: Mapping[NodeId, str]
     edge_digests: Mapping[EdgeId, str]
     hook_specs: Mapping[EdgeId, tuple[HookRef, ...]]
@@ -60,7 +60,7 @@ class IndexedBackend(Generic[VersionValue]):
         models_by_ref: Mapping[ModelRef, VersionNode[VersionValue]] | None = None,
         executable_edge_ids: Iterable[EdgeId] = (),
         edge_metadata: Mapping[EdgeId, Mapping[str, str]] | None = None,
-        content_hashes: Mapping[str, EdgeId] | None = None,
+        digests: Mapping[str, EdgeId] | None = None,
         node_digests: Mapping[NodeId, str] | None = None,
         edge_digests: Mapping[EdgeId, str] | None = None,
         hook_specs: Mapping[EdgeId, tuple[HookRef, ...]] | None = None,
@@ -147,7 +147,7 @@ class IndexedBackend(Generic[VersionValue]):
             models_by_ref=MappingProxyType(resolved_models),
             executable_edge_ids=frozenset(executable_edge_ids),
             edge_metadata=MappingProxyType(dict(edge_metadata or {})),
-            content_hashes=MappingProxyType(dict(content_hashes or {})),
+            digests=MappingProxyType(dict(digests or {})),
             node_digests=MappingProxyType(dict(node_digests or {})),
             edge_digests=MappingProxyType(dict(edge_digests or {})),
             hook_specs=MappingProxyType(

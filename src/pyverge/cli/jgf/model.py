@@ -4,9 +4,14 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from .canonical import Addressable, ContentHasher
-from .identity import EdgeKey, VersionEdge, VersionKey, VersionNode
-from .identity.metadata import ModelDescriptor
+from pyverge.core.versioning.canonical import Addressable, ContentHasher
+from pyverge.core.versioning.identity import (
+    EdgeKey,
+    VersionEdge,
+    VersionKey,
+    VersionNode,
+)
+from pyverge.core.versioning.identity.metadata import ModelDescriptor
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,7 +69,7 @@ class JgfNode:
         metadata = (
             dict(payload) if isinstance(payload, Mapping) else {"canonical": payload}
         )
-        metadata["content_hash"] = value.content_hash(hasher)
+        metadata["digest"] = value.digest(hasher)
         rendered = str(value)
         return cls(id=rendered, label=rendered, metadata=metadata)
 
@@ -179,7 +184,7 @@ class JgfGraph:
         return cls(
             id=id,
             directed=directed,
-            nodes=tuple(node.to_jgf(hasher) for node in versions),
+            nodes=tuple(JgfNode.from_version(node, hasher) for node in versions),
             edges=tuple(
                 JgfEdge.from_edge_key(edge, metadata=projected_metadata.get(edge))
                 for edge in edges

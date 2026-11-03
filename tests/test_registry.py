@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from pyverge import types
 from pyverge.cli.export import ManifestDiff
-from pyverge.cli.jgf import JgfExporter, JgfImporter
+from pyverge.cli.jgf import JgfExporter, JgfImporter, JgfNode
 from pyverge.core import (
     MaxDepthExceededError,
     PayloadValidationError,
@@ -40,7 +40,6 @@ from pyverge.core.registry.types import PathCatalog
 from pyverge.core.versioning import (
     EdgeKey,
     FieldDescriptor,
-    JgfNode,
     NodeId,
     NodeRef,
     TypeRef,
@@ -2697,7 +2696,7 @@ def test_catalog_exports_jgf_and_imports_nodes(
     assert len(document["graph"]["edges"]) == sum(
         len(registry.migrations(kind)) for kind in registry.kinds
     )
-    assert exporter.content_hash(registry) == exporter.content_hash(registry)
+    assert exporter.export_digest(registry) == exporter.export_digest(registry)
     assert not ManifestDiff.compare(document, document).changed
 
     nodes_by_id = {
@@ -2822,7 +2821,7 @@ def test_catalog_lock_returns_frozen_view(
     ],
     indirect=["model_adapter"],
 )
-def test_content_hash_index_tracks_registration(
+def test_digest_index_tracks_registration(
     model_adapter: types.ModelAdapter,
     versioning_settings: VersioningSettings,
     models: list[ModelHandle],
@@ -2830,7 +2829,7 @@ def test_content_hash_index_tracks_registration(
     catalog = Registry(
         namespace=getattr(model_adapter, "model_codec").namespace,
         hasher=default_content_hasher(),
-        index_content_hashes=True,
+        index_digests=True,
         linters=DEFAULT_HEALTH_LINTERS,
     )
     nodes = [model_adapter.versionable(model) for model in models]
@@ -2848,13 +2847,13 @@ def test_content_hash_index_tracks_registration(
 
     key = EdgeKey.from_version_edge(edge)
     assert (
-        catalog.find_edge_by_content_hash(edge.content_hash(default_content_hasher()))
+        catalog.find_edge_by_digest(edge.digest(default_content_hasher()))
         == key
     )
 
     catalog.remove_migration(key)
     assert (
-        catalog.find_edge_by_content_hash(edge.content_hash(default_content_hasher()))
+        catalog.find_edge_by_digest(edge.digest(default_content_hasher()))
         is None
     )
 

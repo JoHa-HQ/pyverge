@@ -39,10 +39,8 @@ from .identity import (
     VersionNode,
     parse_version,
 )
-from .jgf import JgfEdge, JgfGraph, JgfNode
 from .types import (
     Comparable,
-    ContentAddressable,
     Delta,
     Diffable,
     DiffMaterializer,
@@ -75,7 +73,6 @@ __all__ = [
     "Canonicalizer",
     "ChangeSet",
     "Comparable",
-    "ContentAddressable",
     "ContentHasher",
     "DefaultValue",
     "Delta",
@@ -99,9 +96,6 @@ __all__ = [
     "HashingProvider",
     "HookRef",
     "Identifiable",
-    "JgfEdge",
-    "JgfGraph",
-    "JgfNode",
     "KeyRef",
     "LookupKey",
     "Migratable",

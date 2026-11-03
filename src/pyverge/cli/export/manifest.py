@@ -50,10 +50,10 @@ class ManifestExporter:
             "pyverge_version": self.spec.tool_version,
             "manager": manager,
         }
-        content_hash = self.exporter.digest(graph)
+        digest = self.exporter.digest(graph)
         if generated_at is not None:
             graph["metadata"]["generated_at"] = generated_at.isoformat()
-        graph["metadata"]["content_hash"] = content_hash
+        graph["metadata"]["digest"] = digest
         return document
 
 

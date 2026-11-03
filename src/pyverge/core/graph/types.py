@@ -31,22 +31,6 @@ class PathGraphView(
 
 
 @runtime_checkable
-class GraphExportSource(Protocol[VersionValue]):
-    """Native graph surface needed to project a JGF document."""
-
-    @property
-    def namespace(self) -> str: ...
-
-    @property
-    def versions(self) -> Sequence[VersionNode[VersionValue]]: ...
-
-    @property
-    def kinds(self) -> list[ModelKind]: ...
-
-    def edges(self, kind: ModelKind) -> Sequence[EdgeKey[VersionValue]]: ...
-
-
-@runtime_checkable
 class GraphSnapshotSource(Protocol):
     """Read-only source used to compile an immutable migration graph."""
 
@@ -60,7 +44,7 @@ class GraphSnapshotSource(Protocol):
     def entries(self) -> Sequence[NodeEntry]: ...
 
     @property
-    def content_hashes(self) -> Mapping[str, EdgeKey]: ...
+    def digests(self) -> Mapping[str, EdgeKey]: ...
 
     @property
     def entities(self) -> list[ModelKind]: ...
@@ -80,7 +64,6 @@ class GraphSnapshotSource(Protocol):
 
 
 __all__ = [
-    "GraphExportSource",
     "GraphSnapshotSource",
     "GraphView",
     "PathGraphView",

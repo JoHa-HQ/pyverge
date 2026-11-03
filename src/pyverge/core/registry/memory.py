@@ -88,13 +88,13 @@ class Registry(Generic[VersionValue]):
     Args:
         namespace: Non-empty namespace owned by this registry.
         hasher: Content-hash strategy used to compare migration content and to
-            populate the optional content-hash index.
+            populate the optional digest index.
         reflection: Diff-based model reflection and migration binding.
         linters: Callable health rules locked for this registry instance.
         on_missing: Missing-endpoint policy. ``reconstruct_model`` enables
             reflection; ``raise`` is the default.
-        index_content_hashes: Build a content-address lookup for migration
-            edges. Leave disabled unless reverse content-hash lookup is needed.
+        index_digests: Build a digest lookup for migration edges. Leave disabled
+            unless reverse digest lookup is needed.
 
     Raises:
         ValueError: The namespace is empty.
@@ -108,13 +108,13 @@ class Registry(Generic[VersionValue]):
         reflection: ReflectionPort[VersionValue] | None = None,
         linters: Sequence[HealthLinter],
         on_missing: str = "raise",
-        index_content_hashes: bool = False,
+        index_digests: bool = False,
     ) -> None:
         if not namespace:
             raise ValueError("Registry namespace must be non-empty")
         self._namespace = namespace
         self._hasher = hasher
-        self._index_content_hashes = index_content_hashes
+        self._index_digests = index_digests
         self._reflection = reflection
         self._on_missing = on_missing
         self._linters = tuple(linters)
@@ -122,8 +122,8 @@ class Registry(Generic[VersionValue]):
         self._issues_by_namespace: dict[str, set[Any]] = {}
         self._references_to: dict[NodeId, set[Any]] = {}
         self._references_by_entity: dict[Any, frozenset[NodeId]] = {}
-        self._content_hash_index: dict[str, EdgeKey[VersionValue]] | None = (
-            {} if index_content_hashes else None
+        self._digest_index: dict[str, EdgeKey[VersionValue]] | None = (
+            {} if index_digests else None
         )
         self._by_versions: list[NodeEntry] = []
         self._by_kinds: dict[ModelKind, list[NodeEntry]] = defaultdict(list)
@@ -170,8 +170,8 @@ class Registry(Generic[VersionValue]):
         return self._hasher
 
     @property
-    def content_hashes(self: Self) -> Mapping[str, EdgeKey[VersionValue]]:
-        return MappingProxyType(dict(self._content_hash_index or {}))
+    def digests(self: Self) -> Mapping[str, EdgeKey[VersionValue]]:
+        return MappingProxyType(dict(self._digest_index or {}))
 
     @property
     def kinds(self: Self) -> list[ModelKind]:
@@ -455,7 +455,7 @@ class Registry(Generic[VersionValue]):
             reflection=self._reflection,
             linters=self._linters,
             on_missing=self._on_missing,
-            index_content_hashes=self._index_content_hashes,
+            index_digests=self._index_digests,
         )
         new.copy_from(self)
         return new
@@ -474,8 +474,8 @@ class Registry(Generic[VersionValue]):
             set, {v: set(s) for v, s in source._edges_by_version.items()}
         )
         self._hooks = defaultdict(list, {k: list(v) for k, v in source._hooks.items()})
-        if source._content_hash_index is not None:
-            self._content_hash_index = dict(source._content_hash_index)
+        if source._digest_index is not None:
+            self._digest_index = dict(source._digest_index)
         self._health_issues = dict(source._health_issues)
         self._issues_by_namespace = {
             namespace: set(entities)
@@ -487,10 +487,10 @@ class Registry(Generic[VersionValue]):
         }
         self._references_by_entity = dict(source._references_by_entity)
 
-    def find_edge_by_content_hash(self, value: str) -> EdgeKey[VersionValue] | None:
-        if self._content_hash_index is None:
+    def find_edge_by_digest(self, value: str) -> EdgeKey[VersionValue] | None:
+        if self._digest_index is None:
             return None
-        return self._content_hash_index.get(value)
+        return self._digest_index.get(value)
 
     def store(self: Self, entry: NodeEntry) -> NodeEntry:
         """Insert a new node entry; reject duplicates."""
@@ -782,8 +782,8 @@ class Registry(Generic[VersionValue]):
                             del self._edges_by_version[endpoint]
             else:
                 if isinstance(existing, VersionEdge) and isinstance(edge, VersionEdge):
-                    registered_hash = existing.content_hash(self._hasher)
-                    incoming_hash = edge.content_hash(self._hasher)
+                    registered_hash = existing.digest(self._hasher)
+                    incoming_hash = edge.digest(self._hasher)
                     if registered_hash != incoming_hash:
                         raise MigrationConflictError(
                             self._namespace,
@@ -799,9 +799,9 @@ class Registry(Generic[VersionValue]):
         self._edges_by_version[edge.source].add(edge)
         self._edges_by_version[edge.target].add(edge)
         if isinstance(edge, VersionEdge):
-            if self._content_hash_index is not None:
+            if self._digest_index is not None:
                 edge_key = EdgeKey.from_version_edge(edge)
-                self._content_hash_index[edge.content_hash(self._hasher)] = edge_key
+                self._digest_index[edge.digest(self._hasher)] = edge_key
             self._refresh_health(self._affected_by_edge_change(edge))
             return edge
 
@@ -891,10 +891,10 @@ class Registry(Generic[VersionValue]):
             del self._migrations[key.kind][idx]
             if not self._migrations[key.kind]:
                 del self._migrations[key.kind]
-            if self._content_hash_index is not None and isinstance(
+            if self._digest_index is not None and isinstance(
                 existing, VersionEdge
             ):
-                self._content_hash_index.pop(existing.content_hash(self._hasher), None)
+                self._digest_index.pop(existing.digest(self._hasher), None)
             for endpoint in (key.source, key.target):
                 bucket = self._edges_by_version.get(endpoint)
                 if bucket is None:
@@ -913,8 +913,8 @@ class Registry(Generic[VersionValue]):
         self.clear_hooks()
         self._migrations.clear()
         self._edges_by_version.clear()
-        if self._content_hash_index is not None:
-            self._content_hash_index.clear()
+        if self._digest_index is not None:
+            self._digest_index.clear()
         self._rebuild_health()
 
     def remove_migration_range(

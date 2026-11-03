@@ -99,13 +99,6 @@ class Fingerprintable(Protocol):
 
 
 @runtime_checkable
-class ContentAddressable(Protocol):
-    """A value with an explicit canonical payload and content address."""
-
-    def content_hash(self, hasher: ContentHasher) -> str: ...
-
-
-@runtime_checkable
 class Comparable(
     Identifiable,
     Namespaced,
@@ -171,7 +164,7 @@ class DiffProvider(Protocol):
 
 @runtime_checkable
 class Migratable(
-    Transitional[VersionValue_co], ContentAddressable, Protocol[VersionValue_co]
+    Transitional[VersionValue_co], Digestible, Protocol[VersionValue_co]
 ):
     """Executable transition: endpoint identity plus diff and callable."""
 
@@ -279,7 +272,6 @@ EdgeEntry: TypeAlias = Union["EdgeKey", "VersionEdge"]
 
 __all__ = [
     "Comparable",
-    "ContentAddressable",
     "Delta",
     "DiffMaterializer",
     "DiffOrigin",

@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from json_graph_lite.jgf import Graph as LiteGraph
 
+from pyverge.cli.jgf import JgfGraph, JgfNode
 from pyverge.core.registry import CompatibilityReport
 from pyverge.core.versioning import (
     NO_DEFAULT,
@@ -22,8 +23,6 @@ from pyverge.core.versioning import (
     FieldDescriptor,
     FieldStatus,
     FrozenMap,
-    JgfGraph,
-    JgfNode,
     ModelRef,
     TypeRef,
     VersionNode,
@@ -702,7 +701,7 @@ class TestPrimitives:
         hasher = default_content_hasher()
         projected = JgfNode.from_addressable(node, hasher)
         assert projected.id == str(node)
-        assert projected.metadata["content_hash"] == node.content_hash(hasher)
+        assert projected.metadata["digest"] == node.digest(hasher)
         assert projected.metadata["model"] == node.descriptor.to_canonical()
         assert node.model_id.endswith("PersonV1")
 

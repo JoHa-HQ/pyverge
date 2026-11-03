@@ -95,10 +95,10 @@ class GraphBuilder(Generic[VersionValue]):
                     for edge_id, metadata in edge_metadata.items()
                 }
             ),
-            content_hashes=_freeze(
+            digests=_freeze(
                 {
                     digest: edge.id
-                    for digest, edge in source.content_hashes.items()
+                    for digest, edge in source.digests.items()
                 }
             ),
             node_digests=_freeze(node_digests),

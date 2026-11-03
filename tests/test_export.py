@@ -91,7 +91,7 @@ def test_manifest_uses_explicit_spec_and_injected_hasher(
         registry, manager="tests", generated_at=generated_at
     )
     assert document == snapshot
-    assert exporter.content_hash(registry) == "fixed-hash"
+    assert exporter.export_digest(registry) == "fixed-hash"
 
 
 def test_manifest_ids_are_namespace_prefixed() -> None:

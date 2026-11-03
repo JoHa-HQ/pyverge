@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import total_ordering
-from typing import TYPE_CHECKING, Any, Generic, Self
+from typing import Any, Generic, Self
 
 from pyverge.core.types import ModelKind, VersionValue
 
@@ -10,10 +10,6 @@ from ..canonical import ContentHasher
 from ..types import Diffable
 from .metadata import EdgeRef, MigrationDescriptor, MigrationRef
 from .nodes import NodeId, VersionNode
-
-if TYPE_CHECKING:
-    from ..jgf import JgfEdge
-
 
 DEFAULT_DISCRIMINATOR = "default"
 """Discriminator used by legacy pair-keyed edges."""
@@ -246,8 +242,8 @@ class VersionEdge(EdgeKey[VersionValue]):
     def content_payload(self, hasher: ContentHasher) -> dict[str, object]:
         return {
             "id": str(self),
-            "source": self.source.content_hash(hasher),
-            "target": self.target.content_hash(hasher),
+            "source": self.source.digest(hasher),
+            "target": self.target.digest(hasher),
             "discriminator": self.discriminator,
             "diff": self.diff.fingerprint_payload(),
             "migration": {
@@ -256,17 +252,9 @@ class VersionEdge(EdgeKey[VersionValue]):
             },
         }
 
-    def content_hash(self, hasher: ContentHasher) -> str:
-        return hasher.digest(self.content_payload(hasher))
-
     def digest(self, hasher: ContentHasher) -> str:
         """Return the manifest checksum for this executable edge."""
-        return self.content_hash(hasher)
-
-    def to_jgf(self) -> JgfEdge:
-        from ..jgf import JgfEdge  # noqa: PLC0415
-
-        return JgfEdge.from_version_edge(self)
+        return hasher.digest(self.content_payload(hasher))
 
 
 __all__ = [

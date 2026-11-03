@@ -113,7 +113,7 @@ class TestContentAddress:
         ids=["pydantic", "json"],
         indirect=["model_adapter"],
     )
-    def test_node_content_hash(
+    def test_node_digest(
         self,
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
@@ -123,7 +123,7 @@ class TestContentAddress:
         payload = node.content_payload()
         assert payload["id"] == str(node.id)
         assert payload["model"] == node.model_id
-        assert node.content_hash(
+        assert node.digest(
             default_content_hasher()
         ) == default_content_hasher().digest(payload)
 
@@ -136,7 +136,7 @@ class TestContentAddress:
         ids=["pydantic", "json"],
         indirect=["model_adapter"],
     )
-    def test_edge_content_hash_is_deterministic(
+    def test_edge_digest_is_deterministic(
         self,
         model_adapter: PydanticModelAdapter,
         versioning_settings: VersioningSettings,
@@ -158,7 +158,7 @@ class TestContentAddress:
             func=_noop_migration,
         )
         assert left.migration.identity == right.migration.identity
-        assert left.content_hash(default_content_hasher()) == right.content_hash(
+        assert left.digest(default_content_hasher()) == right.digest(
             default_content_hasher()
         )
 
@@ -186,7 +186,7 @@ class TestContentAddress:
             func=_noop_migration,
         )
         other = edge.with_migration(MigrationDescriptor("callable", "migration:other"))
-        assert edge.content_hash(default_content_hasher()) != other.content_hash(
+        assert edge.digest(default_content_hasher()) != other.digest(
             default_content_hasher()
         )
 
@@ -220,7 +220,7 @@ class TestContentAddress:
                 FieldChange(FieldStatus.ADDED, {}),
             )
         )
-        assert edge.content_hash(default_content_hasher()) != other.content_hash(
+        assert edge.digest(default_content_hasher()) != other.digest(
             default_content_hasher()
         )
 
@@ -506,8 +506,7 @@ class TestGraphPrimitives:
         assert edge.key == (source, target)
         assert str(edge) == "test:User@1.0.0->test:User@2.0.0"
         assert edge.content_payload(default_content_hasher())["id"] == str(edge)
-        assert len(edge.content_hash(default_content_hasher())) == SHA256_HEX_LENGTH
-        assert edge.to_jgf().source == str(source)
+        assert len(edge.digest(default_content_hasher())) == SHA256_HEX_LENGTH
         assert edge < other
         assert other > edge
         assert edge != other

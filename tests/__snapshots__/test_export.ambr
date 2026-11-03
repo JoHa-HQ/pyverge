@@ -8,7 +8,7 @@
       'id': 'custom-id',
       'label': 'custom label',
       'metadata': dict({
-        'content_hash': 'fixed-hash',
+        'digest': 'fixed-hash',
         'generated_at': '2024-01-02T03:04:05+00:00',
         'manager': 'tests',
         'manifest_version': '1.0',
@@ -59,7 +59,7 @@
       'id': 'custom-id',
       'label': 'custom label',
       'metadata': dict({
-        'content_hash': 'fixed-hash',
+        'digest': 'fixed-hash',
         'generated_at': '2024-01-02T03:04:05+00:00',
         'manager': 'tests',
         'manifest_version': '1.0',

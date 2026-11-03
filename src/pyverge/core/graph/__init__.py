@@ -42,7 +42,6 @@ from .revision import (
     version_strategy,
 )
 from .types import (
-    GraphExportSource,
     GraphSnapshotSource,
     GraphView,
     PathGraphView,
@@ -60,7 +59,6 @@ __all__ = [
     "GraphBackend",
     "GraphBuilder",
     "GraphCycleError",
-    "GraphExportSource",
     "GraphSnapshotSource",
     "GraphView",
     "IndexedBackend",

@@ -24,7 +24,7 @@ from .linters import (
 )
 from .memory import Registry
 from .types import (
-    ContentHashLookup,
+    DigestLookup,
     GraphCatalog,
     HealthFailLevel,
     HealthIssue,
@@ -43,7 +43,7 @@ __all__ = [
     "CatalogError",
     "CompatibilityLinter",
     "CompatibilityReport",
-    "ContentHashLookup",
+    "DigestLookup",
     "GraphCatalog",
     "GraphLockedError",
     "HealthFailLevel",

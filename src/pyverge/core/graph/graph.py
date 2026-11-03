@@ -98,11 +98,11 @@ class MigrationGraph(Generic[VersionValue]):
         return self.backend.edge_metadata
 
     @property
-    def content_hashes(self) -> Mapping[str, EdgeKey]:
+    def digests(self) -> Mapping[str, EdgeKey]:
         return MappingProxyType(
             {
                 digest: self.backend.edges_by_id[edge_id]
-                for digest, edge_id in self.backend.content_hashes.items()
+                for digest, edge_id in self.backend.digests.items()
             }
         )
 
@@ -334,8 +334,8 @@ class MigrationGraph(Generic[VersionValue]):
             return False
         return len(edges) > 2 and (idx > 0 or idx < len(edges) - 1)  # noqa: PLR2004
 
-    def find_edge_by_content_hash(self, value: str) -> EdgeKey | None:
-        edge_id = self.backend.content_hashes.get(value)
+    def find_edge_by_digest(self, value: str) -> EdgeKey | None:
+        edge_id = self.backend.digests.get(value)
         if edge_id is None:
             return None
         return self.backend.edges_by_id.get(edge_id)

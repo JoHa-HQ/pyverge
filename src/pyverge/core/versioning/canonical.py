@@ -19,9 +19,9 @@ class Canonicalizable(Protocol):
 
 @runtime_checkable
 class Addressable(Canonicalizable, Protocol):
-    """A canonical value with graph identity and content address."""
+    """A canonical value with explicit graph identity and digest."""
 
-    def content_hash(self, hasher: ContentHasher) -> str: ...
+    def digest(self, hasher: ContentHasher) -> str: ...
 
 
 class ValueEncoder(Protocol):

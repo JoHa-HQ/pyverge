@@ -190,6 +190,15 @@ class BuildNumber:
     def __lt__(self, other: Any) -> bool:
         return self.value < other.value
 
+    def __gt__(self, other: Any) -> bool:
+        return self.value > other.value
+
+    def __le__(self, other: Any) -> bool:
+        return self.value <= other.value
+
+    def __ge__(self, other: Any) -> bool:
+        return self.value >= other.value
+
     def __hash__(self) -> int:
         return hash(self.value)
 

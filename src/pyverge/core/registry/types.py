@@ -131,10 +131,10 @@ class PathCatalog(Protocol[VersionValue]):
     ) -> list[EdgeKey[VersionValue]]: ...
 
 
-class ContentHashLookup(Protocol):
-    """Optional content-address index for manifest/debug queries."""
+class DigestLookup(Protocol):
+    """Optional digest index for manifest/debug queries."""
 
-    def find_edge_by_content_hash(self, value: str) -> EdgeKey | None: ...
+    def find_edge_by_digest(self, value: str) -> EdgeKey | None: ...
 
 
 class GraphCatalog(ModelCatalog[VersionValue], Protocol[VersionValue]):
@@ -222,7 +222,7 @@ class RegistryPort(
 
 __all__ = [
     "HEALTH_SEVERITY_ORDER",
-    "ContentHashLookup",
+    "DigestLookup",
     "GraphCatalog",
     "HealthFailLevel",
     "HealthIssue",
