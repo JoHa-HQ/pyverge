@@ -11,6 +11,22 @@ from pyverge.core.types import (
     ModelKind,
     VersionValue,
 )
+from pyverge.core.versioning import (
+    Comparable,
+    ContentHasher,
+    EdgeEntry,
+    EdgeKey,
+    Identifiable,
+    Migratable,
+    MigrationRef,
+    ModelRef,
+    NodeEntry,
+    NodeId,
+    Transitional,
+    VersionEdge,
+    VersionNode,
+)
+from pyverge.core.versioning.errors import NodeConflictError
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.migrations.json_patch import JsonPatch
 from pyverge.migrations.spec import MigrationSpec
@@ -23,21 +39,6 @@ from pyverge.registry.errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
-from pyverge.versioning import (
-    Comparable,
-    ContentHasher,
-    EdgeEntry,
-    EdgeKey,
-    Identifiable,
-    Migratable,
-    ModelRef,
-    NodeEntry,
-    NodeId,
-    Transitional,
-    VersionEdge,
-    VersionNode,
-)
-from pyverge.versioning.errors import NodeConflictError
 
 from .linters import HealthLinter
 from .types import HealthFailLevel, HealthIssue, ReflectionPort
@@ -56,7 +57,7 @@ class Registry(Generic[VersionValue]):
     >>> from pyverge.registry import Registry
     >>> from pyverge.schemas import ModelCodec
     >>> from pyverge.schemas import PydanticModelAdapter
-    >>> from pyverge.versioning import default_content_hasher
+    >>> from pyverge.core.versioning import default_content_hasher
     >>> adapter = PydanticModelAdapter(codec=ModelCodec(
             namespace="default",
             version_property="version",
@@ -725,12 +726,17 @@ class Registry(Generic[VersionValue]):
                     self._namespace,
                     f"Cannot register migration with skip versions: {v_from}→{v_to}",
                 )
+            migration = DefaultMigrationIdentityResolver().resolve(spec.func)
             edge: EdgeEntry = VersionEdge(
                 source=resolved_from,
                 target=resolved_to,
+                ref=MigrationRef(
+                    provider_id=migration.provider_id,
+                    entity_id=migration.entity_id,
+                ),
                 diff=reflection.diff(resolved_from, resolved_to),
                 func=spec.func,
-                migration=DefaultMigrationIdentityResolver().resolve(spec.func),
+                migration=migration,
             )
         else:
             assert not isinstance(entry, MigrationSpec)

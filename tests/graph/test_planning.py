@@ -9,6 +9,7 @@ import pytest
 import semver
 
 from pyverge.core.types import MigrationDirectionStrategy
+from pyverge.core.versioning import EdgeKey, parse_version
 from pyverge.execution.migrations import MigrationBindings
 from pyverge.execution.plan import ExtractedEntry
 from pyverge.graph import (
@@ -24,7 +25,6 @@ from pyverge.graph import (
 )
 from pyverge.registry.errors import CatalogError
 from pyverge.schemas import PydanticModelAdapter
-from pyverge.versioning import EdgeKey, parse_version
 from tests.examples.migrations import USER_JSONATA_V2_TO_V3, USER_JSONPATCH_V1_TO_V2
 from tests.examples.pydantic.semver import (
     UserV1,

@@ -7,7 +7,7 @@ from pyverge.core.types import (
 )
 
 if TYPE_CHECKING:
-    from pyverge.engine import Engine
+    from pyverge.core.engine import Engine
     from pyverge.manager.types import (
         ManagerClassState,
     )

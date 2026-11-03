@@ -11,10 +11,10 @@ from typing import Any, cast
 
 from opentelemetry.trace import StatusCode
 
+from pyverge.core.versioning import MigrationDescriptor, NodeId
 from pyverge.execution.hooks import OpenLineageHook, OTELHook
 from pyverge.execution.hooks.state import new_hook_state
 from pyverge.execution.middleware import OpenLineageMiddleware, OtelMiddleware
-from pyverge.versioning import MigrationDescriptor, NodeId
 
 
 class RecordingSpan:

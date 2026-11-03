@@ -6,13 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Generic, cast
 
 from pyverge.core.types import ModelKind, VersionValue
-from pyverge.registry.errors import (
-    CatalogError,
-    MigrationNotFoundError,
-    MigrationPathError,
-    ModelNotFoundError,
-)
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     Comparable,
     EdgeKey,
     ModelRef,
@@ -20,6 +14,12 @@ from pyverge.versioning import (
     NodeId,
     Transitional,
     VersionNode,
+)
+from pyverge.registry.errors import (
+    CatalogError,
+    MigrationNotFoundError,
+    MigrationPathError,
+    ModelNotFoundError,
 )
 
 

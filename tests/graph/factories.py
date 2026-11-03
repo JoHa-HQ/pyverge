@@ -15,6 +15,15 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
+from pyverge.core.versioning import (
+    MigrationDescriptor,
+    MigrationRef,
+    NodeRef,
+    VersionEdge,
+    VersionKey,
+    VersionNode,
+    default_content_hasher,
+)
 from pyverge.graph import (
     DirectionPolicy,
     GraphBuilder,
@@ -23,13 +32,6 @@ from pyverge.graph import (
 )
 from pyverge.registry import Registry
 from pyverge.schemas.types import ModelAdapter
-from pyverge.versioning import (
-    MigrationDescriptor,
-    VersionEdge,
-    VersionKey,
-    VersionNode,
-    default_content_hasher,
-)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +119,7 @@ class SyntheticGraphFactory:
                 namespace=node.namespace,
                 kind=node.kind,
                 version=node.version,
+                ref=NodeRef(),
             )
             for node in nodes
         )
@@ -147,15 +150,19 @@ class SyntheticGraphFactory:
         source: VersionNode[VersionValue],
         target: VersionNode[VersionValue],
     ) -> VersionEdge:
+        migration = MigrationDescriptor(
+            strategy="synthetic",
+            identity=f"{source}->{target}",
+        )
         return VersionEdge(
             source=source,
             target=target,
+            ref=MigrationRef(
+                provider_id=migration.strategy, entity_id=migration.identity
+            ),
             diff=self._adapter.diff(source, target),
             func=_noop,
-            migration=MigrationDescriptor(
-                strategy="synthetic",
-                identity=f"{source}->{target}",
-            ),
+            migration=migration,
         )
 
 

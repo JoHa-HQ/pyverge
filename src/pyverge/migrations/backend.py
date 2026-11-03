@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
-from pyverge.versioning import Diffable, DiffMaterializer
+from pyverge.core.versioning import Diffable, DiffMaterializer
 
 T = TypeVar("T")
 

@@ -16,13 +16,14 @@ from pydantic import BaseModel
 from pyverge import Manager
 from pyverge.core import (
     ManagerMigrationKey,
-    MigrationContext,
     MigrationKeyInput,
     ModelPair,
     VersionValue,
 )
-from pyverge.engine import Engine
+from pyverge.core.engine import Engine
+from pyverge.core.versioning import Migratable, NodeRef, Versionable, VersionKey
 from pyverge.execution.backends import AsyncBackend
+from pyverge.execution.context import MigrationContext
 from pyverge.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
@@ -39,7 +40,6 @@ from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.settings import MigrationSettings, VersioningSettings, manager_kwargs
-from pyverge.versioning import Migratable, Versionable, VersionKey
 from tests.examples.json import (
     USER_V1_0_0,
     USER_V1_2_3,
@@ -1055,6 +1055,7 @@ def test_manager_stores_key_only_with_namespace(
         namespace="orders",
         kind="User",
         version=semver.Version(1, 0, 0),
+        ref=NodeRef(),
     )
 
     stored = instance.store_model(key)

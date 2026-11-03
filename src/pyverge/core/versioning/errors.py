@@ -7,7 +7,7 @@ from pyverge.core.errors import CatalogError, PyvergeError
 from pyverge.core.types import MIGRATION_PAIR_LEN
 
 if TYPE_CHECKING:
-    from pyverge.versioning.types import MigrationKey
+    from pyverge.core.versioning.types import MigrationKey
 
 
 class MigrationApplicationError(PyvergeError):

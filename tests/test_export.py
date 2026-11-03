@@ -13,6 +13,17 @@ import pytest
 import semver
 
 from pyverge import types
+from pyverge.core.versioning import (
+    ChangeSet,
+    ContentHasher,
+    Diff,
+    DiffOrigin,
+    FieldChange,
+    FieldStatus,
+    FrozenMap,
+    default_canonicalizer,
+    default_content_hasher,
+)
 from pyverge.export import (
     ManifestDiff,
     ManifestExporter,
@@ -24,17 +35,6 @@ from pyverge.registry import Registry
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.schemas.types import ModelHandle
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import (
-    ChangeSet,
-    ContentHasher,
-    Diff,
-    DiffOrigin,
-    FieldChange,
-    FieldStatus,
-    FrozenMap,
-    default_canonicalizer,
-    default_content_hasher,
-)
 from tests.examples.json import USER_V2025_01_01, USER_V2025_03_10
 from tests.examples.pydantic.semver import UserV1, UserV2
 from tests.utils import edge_from_models

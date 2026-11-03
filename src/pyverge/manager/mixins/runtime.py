@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
-from pyverge.core.clock import SystemClock
 from pyverge.core.ids import UuidIdFactory
 from pyverge.core.types import (
     DepthViolationStrategy,
@@ -18,7 +17,9 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
+from pyverge.core.versioning import Diffable, Identifiable
 from pyverge.execution import Runner, ThreadedBackend
+from pyverge.execution.clock import SystemClock
 from pyverge.execution.context import ExecutionEnvironment
 from pyverge.execution.middleware import BackendMiddleware
 from pyverge.execution.types import BackendPort
@@ -29,12 +30,11 @@ from pyverge.graph import (
     ForwardDirection,
 )
 from pyverge.registry import HealthFailLevel, HealthIssue
-from pyverge.versioning import Diffable, Identifiable
 
 from ..descriptors import hybridmethod
 
 if TYPE_CHECKING:
-    from pyverge.engine import Engine
+    from pyverge.core.engine import Engine
     from pyverge.manager.manager import Manager
 
 

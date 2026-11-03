@@ -11,11 +11,11 @@ from pyverge.core.types import (
     TargetResolver,
     VersionValue,
 )
+from pyverge.core.versioning import EdgeKey, MigrationDescriptor, NodeId, VersionNode
 from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
 from pyverge.graph.planning.policy import PolicyEngine
 from pyverge.graph.planning.targets import TargetCompiler, TargetPolicy
 from pyverge.graph.types import MigrationResolver, PathGraphView
-from pyverge.versioning import EdgeKey, MigrationDescriptor, NodeId, VersionNode
 
 if TYPE_CHECKING:
     from pyverge.execution.plan import ExtractedEntry

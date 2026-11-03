@@ -9,11 +9,11 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
+from pyverge.core.versioning import EdgeKey
 from pyverge.graph.planning.direction import DirectionPolicy
 from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
 from pyverge.graph.types import GraphView
 from pyverge.registry.errors import CatalogError
-from pyverge.versioning import EdgeKey
 
 
 @dataclass(frozen=True, slots=True)

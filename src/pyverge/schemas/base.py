@@ -7,10 +7,7 @@ from pyverge.core.types import (
     ModelHandle,
     VersionValue,
 )
-from pyverge.schemas.codec import ModelCodec
-from pyverge.schemas.errors import ProviderCapabilityError
-from pyverge.schemas.runtime import ModelRuntime, PythonModelRuntime
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     Comparable,
     Diff,
     Diffable,
@@ -24,7 +21,10 @@ from pyverge.versioning import (
     VersionNode,
     parse_version,
 )
-from pyverge.versioning.diff import _build_diff
+from pyverge.core.versioning.diff import _build_diff
+from pyverge.schemas.codec import ModelCodec
+from pyverge.schemas.errors import ProviderCapabilityError
+from pyverge.schemas.runtime import ModelRuntime, PythonModelRuntime
 
 
 class AbstractModelAdapter(Generic[VersionValue]):
@@ -109,13 +109,15 @@ class AbstractModelAdapter(Generic[VersionValue]):
         kind: str | None = None,
         version: str | VersionValue | None = None,
     ) -> VersionNode[VersionValue]:
+        descriptor = self.model_descriptor(model_cls)
         return VersionNode[VersionValue](
             namespace=self.model_codec.namespace,
             kind=kind or self.kind(model_cls),
             version=parse_version(
                 version if version is not None else self.version(model_cls)
             ),
-            descriptor=self.model_descriptor(model_cls),
+            ref=descriptor.ref,
+            descriptor=descriptor,
         )
 
     def versionable_from_schema(

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pyverge.core.types import MigrationFunc
-from pyverge.versioning import VersionPair
+from pyverge.core.versioning import VersionPair
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,10 +8,10 @@ from .types import DiffProvider
 
 if TYPE_CHECKING:
     from pyverge.core.types import MigrationFunc
+    from pyverge.core.versioning import Comparable, Diff, Versionable
     from pyverge.discovery.reflection.discovery import DiffDiscovery
     from pyverge.migrations.json_patch import JsonPatch
     from pyverge.schemas.types import ModelAdapter
-    from pyverge.versioning import Comparable, Diff, Versionable
 
 
 class Reflection(DiffProvider[VersionValue], Generic[VersionValue]):

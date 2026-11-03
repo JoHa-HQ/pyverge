@@ -5,9 +5,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .canonical import Addressable, ContentHasher
-from .graph import VersionEdge, VersionNode
-from .identity import EdgeKey, VersionKey
-from .schema import ModelDescriptor
+from .identity import EdgeKey, VersionEdge, VersionKey, VersionNode
+from .identity.metadata import ModelDescriptor
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,7 +39,7 @@ class JgfNode:
         references = sorted(str(reference) for reference in descriptor.references)
         content = {
             "id": str(key),
-            "model": descriptor.ref.model_id,
+            "model": descriptor.ref.entity_id,
             "fields": sorted(descriptor.fields),
             "references": references,
         }
@@ -52,7 +51,7 @@ class JgfNode:
                 **({"namespace": key.namespace} if key.namespace else {}),
                 "kind": key.kind,
                 "version": str(key.version),
-                "model": descriptor.ref.model_id,
+                "model": descriptor.ref.entity_id,
                 "fields": sorted(descriptor.fields),
                 "references": references,
                 "schema_hash": hasher.digest(content),

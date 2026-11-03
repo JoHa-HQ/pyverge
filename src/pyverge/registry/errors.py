@@ -7,7 +7,7 @@ from pyverge.core.errors import CatalogError, PyvergeError
 from pyverge.core.types import MIGRATION_PAIR_LEN, ModelHandle
 
 if TYPE_CHECKING:
-    from pyverge.versioning import MigrationKey, ModelRef
+    from pyverge.core.versioning import MigrationKey, ModelRef
 
 
 class GraphLockedError(CatalogError):

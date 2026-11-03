@@ -7,12 +7,7 @@ from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
     VersionValue,
 )
-from pyverge.registry.errors import (
-    CatalogError,
-    MigrationPathError,
-    ModelNotFoundError,
-)
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     Comparable,
     EdgeKey,
     Migratable,
@@ -21,10 +16,15 @@ from pyverge.versioning import (
     VersionKey,
     VersionNode,
 )
-from pyverge.versioning.errors import MigrationApplicationError
+from pyverge.core.versioning.errors import MigrationApplicationError
+from pyverge.registry.errors import (
+    CatalogError,
+    MigrationPathError,
+    ModelNotFoundError,
+)
 
 if TYPE_CHECKING:
-    from pyverge.engine import Engine
+    from pyverge.core.engine import Engine
     from pyverge.manager.manager import Manager
 
 
@@ -73,6 +73,7 @@ class LookupMixin(Generic[VersionValue]):
             namespace=key.namespace,
             kind=key.kind,
             version=key.version,
+            ref=key.ref,
         )
 
     @_resolve_model_key.register(type)
@@ -91,6 +92,7 @@ class LookupMixin(Generic[VersionValue]):
             namespace=versionable.namespace,
             kind=versionable.kind,
             version=versionable.version,
+            ref=versionable.ref,
         )
 
     @singledispatchmethod

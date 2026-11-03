@@ -6,9 +6,9 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
+from pyverge.core.versioning import ChangeSet
 from pyverge.jgf import JgfExporter
 from pyverge.registry.types import GraphCatalog
-from pyverge.versioning import ChangeSet
 
 
 class ManifestVersion(StrEnum):

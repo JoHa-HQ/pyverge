@@ -12,7 +12,7 @@ from __future__ import annotations
 import semver
 
 from pyverge import Manager
-from pyverge.core import MigrationContext
+from pyverge.execution.context import MigrationContext
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 from tests.examples.pydantic.semver import (

@@ -24,7 +24,7 @@ from pyverge.adapters.faststream import (
     publisher,
     subscriber,
 )
-from pyverge.core import MigrationContext
+from pyverge.execution.context import MigrationContext
 from pyverge.registry.errors import MigrationPathError
 from pyverge.schemas import PydanticModelAdapter
 from tests.examples.pydantic.semver import (

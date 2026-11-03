@@ -1,4 +1,6 @@
 from .backends import AsyncBackend, ProcessBackend, ThreadedBackend
+from .clock import Clock, SystemClock
+from .context import EMPTY_CONTEXT, MigrationContext
 from .coordinator import ExecutionCoordinator
 from .errors import (
     AsyncExecutionRequired,
@@ -36,6 +38,7 @@ from .types import (
 )
 
 __all__ = [
+    "EMPTY_CONTEXT",
     "AsyncBackend",
     "AsyncExecutionRequired",
     "AuditEvent",
@@ -43,6 +46,7 @@ __all__ = [
     "AuditSink",
     "BackendMiddleware",
     "BackendPort",
+    "Clock",
     "ContainerExtractor",
     "Entry",
     "EntryExtractor",
@@ -56,6 +60,7 @@ __all__ = [
     "IdempotencyMiddleware",
     "IdempotencyStore",
     "MigrationBindings",
+    "MigrationContext",
     "MigrationHook",
     "OTELHook",
     "OpenLineageHook",
@@ -68,6 +73,7 @@ __all__ = [
     "RuntimePort",
     "SchemaFieldsExtractor",
     "SyncExecutionRequired",
+    "SystemClock",
     "TargetValidationError",
     "ThreadedBackend",
     "Transaction",

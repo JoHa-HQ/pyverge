@@ -8,34 +8,36 @@ from .canonical import (
     default_encoders,
 )
 from .diff import (
-    BackwardCompatibilityGuard,
     ChangeSet,
-    CompatibilityReport,
     Diff,
     FieldChange,
     FieldStatus,
 )
 from .frozen import FrozenMap
-from .graph import (
-    EdgeKey,
-    NodeId,
-    VersionEdge,
-    VersionKey,
-    VersionNode,
-)
-from .identity import parse_version
-from .jgf import JgfEdge, JgfGraph, JgfNode
-from .schema import (
+from .identity import (
     NO_DEFAULT,
     DefaultValue,
+    EdgeKey,
+    EdgeRef,
     FieldDescriptor,
+    HashingProvider,
+    HookRef,
+    KeyRef,
     MigrationDescriptor,
+    MigrationRef,
     ModelDescriptor,
     ModelRef,
     NoDefault,
+    NodeId,
+    NodeRef,
     TypeKind,
     TypeRef,
+    VersionEdge,
+    VersionKey,
+    VersionNode,
+    parse_version,
 )
+from .jgf import JgfEdge, JgfGraph, JgfNode
 from .types import (
     Comparable,
     ContentAddressable,
@@ -48,7 +50,6 @@ from .types import (
     EdgeEntry,
     Fingerprintable,
     Identifiable,
-    KeyRef,
     LookupKey,
     Migratable,
     MigrationHookMap,
@@ -66,12 +67,10 @@ from .types import (
 __all__ = [
     "NO_DEFAULT",
     "Addressable",
-    "BackwardCompatibilityGuard",
     "Canonicalizable",
     "Canonicalizer",
     "ChangeSet",
     "Comparable",
-    "CompatibilityReport",
     "ContentAddressable",
     "ContentHasher",
     "DefaultValue",
@@ -84,12 +83,15 @@ __all__ = [
     "Diffable",
     "EdgeEntry",
     "EdgeKey",
+    "EdgeRef",
     "Edged",
     "FieldChange",
     "FieldDescriptor",
     "FieldStatus",
     "Fingerprintable",
     "FrozenMap",
+    "HashingProvider",
+    "HookRef",
     "Identifiable",
     "JgfEdge",
     "JgfGraph",
@@ -100,6 +102,7 @@ __all__ = [
     "MigrationDescriptor",
     "MigrationHookMap",
     "MigrationKey",
+    "MigrationRef",
     "ModelDescriptor",
     "ModelRef",
     "ModelRefProvider",
@@ -107,6 +110,7 @@ __all__ = [
     "NoDefault",
     "NodeEntry",
     "NodeId",
+    "NodeRef",
     "Ordered",
     "Transitional",
     "TypeKind",

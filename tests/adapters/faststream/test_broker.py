@@ -20,7 +20,7 @@ from pyverge.adapters.faststream import (
     PyvergeBroker,
     subscriber,
 )
-from pyverge.core import MigrationContext
+from pyverge.execution.context import MigrationContext
 from pyverge.manager.types import VersionRange
 from pyverge.schemas import PydanticModelAdapter
 from tests.examples.pydantic.semver import (

@@ -9,18 +9,8 @@ import pendulum
 import pytest
 from pydantic import ValidationError
 
-from pyverge.discovery.reflection import CompositeDiffDiscovery, Reflection
-from pyverge.engine import Engine
-from pyverge.migrations import JsonPatchMigration
-from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.schemas import (
-    DataclassModelAdapter,
-    JsonSchemaModelAdapter,
-    ModelCodec,
-    PydanticModelAdapter,
-)
-from pyverge.settings import MigrationSettings, VersioningSettings
-from pyverge.versioning import (
+from pyverge.core.engine import Engine
+from pyverge.core.versioning import (
     Diff,
     DiffOrigin,
     EdgeKey,
@@ -31,6 +21,16 @@ from pyverge.versioning import (
     TypeRef,
     parse_version,
 )
+from pyverge.discovery.reflection import CompositeDiffDiscovery, Reflection
+from pyverge.migrations import JsonPatchMigration
+from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
+from pyverge.schemas import (
+    DataclassModelAdapter,
+    JsonSchemaModelAdapter,
+    ModelCodec,
+    PydanticModelAdapter,
+)
+from pyverge.settings import MigrationSettings, VersioningSettings
 from tests.examples.dataclasses import (
     AddressV1,
     ContactV1,

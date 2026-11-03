@@ -4,9 +4,8 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Generic, TypeAlias
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.types import VersionValue
-from pyverge.execution.context import ExecutionEnvironment, RunContext
+from pyverge.execution.context import ExecutionEnvironment, MigrationContext, RunContext
 from pyverge.execution.coordinator import ExecutionCoordinator
 from pyverge.execution.errors import TargetValidationError, UnknownModelError
 from pyverge.execution.middleware import BackendMiddleware

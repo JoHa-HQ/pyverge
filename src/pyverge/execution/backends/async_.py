@@ -9,14 +9,13 @@ from typing import Any
 
 import anyio
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.types import VersionValue
-from pyverge.execution.context import RunContext, StepContext
+from pyverge.core.versioning import EdgeKey
+from pyverge.execution.context import MigrationContext, RunContext, StepContext
 from pyverge.execution.hooks.state import new_hook_state
 from pyverge.execution.plan import ExecutionPlan, PathPlanEntry
 from pyverge.graph.planning.path import Path
 from pyverge.schemas.types import ModelIdentityPort
-from pyverge.versioning import EdgeKey
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,10 +8,9 @@ from typing import Any, Generic, Self, TypeVar
 from pyverge.core.types import VersionValue
 
 from .frozen import FrozenMap
-from .schema import ModelDescriptor, NoDefault
+from .identity.metadata import ModelDescriptor, NoDefault
 from .types import (
     Comparable,
-    Diffable,
     DiffMaterializer,
     DiffOrigin,
     DiffProvider,
@@ -278,10 +277,10 @@ def _build_diff(
     source: Versionable[VersionValue],
     target: Comparable[VersionValue],
 ) -> Diff[VersionValue]:
-    source_descriptor = getattr(source, "descriptor", None)
-    target_descriptor = getattr(target, "descriptor", None)
+    source_descriptor = source.descriptor
+    target_descriptor = target.descriptor if isinstance(target, Versionable) else None
     fields: FrozenMap[str, FieldChange] = FrozenMap()
-    if source_descriptor is not None and target_descriptor is not None:
+    if target_descriptor is not None:
         if source.strategy != target.strategy:
             raise ValueError(
                 f"Cannot create diff across strategies: "
@@ -352,84 +351,9 @@ def _diff_fields(
 
 
 __all__ = [
-    "BackwardCompatibilityGuard",
     "ChangeSet",
-    "CompatibilityReport",
     "Diff",
     "DiffOrigin",
     "FieldChange",
     "FieldStatus",
 ]
-
-
-@dataclass(frozen=True, slots=True)
-class CompatibilityReport:
-    """Structural compatibility of one version transition.
-
-    Identity fields are excluded by the caller: they change on every version
-    and must not be reported as breaking schema changes.
-    """
-
-    kind: str
-    source_version: str
-    target_version: str
-    added_fields: tuple[str, ...]
-    removed_fields: tuple[str, ...]
-    modified_fields: tuple[str, ...]
-    structural_breaking: bool
-
-    @classmethod
-    def from_diff(
-        cls,
-        diff: Diffable,
-        *,
-        identity_fields: frozenset[str],
-    ) -> Self:
-        added = tuple(
-            field for field in diff.added_fields if field not in identity_fields
-        )
-        removed = tuple(
-            field for field in diff.removed_fields if field not in identity_fields
-        )
-        modified = {
-            field: change
-            for field, change in diff.modified_fields.items()
-            if field not in identity_fields
-        }
-        structural = (
-            bool(removed)
-            or any("type_changed" in change for change in modified.values())
-            or any("required_changed" in change for change in modified.values())
-            or any(diff.is_added_required(field) for field in added)
-        )
-        return cls(
-            kind=diff.source.kind,
-            source_version=str(diff.source.version),
-            target_version=str(diff.target.version),
-            added_fields=added,
-            removed_fields=removed,
-            modified_fields=tuple(sorted(modified)),
-            structural_breaking=structural,
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class BackwardCompatibilityGuard:
-    """Evaluate whether a declared compatible transition is structural breaking."""
-
-    identity_fields: frozenset[str]
-
-    def evaluate(self, diff: Diffable) -> CompatibilityReport:
-        return CompatibilityReport.from_diff(
-            diff,
-            identity_fields=self.identity_fields,
-        )
-
-    def required_additions(
-        self,
-        diff: Diffable,
-        report: CompatibilityReport,
-    ) -> tuple[str, ...]:
-        return tuple(
-            field for field in report.added_fields if diff.is_added_required(field)
-        )

@@ -4,14 +4,14 @@ from typing import Any
 
 import jsonpatch
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     ModelData,
 )
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     MigrationDescriptor,
     default_canonicalizer,
 )
+from pyverge.execution.context import MigrationContext
 
 
 class SetDefaultOperation(jsonpatch.PatchOperation):

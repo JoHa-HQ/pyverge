@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from pyverge.core.types import HookState
-from pyverge.versioning import MigrationDescriptor, NodeId
+from pyverge.core.versioning import MigrationDescriptor, NodeId
 
 
 @runtime_checkable

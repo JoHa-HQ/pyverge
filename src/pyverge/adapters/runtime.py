@@ -6,8 +6,8 @@ import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from pyverge.core import MigrationContext
 from pyverge.core.types import ModelData
+from pyverge.execution.context import MigrationContext
 from pyverge.manager import Manager
 from pyverge.manager.types import TargetPolicy
 from pyverge.registry import HealthFailLevel

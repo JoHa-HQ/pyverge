@@ -11,16 +11,8 @@ from typing import Any
 import pytest
 from json_graph_lite.jgf import Graph as LiteGraph
 
-from pyverge.schemas import (
-    DataclassModelAdapter,
-    JsonSchemaModelAdapter,
-    ModelCodec,
-    PydanticModelAdapter,
-)
-from pyverge.settings import VersioningSettings
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     NO_DEFAULT,
-    BackwardCompatibilityGuard,
     Canonicalizer,
     ChangeSet,
     Diff,
@@ -39,10 +31,18 @@ from pyverge.versioning import (
     default_encoders,
     parse_version,
 )
-from pyverge.versioning.errors import (
+from pyverge.core.versioning.errors import (
     BackwardCompatibilityError,
     MigrationApplicationError,
 )
+from pyverge.registry import CompatibilityReport
+from pyverge.schemas import (
+    DataclassModelAdapter,
+    JsonSchemaModelAdapter,
+    ModelCodec,
+    PydanticModelAdapter,
+)
+from pyverge.settings import VersioningSettings
 from tests.examples.dataclasses import PersonV1 as DataclassPersonV1
 from tests.examples.json import (
     ADDRESS_V1_0_0,
@@ -551,10 +551,9 @@ class TestDiff:
         assert inverted.is_removed("added")
         assert inverted.is_backward
 
-        guard = BackwardCompatibilityGuard(frozenset())
-        report = guard.evaluate(diff)
+        report = CompatibilityReport.from_diff(diff, identity_fields=frozenset())
         assert report.added_fields == ("added",)
-        assert guard.required_additions(diff, report) == ("added",)
+        assert report.required_additions(diff) == ("added",)
 
     @pytest.mark.parametrize(
         "edge",
@@ -645,8 +644,8 @@ class TestPrimitives:
         }
         assert (
             extended.with_ref(
-                ModelRef(provider="dataclass", model_id="demo.Other")
-            ).ref.model_id
+                ModelRef(provider_id="dataclass", entity_id="demo.Other")
+            ).ref.entity_id
             == "demo.Other"
         )
 

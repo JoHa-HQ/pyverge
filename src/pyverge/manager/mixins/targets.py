@@ -3,12 +3,15 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
+from pyverge.core.engine import Engine
 from pyverge.core.types import (
     ModelKind,
     TargetResolver,
     VersionValue,
 )
-from pyverge.engine import Engine
+from pyverge.core.versioning import (
+    VersionNode,
+)
 from pyverge.graph.planning.targets import TargetCompiler
 from pyverge.manager.types import (
     TargetPolicy,
@@ -16,9 +19,6 @@ from pyverge.manager.types import (
 )
 from pyverge.schemas.types import (
     ModelHandle,
-)
-from pyverge.versioning import (
-    VersionNode,
 )
 
 from ..descriptors import hybridmethod

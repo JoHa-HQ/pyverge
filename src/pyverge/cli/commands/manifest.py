@@ -7,6 +7,7 @@ from typing import Annotated, cast
 import typer
 
 from pyverge import __version__
+from pyverge.core.versioning import default_content_hasher
 from pyverge.export import (
     ManifestDiff,
     ManifestExporter,
@@ -15,7 +16,6 @@ from pyverge.export import (
 )
 from pyverge.jgf import JgfExporter
 from pyverge.registry.types import GraphCatalog
-from pyverge.versioning import default_content_hasher
 
 from .._helpers import write_json_file
 from ..config import ConfigError, resolve_manager

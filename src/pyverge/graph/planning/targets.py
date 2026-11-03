@@ -10,10 +10,16 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
+from pyverge.core.versioning import (
+    NodeRef,
+    Versionable,
+    VersionKey,
+    VersionNode,
+    parse_version,
+)
 from pyverge.graph.types import GraphView
 from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import ModelIdentityPort
-from pyverge.versioning import Versionable, VersionKey, VersionNode, parse_version
 
 TargetStrategy = Literal["latest", "earliest", "skip"]
 
@@ -255,6 +261,7 @@ class TargetCompiler(Generic[VersionValue]):
                 namespace=current.namespace,
                 kind=current.kind,
                 version=parsed,
+                ref=NodeRef(),
             )
             return self.graph.get_model(key)
 

@@ -151,7 +151,7 @@ class Canonicalizer:
     """Compose canonical value encoders and render canonical JSON.
 
     Examples:
-        >>> from pyverge.versioning import default_canonicalizer
+        >>> from pyverge.core.versioning import default_canonicalizer
         >>> default_canonicalizer().dumps({"b": 2, "a": [1, 3]})
         '{"a":[1,3],"b":2}'
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from pyverge.versioning import Identifiable
+from pyverge.core.versioning import Identifiable
 
 from ..types import GraphCatalog, HealthIssue
 

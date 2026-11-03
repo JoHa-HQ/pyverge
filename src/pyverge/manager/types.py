@@ -16,6 +16,7 @@ from pyverge.core.types import (
     TargetResolver,
     VersionValue,
 )
+from pyverge.core.versioning import Versionable
 from pyverge.graph.planning.targets import (
     DefaultTarget as DefaultTarget,  # noqa: PLC0414
 )
@@ -40,18 +41,17 @@ from pyverge.graph.planning.targets import (
 from pyverge.schemas.types import (
     ModelAdapter,
 )
-from pyverge.versioning import Versionable
 
 if TYPE_CHECKING:
+    from pyverge.core.engine import Engine
     from pyverge.core.types import (
         Attachable,
     )
+    from pyverge.core.versioning import ContentHasher, DiffMaterializer
     from pyverge.discovery.reflection import DiffProvider
-    from pyverge.engine import Engine
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
     from pyverge.registry import Registry
-    from pyverge.versioning import ContentHasher, DiffMaterializer
 
 
 #: A callable that binds a registry to a :data:`TargetResolver`; the shape of

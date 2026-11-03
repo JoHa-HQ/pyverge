@@ -6,10 +6,10 @@ from types import MappingProxyType
 from typing import Generic, cast
 
 from pyverge.core.types import Attachable, VersionValue
+from pyverge.core.versioning import EdgeKey
 from pyverge.graph.types import MigrationDefinition
 from pyverge.registry.errors import MigrationNotFoundError
 from pyverge.registry.types import GraphCatalog
-from pyverge.versioning import EdgeKey
 
 
 @dataclass(frozen=True, slots=True)

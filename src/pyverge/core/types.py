@@ -18,10 +18,8 @@ from typing import (
 from pendulum import Date
 from semver import Version as SemVer
 
-from .context import MigrationContext
-
 if TYPE_CHECKING:
-    from pyverge.versioning import (
+    from pyverge.core.versioning import (
         EdgeKey,
         MigrationDescriptor,
         NodeId,
@@ -29,6 +27,9 @@ if TYPE_CHECKING:
         VersionKey,
         VersionNode,
     )
+    from pyverge.execution.context import MigrationContext
+else:
+    MigrationContext = Any
 
 # ---------------------------------------------------------------------------
 # Version axis
@@ -123,7 +124,7 @@ ManagerKey: TypeAlias = ModelKey | ManagerMigrationKey | ModelPair
 
 
 # ---------------------------------------------------------------------------
-# Behavior protocols (version protocols live in pyverge.versioning)
+# Behavior protocols (version protocols live in pyverge.core.versioning)
 # ---------------------------------------------------------------------------
 
 

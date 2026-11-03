@@ -9,21 +9,21 @@ from pyverge.core.types import (
     ModelKind,
     VersionValue,
 )
-from pyverge.schemas.types import (
-    ModelHandle,
-)
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     Comparable,
     NodeId,
     Versionable,
     VersionNode,
     parse_version,
 )
+from pyverge.schemas.types import (
+    ModelHandle,
+)
 
 from ..descriptors import hybridmethod
 
 if TYPE_CHECKING:
-    from pyverge.engine import Engine
+    from pyverge.core.engine import Engine
     from pyverge.manager.manager import Manager
 
 

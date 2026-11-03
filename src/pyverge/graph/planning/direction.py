@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from pyverge.core.types import MigrationDirectionStrategy, VersionValue
-from pyverge.versioning import VersionNode
+from pyverge.core.versioning import VersionNode
 
 
 @runtime_checkable

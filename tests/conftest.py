@@ -10,17 +10,17 @@ from typing import Any, cast
 import pytest
 
 from pyverge import Manager
-from pyverge.core.clock import SystemClock
+from pyverge.core.engine import Engine
 from pyverge.core.ids import UuidIdFactory
 from pyverge.core.types import (
     VersionValue,
 )
+from pyverge.core.versioning import default_content_hasher
 from pyverge.discovery.reflection import (
     CompositeDiffDiscovery,
     Reflection,
     Reflector,
 )
-from pyverge.engine import Engine
 from pyverge.execution import (
     ExecutionCoordinator,
     ExecutionPlanner,
@@ -28,6 +28,7 @@ from pyverge.execution import (
     Runner,
 )
 from pyverge.execution.backends import ThreadedBackend
+from pyverge.execution.clock import SystemClock
 from pyverge.execution.context import ExecutionEnvironment
 from pyverge.execution.migrations import MigrationBindings
 from pyverge.execution.types import BackendPort
@@ -60,7 +61,6 @@ from pyverge.settings import (
     without_identity,
 )
 from pyverge.types import VersionEdge
-from pyverge.versioning import default_content_hasher
 from tests.utils import edge_from_nodes, envelope_model, register_models
 from tests.utils.engine import register_migrations
 

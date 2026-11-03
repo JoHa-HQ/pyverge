@@ -3,14 +3,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Generic, Protocol, runtime_checkable
 
 from pyverge.core.types import MigrationFunc, VersionValue
+from pyverge.core.versioning import (
+    Comparable,
+    Diff,
+    Diffable,
+    DiffMaterializer,
+    VersionNode,
+)
 from pyverge.migrations.json_patch import JsonPatch
 from pyverge.schemas.types import ModelAdapter
-from pyverge.versioning import Comparable, Diff, Diffable, DiffMaterializer, VersionNode
 
 from .errors import CatalogError
 
 if TYPE_CHECKING:
-    from pyverge.versioning import Versionable
+    from pyverge.core.versioning import Versionable
 
 
 @runtime_checkable

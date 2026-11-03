@@ -6,16 +6,16 @@ from typing import Any, Generic, Literal
 
 from pyverge.core.errors import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.types import VersionValue
+from pyverge.core.versioning import (
+    VersionKey,
+    VersionNode,
+)
 from pyverge.execution.types import (
     Entry,
 )
 from pyverge.graph.types import GraphView
 from pyverge.schemas.types import (
     ModelAdapter,
-)
-from pyverge.versioning import (
-    VersionKey,
-    VersionNode,
 )
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from pyverge.core.types import MigrationFunc
-from pyverge.versioning import MigrationDescriptor
+from pyverge.core.versioning import MigrationDescriptor
 
 
 class MigrationIdentityResolver(Protocol):

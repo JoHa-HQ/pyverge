@@ -10,7 +10,7 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     Comparable,
     Diff,
     Diffable,

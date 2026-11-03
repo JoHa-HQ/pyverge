@@ -10,7 +10,7 @@ from typing import Any, cast
 
 import pytest
 
-from pyverge.core.context import MigrationContext
+from pyverge.execution.context import MigrationContext
 from pyverge.execution.middleware import (
     AuditMiddleware,
     IdempotencyMiddleware,

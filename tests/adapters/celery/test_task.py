@@ -13,7 +13,7 @@ from celery import chain
 from celery.exceptions import CeleryError
 
 from pyverge.adapters.celery import CeleryRuntime, task
-from pyverge.core import MigrationContext
+from pyverge.execution.context import MigrationContext
 from pyverge.schemas import PydanticModelAdapter
 from tests.examples.pydantic.semver import (
     UserV1,

@@ -13,9 +13,16 @@ import pytest
 import semver
 
 from pyverge import types
-from pyverge.core import MigrationContext
-from pyverge.engine import Engine
+from pyverge.core.engine import Engine
+from pyverge.core.versioning import (
+    EdgeKey,
+    FieldDescriptor,
+    NodeRef,
+    TypeRef,
+    VersionKey,
+)
 from pyverge.execution import MigrationHook
+from pyverge.execution.context import MigrationContext
 from pyverge.graph import fixed_target_resolver, latest_target_resolver
 from pyverge.migrations import JsonPatchMigration
 from pyverge.registry.errors import (
@@ -32,12 +39,6 @@ from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.settings import MigrationSettings
-from pyverge.versioning import (
-    EdgeKey,
-    FieldDescriptor,
-    TypeRef,
-    VersionKey,
-)
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -108,6 +109,7 @@ class TestModelManagement:
                         namespace="test",
                         kind="User",
                         version=semver.Version(9, 9, 9),
+                        ref=NodeRef(),
                     )
                 ),
                 ModelNotFoundError,
@@ -121,6 +123,7 @@ class TestModelManagement:
                         namespace="test",
                         kind="User",
                         version=pendulum.Date(2099, 1, 1),
+                        ref=NodeRef(),
                     )
                 ),
                 ModelNotFoundError,
@@ -461,6 +464,7 @@ class TestModelManagement:
             namespace=node.namespace,
             kind=node.kind,
             version=node.version,
+            ref=NodeRef(),
         )
 
         assert engine.store_model(key) == key

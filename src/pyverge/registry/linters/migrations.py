@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from itertools import pairwise
 
-from pyverge.versioning import EdgeKey, Identifiable, VersionKey
+from pyverge.core.versioning import EdgeKey, Identifiable, VersionKey
 
 from ..types import GraphCatalog, HealthIssue
 

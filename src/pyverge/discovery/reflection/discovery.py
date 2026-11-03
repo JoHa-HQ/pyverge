@@ -6,9 +6,7 @@ import textwrap
 from typing import Any, Generic
 
 from pyverge.core.types import MigrationFunc, VersionValue
-from pyverge.discovery.reflection.types import DiffDiscovery
-from pyverge.migrations.json_patch import JsonPatch
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     Comparable,
     Diff,
     DiffOrigin,
@@ -17,6 +15,8 @@ from pyverge.versioning import (
     FrozenMap,
     Versionable,
 )
+from pyverge.discovery.reflection.types import DiffDiscovery
+from pyverge.migrations.json_patch import JsonPatch
 
 
 class JsonPatchDiffDiscovery(Generic[VersionValue]):

@@ -3,14 +3,19 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import ClassVar
 
+from pyverge.core.engine import Engine
 from pyverge.core.types import VersionValue
+from pyverge.core.versioning import (
+    ContentHasher,
+    DiffMaterializer,
+    default_content_hasher,
+)
 from pyverge.discovery.reflection import (
     CompositeDiffDiscovery,
     DiffProvider,
     Reflection,
     Reflector,
 )
-from pyverge.engine import Engine
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
 from pyverge.registry import (
@@ -21,11 +26,6 @@ from pyverge.registry import (
 )
 from pyverge.schemas.types import (
     ModelAdapter,
-)
-from pyverge.versioning import (
-    ContentHasher,
-    DiffMaterializer,
-    default_content_hasher,
 )
 
 from .descriptors import ManagerMeta

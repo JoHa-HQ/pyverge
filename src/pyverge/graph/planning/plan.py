@@ -9,8 +9,8 @@ from pyverge.core.types import (
     ModelHandle,
     VersionValue,
 )
+from pyverge.core.versioning import MigrationDescriptor, ModelRef, VersionNode
 from pyverge.graph.planning.path import Path
-from pyverge.versioning import MigrationDescriptor, ModelRef, VersionNode
 
 
 @dataclass(frozen=True, slots=True)

@@ -13,6 +13,19 @@ from pyverge.core.types import (
     VersionMissingStrategy,
     VersionValue,
 )
+from pyverge.core.versioning import (
+    Comparable,
+    EdgeKey,
+    Identifiable,
+    Migratable,
+    ModelRef,
+    NodeEntry,
+    Transitional,
+    Versionable,
+    VersionKey,
+    VersionNode,
+    VersionPair,
+)
 from pyverge.execution import (
     ExecutionCoordinator,
     ExecutionPlanner,
@@ -41,19 +54,6 @@ from pyverge.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.schemas.types import ModelAdapter
-from pyverge.versioning import (
-    Comparable,
-    EdgeKey,
-    Identifiable,
-    Migratable,
-    ModelRef,
-    NodeEntry,
-    Transitional,
-    Versionable,
-    VersionKey,
-    VersionNode,
-    VersionPair,
-)
 
 
 class Engine(Generic[VersionValue]):

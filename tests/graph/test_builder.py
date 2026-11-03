@@ -6,10 +6,10 @@ from __future__ import annotations
 import pytest
 import semver
 
+from pyverge.core.versioning import EdgeKey, NodeRef, VersionKey
 from pyverge.registry.errors import CatalogError
 from pyverge.schemas import PydanticModelAdapter
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import EdgeKey, VersionKey
 from tests.examples.migrations import USER_JSONATA_V2_TO_V3, USER_JSONPATCH_V1_TO_V2
 from tests.examples.pydantic.semver import UserV1, UserV2, UserV3, migrate_v1_to_v2
 from tests.utils import envelope_model
@@ -44,7 +44,9 @@ def test_graph_snapshots_catalog(model_adapter, registry, graph) -> None:
 
 
 def test_graph_snapshots_key_only_entries(registry, graph) -> None:
-    key = VersionKey(namespace="test", kind="User", version=semver.Version(1, 0, 0))
+    key = VersionKey(
+        namespace="test", kind="User", version=semver.Version(1, 0, 0), ref=NodeRef()
+    )
     registry.store(key)
     snapshot = graph()
 
@@ -134,6 +136,7 @@ def test_snapshot_is_immutable_after_registry_mutation(
         namespace=node.namespace,
         kind=node.kind,
         version=node.version,
+        ref=NodeRef(),
     )
 
     target = envelope_model(model_adapter, versioning_settings, UserV2)

@@ -12,26 +12,28 @@ import pendulum
 import pytest
 import semver
 
+from pyverge.core.versioning import (
+    Diff,
+    EdgeKey,
+    EdgeRef,
+    FieldChange,
+    FieldStatus,
+    FrozenMap,
+    MigrationDescriptor,
+    NodeId,
+    NodeRef,
+    VersionKey,
+    default_content_hasher,
+)
+from pyverge.core.versioning.errors import (
+    MigrationApplicationError,
+)
 from pyverge.schemas import (
     JsonSchemaModelAdapter,
     ModelCodec,
     PydanticModelAdapter,
 )
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import (
-    Diff,
-    EdgeKey,
-    FieldChange,
-    FieldStatus,
-    FrozenMap,
-    MigrationDescriptor,
-    NodeId,
-    VersionKey,
-    default_content_hasher,
-)
-from pyverge.versioning.errors import (
-    MigrationApplicationError,
-)
 from tests.examples.json import (
     USER_V0_1_1_DEV_7,
     USER_V1_2_3,
@@ -261,13 +263,16 @@ class TestNodeIdentity:
 
     def test_version_key_ref_is_not_identity(self) -> None:
         left = VersionKey(
-            namespace="orders", kind="Order", version=semver.Version.parse("1.0.0")
+            namespace="orders",
+            kind="Order",
+            version=semver.Version.parse("1.0.0"),
+            ref=NodeRef(),
         )
         right = VersionKey(
             namespace="orders",
             kind="Order",
             version=semver.Version.parse("1.0.0"),
-            ref=object(),
+            ref=NodeRef(metadata={"source": "right"}),
         )
 
         assert left == right
@@ -282,6 +287,7 @@ class TestNodeIdentity:
                 target=NodeId[semver.Version](
                     "b", "Order", semver.Version.parse("2.0.0")
                 ),
+                ref=EdgeRef(),
             )
 
     def test_key_digests_exclude_metadata_ref(self) -> None:
@@ -290,13 +296,13 @@ class TestNodeIdentity:
             namespace="orders",
             kind="Order",
             version=semver.Version.parse("1.0.0"),
-            ref=object(),
+            ref=NodeRef(metadata={"sample": 1}),
         )
         node_b = VersionKey(
             namespace="orders",
             kind="Order",
             version=semver.Version.parse("1.0.0"),
-            ref=object(),
+            ref=NodeRef(metadata={"sample": 1}),
         )
         assert node_a.digest(hasher) == node_b.digest(hasher)
 
@@ -307,7 +313,7 @@ class TestNodeIdentity:
             target=NodeId[semver.Version](
                 "orders", "Order", semver.Version.parse("2.0.0")
             ),
-            ref=object(),
+            ref=EdgeRef(metadata={"sample": 1}),
         )
         edge_b = EdgeKey(
             source=NodeId[semver.Version](
@@ -316,7 +322,7 @@ class TestNodeIdentity:
             target=NodeId[semver.Version](
                 "orders", "Order", semver.Version.parse("2.0.0")
             ),
-            ref=object(),
+            ref=EdgeRef(metadata={"sample": 1}),
         )
         assert edge_a.digest(hasher) == edge_b.digest(hasher)
 
@@ -362,7 +368,7 @@ class TestNodeIdentity:
             namespace="orders",
             kind="Order",
             version=semver.Version.parse("1.0.0"),
-            ref=object(),
+            ref=NodeRef(metadata={"pickle": True}),
         )
 
         copied = copy.copy(key)
@@ -378,6 +384,7 @@ class TestNodeIdentity:
             EdgeKey(
                 source=NodeId.parse("orders", "Order", "1.0.0"),
                 target=NodeId.parse("orders", "Invoice", "2.0.0"),
+                ref=EdgeRef(),
             )
 
     def test_key_digest_includes_namespace(self) -> None:
@@ -386,11 +393,13 @@ class TestNodeIdentity:
             namespace="orders",
             kind="Order",
             version=semver.Version.parse("1.0.0"),
+            ref=NodeRef(),
         )
         right = VersionKey(
             namespace="billing",
             kind="Order",
             version=semver.Version.parse("1.0.0"),
+            ref=NodeRef(),
         )
 
         assert left.digest(hasher) != right.digest(hasher)
@@ -420,7 +429,7 @@ class TestGraphPrimitives:
             namespace="test",
             kind="User",
             version=semver.Version.parse("1.2.3"),
-            ref=object(),
+            ref=NodeRef(),
         )
 
         assert str(key) == "test:User@1.2.3"
@@ -429,6 +438,7 @@ class TestGraphPrimitives:
                 namespace="test",
                 kind="User",
                 version=semver.Version.parse("1.2.3"),
+                ref=NodeRef(),
             )
         )
         assert "VersionKey[Version]" in repr(key)

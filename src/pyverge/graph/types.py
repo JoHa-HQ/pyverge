@@ -4,8 +4,7 @@ from collections.abc import Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
 from pyverge.core.types import Attachable, MigrationFunc, ModelKind, VersionValue
-from pyverge.registry.types import ModelCatalog, PathCatalog
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     Diffable,
     EdgeEntry,
     EdgeKey,
@@ -15,6 +14,7 @@ from pyverge.versioning import (
     Transitional,
     VersionNode,
 )
+from pyverge.registry.types import ModelCatalog, PathCatalog
 
 
 @runtime_checkable

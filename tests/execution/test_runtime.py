@@ -17,15 +17,20 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from pyverge.core import MaxDepthExceededError, PayloadValidationError
-from pyverge.core.context import MigrationContext
-from pyverge.engine import Engine
+from pyverge.core.engine import Engine
+from pyverge.core.versioning import EdgeKey, VersionNode
 from pyverge.execution import (
     ExecutionPlanner,
     PayloadWalker,
     Runner,
 )
 from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
-from pyverge.execution.context import LayeredView, RunContext, StepContext
+from pyverge.execution.context import (
+    LayeredView,
+    MigrationContext,
+    RunContext,
+    StepContext,
+)
 from pyverge.execution.errors import (
     AsyncExecutionRequired,
     TargetValidationError,
@@ -41,7 +46,6 @@ from pyverge.graph import (
 )
 from pyverge.registry import Registry
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey, VersionNode
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (
     UserV20250310,

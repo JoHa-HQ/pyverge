@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from pyverge.versioning import EdgeKey, JgfEdge, JgfNode, VersionNode
+from pyverge.core.versioning import EdgeKey, JgfEdge, JgfNode, VersionNode
 
 
 class NodeResolver(Protocol):

@@ -11,15 +11,15 @@ from pyverge.core.types import (
     ModelPair,
     VersionValue,
 )
+from pyverge.core.versioning import EdgeKey, Migratable
 from pyverge.migrations import JsonataMigration, JsonPatchMigration
-from pyverge.versioning import EdgeKey, Migratable
 
 from ..descriptors import hybridmethod
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from pyverge.engine import Engine
+    from pyverge.core.engine import Engine
     from pyverge.manager.manager import Manager
 
 

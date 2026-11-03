@@ -8,7 +8,7 @@ from pyverge.core.types import (
     ModelHandle,
     VersionValue,
 )
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     Comparable,
     Diffable,
     FieldDescriptor,
@@ -18,7 +18,7 @@ from pyverge.versioning import (
 )
 
 if TYPE_CHECKING:
-    from pyverge.versioning import Diff, ModelRef, VersionNode
+    from pyverge.core.versioning import Diff, ModelRef, VersionNode
 
 #: Provider model TypeVars. These live outside core on purpose: core operates
 #: on opaque :data:`ModelHandle` values, so no provider model base appears in a

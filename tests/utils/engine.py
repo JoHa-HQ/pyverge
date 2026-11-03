@@ -8,6 +8,15 @@ from __future__ import annotations
 from typing import Any, cast
 
 from pyverge.core import MigrationFunc, VersionValue
+from pyverge.core.versioning import (
+    Diff,
+    MigrationRef,
+    NodeRef,
+    VersionEdge,
+    VersionKey,
+    VersionNode,
+    parse_version,
+)
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.registry import Registry
 from pyverge.schemas.types import (
@@ -15,7 +24,6 @@ from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import Diff, VersionEdge, VersionKey, VersionNode, parse_version
 
 
 def envelope_model(
@@ -41,6 +49,7 @@ def meta_versionable(
         namespace=getattr(adapter, "model_codec").namespace,
         kind=kind,
         version=parse_version(version),
+        ref=NodeRef(),
     )
 
 
@@ -52,12 +61,14 @@ def edge_from_nodes(
     func: MigrationFunc,
 ) -> VersionEdge[VersionValue]:
     """Build a VersionEdge from two materialized version nodes."""
+    migration = DefaultMigrationIdentityResolver().resolve(func)
     return VersionEdge(
         source=source,
         target=target,
+        ref=MigrationRef(provider_id=migration.strategy, entity_id=migration.identity),
         diff=Diff.from_pair(source=source, target=target, adapter=adapter),
         func=func,
-        migration=DefaultMigrationIdentityResolver().resolve(func),
+        migration=migration,
     )
 
 
@@ -123,12 +134,17 @@ def register_migrations(
             versions[0],
             versions[1],
         )
+        migration_descriptor = DefaultMigrationIdentityResolver().resolve(func)
         registry.store_migration(
             VersionEdge(
                 source=versions[0],
                 target=versions[1],
+                ref=MigrationRef(
+                    provider_id=migration_descriptor.strategy,
+                    entity_id=migration_descriptor.identity,
+                ),
                 diff=diff,
                 func=func,
-                migration=DefaultMigrationIdentityResolver().resolve(func),
+                migration=migration_descriptor,
             )
         )

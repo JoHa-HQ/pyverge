@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from pyverge.core.versioning import JgfGraph, JgfNode
+from pyverge.core.versioning.canonical import ContentHasher
 from pyverge.graph.types import GraphExportSource
 from pyverge.registry.types import ModelCatalog
-from pyverge.versioning import JgfGraph, JgfNode
-from pyverge.versioning.canonical import ContentHasher
 
 
 class JgfExporter:

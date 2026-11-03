@@ -13,10 +13,7 @@ from pyverge.core.types import (
     ModelHandle,
     VersionValue,
 )
-from pyverge.schemas.base import AbstractModelAdapter
-from pyverge.schemas.codec import ModelCodec
-from pyverge.schemas.runtime import ModelRuntime, annotation_type_ref
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     NO_DEFAULT,
     Diffable,
     FieldDescriptor,
@@ -24,6 +21,9 @@ from pyverge.versioning import (
     TypeRef,
     default_canonicalizer,
 )
+from pyverge.schemas.base import AbstractModelAdapter
+from pyverge.schemas.codec import ModelCodec
+from pyverge.schemas.runtime import ModelRuntime, annotation_type_ref
 
 
 class DataclassModelAdapter(AbstractModelAdapter):

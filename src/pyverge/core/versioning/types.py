@@ -21,24 +21,19 @@ from pyverge.core.types import (
 
 from .canonical import ContentHasher
 from .identity import NodeId
+from .identity.metadata import KeyRef
 
 if TYPE_CHECKING:
-    from pyverge.core.context import MigrationContext
     from pyverge.core.types import Attachable
+    from pyverge.execution.context import MigrationContext
 
     from .diff import Diff
-    from .graph import VersionEdge, VersionNode
-    from .identity import EdgeKey, VersionKey
-    from .schema import ModelDescriptor, ModelRef
+    from .identity import EdgeKey, VersionEdge, VersionKey, VersionNode
+    from .identity.metadata import ModelDescriptor, ModelRef
 
 T_co = TypeVar("T_co", covariant=True)
 RenderOutput = TypeVar("RenderOutput")
 MaterializedOutput = TypeVar("MaterializedOutput")
-
-
-@runtime_checkable
-class KeyRef(Protocol):
-    """Opaque metadata handle attached to a graph key."""
 
 
 @runtime_checkable

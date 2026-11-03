@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
 from functools import total_ordering
 from typing import TYPE_CHECKING, Any, Generic, Self, cast
 
@@ -9,9 +10,12 @@ from semver import Version
 
 from pyverge.core.types import ModelKind, VersionValue
 
+from ..errors import NodeConflictError
+from .metadata import FieldDescriptor, ModelDescriptor, ModelRef, NodeRef
+
 if TYPE_CHECKING:
-    from .canonical import ContentHasher
-    from .types import KeyRef
+    from ..canonical import ContentHasher
+    from ..jgf import JgfNode
 
 
 def parse_version(value: str | VersionValue) -> VersionValue:
@@ -149,9 +153,30 @@ class NodeId(Generic[VersionValue]):
 
 @dataclass(frozen=True, slots=True, eq=False, kw_only=True)
 class VersionKey(NodeId[VersionValue]):
-    """A node identity plus identity-neutral storage metadata."""
+    """A node identity plus required, agnostic storage metadata."""
 
-    ref: KeyRef | None = None
+    ref: NodeRef
+
+    def __post_init__(self) -> None:
+        NodeId.__post_init__(self)
+        if not isinstance(self.ref, NodeRef):
+            raise TypeError("VersionKey.ref must be a NodeRef")
+
+    @classmethod
+    def parse(
+        cls,
+        namespace: str,
+        kind: ModelKind,
+        version: str | VersionValue,
+        *,
+        ref: NodeRef | None = None,
+    ) -> Self:
+        return cls(
+            namespace=namespace,
+            kind=kind,
+            version=parse_version(version),
+            ref=ref or NodeRef(),
+        )
 
     def digest(self, hasher: ContentHasher) -> str:
         return hasher.digest(
@@ -188,118 +213,130 @@ class VersionKey(NodeId[VersionValue]):
         )
 
 
-@total_ordering
-@dataclass(frozen=True, slots=True, eq=False)
-class EdgeKey(Generic[VersionValue]):
-    """A directed edge identity plus identity-neutral storage metadata."""
+@dataclass(frozen=True, slots=True, eq=False, kw_only=True)
+class VersionNode(VersionKey[VersionValue]):
+    """An enriched version key that always binds a model descriptor."""
 
-    source: NodeId[VersionValue]
-    target: NodeId[VersionValue]
-    ref: KeyRef | None = field(default=None, compare=False, hash=False, repr=False)
+    descriptor: ModelDescriptor
 
     def __post_init__(self) -> None:
-        if self.source.namespace != self.target.namespace:
-            raise ValueError(
-                "Cross-namespace edges are forbidden: "
-                f"{self.source.namespace!r} != {self.target.namespace!r}"
-            )
-        if self.source.kind != self.target.kind:
-            raise ValueError(
-                "Cross-kind edges are forbidden: "
-                f"{self.source.kind!r} != {self.target.kind!r}"
-            )
-
-    @classmethod
-    def from_pair(
-        cls,
-        source: NodeId[VersionValue],
-        target: NodeId[VersionValue],
-        *,
-        ref: KeyRef | None = None,
-    ) -> Self:
-        return cls(source=source, target=target, ref=ref)
-
-    @classmethod
-    def from_version_edge(
-        cls,
-        edge: Any,
-        *,
-        ref: KeyRef | None = None,
-    ) -> Self:
-        return cls(source=edge.source, target=edge.target, ref=ref)
+        VersionKey.__post_init__(self)
+        if not isinstance(self.ref, ModelRef):
+            raise TypeError("VersionNode.ref must be a ModelRef")
 
     @property
-    def id(self) -> Self:
+    def id(self) -> VersionNode[VersionValue]:
         return self
 
     @property
-    def namespace(self) -> str:
-        return self.source.namespace
+    def key(self) -> VersionKey[VersionValue]:
+        return self
 
     @property
-    def kind(self) -> ModelKind:
-        return self.source.kind
+    def modelref(self) -> ModelRef:
+        return self.descriptor.ref
 
     @property
-    def key(self) -> tuple[NodeId[VersionValue], NodeId[VersionValue]]:
-        return self.source, self.target
+    def is_model(self) -> bool:
+        return True
 
     @property
-    def is_executable(self) -> bool:
-        return False
+    def model_id(self) -> str:
+        return self.descriptor.ref.entity_id
 
-    def _check(self, other: object) -> EdgeKey[Any]:
-        if not isinstance(other, EdgeKey):
-            raise NotImplementedError(
-                f"Cannot compare {self.__class__.__name__} with "
-                f"{other.__class__.__name__}"
-            )
-        return other
+    @property
+    def references(self) -> frozenset[NodeId[VersionValue]]:
+        return self.descriptor.references
 
-    def __eq__(self, other: object) -> bool:
-        candidate = self._check(other)
-        return self.key == candidate.key
+    @property
+    def fields(self) -> frozenset[str]:
+        return frozenset(self.descriptor.fields)
 
-    def __lt__(self, other: object) -> bool:
-        candidate = self._check(other)
-        return self.key < candidate.key
+    def reconcile(self, existing: VersionKey[VersionValue]) -> VersionKey[VersionValue]:
+        if not existing.is_model:
+            return self
+        if self.fields != existing.fields:
+            raise NodeConflictError(existing, self)
+        return existing
 
-    def __gt__(self, other: object) -> bool:
-        candidate = self._check(other)
-        return self.key > candidate.key
-
-    def __hash__(self) -> int:
-        return hash(self.key)
-
-    def digest(self, hasher: ContentHasher) -> str:
-        return hasher.digest(
-            {
-                "source": {
-                    "namespace": self.source.namespace,
-                    "kind": self.source.kind,
-                    "version": str(self.source.version),
-                },
-                "target": {
-                    "namespace": self.target.namespace,
-                    "kind": self.target.kind,
-                    "version": str(self.target.version),
-                },
-            }
+    def with_descriptor(self, descriptor: ModelDescriptor) -> Self:
+        return type(self)(
+            namespace=self.namespace,
+            kind=self.kind,
+            version=self.version,
+            ref=self.ref,
+            descriptor=descriptor,
         )
 
-    def __str__(self) -> str:
-        return f"{self.source}->{self.target}"
+    def with_fields(self, *fields: FieldDescriptor) -> Self:
+        return self.with_descriptor(self.descriptor.with_fields(*fields))
+
+    def without_fields(self, *names: str) -> Self:
+        return self.with_descriptor(self.descriptor.without_fields(*names))
+
+    def content_payload(self) -> dict[str, object]:
+        if not self.model_id:
+            raise ValueError(
+                f"VersionNode {self} requires model_id for content hashing"
+            )
+        return {
+            "id": str(self),
+            "model": self.model_id,
+            "fields": sorted(self.fields),
+            "references": sorted(str(reference) for reference in self.references),
+        }
+
+    @classmethod
+    def from_canonical(
+        cls,
+        value: Mapping[str, Any],
+        *,
+        parse_version: Callable[[str], Any],
+    ) -> VersionNode[VersionValue]:
+        descriptor = ModelDescriptor.from_canonical(
+            value["model"], parse_version=parse_version
+        )
+        ref_value = value.get("ref")
+        ref = (
+            ModelRef.from_canonical(ref_value)
+            if ref_value is not None
+            else descriptor.ref
+        )
+        return cls(
+            namespace=str(value["namespace"]),
+            kind=str(value["kind"]),
+            version=parse_version(str(value["version"])),
+            ref=ref,
+            descriptor=descriptor,
+        )
+
+    def to_canonical(self) -> dict[str, Any]:
+        return {
+            "namespace": self.namespace,
+            "kind": self.kind,
+            "version": str(self.version),
+            "ref": self.ref.to_canonical(),
+            "model": self.descriptor.to_canonical(),
+        }
+
+    def content_hash(self, hasher: ContentHasher) -> str:
+        return hasher.digest(self.content_payload())
+
+    def to_jgf(self, hasher: ContentHasher) -> JgfNode:
+        from ..jgf import JgfNode  # noqa: PLC0415
+
+        return JgfNode.from_version(self, hasher)
 
     def __repr__(self) -> str:
         return (
-            f"EdgeKey[{type(self.source.version).__name__}]("
-            f"{self.source!r}, {self.target!r})"
+            f"VersionNode[{self.strategy.__name__}]("
+            f"{self.namespace!r}, {self.kind!r}, {self.version!r})"
         )
 
 
 __all__ = [
-    "EdgeKey",
     "NodeId",
     "VersionKey",
+    "VersionNode",
     "parse_version",
 ]

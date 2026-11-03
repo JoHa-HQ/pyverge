@@ -6,10 +6,10 @@ from types import MappingProxyType
 from typing import Any, Generic
 
 from pyverge.core.types import ModelKind, VersionValue
+from pyverge.core.versioning import EdgeKey, NodeId
 from pyverge.graph.graph import MigrationGraph
 from pyverge.graph.types import GraphSnapshotSource
 from pyverge.registry.errors import CatalogError
-from pyverge.versioning import EdgeKey, NodeId
 
 
 def _freeze(values: Mapping[Any, Any]) -> Mapping[Any, Any]:
@@ -37,7 +37,7 @@ class GraphBuilder(Generic[VersionValue]):
         for kind in kinds:
             edges: list[EdgeKey] = []
             for entry in source.edges(kind):
-                edge = EdgeKey.from_pair(entry.source, entry.target)
+                edge = EdgeKey.from_pair(entry.source, entry.target, ref=entry.ref)
                 edges.append(edge)
                 edges_by_endpoint[entry.source].add(edge)
                 edges_by_endpoint[entry.target].add(edge)

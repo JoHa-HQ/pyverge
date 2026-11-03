@@ -20,11 +20,23 @@ from pydantic import BaseModel
 from pyverge import types
 from pyverge.core import (
     MaxDepthExceededError,
-    MigrationContext,
     PayloadValidationError,
 )
-from pyverge.engine import Engine
+from pyverge.core.engine import Engine
+from pyverge.core.versioning import (
+    EdgeKey,
+    FieldDescriptor,
+    JgfNode,
+    NodeId,
+    NodeRef,
+    TypeRef,
+    VersionKey,
+    VersionNode,
+    default_content_hasher,
+)
+from pyverge.core.versioning.errors import BackwardCompatibilityError
 from pyverge.execution import MigrationHook
+from pyverge.execution.context import MigrationContext
 from pyverge.execution.extractors import (
     ContainerExtractor,
     PayloadWalker,
@@ -49,17 +61,6 @@ from pyverge.schemas.types import (
     ModelHandle,
 )
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import (
-    EdgeKey,
-    FieldDescriptor,
-    JgfNode,
-    NodeId,
-    TypeRef,
-    VersionKey,
-    VersionNode,
-    default_content_hasher,
-)
-from pyverge.versioning.errors import BackwardCompatibilityError
 from tests.examples.json import (
     ADDRESS_V1_0_0,
     ADDRESS_V2_0_0,
@@ -313,6 +314,7 @@ class TestModel:
                     namespace="test",
                     kind="User",
                     version=semver.Version.parse("1.0.0"),
+                    ref=NodeRef(),
                 ),
                 id="semver_version_node_v1",
             ),
@@ -323,6 +325,7 @@ class TestModel:
                     namespace="test",
                     kind="User",
                     version=semver.Version.parse("0.1.1+dev.7"),
+                    ref=NodeRef(),
                 ),
                 id="semver_version_node_dev",
             ),
@@ -333,6 +336,7 @@ class TestModel:
                     namespace="test",
                     kind="User",
                     version=pendulum.Date(2025, 3, 10),
+                    ref=NodeRef(),
                 ),
                 id="json_chrono_version_node",
             ),
@@ -3058,6 +3062,7 @@ def test_key_only_entry_hydrates_to_full_node(
         namespace=node.namespace,
         kind=node.kind,
         version=node.version,
+        ref=NodeRef(),
     )
 
     assert registry.store(key) == key
@@ -3083,6 +3088,7 @@ def test_reconcile_does_not_hydrate_key_only_entry(
         namespace=node.namespace,
         kind=node.kind,
         version=node.version,
+        ref=NodeRef(),
     )
     registry.store(key)
 
@@ -3111,6 +3117,7 @@ def test_hydration_uses_entry_namespace(
         namespace=node.namespace,
         kind=node.kind,
         version=node.version,
+        ref=NodeRef(),
     )
     registry.store(key)
 

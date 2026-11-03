@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     ModelData,
 )
+from pyverge.execution.context import MigrationContext
 
 
 def _schema(kind: str, version: str, props: dict[str, Any]) -> dict[str, Any]:

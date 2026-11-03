@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from pyverge.core.types import VersionValue
-from pyverge.versioning import FieldDescriptor, NoDefault, VersionKey
+from pyverge.core.versioning import FieldDescriptor, NoDefault, VersionKey
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

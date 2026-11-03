@@ -16,6 +16,7 @@ from .errors import (
 from .linters import (
     DEFAULT_HEALTH_LINTERS,
     CompatibilityLinter,
+    CompatibilityReport,
     HealthLinter,
     MissingEdgeEndpointsLinter,
     MissingMigrationsLinter,
@@ -41,6 +42,7 @@ __all__ = [
     "DEFAULT_HEALTH_LINTERS",
     "CatalogError",
     "CompatibilityLinter",
+    "CompatibilityReport",
     "ContentHashLookup",
     "GraphCatalog",
     "GraphLockedError",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pyverge.versioning import Identifiable, VersionKey
+from pyverge.core.versioning import Identifiable, VersionKey
 
 from ..types import GraphCatalog, HealthIssue
 

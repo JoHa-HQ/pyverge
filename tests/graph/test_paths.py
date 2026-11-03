@@ -7,10 +7,10 @@ import pendulum
 import pytest
 import semver
 
+from pyverge.core.versioning import EdgeKey, NodeRef, VersionKey
 from pyverge.registry.errors import MigrationPathError
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import EdgeKey, VersionKey
 from tests.examples.json import USER_V2025_01_01, USER_V2025_03_10
 from tests.examples.pydantic.semver import UserV1, UserV2, UserV3
 from tests.utils import edge_from_models, envelope_model, meta_versionable
@@ -85,11 +85,13 @@ def test_key_only_path_forbids_planning_until_hydrated(
         namespace=source.namespace,
         kind=source.kind,
         version=source.version,
+        ref=NodeRef(),
     )
     target_key = VersionKey(
         namespace=target.namespace,
         kind=target.kind,
         version=target.version,
+        ref=NodeRef(),
     )
     registry.store(source_key)
     registry.store(target_key)
@@ -196,6 +198,7 @@ def test_path_requires_complete_hydration(
                 namespace=node.namespace,
                 kind=node.kind,
                 version=node.version,
+                ref=NodeRef(),
             )
         )
 
@@ -243,6 +246,7 @@ def test_unrelated_key_only_nodes_do_not_block_path(registry, graph) -> None:
         namespace="test",
         kind="User",
         version=semver.Version(3, 0, 0),
+        ref=NodeRef(),
     )
     registry.store(unrelated)
 
