@@ -357,3 +357,46 @@ def test_otel_adapter_records_failed_step(
     assert spans["orders.migrate"].status[0] == StatusCode.ERROR
     assert spans["orders.run"].status[0] == StatusCode.ERROR
     assert spans["orders.migrate"].exceptions
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
+)
+@pytest.mark.parametrize("mode", ["off", "errors"])
+def test_telemetry_success_can_be_suppressed(
+    registry: Registry,
+    runner_factory,
+    mode: str,
+) -> None:
+    recorder = RecordingTelemetry()
+
+    result = _run(
+        runner_factory(telemetry=(recorder,), telemetry_mode=mode),
+        registry,
+    )
+
+    assert result["document"]["version"] == "2.0.0"
+    assert recorder.events == []
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    _FAILING_MODELS,
+    indirect=["model_adapter", "registry"],
+)
+def test_telemetry_errors_mode_emits_only_failures(
+    registry: Registry,
+    runner_factory,
+) -> None:
+    recorder = RecordingTelemetry()
+
+    with pytest.raises(Exception, match="boom"):
+        _run(
+            runner_factory(
+                telemetry=(recorder,),
+                telemetry_mode="errors",
+            ),
+            registry,
+        )
+
+    assert _types(recorder.events) == ["StepFailed", "RunFailed"]

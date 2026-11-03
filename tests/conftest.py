@@ -47,6 +47,7 @@ from pyverge.runtime.clock import SystemClock
 from pyverge.runtime.context import ExecutionEnvironment
 from pyverge.runtime.factory import RunnerFactory
 from pyverge.runtime.migrations import MigrationBindings
+from pyverge.runtime.telemetry import TelemetryMode
 from pyverge.runtime.types import BackendPort, CopyPolicy
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.codec import ModelCodec
@@ -280,6 +281,7 @@ def runner_factory(
     def build(
         *,
         telemetry: tuple[Any, ...] = (),
+        telemetry_mode: TelemetryMode = "all",
         plan_cache_size: int = 0,
         copy: CopyPolicy = "deep",
     ) -> Runner[VersionValue]:
@@ -300,6 +302,7 @@ def runner_factory(
             validation_mode=migration_settings.validation_mode,
             middleware=(),
             telemetry=telemetry,
+            telemetry_mode=telemetry_mode,
             plan_cache_size=plan_cache_size,
             copy=copy,
         )

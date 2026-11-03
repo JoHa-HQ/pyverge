@@ -336,7 +336,8 @@ class StepInvoker(Generic[VersionValue]):
     ) -> ModelData:
         telemetry = step.run.environment.telemetry
         started = time.perf_counter()
-        telemetry.emit(StepStarted(step=step))
+        if telemetry.emits_success:
+            telemetry.emit(StepStarted(step=step))
         try:
             with ExitStack() as stack:
                 self.before(data, step, hook_state, stack)
@@ -358,20 +359,22 @@ class StepInvoker(Generic[VersionValue]):
                     raise self.entry.migration_error(error) from error
                 self.after(data, migrated, step, hook_state)
         except BaseException as error:
+            if telemetry.emits_failure:
+                telemetry.emit(
+                    StepFailed(
+                        step=step,
+                        error=error,
+                        duration_seconds=time.perf_counter() - started,
+                    )
+                )
+            raise
+        if telemetry.emits_success:
             telemetry.emit(
-                StepFailed(
+                StepCompleted(
                     step=step,
-                    error=error,
                     duration_seconds=time.perf_counter() - started,
                 )
             )
-            raise
-        telemetry.emit(
-            StepCompleted(
-                step=step,
-                duration_seconds=time.perf_counter() - started,
-            )
-        )
         return migrated
 
     async def run_async(
@@ -384,7 +387,8 @@ class StepInvoker(Generic[VersionValue]):
     ) -> ModelData:
         telemetry = step.run.environment.telemetry
         started = time.perf_counter()
-        telemetry.emit(StepStarted(step=step))
+        if telemetry.emits_success:
+            telemetry.emit(StepStarted(step=step))
         try:
             async with AsyncExitStack() as stack:
                 await self.before_async(data, step, hook_state, stack)
@@ -405,20 +409,22 @@ class StepInvoker(Generic[VersionValue]):
                     raise self.entry.migration_error(error) from error
                 await self.after_async(data, migrated, step, hook_state)
         except BaseException as error:
+            if telemetry.emits_failure:
+                telemetry.emit(
+                    StepFailed(
+                        step=step,
+                        error=error,
+                        duration_seconds=time.perf_counter() - started,
+                    )
+                )
+            raise
+        if telemetry.emits_success:
             telemetry.emit(
-                StepFailed(
+                StepCompleted(
                     step=step,
-                    error=error,
                     duration_seconds=time.perf_counter() - started,
                 )
             )
-            raise
-        telemetry.emit(
-            StepCompleted(
-                step=step,
-                duration_seconds=time.perf_counter() - started,
-            )
-        )
         return migrated
 
     @staticmethod

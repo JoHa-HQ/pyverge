@@ -91,7 +91,8 @@ class Runner(Generic[VersionValue]):
             bindings=MigrationContext.create(context),
         )
         telemetry = self.environment.telemetry
-        telemetry.emit(RunStarted(run=run, plan=plan))
+        if telemetry.emits_success:
+            telemetry.emit(RunStarted(run=run, plan=plan))
         started = time.perf_counter()
         try:
             backend = self.backend
@@ -99,24 +100,26 @@ class Runner(Generic[VersionValue]):
                 backend = layer.wrap(backend)
             result = backend.execute(plan, data, run, self.adapter)
         except BaseException as error:
-            telemetry.emit(
-                RunFailed(
-                    run=run,
-                    plan=plan,
-                    error=error,
-                    duration_seconds=time.perf_counter() - started,
+            if telemetry.emits_failure:
+                telemetry.emit(
+                    RunFailed(
+                        run=run,
+                        plan=plan,
+                        error=error,
+                        duration_seconds=time.perf_counter() - started,
+                    )
                 )
-            )
             raise
         if inspect.isawaitable(result):
             return self._await_result(result, run, plan, started)
-        telemetry.emit(
-            RunCompleted(
-                run=run,
-                plan=plan,
-                duration_seconds=time.perf_counter() - started,
+        if telemetry.emits_success:
+            telemetry.emit(
+                RunCompleted(
+                    run=run,
+                    plan=plan,
+                    duration_seconds=time.perf_counter() - started,
+                )
             )
-        )
         return result
 
     def _copy(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -137,22 +140,24 @@ class Runner(Generic[VersionValue]):
         try:
             value = await result
         except BaseException as error:
+            if telemetry.emits_failure:
+                telemetry.emit(
+                    RunFailed(
+                        run=run,
+                        plan=plan,
+                        error=error,
+                        duration_seconds=time.perf_counter() - started,
+                    )
+                )
+            raise
+        if telemetry.emits_success:
             telemetry.emit(
-                RunFailed(
+                RunCompleted(
                     run=run,
                     plan=plan,
-                    error=error,
                     duration_seconds=time.perf_counter() - started,
                 )
             )
-            raise
-        telemetry.emit(
-            RunCompleted(
-                run=run,
-                plan=plan,
-                duration_seconds=time.perf_counter() - started,
-            )
-        )
         return value
 
     def _validate_target(

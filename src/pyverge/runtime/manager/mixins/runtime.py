@@ -28,7 +28,7 @@ from pyverge.runtime.context import DEFAULT_LOGGER, ExecutionEnvironment
 from pyverge.runtime.facade import Runtime
 from pyverge.runtime.factory import RunnerOptions
 from pyverge.runtime.middleware import BackendMiddleware
-from pyverge.runtime.telemetry import TelemetryAdapter
+from pyverge.runtime.telemetry import TelemetryAdapter, TelemetryMode
 from pyverge.runtime.types import BackendPort, CopyPolicy
 
 from ..descriptors import hybridmethod
@@ -57,6 +57,7 @@ class RuntimeMixin(Generic[VersionValue]):
         backend: BackendPort | None = None,
         middleware: tuple[BackendMiddleware, ...] = (),
         telemetry: tuple[TelemetryAdapter, ...] = (),
+        telemetry_mode: TelemetryMode = "all",
         environment: ExecutionEnvironment | None = None,
         runtime: BackendPort | None = None,
         direction: MigrationDirectionStrategy = "any",
@@ -87,6 +88,7 @@ class RuntimeMixin(Generic[VersionValue]):
             discriminator=discriminator,
             middleware=middleware,
             telemetry=telemetry,
+            telemetry_mode=telemetry_mode,
             plan_cache_size=plan_cache_size,
             copy=copy,
         )
@@ -99,6 +101,7 @@ class RuntimeMixin(Generic[VersionValue]):
         backend: BackendPort | None = None,
         middleware: tuple[BackendMiddleware, ...] = (),
         telemetry: tuple[TelemetryAdapter, ...] = (),
+        telemetry_mode: TelemetryMode = "all",
         environment: ExecutionEnvironment | None = None,
         runtime: BackendPort | None = None,
         direction: MigrationDirectionStrategy = "any",
@@ -120,6 +123,7 @@ class RuntimeMixin(Generic[VersionValue]):
             backend=backend,
             middleware=middleware,
             telemetry=telemetry,
+            telemetry_mode=telemetry_mode,
             environment=environment,
             runtime=runtime,
             direction=direction,
