@@ -1,7 +1,5 @@
 from .audit import AuditMiddleware
 from .idempotency import IdempotencyMiddleware
-from .openlineage import OpenLineageMiddleware
-from .otel import OtelMiddleware
 from .retry import RetryMiddleware
 from .transaction import TransactionMiddleware
 from .types import (
@@ -22,8 +20,6 @@ __all__ = [
     "IdempotencyKeyFactory",
     "IdempotencyMiddleware",
     "IdempotencyStore",
-    "OpenLineageMiddleware",
-    "OtelMiddleware",
     "RetryMiddleware",
     "Transaction",
     "TransactionManager",

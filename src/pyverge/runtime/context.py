@@ -16,6 +16,7 @@ from pyverge.core.versioning import (
 )
 
 from .clock import Clock
+from .telemetry import EMPTY_TELEMETRY, TelemetryPublisher
 
 DEFAULT_LOGGER = logging.getLogger("pyverge.runtime")
 
@@ -93,6 +94,7 @@ class ExecutionEnvironment:
     id_factory: IdFactory
     logger: Any
     tracer: Any
+    telemetry: TelemetryPublisher = field(default=EMPTY_TELEMETRY)
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import inspect
+import time
 from dataclasses import dataclass
 from typing import Any, Generic, TypeAlias
 
@@ -12,6 +14,7 @@ from pyverge.runtime.coordinator import ExecutionCoordinator
 from pyverge.runtime.errors import TargetValidationError, UnknownModelError
 from pyverge.runtime.middleware import BackendMiddleware
 from pyverge.runtime.plan import ExecutionPlan
+from pyverge.runtime.telemetry import RunCompleted, RunFailed, RunStarted
 from pyverge.runtime.types import BackendPort
 from pyverge.schemas.types import ModelAdapter
 
@@ -85,10 +88,63 @@ class Runner(Generic[VersionValue]):
             environment=self.environment,
             bindings=MigrationContext.create(context),
         )
-        backend = self.backend
-        for layer in reversed(self.middleware):
-            backend = layer.wrap(backend)
-        return backend.execute(plan, data, run, self.adapter)
+        telemetry = self.environment.telemetry
+        telemetry.emit(RunStarted(run=run, plan=plan))
+        started = time.perf_counter()
+        try:
+            backend = self.backend
+            for layer in reversed(self.middleware):
+                backend = layer.wrap(backend)
+            result = backend.execute(plan, data, run, self.adapter)
+        except BaseException as error:
+            telemetry.emit(
+                RunFailed(
+                    run=run,
+                    plan=plan,
+                    error=error,
+                    duration_seconds=time.perf_counter() - started,
+                )
+            )
+            raise
+        if inspect.isawaitable(result):
+            return self._await_result(result, run, plan, started)
+        telemetry.emit(
+            RunCompleted(
+                run=run,
+                plan=plan,
+                duration_seconds=time.perf_counter() - started,
+            )
+        )
+        return result
+
+    async def _await_result(
+        self,
+        result: Any,
+        run: RunContext,
+        plan: ExecutionPlan[VersionValue],
+        started: float,
+    ) -> Any:
+        telemetry = self.environment.telemetry
+        try:
+            value = await result
+        except BaseException as error:
+            telemetry.emit(
+                RunFailed(
+                    run=run,
+                    plan=plan,
+                    error=error,
+                    duration_seconds=time.perf_counter() - started,
+                )
+            )
+            raise
+        telemetry.emit(
+            RunCompleted(
+                run=run,
+                plan=plan,
+                duration_seconds=time.perf_counter() - started,
+            )
+        )
+        return value
 
     def _validate_target(
         self, plan: ExecutionPlan[VersionValue], data: dict[str, Any]
