@@ -8,11 +8,25 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
+from uuid import NAMESPACE_URL, uuid5
 
 import pytest
+import semver
 from opentelemetry.trace import StatusCode
 
-from pyverge.core.versioning import EdgeId, MigrationDescriptor, NodeId
+from pyverge._version import __version__
+from pyverge.core.versioning import (
+    EdgeId,
+    FieldDescriptor,
+    FrozenMap,
+    MigrationDescriptor,
+    ModelDescriptor,
+    ModelRef,
+    NodeId,
+    TypeKind,
+    TypeRef,
+    VersionNode,
+)
 from pyverge.runtime.context import MigrationContext, StepContext
 from pyverge.runtime.hooks import OpenLineageHook, OTELHook
 from pyverge.runtime.hooks.state import new_hook_state
@@ -74,6 +88,29 @@ class RecordingLineageClient:
 
 def _node(version: str) -> NodeId:
     return NodeId.parse("com.acme.orders", "User", version)
+
+
+def _version_node(version: str, *fields: tuple[str, TypeKind]) -> VersionNode:
+    ref = ModelRef(provider_id="test", entity_id="tests.User")
+    return VersionNode(
+        namespace="com.acme.orders",
+        kind="User",
+        version=semver.Version.parse(version),
+        ref=ref,
+        descriptor=ModelDescriptor(
+            ref=ref,
+            fields=FrozenMap(
+                {
+                    name: FieldDescriptor(
+                        name=name,
+                        type_ref=TypeRef(kind=kind),
+                        required=True,
+                    )
+                    for name, kind in fields
+                }
+            ),
+        ),
+    )
 
 
 def _step(  # noqa: PLR0913
@@ -260,3 +297,65 @@ def test_openlineage_hook_includes_discriminator() -> None:
         pass
 
     assert client.events[0].job.name == "migration.User.1.0.0->2.0.0.canary"
+
+
+def test_openlineage_hook_emits_data_and_migration_facets() -> None:
+    client = RecordingLineageClient()
+    hook = OpenLineageHook(
+        client=client,
+        namespace="com.acme.orders",
+        producer="tests",
+    )
+    state = new_hook_state()
+    source = _version_node("1.0.0", ("name", TypeKind.STRING))
+    target = _version_node(
+        "2.0.0",
+        ("name", TypeKind.STRING),
+        ("age", TypeKind.INTEGER),
+    )
+    descriptor = MigrationDescriptor("jsonpatch", "docs.user.v1_v2")
+
+    with hook.before_migrate(
+        _step(source, target, migration=descriptor, discriminator="canary"),
+        {},
+        state=state,
+    ):
+        pass
+
+    started = client.events[0]
+    tags = {tag.key: tag.value for tag in started.job.facets["tags"].tags}
+    assert tags["pyverge.migration.name"] == "one_to_two"
+    assert tags["pyverge.migration.discriminator"] == "canary"
+    assert tags["pyverge.migration.strategy"] == "jsonpatch"
+    assert tags["pyverge.migration.identity"] == "docs.user.v1_v2"
+    assert started.job.facets["jobType"].jobType == "MIGRATION"
+    assert started.run.facets["processing_engine"].version == __version__
+    assert started.run.facets["parent"].run.runId == str(uuid5(NAMESPACE_URL, "run"))
+    assert started.inputs[0].facets["version"].datasetVersion == "1.0.0"
+    assert started.outputs[0].facets["version"].datasetVersion == "2.0.0"
+    assert [field.name for field in started.inputs[0].facets["schema"].fields] == [
+        "name"
+    ]
+    assert [field.name for field in started.outputs[0].facets["schema"].fields] == [
+        "age",
+        "name",
+    ]
+
+
+def test_openlineage_hook_records_error_facet() -> None:
+    client = RecordingLineageClient()
+    hook = OpenLineageHook(
+        client=client,
+        namespace="com.acme.orders",
+        producer="tests",
+    )
+    state = new_hook_state()
+    v1, v2 = _node("1.0.0"), _node("2.0.0")
+
+    with pytest.raises(RuntimeError):
+        with hook.before_migrate(_step(v1, v2), {}, state=state):
+            raise RuntimeError("boom")
+
+    failed = client.events[-1]
+    assert failed.eventType.value == "FAIL"
+    assert failed.run.facets["error"].message == "boom"

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from types import TracebackType
 from typing import Any
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from openlineage.client.event_v2 import (
     InputDataset,
@@ -14,10 +14,56 @@ from openlineage.client.event_v2 import (
     RunEvent,
     RunState,
 )
+from openlineage.client.facet_v2 import (
+    dataset_version_dataset,
+    error_message_run,
+    job_type_job,
+    parent_run,
+    processing_engine_run,
+    schema_dataset,
+    tags_job,
+)
 
+from pyverge._version import __version__
 from pyverge.core.types import HookState
 from pyverge.runtime.context import StepContext
 from pyverge.runtime.hooks.types import HookScope, MigrationHook
+
+
+def _type_name(type_ref: Any) -> str:
+    kind = str(type_ref.kind)
+    if type_ref.name:
+        return f"{kind}[{type_ref.name}]"
+    if type_ref.ref is not None:
+        return str(type_ref.ref)
+    return kind
+
+
+def _schema_fields(node: Any) -> list[schema_dataset.SchemaDatasetFacetFields]:
+    descriptor = getattr(node, "descriptor", None)
+    fields = getattr(descriptor, "fields", None)
+    if fields is None:
+        return []
+    return [
+        schema_dataset.SchemaDatasetFacetFields(
+            name=field.name,
+            type=_type_name(field.type_ref),
+            ordinal_position=index,
+        )
+        for index, (_, field) in enumerate(fields.sorted_items())
+    ]
+
+
+def _dataset_facets(node: Any) -> dict[str, Any]:
+    facets: dict[str, Any] = {
+        "version": dataset_version_dataset.DatasetVersionDatasetFacet(
+            datasetVersion=str(node.version),
+        ),
+    }
+    fields = _schema_fields(node)
+    if fields:
+        facets["schema"] = schema_dataset.SchemaDatasetFacet(fields=fields)
+    return facets
 
 
 @dataclass
@@ -45,18 +91,92 @@ class _LineageScope:
         traceback: TracebackType | None,
     ) -> None:
         event_type = RunState.FAIL if exc is not None else RunState.COMPLETE
-        self.client.emit(self._event(event_type))
+        self.client.emit(self._event(event_type, error=exc))
 
-    def _event(self, event_type: RunState) -> RunEvent:
+    def _event(
+        self, event_type: RunState, *, error: BaseException | None = None
+    ) -> RunEvent:
         return RunEvent(
             eventTime=datetime.now(UTC).isoformat(),
             producer=self.producer,
             eventType=event_type,
-            run=Run(runId=self.run_id),
-            job=Job(namespace=self.namespace, name=self.job_name),
-            inputs=[InputDataset(self.namespace, str(self.step.source))],
-            outputs=[OutputDataset(self.namespace, str(self.step.target))],
+            run=Run(runId=self.run_id, facets=self._run_facets(error)),
+            job=Job(
+                namespace=self.namespace,
+                name=self.job_name,
+                facets=self._job_facets(),
+            ),
+            inputs=[
+                InputDataset(
+                    self.namespace,
+                    str(self.step.source),
+                    facets=_dataset_facets(self.step.source),
+                )
+            ],
+            outputs=[
+                OutputDataset(
+                    self.namespace,
+                    str(self.step.target),
+                    facets=_dataset_facets(self.step.target),
+                )
+            ],
         )
+
+    def _job_facets(self) -> dict[str, Any]:
+        tags = [
+            tags_job.TagsJobFacetFields(
+                key="pyverge.migration.name",
+                value=self.step.name,
+            ),
+            tags_job.TagsJobFacetFields(
+                key="pyverge.migration.discriminator",
+                value=self.step.edge.discriminator,
+            ),
+        ]
+        if self.step.migration is not None:
+            tags.extend(
+                [
+                    tags_job.TagsJobFacetFields(
+                        key="pyverge.migration.strategy",
+                        value=self.step.migration.strategy,
+                    ),
+                    tags_job.TagsJobFacetFields(
+                        key="pyverge.migration.identity",
+                        value=self.step.migration.identity,
+                    ),
+                ]
+            )
+        return {
+            "jobType": job_type_job.JobTypeJobFacet(
+                processingType="BATCH",
+                integration="pyverge",
+                jobType="MIGRATION",
+            ),
+            "tags": tags_job.TagsJobFacet(tags=tags),
+        }
+
+    def _run_facets(self, error: BaseException | None) -> dict[str, Any]:
+        facets: dict[str, Any] = {
+            "processing_engine": processing_engine_run.ProcessingEngineRunFacet(
+                name="pyverge",
+                version=__version__,
+            ),
+            "parent": parent_run.ParentRunFacet(
+                run=parent_run.Run(
+                    runId=str(uuid5(NAMESPACE_URL, self.step.run.run_id))
+                ),
+                job=parent_run.Job(
+                    namespace=self.namespace,
+                    name="migration.run",
+                ),
+            ),
+        }
+        if error is not None:
+            facets["error"] = error_message_run.ErrorMessageRunFacet(
+                message=str(error),
+                programmingLanguage="python",
+            )
+        return facets
 
     @staticmethod
     def _job_name(step: StepContext) -> str:
