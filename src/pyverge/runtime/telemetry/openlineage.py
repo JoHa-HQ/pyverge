@@ -26,7 +26,8 @@ from openlineage.client.facet_v2 import (
 
 from pyverge._version import __version__
 from pyverge.runtime.context import DatasetContext, StepContext
-from pyverge.runtime.telemetry import (
+
+from . import (
     RunCompleted,
     RunFailed,
     RunStarted,

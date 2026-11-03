@@ -45,8 +45,8 @@ from .telemetry import (
     TelemetryEvent,
     TelemetryPublisher,
 )
-from .telemetry_openlineage import OpenLineageAdapter
-from .telemetry_otel import OtelAdapter
+from .telemetry.openlineage import OpenLineageAdapter
+from .telemetry.otel import OtelAdapter
 from .types import (
     BackendPort,
     Entry,
