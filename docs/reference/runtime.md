@@ -70,6 +70,15 @@ Backends own scheduling and callable invocation only. Entry payload read/write,
 step contexts, version stamping, and hook scope lifecycles live in the
 execution plan and step invoker, so every backend behaves the same way.
 
+A strategy receives only the migration callable, the current value, and the
+step context view. It does not read or write payload paths, run hooks, or build
+step metadata:
+
+```python
+def invoke(func, data, context):
+    return func(data, context)
+```
+
 The backend determines whether `run()` returns a result or an awaitable.
 
 ## Hooks
@@ -127,7 +136,8 @@ on the hook instance. Store it in `state` by hook instance key when needed.
 `HookScope` and are entered with `ExitStack`; async scopes implement
 `AsyncHookScope` and are entered with `AsyncExitStack` by the async backend.
 Resources are closed on success, error, or cancellation. `OTELHook` and
-`OpenLineageHook` use this to scope spans and run events.
+`OpenLineageHook` use this to scope spans and run events. OpenLineage events
+include version, schema, job, and run facets; payload values are never emitted.
 
 Register a hook on a specific edge:
 
