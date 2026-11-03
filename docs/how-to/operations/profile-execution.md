@@ -69,7 +69,7 @@ class _MemrayRun:
 
 ```python
 manager = UserManager()
-runner = manager.runner(middleware=(MemrayMiddleware("memray-runs"),))
+runner = manager.runtime(middleware=(MemrayMiddleware("memray-runs"),)).runner
 payload = {
     "kind": "User",
     "version": "1.0.0",

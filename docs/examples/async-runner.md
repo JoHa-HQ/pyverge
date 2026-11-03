@@ -36,13 +36,13 @@ async def add_age(data: dict, context=None) -> dict:
 
 
 manager = UserManager()
-runner = manager.runner(
+runner = manager.runtime(
     runtime=AsyncBackend(
         backend="asyncio",
         backend_options={},
         max_workers=2,
     )
-)
+).runner
 result = asyncio.run(
     runner.run({"kind": "User", "version": "1.0.0", "name": "Alice"}, "latest")
 )

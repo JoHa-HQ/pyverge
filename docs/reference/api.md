@@ -19,9 +19,16 @@ Generated from the public Python API.
 - [Graph identity and planning](graph.md)
 - [NodeId](graph.md)
 - [VersionKey](graph.md)
+- [EdgeId](graph.md)
 - [EdgeKey](graph.md)
 - [VersionNode](graph.md)
 - [VersionEdge](graph.md)
+
+## Graph lock
+
+- [Revision and digests](graph.md)
+- [Backends](graph.md)
+- [Persistence](graph.md)
 
 ## Runner
 

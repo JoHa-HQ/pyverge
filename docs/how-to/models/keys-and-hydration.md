@@ -14,8 +14,8 @@ model is available.
 ### Store a key-only placeholder
 
 ```python
-from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
-from pyverge.versioning import VersionKey, default_content_hasher
+from pyverge.core.registry import DEFAULT_HEALTH_LINTERS, Registry
+from pyverge.core.versioning import VersionKey, default_content_hasher
 
 registry = Registry(
     namespace="com.acme.users",
@@ -65,7 +65,7 @@ unregistered key.
 ### Build the graph
 
 ```python
-from pyverge.graph import GraphBuilder
+from pyverge.core.graph import GraphBuilder
 
 graph = GraphBuilder().build(registry)
 assert graph.get_model(key) is not None

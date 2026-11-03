@@ -12,7 +12,7 @@ request timestamps, exchange rates. Pass them to `migrate`; the same
 `MigrationContext` reaches every step:
 
 ```python
-result = manager.runner().run(payload, "latest", context={"tenant_id": "tenant_99"})
+result = manager.runtime().runner.run(payload, "latest", context={"tenant_id": "tenant_99"})
 ```
 
 The context is a read-only **view** over the mapping you pass, not a copy.
@@ -44,7 +44,7 @@ calls and tests simple.
 ## Verify
 
 ```python
-result = manager.runner().run(payload, "latest", context={"tenant_id": "t1"})
+result = manager.runtime().runner.run(payload, "latest", context={"tenant_id": "t1"})
 ```
 
 ## Troubleshooting

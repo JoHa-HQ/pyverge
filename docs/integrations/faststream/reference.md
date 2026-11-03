@@ -10,9 +10,9 @@ or a `VersionRange`. A range resolves to the highest matching version:
 
 ```python
 from pyverge.adapters.faststream import FastStreamRuntime
-from pyverge.manager.types import VersionRange
+from pyverge.runtime.manager.types import VersionRange
 
-runtime = FastStreamRuntime(manager, manager.runner())
+runtime = FastStreamRuntime(manager, manager.runtime().runner)
 
 @subscriber(broker, "orders", runtime=runtime, targets=VersionRange(gte="1.0.0", lt="2.0.0"))
 async def handle(order: OrderV2) -> None: ...
@@ -33,7 +33,7 @@ raw_broker = ...  # any FastStream broker
 broker = PyvergeBroker(
     raw_broker,
     manager=manager,
-    runner=manager.runner(),
+    runner=manager.runtime().runner,
 )
 
 @broker.subscriber("orders", target="latest")
@@ -62,11 +62,11 @@ broker = PyvergeBroker(broker, runtime=runtime)
 
 async def start() -> None:
     runtime.bind(
-        manager.runner(
+        manager.runtime(
             backend=backend,
             environment=execution_environment,
             middleware=middleware,
-        )
+        ).runner
     )
 ```
 

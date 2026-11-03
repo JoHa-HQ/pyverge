@@ -169,7 +169,7 @@ Emits a JGF v2 envelope:
 - edges with `source`, `target`, `relation: migration`
 - node metadata: `namespace`, fields, references, `schema_hash`
 - edge metadata: `namespace`, strategy/spec, compatibility, `migration_hash`
-- graph metadata: `manifest_version`, `pyverge_version`, `generated_at`, `content_hash`
+- graph metadata: `manifest_version`, `pyverge_version`, `generated_at`, `digest`
 
 Comparison ignores volatile graph metadata (`generated_at`, tool version) and
 checks node/edge content. It exits `1` on divergence.

@@ -16,12 +16,12 @@ Compatibility notes for the execution/registration architecture change.
 | Before | After |
 | --- | --- |
 | `Manager.configure(settings, adapter)` | `Manager.configure(adapter, **manager_kwargs(settings))` |
-| `manager.migrate(payload, target)` | `manager.runner().run(payload, target)` |
+| `manager.migrate(payload, target)` | `manager.runtime().runner.run(payload, target)` |
 | `await manager.amigrate(payload, target)` | `await manager.runner(runtime=AsyncBackend(...)).run(payload, target)` |
 | `manager.delegate()` / `manager.prepare()` | removed; build a `Runner` and reuse it |
 | `MigrationSettings(execution_mode=...)` | choose `ThreadedBackend`, `AsyncBackend`, or `ProcessBackend` |
 | `MigrationSettings(parallel_workers=...)` | backend `max_workers` |
-| `pyverge.migration.*` | `pyverge.engine`, `pyverge.registry`, `pyverge.schemas`, `pyverge.migrations`, `pyverge.versioning` |
+| `pyverge.migration.*` | `pyverge.core.engine`, `pyverge.core.registry`, `pyverge.schemas`, `pyverge.migrations`, `pyverge.core.versioning` |
 | `ToolDiscovery` | `PyvergeProvider` |
 | `discovery.register()` | `await discovery.sync(server)` |
 | `Reflector(manager)` FastStream startup hook | explicit model/migration registration before runtime |
@@ -81,7 +81,7 @@ migrated = manager.migrate(payload, target="latest")
 After:
 
 ```python
-migrated = manager.runner().run(payload, "latest")
+migrated = manager.runtime().runner.run(payload, "latest")
 ```
 
 `Runner.run()` defaults:
@@ -103,7 +103,7 @@ result = await manager.amigrate(payload, target="latest")
 After:
 
 ```python
-from pyverge.execution import AsyncBackend
+from pyverge.runtime import AsyncBackend
 
 runner = manager.runner(
     runtime=AsyncBackend(
@@ -118,11 +118,11 @@ result = await runner.run(payload, "latest")
 ## Process isolation
 
 ```python
-from pyverge.execution import ProcessBackend
+from pyverge.runtime import ProcessBackend
 
 backend = ProcessBackend(max_workers=2)
 try:
-    result = manager.runner(runtime=backend).run(payload, "latest")
+    result = manager.runtime(runtime=backend).runner.run(payload, "latest")
 finally:
     backend.close()
 ```
@@ -130,7 +130,7 @@ finally:
 ## Runtime context
 
 ```python
-result = manager.runner().run(
+result = manager.runtime().runner.run(
     payload,
     "latest",
     context={"tenant_id": "tenant_99"},
@@ -144,7 +144,7 @@ carries the namespace, kind, and parsed version; keys add identity-neutral
 storage metadata.
 
 ```python
-from pyverge.versioning import EdgeKey, NodeId, VersionKey, VersionNode
+from pyverge.core.versioning import EdgeKey, NodeId, VersionKey, VersionNode
 
 node_id = NodeId("com.joha.order", "Order", "1.0.0")
 key = VersionKey(
@@ -215,10 +215,10 @@ no longer exists.
 ## Import moves
 
 ```python
-from pyverge.engine import Engine
-from pyverge.registry import Registry
+from pyverge.core.engine import Engine
+from pyverge.core.registry import Registry
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey, NodeId, VersionKey, VersionNode
+from pyverge.core.versioning import EdgeKey, NodeId, VersionKey, VersionNode
 ```
 
 `pyverge.migration` is gone.
@@ -278,15 +278,15 @@ the current API.
 Use the owning contexts:
 
 ```python
-from pyverge.engine import Engine
-from pyverge.registry import Registry
+from pyverge.core.engine import Engine
+from pyverge.core.registry import Registry
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey, VersionNode
+from pyverge.core.versioning import EdgeKey, VersionNode
 ```
 
 ### `manager` has no `migrate` or `amigrate`
 
-Use `manager.runner().run(...)` and select async/process execution with a
+Use `manager.runtime().runner.run(...)` and select async/process execution with a
 backend.
 
 ### Async required / sync required

@@ -38,7 +38,7 @@ from hypothesis import given, strategies as st
 
 @given(st.from_type(UserV2))
 def test_v2_to_v3_is_total(v2):
-    manager.runner().run(v2.model_dump(), target="3.0.0")
+    manager.runtime().runner.run(v2.model_dump(), target="3.0.0")
 ```
 
 ### Generate graph shapes

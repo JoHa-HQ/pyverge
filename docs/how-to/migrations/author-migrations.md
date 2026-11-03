@@ -34,7 +34,7 @@ Without a registered reverse edge, a backward migration raises.
 Run the edge and validate the result against the target model:
 
 ```python
-manager.runner().run(payload, "2.0.0")
+manager.runtime().runner.run(payload, "2.0.0")
 ```
 
 ## Troubleshooting

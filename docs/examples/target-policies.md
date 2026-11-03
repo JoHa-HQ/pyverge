@@ -49,9 +49,9 @@ def v2_to_v3(data: dict, context=None) -> dict:
 manager = UserManager()
 payload = {"kind": "User", "version": "1.0.0", "name": "Alice"}
 
-assert manager.runner().run(payload, "latest")["version"] == "3.0.0"
-assert manager.runner().run(payload, "earliest")["version"] == "1.0.0"
-assert manager.runner().run(payload, "2.0.0")["version"] == "2.0.0"
-assert manager.runner().run(payload, {"User": "2.0.0"})["version"] == "2.0.0"
-assert manager.runner().run(payload, "skip")["version"] == "1.0.0"
+assert manager.runtime().runner.run(payload, "latest")["version"] == "3.0.0"
+assert manager.runtime().runner.run(payload, "earliest")["version"] == "1.0.0"
+assert manager.runtime().runner.run(payload, "2.0.0")["version"] == "2.0.0"
+assert manager.runtime().runner.run(payload, {"User": "2.0.0"})["version"] == "2.0.0"
+assert manager.runtime().runner.run(payload, "skip")["version"] == "1.0.0"
 ```

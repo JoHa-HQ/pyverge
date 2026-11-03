@@ -37,7 +37,7 @@ def add_age(data: dict, context=None) -> dict:
     return {**data, "age": 0}
 
 manager = UserManager()
-result = manager.runner().run(
+result = manager.runtime().runner.run(
     {"kind": "User", "version": "1.0.0", "name": "Alice"},
     "latest",
 )

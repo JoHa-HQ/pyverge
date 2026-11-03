@@ -87,8 +87,9 @@ converge first, then the enclosing `Person`.
 
 ## Execution
 
-`PayloadWalker` owns discovery. `PathFinder` owns graph planning. The backend
-owns execution. Hooks wrap each migration step, and middleware wraps the backend
-execution seam.
+`PayloadWalker` owns discovery. `PathFinder` owns graph planning. The execution
+plan owns entry payload read/write and step contexts. The backend owns only
+scheduling and callable invocation through an execution strategy. Hooks wrap
+each migration step, and middleware wraps the backend execution seam.
 See [Runtime reference](../reference/runtime.md) and
 [Run payloads](../how-to/runtime/run-payloads.md).

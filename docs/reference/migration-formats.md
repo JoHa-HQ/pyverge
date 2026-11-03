@@ -81,7 +81,7 @@ class UserV1ToV2:
 ```
 
 ```python
-result = manager.runner().run(payload, "latest", context={"tenant_id": "tenant_99"})
+result = manager.runtime().runner.run(payload, "latest", context={"tenant_id": "tenant_99"})
 ```
 
 `JsonataMigration` is a declarative spec; it produces a callable

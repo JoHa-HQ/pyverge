@@ -42,7 +42,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, OTLPSpanExporter
 
 from pyverge.types import ManagerMigrationKey
-from pyverge.execution import OTELHook
+from pyverge.runtime import OTELHook
 
 provider = TracerProvider()
 provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
@@ -62,6 +62,7 @@ migration.source
 migration.target
 migration.strategy       # when available
 migration.identity       # when available
+migration.discriminator
 migration.duration_seconds
 ```
 
@@ -72,8 +73,8 @@ migration.duration_seconds
 validation:
 
 ```python
-from pyverge.execution import OpenLineageHook
-from pyverge.execution.middleware import OpenLineageMiddleware
+from pyverge.runtime import OpenLineageHook
+from pyverge.runtime.middleware import OpenLineageMiddleware
 
 middleware = OpenLineageMiddleware(
     client=client,
@@ -99,7 +100,7 @@ migration.User.1.0.0->2.0.0
 
 ```python
 manager.attach_hooks([AuditHook()])
-result = manager.runner().run(payload, "latest")
+result = manager.runtime().runner.run(payload, "latest")
 ```
 
 ## Troubleshooting

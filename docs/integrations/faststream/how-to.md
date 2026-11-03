@@ -96,7 +96,7 @@ app = FastStream(broker.underlying)
 
 async def main() -> None:
     # Bind the runner once, when the application starts.
-    broker.bind(manager.runner())
+    broker.bind(manager.runtime().runner)
     # Drive `broker.underlying` with the in-memory test broker for your
     # transport. Either versioned topic reaches the same handler.
     # handle() receives the v2 shape (currency filled in) and publishes a v1
@@ -124,8 +124,8 @@ from pyverge.adapters.faststream import (
     subscriber,
 )
 
-inbound = FastStreamRuntime(inbound_manager, inbound_manager.runner())
-outbound = FastStreamRuntime(outbound_manager, outbound_manager.runner())
+inbound = FastStreamRuntime(inbound_manager, inbound_manager.runtime().runner)
+outbound = FastStreamRuntime(outbound_manager, outbound_manager.runtime().runner)
 
 
 @subscriber(broker, "orders", runtime=inbound, targets="latest")
@@ -146,7 +146,7 @@ middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
 spans **as current**, so each step nests under the consume span:
 
 ```python
-from pyverge.execution import OTELHook
+from pyverge.runtime import OTELHook
 
 # FastStream's transport-specific telemetry middleware carries the consume span.
 broker.underlying.add_middleware(telemetry_middleware)
