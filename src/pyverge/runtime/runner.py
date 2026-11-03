@@ -15,7 +15,7 @@ from pyverge.runtime.errors import TargetValidationError, UnknownModelError
 from pyverge.runtime.middleware import BackendMiddleware
 from pyverge.runtime.plan import ExecutionPlan
 from pyverge.runtime.telemetry import RunCompleted, RunFailed, RunStarted
-from pyverge.runtime.types import BackendPort
+from pyverge.runtime.types import BackendPort, CopyPolicy
 from pyverge.schemas.types import ModelAdapter
 
 RunResult: TypeAlias = Any
@@ -30,6 +30,7 @@ class Runner(Generic[VersionValue]):
     backend: BackendPort[VersionValue]
     middleware: tuple[BackendMiddleware, ...]
     environment: ExecutionEnvironment
+    copy: CopyPolicy = "deep"
 
     def plan(
         self,
@@ -81,7 +82,7 @@ class Runner(Generic[VersionValue]):
         context: MigrationContext | None,
         run_id: str | None = None,
     ) -> RunResult:
-        data = copy.deepcopy(plan.payload)
+        data = self._copy(plan.payload)
         active_run_id = run_id or self.environment.id_factory.new("run_")
         run = RunContext(
             run_id=active_run_id,
@@ -117,6 +118,13 @@ class Runner(Generic[VersionValue]):
             )
         )
         return result
+
+    def _copy(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if self.copy == "none":
+            return payload
+        if self.copy == "shallow":
+            return dict(payload)
+        return copy.deepcopy(payload)
 
     async def _await_result(
         self,

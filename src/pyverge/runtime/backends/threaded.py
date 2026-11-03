@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -26,7 +25,7 @@ class ThreadedBackend:
         run: RunContext,
         adapter: ModelIdentityPort,
     ) -> dict[str, Any]:
-        data = copy.deepcopy(payload)
+        data = payload
         hook_state = new_hook_state()
         for level in plan.levels:
             if self._max_workers > 1:

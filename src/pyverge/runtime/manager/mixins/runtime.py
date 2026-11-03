@@ -29,7 +29,7 @@ from pyverge.runtime.facade import Runtime
 from pyverge.runtime.factory import RunnerOptions
 from pyverge.runtime.middleware import BackendMiddleware
 from pyverge.runtime.telemetry import TelemetryAdapter
-from pyverge.runtime.types import BackendPort
+from pyverge.runtime.types import BackendPort, CopyPolicy
 
 from ..descriptors import hybridmethod
 from ..types import ManagerMigrationKey, ModelKey, ModelPair, warn_model_pair
@@ -67,6 +67,7 @@ class RuntimeMixin(Generic[VersionValue]):
         validation_mode: Literal["strict", "lax", "none"] = "lax",
         discriminator: str = "default",
         plan_cache_size: int = 0,
+        copy: CopyPolicy = "deep",
     ) -> Runtime[VersionValue]:
         options = RunnerOptions(
             backend=backend or runtime or ThreadedBackend(max_workers=0),
@@ -87,6 +88,7 @@ class RuntimeMixin(Generic[VersionValue]):
             middleware=middleware,
             telemetry=telemetry,
             plan_cache_size=plan_cache_size,
+            copy=copy,
         )
         store = type(self)._default_runtime
         return Runtime(engine=self.engine, bindings=store.bindings).with_runner(options)
@@ -107,6 +109,7 @@ class RuntimeMixin(Generic[VersionValue]):
         validation_mode: Literal["strict", "lax", "none"] = "lax",
         discriminator: str = "default",
         plan_cache_size: int = 0,
+        copy: CopyPolicy = "deep",
     ) -> Runner[VersionValue]:
         warnings.warn(
             "Manager.runner() is deprecated; use Manager.runtime().runner",
@@ -127,6 +130,7 @@ class RuntimeMixin(Generic[VersionValue]):
             validation_mode=validation_mode,
             discriminator=discriminator,
             plan_cache_size=plan_cache_size,
+            copy=copy,
         )
         assert runtime_view.runner is not None
         return runtime_view.runner
