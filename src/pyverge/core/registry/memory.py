@@ -166,6 +166,10 @@ class Registry(Generic[VersionValue]):
         return self._namespace
 
     @property
+    def hasher(self: Self) -> ContentHasher:
+        return self._hasher
+
+    @property
     def content_hashes(self: Self) -> Mapping[str, EdgeKey[VersionValue]]:
         return MappingProxyType(dict(self._content_hash_index or {}))
 

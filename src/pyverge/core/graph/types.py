@@ -6,8 +6,10 @@ from typing import Protocol, runtime_checkable
 from pyverge.core.registry.types import ModelCatalog, PathCatalog
 from pyverge.core.types import ModelKind, VersionValue
 from pyverge.core.versioning import (
+    ContentHasher,
     EdgeEntry,
     EdgeKey,
+    HookRef,
     ModelRef,
     NodeEntry,
     Transitional,
@@ -52,6 +54,9 @@ class GraphSnapshotSource(Protocol):
     def namespace(self) -> str: ...
 
     @property
+    def hasher(self) -> ContentHasher: ...
+
+    @property
     def entries(self) -> Sequence[NodeEntry]: ...
 
     @property
@@ -70,6 +75,8 @@ class GraphSnapshotSource(Protocol):
     def models(self, kind: ModelKind | None) -> frozenset[ModelRef]: ...
 
     def get_model_by_ref(self, ref: ModelRef) -> VersionNode: ...
+
+    def get_hooks(self, key: Transitional) -> Sequence[HookRef]: ...
 
 
 __all__ = [

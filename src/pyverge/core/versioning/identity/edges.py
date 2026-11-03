@@ -259,6 +259,10 @@ class VersionEdge(EdgeKey[VersionValue]):
     def content_hash(self, hasher: ContentHasher) -> str:
         return hasher.digest(self.content_payload(hasher))
 
+    def digest(self, hasher: ContentHasher) -> str:
+        """Return the manifest checksum for this executable edge."""
+        return self.content_hash(hasher)
+
     def to_jgf(self) -> JgfEdge:
         from ..jgf import JgfEdge  # noqa: PLC0415
 

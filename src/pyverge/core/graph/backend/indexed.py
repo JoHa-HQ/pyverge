@@ -10,6 +10,7 @@ from pyverge.core.types import ModelKind, VersionValue
 from pyverge.core.versioning import (
     EdgeId,
     EdgeKey,
+    HookRef,
     ModelRef,
     NodeEntry,
     NodeId,
@@ -44,6 +45,9 @@ class IndexedBackend(Generic[VersionValue]):
     executable_edge_ids: frozenset[EdgeId]
     edge_metadata: Mapping[EdgeId, Mapping[str, str]]
     content_hashes: Mapping[str, EdgeId]
+    node_digests: Mapping[NodeId, str]
+    edge_digests: Mapping[EdgeId, str]
+    hook_specs: Mapping[EdgeId, tuple[HookRef, ...]]
 
     @classmethod
     def build(  # noqa: PLR0913
@@ -57,6 +61,9 @@ class IndexedBackend(Generic[VersionValue]):
         executable_edge_ids: Iterable[EdgeId] = (),
         edge_metadata: Mapping[EdgeId, Mapping[str, str]] | None = None,
         content_hashes: Mapping[str, EdgeId] | None = None,
+        node_digests: Mapping[NodeId, str] | None = None,
+        edge_digests: Mapping[EdgeId, str] | None = None,
+        hook_specs: Mapping[EdgeId, tuple[HookRef, ...]] | None = None,
     ) -> IndexedBackend[VersionValue]:
         ordered_nodes = tuple(sorted(nodes))
         ordered_edges = tuple(sorted(edges))
@@ -141,6 +148,11 @@ class IndexedBackend(Generic[VersionValue]):
             executable_edge_ids=frozenset(executable_edge_ids),
             edge_metadata=MappingProxyType(dict(edge_metadata or {})),
             content_hashes=MappingProxyType(dict(content_hashes or {})),
+            node_digests=MappingProxyType(dict(node_digests or {})),
+            edge_digests=MappingProxyType(dict(edge_digests or {})),
+            hook_specs=MappingProxyType(
+                dict(sorted((hook_specs or {}).items()))
+            ),
         )
 
     @property

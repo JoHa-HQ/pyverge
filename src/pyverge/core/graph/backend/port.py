@@ -7,6 +7,7 @@ from pyverge.core.types import ModelKind, VersionValue
 from pyverge.core.versioning import (
     EdgeId,
     EdgeKey,
+    HookRef,
     ModelRef,
     NodeEntry,
     NodeId,
@@ -74,6 +75,15 @@ class GraphBackend(Protocol[VersionValue]):
 
     @property
     def content_hashes(self) -> Mapping[str, EdgeId]: ...
+
+    @property
+    def node_digests(self) -> Mapping[NodeId, str]: ...
+
+    @property
+    def edge_digests(self) -> Mapping[EdgeId, str]: ...
+
+    @property
+    def hook_specs(self) -> Mapping[EdgeId, tuple[HookRef, ...]]: ...
 
     def edge_key(self, edge: EdgeId) -> EdgeKey: ...
 

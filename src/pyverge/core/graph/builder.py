@@ -9,7 +9,7 @@ from pyverge.core.graph.graph import MigrationGraph
 from pyverge.core.graph.types import GraphSnapshotSource
 from pyverge.core.registry.errors import CatalogError
 from pyverge.core.types import VersionValue
-from pyverge.core.versioning import EdgeId, EdgeKey
+from pyverge.core.versioning import EdgeId, EdgeKey, HookRef
 
 
 def _freeze(values: Mapping[Any, Any]) -> Mapping[Any, Any]:
@@ -27,9 +27,13 @@ class GraphBuilder(Generic[VersionValue]):
         self,
         source: GraphSnapshotSource,
     ) -> MigrationGraph[VersionValue]:
+        hasher = source.hasher
         nodes = tuple(sorted(source.entries))
+        node_digests = {node.id: node.digest(hasher) for node in nodes}
         kinds = set(source.entities) | set(source.kinds)
         edges_by_id: dict[EdgeId, EdgeKey] = {}
+        edge_digests: dict[EdgeId, str] = {}
+        hook_specs: dict[EdgeId, tuple[HookRef, ...]] = {}
         executable_edge_ids: set[EdgeId] = set()
         edge_metadata: dict[EdgeId, Mapping[str, str]] = {}
         for kind in kinds:
@@ -41,6 +45,12 @@ class GraphBuilder(Generic[VersionValue]):
                     ref=entry.ref,
                 )
                 edges_by_id[edge.id] = edge
+                edge_digests[edge.id] = entry.digest(hasher)
+                hooks = source.get_hooks(edge)
+                if hooks:
+                    hook_specs[edge.id] = tuple(
+                        sorted(hooks, key=lambda ref: ref.digest(hasher))
+                    )
                 if entry.is_executable:
                     executable_edge_ids.add(edge.id)
                     migration = getattr(entry, "migration", None)
@@ -80,6 +90,9 @@ class GraphBuilder(Generic[VersionValue]):
                     for digest, edge in source.content_hashes.items()
                 }
             ),
+            node_digests=_freeze(node_digests),
+            edge_digests=_freeze(edge_digests),
+            hook_specs=_freeze(hook_specs),
         )
         return MigrationGraph(backend=backend)
 

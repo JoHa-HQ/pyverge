@@ -323,6 +323,10 @@ class VersionNode(VersionKey[VersionValue]):
     def content_hash(self, hasher: ContentHasher) -> str:
         return hasher.digest(self.content_payload())
 
+    def digest(self, hasher: ContentHasher) -> str:
+        """Return the manifest checksum for this node."""
+        return self.content_hash(hasher)
+
     def to_jgf(self, hasher: ContentHasher) -> JgfNode:
         from ..jgf import JgfNode  # noqa: PLC0415
 
