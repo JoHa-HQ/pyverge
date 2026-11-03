@@ -45,6 +45,7 @@ from pyverge.runtime import (
 from pyverge.runtime.backends import ThreadedBackend
 from pyverge.runtime.clock import SystemClock
 from pyverge.runtime.context import ExecutionEnvironment
+from pyverge.runtime.factory import RunnerFactory
 from pyverge.runtime.migrations import MigrationBindings
 from pyverge.runtime.types import BackendPort
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
@@ -277,10 +278,13 @@ def runner_factory(
     migration_settings: MigrationSettings,
 ) -> Callable[[], Runner[VersionValue]]:
     def build() -> Runner[VersionValue]:
-        return engine.runner(
-            bindings=getattr(
-                registry, "bindings", MigrationBindings(name=registry.namespace)
-            ),
+        bindings = getattr(
+            registry, "bindings", MigrationBindings(name=registry.namespace)
+        )
+        return RunnerFactory().create(
+            engine.snapshot(),
+            bindings,
+            engine.adapter,
             backend=runtime_backend,
             environment=runtime_environment,
             direction=direction_policy(migration_settings.direction),

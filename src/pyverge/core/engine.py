@@ -1,16 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any, Generic, Literal, Self, cast, overload
+from typing import Any, Generic, Self, cast, overload
 
-from pyverge.core.graph import (
-    DirectionPolicy,
-    GraphBuilder,
-    MigrationGraph,
-    PathFinder,
-    PolicyEngine,
-    TargetCompiler,
-)
+from pyverge.core.graph import GraphBuilder, MigrationGraph
 from pyverge.core.registry import HealthFailLevel, HealthIssue, Registry
 from pyverge.core.registry.errors import (
     CatalogError,
@@ -19,12 +12,9 @@ from pyverge.core.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.core.types import (
-    DepthViolationStrategy,
-    DirectionViolationStrategy,
     MigrationFunc,
     ModelHandle,
     ModelKind,
-    VersionMissingStrategy,
     VersionValue,
 )
 from pyverge.core.versioning import (
@@ -44,16 +34,6 @@ from pyverge.core.versioning import (
 )
 from pyverge.migrations import MigrationSpec
 from pyverge.migrations.json_patch import JsonPatch
-from pyverge.runtime import (
-    ExecutionCoordinator,
-    ExecutionPlanner,
-    PayloadWalker,
-    Runner,
-)
-from pyverge.runtime.context import ExecutionEnvironment
-from pyverge.runtime.middleware import BackendMiddleware
-from pyverge.runtime.migrations import MigrationBindings
-from pyverge.runtime.types import BackendPort
 from pyverge.schemas.types import ModelAdapter
 
 
@@ -73,7 +53,6 @@ class Engine(Generic[VersionValue]):
     - delegating migration registration, reflection, and binding to the
       Registry;
     - building immutable graph snapshots;
-    - resolving executable migration bindings and constructing runtime runners.
 
     It does not execute migrations; :class:`~pyverge.runtime.Runner` does.
     Migration registration, reflection, identity assignment, and compatibility
@@ -128,48 +107,6 @@ class Engine(Generic[VersionValue]):
             for edge in self.registry.migrations(kind):
                 for hook in hooks:
                     self.registry.add_hook(edge, hook)
-
-    def runner(  # noqa: PLR0913
-        self: Self,
-        *,
-        bindings: MigrationBindings[VersionValue],
-        backend: BackendPort[VersionValue],
-        environment: ExecutionEnvironment,
-        direction: DirectionPolicy,
-        on_direction_violation: DirectionViolationStrategy,
-        on_missing_path: VersionMissingStrategy,
-        depth_limit: int,
-        on_depth_violation: DepthViolationStrategy,
-        validation_mode: Literal["strict", "lax", "none"],
-        middleware: tuple[BackendMiddleware, ...] = (),
-    ) -> Runner[VersionValue]:
-        graph = self.snapshot()
-        coordinator = ExecutionCoordinator[VersionValue](
-            extractor=PayloadWalker[VersionValue](
-                graph,
-                adapter=self.adapter,
-                validation_mode=validation_mode,
-            ),
-            finder=PathFinder[VersionValue](
-                graph=graph,
-                targets=TargetCompiler[VersionValue](graph, self.adapter),
-                policy=PolicyEngine[VersionValue](
-                    direction=direction,
-                    on_direction_violation=on_direction_violation,
-                    on_missing_path=on_missing_path,
-                    depth_limit=depth_limit,
-                    on_depth_violation=on_depth_violation,
-                ),
-            ),
-            planner=ExecutionPlanner[VersionValue](bindings=bindings),
-        )
-        return Runner[VersionValue](
-            coordinator=coordinator,
-            adapter=self.adapter,
-            backend=backend,
-            middleware=middleware,
-            environment=environment,
-        )
 
     def copy(self) -> Engine[VersionValue]:
         return Engine(self.registry.copy(), self.adapter)

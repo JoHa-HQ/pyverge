@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from functools import singledispatchmethod
@@ -10,6 +11,8 @@ from pyverge.core.ids import IdFactory
 from pyverge.core.versioning import EdgeKey, VersionNode
 
 from .clock import Clock
+
+DEFAULT_LOGGER = logging.getLogger("pyverge.runtime")
 
 
 class MigrationContext(Mapping[str, Any]):
@@ -118,6 +121,7 @@ class StepContext:
 
 
 __all__ = [
+    "DEFAULT_LOGGER",
     "ExecutionEnvironment",
     "RunContext",
     "StepContext",

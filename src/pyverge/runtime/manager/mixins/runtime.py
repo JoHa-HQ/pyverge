@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import warnings
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
@@ -27,7 +27,9 @@ from pyverge.core.types import (
 from pyverge.core.versioning import Diffable, Identifiable
 from pyverge.runtime import Runner, ThreadedBackend
 from pyverge.runtime.clock import SystemClock
-from pyverge.runtime.context import ExecutionEnvironment
+from pyverge.runtime.context import DEFAULT_LOGGER, ExecutionEnvironment
+from pyverge.runtime.facade import Runtime
+from pyverge.runtime.factory import RunnerOptions
 from pyverge.runtime.middleware import BackendMiddleware
 from pyverge.runtime.types import BackendPort
 
@@ -47,23 +49,44 @@ def _direction(strategy: MigrationDirectionStrategy) -> DirectionPolicy:
     return policies[strategy]()
 
 
-@dataclass(frozen=True, slots=True)
-class RunnerOptions(Generic[VersionValue]):
-    """Manager-level runner configuration."""
-
-    backend: BackendPort
-    environment: ExecutionEnvironment
-    direction: DirectionPolicy
-    on_direction_violation: DirectionViolationStrategy
-    on_missing_path: VersionMissingStrategy
-    depth_limit: int
-    on_depth_violation: DepthViolationStrategy
-    validation_mode: Literal["strict", "lax", "none"]
-    middleware: tuple[BackendMiddleware, ...] = ()
-
-
 class RuntimeMixin(Generic[VersionValue]):
     """Manager runtime integration and primitive operations."""
+
+    def runtime(  # noqa: PLR0913
+        self: Manager[VersionValue],
+        *,
+        backend: BackendPort | None = None,
+        middleware: tuple[BackendMiddleware, ...] = (),
+        environment: ExecutionEnvironment | None = None,
+        runtime: BackendPort | None = None,
+        direction: MigrationDirectionStrategy = "any",
+        on_direction_violation: DirectionViolationStrategy = "skip",
+        on_missing_path: VersionMissingStrategy = "raise",
+        depth_limit: int = -1,
+        on_depth_violation: DepthViolationStrategy = "skip",
+        validation_mode: Literal["strict", "lax", "none"] = "lax",
+    ) -> Runtime[VersionValue]:
+        options = RunnerOptions(
+            backend=backend or runtime or ThreadedBackend(max_workers=0),
+            environment=environment
+            or ExecutionEnvironment(
+                clock=SystemClock(),
+                id_factory=UuidIdFactory(),
+                logger=DEFAULT_LOGGER,
+                tracer=None,
+            ),
+            direction=_direction(direction),
+            on_direction_violation=on_direction_violation,
+            on_missing_path=on_missing_path,
+            depth_limit=depth_limit,
+            on_depth_violation=on_depth_violation,
+            validation_mode=validation_mode,
+            middleware=middleware,
+        )
+        store = type(self)._default_runtime
+        return Runtime(engine=self.engine, bindings=store.bindings).with_runner(
+            options
+        )
 
     def runner(  # noqa: PLR0913
         self: Manager[VersionValue],
@@ -79,24 +102,25 @@ class RuntimeMixin(Generic[VersionValue]):
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
     ) -> Runner[VersionValue]:
-        return self.engine.runner(
-            bindings=self.runtime.bindings,
-            backend=backend or runtime or ThreadedBackend(max_workers=0),
+        warnings.warn(
+            "Manager.runner() is deprecated; use Manager.runtime().runner",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        runtime_view = self.runtime(
+            backend=backend,
             middleware=middleware,
-            environment=environment
-            or ExecutionEnvironment(
-                clock=SystemClock(),
-                id_factory=UuidIdFactory(),
-                logger=None,
-                tracer=None,
-            ),
-            direction=_direction(direction),
+            environment=environment,
+            runtime=runtime,
+            direction=direction,
             on_direction_violation=on_direction_violation,
             on_missing_path=on_missing_path,
             depth_limit=depth_limit,
             on_depth_violation=on_depth_violation,
             validation_mode=validation_mode,
         )
+        assert runtime_view.runner is not None
+        return runtime_view.runner
 
     def info(
         self: Manager[VersionValue],

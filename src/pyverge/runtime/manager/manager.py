@@ -87,10 +87,6 @@ class Manager(
     def registry(self) -> Registry[VersionValue]:
         return self.engine.registry
 
-    @property
-    def runtime(self) -> Runtime:
-        return type(self)._default_runtime
-
     @classmethod
     def configure(  # noqa: PLR0913
         cls,
