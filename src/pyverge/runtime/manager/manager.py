@@ -33,7 +33,6 @@ from pyverge.schemas.types import (
 
 from .descriptors import ManagerMeta
 from .mixins import (
-    DiscoveryMixin,
     EngineLifecycleMixin,
     LookupMixin,
     MigrationStoreMixin,
@@ -45,7 +44,6 @@ from .types import ManagerConfig
 
 
 class Manager(
-    DiscoveryMixin[VersionValue],
     EngineLifecycleMixin[VersionValue],
     TargetResolutionMixin[VersionValue],
     ModelStoreMixin[VersionValue],
