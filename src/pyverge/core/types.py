@@ -15,9 +15,6 @@ from typing import (
     runtime_checkable,
 )
 
-from pendulum import Date
-from semver import Version as SemVer
-
 if TYPE_CHECKING:
     from pyverge.core.versioning import (
         EdgeKey,
@@ -32,10 +29,26 @@ if TYPE_CHECKING:
 # Version axis
 # ---------------------------------------------------------------------------
 
-#: Core version value axis: semver and ISO dates are parallel strategies.
-VersionValue = TypeVar("VersionValue", SemVer, Date)
+@runtime_checkable
+class VersionValueProtocol(Protocol):
+    """Ordering and hashing contract for one parsed version value.
+
+    ``semver.Version`` and ``pendulum.Date`` satisfy this. Custom version
+    strategies must provide a stable string form, total ordering, equality,
+    and hashing before they can occupy the version slot.
+    """
+
+    def __str__(self) -> str: ...
+    def __lt__(self, other: Any, /) -> bool: ...
+    def __hash__(self) -> int: ...
+
+
+#: Core version value axis: any value satisfying the ordering protocol.
+VersionValue = TypeVar("VersionValue", bound=VersionValueProtocol)
 #: Covariant form for protocols where the version is output-only.
-VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
+VersionValue_co = TypeVar(
+    "VersionValue_co", bound=VersionValueProtocol, covariant=True
+)
 
 #: Per-execution hook state supplied by the execution backend.
 HookState: TypeAlias = ContextVar[dict[int, tuple[Any, ...]]]

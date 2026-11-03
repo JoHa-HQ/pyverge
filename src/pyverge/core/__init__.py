@@ -29,6 +29,7 @@ from .types import (
     VersionMissingStrategy,
     VersionValue,
     VersionValue_co,
+    VersionValueProtocol,
 )
 
 __all__ = [
@@ -60,5 +61,6 @@ __all__ = [
     "ValidationMode",
     "VersionMissingStrategy",
     "VersionValue",
+    "VersionValueProtocol",
     "VersionValue_co",
 ]
