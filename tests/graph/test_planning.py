@@ -210,15 +210,13 @@ def test_path_finder_cache_reuses_resolved_steps(path_finder, nodes) -> None:
 
 
 class _Hook:
-    def before_migrate(self, name, from_version, to_version, data) -> None:
+    def before_migrate(self, step, data) -> None:
         pass
 
-    def after_migrate(
-        self, name, from_version, to_version, original_data, migrated_data
-    ) -> None:
+    def after_migrate(self, step, original_data, migrated_data) -> None:
         pass
 
-    def on_error(self, name, from_version, to_version, data, error) -> None:
+    def on_error(self, step, data, error) -> None:
         pass
 
 
