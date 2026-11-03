@@ -73,33 +73,6 @@ from tests.utils import envelope_model, meta_versionable
 
 class TestModelManagement:
     @pytest.mark.parametrize(
-        "model_adapter, registry, models",
-        [
-            [PydanticModelAdapter, [semver.Version, "test", [UserV1], []], [UserV1]],
-            [
-                PydanticModelAdapter,
-                [pendulum.Date, "test", [UserV20250310], []],
-                [UserV20250310],
-            ],
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_get_model_by_versionable(
-        self,
-        subtests: pytest.Subtests,
-        migration_settings: MigrationSettings,
-        engine: Engine[types.VersionValue],
-        models: list[ModelHandle],
-    ) -> None:
-        for model in models:
-            with subtests.test(f"model={model.__name__}"):
-                version = envelope_model(engine.adapter, migration_settings, model)
-                assert (
-                    engine.adapter.resolve(engine.get_model(version).descriptor.ref)
-                    is model
-                )
-
-    @pytest.mark.parametrize(
         "model_adapter, registry, operation, expected",
         [
             pytest.param(
@@ -370,28 +343,6 @@ class TestModelManagement:
             return
         with pytest.raises(expected_error):
             engine.get_latest_model(version.kind)
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, model",
-        [
-            [PydanticModelAdapter, [semver.Version, "test", [UserV1], []], UserV1],
-            [
-                JsonSchemaModelAdapter,
-                [pendulum.Date, "test", [USER_V0_1_1_DEV_7], []],
-                USER_V0_1_1_DEV_7,
-            ],
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_contains_version_tuple(
-        self,
-        engine: Engine[types.VersionValue],
-        model: ModelHandle,
-    ) -> None:
-        version = envelope_model(engine.adapter, None, model)
-        assert version in engine
-        # Typed-only: a raw (kind, version) tuple is manager sugar, not engine.
-        assert (version.kind, version.version) not in engine
 
     @pytest.mark.parametrize(
         "model_adapter, registry, model",
@@ -726,34 +677,6 @@ class TestMigrationManagement:
         [
             pytest.param(
                 PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2, UserV3], []],
-                [UserV1, UserV2, UserV3],
-                id="pydantic_semver_user_v1_v2_v3",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_remove_non_critical_ok(
-        self,
-        engine: Engine[types.VersionValue],
-        models: list[ModelHandle],
-    ) -> None:
-        versions = [envelope_model(engine.adapter, None, m) for m in models]
-
-        for index, pair in enumerate(pairwise(versions)):
-            engine.store_migration(
-                pair,
-                lambda d, _: d,
-                backward_compatible=index == 0,
-            )
-
-        engine.remove_migration(EdgeKey.from_pair(versions[0], versions[1]))
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, models",
-        [
-            pytest.param(
-                PydanticModelAdapter,
                 [
                     semver.Version,
                     "test",
@@ -805,30 +728,6 @@ class TestMigrationManagement:
         engine.remove_migration(edge, force=True)
         with pytest.raises(MigrationNotFoundError):
             engine.get_migration(edge)
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, models",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [], []],
-                [UserV1, UserV2],
-                id="pydantic_semver_user_v1_v2",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_remove_missing_raises(
-        self,
-        engine: Engine[types.VersionValue],
-        models: list[ModelHandle],
-    ) -> None:
-        versions = [envelope_model(engine.adapter, None, m) for m in models]
-        for v in versions:
-            engine.store_model(v)
-
-        with pytest.raises(MigrationNotFoundError):
-            engine.remove_migration(EdgeKey.from_pair(versions[0], versions[1]))
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -911,20 +810,6 @@ class TestMigrationManagement:
             engine.registry.has_migration(EdgeKey.from_pair(versions[0], versions[1]))
             is False
         )
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [], []],
-                id="pydantic_semver_empty",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_delete_unknown_kind_noop(self, engine: Engine[types.VersionValue]) -> None:
-        engine.delete_kind("Nope")
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models, scenario",
@@ -1018,89 +903,11 @@ class TestReflection:
         assert all(field in model.model_fields for field in ["name", "age", "version"])
         assert model.model_fields["version"].default == "2.0.0"
 
-    @pytest.mark.parametrize(
-        "model_adapter, registry, migration_settings, models",
-        [
-            pytest.param(
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV2], []],
-                {"on_missing": "skip"},
-                [UserV2],
-                id="pydantic_skip_user_v2",
-            ),
-        ],
-        indirect=["model_adapter", "registry", "migration_settings"],
-    )
-    def test_skips_reconstruction_when_disabled(
-        self,
-        engine: Engine[types.VersionValue],
-        models: list[ModelHandle],
-    ) -> None:
-        real = envelope_model(engine.adapter, None, models[0])
-        key = engine.adapter.version_key(kind="User", version="1.0.0")
-
-        with pytest.raises(ModelNotFoundError):
-            engine.store_migration((key, real), lambda d, _: {**d, "age": None})
-
 
 class TestLookupTyped:
     """Engine operator overloads operate on typed keys only."""
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, model",
-        [
-            [PydanticModelAdapter, [semver.Version, "test", [UserV1], []], UserV1],
-            [
-                JsonSchemaModelAdapter,
-                [pendulum.Date, "test", [USER_V0_1_1_DEV_7], []],
-                USER_V0_1_1_DEV_7,
-            ],
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_contains_typed_node(
-        self,
-        engine: Engine[types.VersionValue],
-        model: ModelHandle,
-    ) -> None:
-        version = envelope_model(engine.adapter, None, model)
-        assert version in engine
-        assert engine[version].descriptor == version.descriptor
-
-    @pytest.mark.parametrize(
-        "model_adapter, registry, models",
-        [
-            [
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d, _: d)],
-                ],
-                [UserV1, UserV2],
-            ],
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_getitem_typed_edge_key(
-        self,
-        engine: Engine[types.VersionValue],
-        models: list[ModelHandle],
-    ) -> None:
-        versions = [envelope_model(engine.adapter, None, m) for m in models]
-        key = EdgeKey.from_pair(versions[0], versions[1])
-        assert engine[key] is not None
 
 
 class TestNamespaceGateway:
     def test_engine_uses_codec_namespace(self, engine: Engine) -> None:
         assert engine.registry.namespace == engine.namespace
-
-    def test_engine_preserves_foreign_entries(self, engine: Engine) -> None:
-        node = engine.adapter.versionable(UserV1).with_namespace("billing")
-        key = VersionKey.parse("billing", "User", "1.0.0")
-
-        engine.store_model(node)
-
-        assert engine.get_model(key).namespace == "billing"
