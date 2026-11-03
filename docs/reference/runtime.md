@@ -16,6 +16,7 @@ runtime = manager.runtime(
     runtime=None,
     backend=None,
     middleware=(),
+    telemetry=(),
     environment=None,
     direction="any",
     on_direction_violation="skip",
@@ -138,9 +139,10 @@ Store it in `state` by hook instance key when needed.
 `before_migrate` may return a per-step context manager. Sync scopes implement
 `HookScope` and are entered with `ExitStack`; async scopes implement
 `AsyncHookScope` and are entered with `AsyncExitStack` by the async backend.
-Resources are closed on success, error, or cancellation. `OTELHook` and
-`OpenLineageHook` use this to scope spans and run events. OpenLineage events
-include version, schema, job, and run facets; payload values are never emitted.
+Resources are closed on success, error, or cancellation.
+
+Hooks are for custom behavior. Telemetry uses lifecycle adapters instead, so
+hooks no longer need to own run or step telemetry resources.
 
 Register a hook on a specific edge:
 
@@ -161,16 +163,56 @@ is a `before_migrate` / `after_migrate` / `on_error` method declared with
 `async def`; the async backend awaits it. The sync backend rejects awaitable
 hook results with `AsyncExecutionRequired`.
 
+## Telemetry
+
+`manager.runtime(telemetry=(...))` attaches lifecycle adapters. The runtime
+emits six typed events:
+
+```text
+RunStarted
+  StepStarted
+  StepCompleted | StepFailed
+RunCompleted | RunFailed
+```
+
+Run events carry the `RunContext` and `ExecutionPlan`; step events carry the
+`StepContext`. Adapters implement one synchronous method:
+
+```python
+class TelemetryAdapter:
+    def emit(self, event: TelemetryEvent) -> None: ...
+```
+
+Emission is best-effort and isolated. An adapter failure is logged, does not
+fail the migration, and does not prevent other adapters from receiving the
+event. Payload values are never emitted.
+
+Bundled adapters:
+
+```python
+from pyverge.runtime import OpenLineageAdapter, OtelAdapter
+
+runner = manager.runtime(
+    telemetry=(
+        OtelAdapter(tracer=trace.get_tracer("orders"), service="orders"),
+        OpenLineageAdapter(
+            client=lineage_client,
+            namespace="com.acme.orders",
+            producer="orders-service",
+        ),
+    )
+).runner
+```
+
+`OpenLineageAdapter` emits run-level and step-level events with version, schema,
+job, parent-run, and error facets. A namespace mismatch is logged and the
+adapter emits nothing, because telemetry cannot fail the migration.
+
 ## Middleware
 
-`manager.runtime(middleware=(...))` accepts backend middleware for retry,
-idempotency, transactions, audit, OpenTelemetry, and OpenLineage. Middleware
-wraps the backend execution seam, not individual migrations.
-
-`OpenLineageMiddleware` validates the configured OpenLineage namespace against
-the graph namespace when the graph has one. Datasets use namespaced `NodeId`
-values; run events identify the complete execution while edge-level hooks emit
-per-migration events.
+`manager.runtime(middleware=(...))` accepts control middleware for retry,
+idempotency, transactions, and audit. Middleware wraps the backend execution
+seam, not individual migrations.
 
 See [Run payloads](../how-to/runtime/run-payloads.md) for examples and
 [Execution flow](../explanation/execution-flow.md) for ordering.
