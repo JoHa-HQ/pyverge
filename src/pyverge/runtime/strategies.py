@@ -1,19 +1,34 @@
 from __future__ import annotations
 
+import inspect
 from collections.abc import Mapping
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from typing import Protocol
 
-from pyverge.core.types import ModelData
-from pyverge.runtime.context import StepContext
-from pyverge.runtime.plan import ExecutionEntry
+from pyverge.core.types import MigrationFunc, ModelData
 
 
-def _run_in_process(
-    work: Any, data: ModelData, context: Mapping[str, Any]
-) -> ModelData:
-    return work(data, dict(context))
+class SyncStepStrategy(Protocol):
+    """Execute one sync migration callable."""
+
+    def invoke(
+        self,
+        func: MigrationFunc,
+        data: ModelData,
+        context: Mapping[str, object],
+    ) -> ModelData: ...
+
+
+class AsyncStepStrategy(Protocol):
+    """Execute one sync or async migration callable from a coroutine."""
+
+    async def invoke(
+        self,
+        func: MigrationFunc,
+        data: ModelData,
+        context: Mapping[str, object],
+    ) -> ModelData: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,12 +37,11 @@ class ThreadedStrategy:
 
     def invoke(
         self,
-        entry: ExecutionEntry,
-        index: int,
+        func: MigrationFunc,
         data: ModelData,
-        step: StepContext,
+        context: Mapping[str, object],
     ) -> ModelData:
-        return entry.invoke_migration(index, data, step.view)
+        return func(data, context)
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,20 +52,11 @@ class ProcessStrategy:
 
     def invoke(
         self,
-        entry: ExecutionEntry,
-        index: int,
+        func: MigrationFunc,
         data: ModelData,
-        step: StepContext,
+        context: Mapping[str, object],
     ) -> ModelData:
-        try:
-            return self.executor.submit(
-                _run_in_process,
-                entry.migration_func(index),
-                data,
-                dict(step.view),
-            ).result()
-        except Exception as exc:
-            raise entry.migration_error(exc) from exc
+        return self.executor.submit(func, data, dict(context)).result()
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,16 +65,20 @@ class AsyncStrategy:
 
     async def invoke(
         self,
-        entry: ExecutionEntry,
-        index: int,
+        func: MigrationFunc,
         data: ModelData,
-        step: StepContext,
+        context: Mapping[str, object],
     ) -> ModelData:
-        return await entry.invoke_migration_async(index, data, step.view)
+        result = func(data, context)
+        if inspect.isawaitable(result):
+            return await result
+        return result
 
 
 __all__ = [
+    "AsyncStepStrategy",
     "AsyncStrategy",
     "ProcessStrategy",
+    "SyncStepStrategy",
     "ThreadedStrategy",
 ]
