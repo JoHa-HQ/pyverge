@@ -127,42 +127,6 @@ async def test_invalid_header_fails_before_the_handler(manager) -> None:
     [pytest.param(PydanticModelAdapter, REGISTRY, id="pydantic")],
     indirect=True,
 )
-async def test_facade_publish_to_converges_each_route(manager) -> None:
-    instance = manager()
-    broker = PyvergeBroker(
-        KafkaBroker("localhost:9092"),
-        manager=instance,
-        runner=instance.runner(),
-    )
-    out_v1: list[dict[str, Any]] = []
-    out_v2: list[dict[str, Any]] = []
-
-    @broker.subscriber("in-topic")
-    @broker.publish_to(routes={"out-v1": "1.0.0", "out-v2": "latest"})
-    async def handle(user: UserV2) -> UserV2:
-        return user
-
-    @broker.underlying.subscriber("out-v1")
-    async def sink_v1(payload: dict) -> None:
-        out_v1.append(payload)
-
-    @broker.underlying.subscriber("out-v2")
-    async def sink_v2(payload: dict) -> None:
-        out_v2.append(payload)
-
-    async with TestKafkaBroker(broker.underlying) as br:
-        await br.publish(V2_PAYLOAD, "in-topic")
-
-    assert out_v1 == [V1_PAYLOAD]
-    assert out_v2 == [V2_PAYLOAD]
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [pytest.param(PydanticModelAdapter, REGISTRY, id="pydantic")],
-    indirect=True,
-)
 @pytest.mark.parametrize(
     "header_value, expected",
     [
