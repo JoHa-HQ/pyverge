@@ -27,12 +27,8 @@ from pyverge.core.graph import (
     skip_target_resolver,
 )
 from pyverge.core.registry import Registry
-from pyverge.core.registry.errors import MigrationNotFoundError
 from pyverge.core.versioning import (
-    EdgeId,
     EdgeKey,
-    MigrationDescriptor,
-    NodeId,
     VersionNode,
 )
 from pyverge.runtime import (
@@ -51,7 +47,6 @@ from pyverge.runtime.errors import (
     TargetValidationError,
     UnknownModelError,
 )
-from pyverge.runtime.migrations import MigrationBindings
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (
@@ -1416,33 +1411,3 @@ def test_runner_awaits_async_hooks(
     )
 
     assert calls == ["before", "after"]
-
-
-def test_migration_bindings_distinguish_parallel_edges() -> None:
-    source = NodeId.parse("test", "User", "1.0.0")
-    target = NodeId.parse("test", "User", "2.0.0")
-    canary = EdgeId.from_pair(source, target, discriminator="canary")
-    stable = EdgeId.from_pair(source, target, discriminator="stable")
-
-    def canary_migration(data, _):
-        return data
-
-    def stable_migration(data, _):
-        return data
-
-    bindings = MigrationBindings(name="test")
-    bindings.store_migration(
-        canary,
-        canary_migration,
-        MigrationDescriptor(strategy="json_patch", identity="canary"),
-    )
-    bindings.store_migration(
-        stable,
-        stable_migration,
-        MigrationDescriptor(strategy="json_patch", identity="stable"),
-    )
-
-    assert bindings.resolve(canary).func is canary_migration
-    assert bindings.resolve(stable).func is stable_migration
-    with pytest.raises(MigrationNotFoundError):
-        bindings.resolve(EdgeId.from_pair(source, target))

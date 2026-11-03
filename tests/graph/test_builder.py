@@ -229,3 +229,57 @@ def test_graph_preserves_edge_discriminators(registry, graph) -> None:
     assert snapshot.has_edge(canary)
     assert snapshot.get_edge(canary).discriminator == "canary"
     assert snapshot.edge_metadata[canary]["strategy"]
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_snapshot_lookup_flags(registry, graph) -> None:
+    snapshot = graph()
+
+    assert len(snapshot.node_entries(full=True)) == 2  # noqa: PLR2004
+    assert len(snapshot.node_entries(connected=True)) == 2  # noqa: PLR2004
+    assert snapshot.node_entries(orphaned=True) == ()
+    assert len(snapshot.edge_entries(executable=True)) == 1
+    assert snapshot.edge_entries(executable=False) == ()
+    assert snapshot.edge_entries(origin="unset") == ()
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [semver.Version, "test", [], []],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_snapshot_lookup_flags_identify_orphans(registry, graph) -> None:
+    for version in ("1.0.0", "2.0.0"):
+        registry.store(
+            VersionKey(
+                namespace="test",
+                kind="User",
+                version=semver.Version.parse(version),
+                ref=NodeRef(),
+            )
+        )
+
+    snapshot = graph()
+
+    assert len(snapshot.node_entries(full=False)) == 2  # noqa: PLR2004
+    assert len(snapshot.node_entries(orphaned=True)) == 2  # noqa: PLR2004
+    assert len(snapshot.node_entries(connected=False)) == 2  # noqa: PLR2004

@@ -33,7 +33,6 @@ from .planning import (
     range_target_resolver,
     skip_target_resolver,
 )
-from .state import GraphState
 from .types import (
     GraphExportSource,
     GraphSnapshotSource,
@@ -55,7 +54,6 @@ __all__ = [
     "GraphCycleError",
     "GraphExportSource",
     "GraphSnapshotSource",
-    "GraphState",
     "GraphView",
     "IndexedBackend",
     "MigrationGraph",

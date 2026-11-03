@@ -98,6 +98,16 @@ class NodeId(Generic[VersionValue]):
     def identity(self) -> tuple[str, ModelKind, VersionValue]:
         return self.namespace, self.kind, self.version
 
+    def digest(self, hasher: ContentHasher) -> str:
+        """Return the stable identity digest for this node."""
+        return hasher.digest(
+            {
+                "namespace": self.namespace,
+                "kind": self.kind,
+                "version": str(self.version),
+            }
+        )
+
     def with_namespace(self, namespace: str) -> Self:
         return replace(self, namespace=namespace)
 
@@ -176,15 +186,6 @@ class VersionKey(NodeId[VersionValue]):
             kind=kind,
             version=parse_version(version),
             ref=ref or NodeRef(),
-        )
-
-    def digest(self, hasher: ContentHasher) -> str:
-        return hasher.digest(
-            {
-                "namespace": self.namespace,
-                "kind": self.kind,
-                "version": str(self.version),
-            }
         )
 
     @property

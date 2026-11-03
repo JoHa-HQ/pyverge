@@ -1081,3 +1081,40 @@ def test_manager_namespace_derives_from_adapter_codec() -> None:
     manager = Manager[semver.Version].configure(adapter)
 
     assert manager._default_engine.registry.namespace == "orders"
+
+
+@pytest.mark.parametrize(
+    ("model_adapter", "registry"),
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "test", [UserV1, UserV2], []],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_parallel_discriminators_run_default_path(manager: type[Manager]) -> None:
+    instance = manager()
+    key = ManagerMigrationKey("User", "1.0.0", "2.0.0")
+    instance.store_migration(key, migrate_v1_to_v2)
+    instance.store_migration(key, migrate_v1_to_v2, discriminator="canary")
+
+    edges = instance.registry.edges("User")
+    assert {edge.discriminator for edge in edges} == {"default", "canary"}
+
+    runtime = instance.runtime()
+    assert runtime.runner is not None
+    result = runtime.runner.run(
+        {
+            "kind": "User",
+            "version": "1.0.0",
+            "name": "Alice",
+            "email": "alice@example.com",
+            "role": "user",
+        },
+        "2.0.0",
+    )
+
+    assert result["version"] == "2.0.0"
+    assert result["name"] == "Alice"

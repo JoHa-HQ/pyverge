@@ -6,7 +6,6 @@ from typing import Any, Generic
 
 from pyverge.core.graph.backend import IndexedBackend
 from pyverge.core.graph.graph import MigrationGraph
-from pyverge.core.graph.state import GraphState
 from pyverge.core.graph.types import GraphSnapshotSource
 from pyverge.core.registry.errors import CatalogError
 from pyverge.core.types import VersionValue
@@ -60,12 +59,11 @@ class GraphBuilder(Generic[VersionValue]):
                 f"Graph cannot mix namespaces: {sorted(namespaces)}",
             )
 
-        backend = IndexedBackend[VersionValue].build(nodes, edges)
-        state = GraphState(
+        backend = IndexedBackend[VersionValue].build(
+            nodes,
+            edges,
             name=source.namespace,
             namespace=source.namespace,
-            nodes=_freeze({entry.id: entry for entry in nodes}),
-            edges=_freeze(dict(edges_by_id)),
             models_by_ref=_freeze(
                 {ref: source.get_model_by_ref(ref) for ref in source.models(None)}
             ),
@@ -82,9 +80,8 @@ class GraphBuilder(Generic[VersionValue]):
                     for digest, edge in source.content_hashes.items()
                 }
             ),
-            backend=backend,
         )
-        return MigrationGraph(state=state)
+        return MigrationGraph(backend=backend)
 
 
 __all__ = ["GraphBuilder"]

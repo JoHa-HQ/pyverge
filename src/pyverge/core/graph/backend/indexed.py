@@ -1,95 +1,37 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Generic, Literal, Protocol, runtime_checkable
+from typing import Generic, cast
 
-from pyverge.core.types import ModelKind, VersionValue, VersionValue_co
-from pyverge.core.versioning import EdgeId, EdgeKey, NodeEntry, NodeId
+from pyverge.core.types import ModelKind, VersionValue
+from pyverge.core.versioning import (
+    EdgeId,
+    EdgeKey,
+    ModelRef,
+    NodeEntry,
+    NodeId,
+    VersionNode,
+)
 
-Direction = Literal["out", "in", "both"]
-"""Traversal direction for backend neighbor queries."""
-
-EdgePredicate = Callable[[EdgeKey], bool]
-"""Predicate used to filter edges during backend traversal."""
-
-
-class GraphCycleError(ValueError):
-    """Raised when a backend traversal requires an acyclic graph."""
-
-
-@runtime_checkable
-class GraphBackend(Protocol[VersionValue_co]):
-    """Backend-neutral port over a locked graph.
-
-    Backends store native ``NodeEntry`` and ``EdgeKey`` values, or stable IDs
-    for traversal. No backend-native node or edge object is exposed.
-    """
-
-    @property
-    def nodes(self) -> tuple[NodeEntry, ...]: ...
-
-    @property
-    def edges(self) -> tuple[EdgeKey, ...]: ...
-
-    @property
-    def nodes_by_kind(self) -> Mapping[ModelKind, tuple[NodeEntry, ...]]: ...
-
-    @property
-    def edges_by_kind(self) -> Mapping[ModelKind, tuple[EdgeKey, ...]]: ...
-
-    @property
-    def edges_by_endpoint(self) -> Mapping[NodeId, frozenset[EdgeKey]]: ...
-
-    def nodes_for_kind(self, kind: ModelKind) -> tuple[NodeEntry, ...]: ...
-
-    def edges_for_kind(self, kind: ModelKind) -> tuple[EdgeKey, ...]: ...
-
-    def incident(self, node: NodeId) -> frozenset[EdgeKey]: ...
-
-    def outgoing(self, node: NodeId) -> frozenset[EdgeKey]: ...
-
-    def incoming(self, node: NodeId) -> frozenset[EdgeKey]: ...
-
-    def edges_between(
-        self,
-        source: NodeId,
-        target: NodeId,
-    ) -> tuple[EdgeKey, ...]: ...
-
-    def has_node(self, node: NodeId) -> bool: ...
-
-    def has_edge(self, edge: EdgeId) -> bool: ...
-
-    def neighbors(
-        self,
-        node: NodeId,
-        *,
-        direction: Direction = "both",
-    ) -> tuple[NodeId, ...]: ...
-
-    def index_of(self, node: NodeId) -> int | None: ...
-
-    def shortest_path(
-        self,
-        source: NodeId,
-        target: NodeId,
-        *,
-        predicate: EdgePredicate | None = None,
-    ) -> tuple[EdgeKey, ...] | None: ...
-
-    def topological_sort(self) -> tuple[NodeId, ...]: ...
+from .port import Direction, EdgePredicate, GraphCycleError
 
 
 @dataclass(frozen=True, slots=True)
 class IndexedBackend(Generic[VersionValue]):
-    """Dependency-free backend using frozen maps and sorted tuples."""
+    """Dependency-free backend using frozen maps and sorted tuples.
 
+    The backend owns its state and every index derived from it.
+    """
+
+    name: str
+    namespace: str
     nodes: tuple[NodeEntry, ...]
     edges: tuple[EdgeKey, ...]
     nodes_by_id: Mapping[NodeId, NodeEntry]
+    edges_by_id: Mapping[EdgeId, EdgeKey]
     nodes_by_kind: Mapping[ModelKind, tuple[NodeEntry, ...]]
     edges_by_kind: Mapping[ModelKind, tuple[EdgeKey, ...]]
     edges_by_endpoint: Mapping[NodeId, frozenset[EdgeKey]]
@@ -98,15 +40,40 @@ class IndexedBackend(Generic[VersionValue]):
     edges_by_pair: Mapping[tuple[NodeId, NodeId], tuple[EdgeKey, ...]]
     node_positions: Mapping[NodeId, int]
     edge_ids: frozenset[EdgeId]
+    models_by_ref: Mapping[ModelRef, VersionNode[VersionValue]]
+    executable_edge_ids: frozenset[EdgeId]
+    edge_metadata: Mapping[EdgeId, Mapping[str, str]]
+    content_hashes: Mapping[str, EdgeId]
 
     @classmethod
-    def build(
+    def build(  # noqa: PLR0913
         cls,
         nodes: Iterable[NodeEntry],
         edges: Iterable[EdgeKey],
-    ) -> IndexedBackend:
+        *,
+        name: str = "",
+        namespace: str = "",
+        models_by_ref: Mapping[ModelRef, VersionNode[VersionValue]] | None = None,
+        executable_edge_ids: Iterable[EdgeId] = (),
+        edge_metadata: Mapping[EdgeId, Mapping[str, str]] | None = None,
+        content_hashes: Mapping[str, EdgeId] | None = None,
+    ) -> IndexedBackend[VersionValue]:
         ordered_nodes = tuple(sorted(nodes))
         ordered_edges = tuple(sorted(edges))
+        resolved_namespace = namespace or (
+            ordered_nodes[0].namespace
+            if ordered_nodes
+            else (ordered_edges[0].namespace if ordered_edges else "")
+        )
+        resolved_models: dict[ModelRef, VersionNode[VersionValue]] = (
+            dict(models_by_ref) if models_by_ref is not None else {}
+        )
+        if models_by_ref is None:
+            for node in ordered_nodes:
+                if node.is_model:
+                    resolved_models[cast("ModelRef", node.modelref)] = cast(
+                        "VersionNode[VersionValue]", node
+                    )
 
         nodes_by_kind: dict[ModelKind, list[NodeEntry]] = {}
         node_positions: dict[NodeId, int] = {}
@@ -131,10 +98,15 @@ class IndexedBackend(Generic[VersionValue]):
             edges_by_pair.setdefault(edge.key, []).append(edge)
 
         return cls(
+            name=name or resolved_namespace,
+            namespace=resolved_namespace,
             nodes=ordered_nodes,
             edges=ordered_edges,
             nodes_by_id=MappingProxyType(
                 {entry.id: entry for entry in ordered_nodes}
+            ),
+            edges_by_id=MappingProxyType(
+                {edge.id: edge for edge in ordered_edges}
             ),
             nodes_by_kind=MappingProxyType(
                 {kind: tuple(bucket) for kind, bucket in nodes_by_kind.items()}
@@ -165,7 +137,23 @@ class IndexedBackend(Generic[VersionValue]):
             ),
             node_positions=MappingProxyType(node_positions),
             edge_ids=frozenset(edge_ids),
+            models_by_ref=MappingProxyType(resolved_models),
+            executable_edge_ids=frozenset(executable_edge_ids),
+            edge_metadata=MappingProxyType(dict(edge_metadata or {})),
+            content_hashes=MappingProxyType(dict(content_hashes or {})),
         )
+
+    @property
+    def executable_edges(self) -> frozenset[EdgeKey]:
+        return frozenset(
+            self.edges_by_id[edge_id] for edge_id in self.executable_edge_ids
+        )
+
+    def edge_key(self, edge: EdgeId) -> EdgeKey:
+        return self.edges_by_id[edge.id]
+
+    def is_executable(self, edge: EdgeId) -> bool:
+        return edge.id in self.executable_edge_ids
 
     def nodes_for_kind(self, kind: ModelKind) -> tuple[NodeEntry, ...]:
         return self.nodes_by_kind.get(kind, ())
@@ -247,9 +235,7 @@ class IndexedBackend(Generic[VersionValue]):
         for edge in self.edges:
             indegree[edge.target.id] += 1
 
-        ready = deque(
-            node for node in sorted(indegree) if indegree[node] == 0
-        )
+        ready = deque(node for node in sorted(indegree) if indegree[node] == 0)
         ordered: list[NodeId] = []
         while ready:
             current = ready.popleft()
@@ -280,10 +266,4 @@ class IndexedBackend(Generic[VersionValue]):
         return tuple(path)
 
 
-__all__ = [
-    "Direction",
-    "EdgePredicate",
-    "GraphBackend",
-    "GraphCycleError",
-    "IndexedBackend",
-]
+__all__ = ["IndexedBackend"]

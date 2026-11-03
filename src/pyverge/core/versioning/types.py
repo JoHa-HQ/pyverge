@@ -34,7 +34,14 @@ MaterializedOutput = TypeVar("MaterializedOutput")
 
 
 @runtime_checkable
-class Identifiable(Protocol):
+class Digestible(Protocol):
+    """Stable identity digest independent of metadata refs."""
+
+    def digest(self, hasher: ContentHasher) -> str: ...
+
+
+@runtime_checkable
+class Identifiable(Digestible, Protocol):
     """Stable identity shared by nodes and edges."""
 
     @property
@@ -279,6 +286,7 @@ __all__ = [
     "DiffProvider",
     "DiffRenderer",
     "Diffable",
+    "Digestible",
     "EdgeEntry",
     "Edged",
     "Fingerprintable",

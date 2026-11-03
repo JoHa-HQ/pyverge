@@ -90,6 +90,24 @@ class EdgeId(Generic[VersionValue]):
     ) -> tuple[NodeId[VersionValue], NodeId[VersionValue], str]:
         return self.source, self.target, self.discriminator
 
+    def digest(self, hasher: ContentHasher) -> str:
+        """Return the stable identity digest for this edge."""
+        return hasher.digest(
+            {
+                "source": {
+                    "namespace": self.source.namespace,
+                    "kind": self.source.kind,
+                    "version": str(self.source.version),
+                },
+                "target": {
+                    "namespace": self.target.namespace,
+                    "kind": self.target.kind,
+                    "version": str(self.target.version),
+                },
+                "discriminator": self.discriminator,
+            }
+        )
+
     def _check(self, other: object) -> EdgeId[Any]:
         if not isinstance(other, EdgeId):
             raise NotImplementedError(
@@ -176,22 +194,7 @@ class EdgeKey(EdgeId[VersionValue]):
             discriminator=self.discriminator,
         )
 
-    def digest(self, hasher: ContentHasher) -> str:
-        return hasher.digest(
-            {
-                "source": {
-                    "namespace": self.source.namespace,
-                    "kind": self.source.kind,
-                    "version": str(self.source.version),
-                },
-                "target": {
-                    "namespace": self.target.namespace,
-                    "kind": self.target.kind,
-                    "version": str(self.target.version),
-                },
-                "discriminator": self.discriminator,
-            }
-        )
+
 
 
 @dataclass(frozen=True, slots=True, eq=False, kw_only=True)
