@@ -124,11 +124,11 @@ class ModelCatalog(Protocol[VersionValue]):
 class PathCatalog(Protocol[VersionValue]):
     """Narrow read port needed to resolve migration paths."""
 
-    def migration_path(
+    def edge_path(
         self,
         from_version: VersionNode[VersionValue],
         to_version: VersionNode[VersionValue],
-    ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]: ...
+    ) -> list[EdgeKey[VersionValue]]: ...
 
 
 class ContentHashLookup(Protocol):

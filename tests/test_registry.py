@@ -2880,23 +2880,25 @@ def test_remote_path_catalog_is_substitutable(
     class _RemotePathCatalog:
         """A remote adapter that answers path queries without graph download."""
 
-        def migration_path(
+        def edge_path(
             self,
             from_version: VersionNode,
             to_version: VersionNode,
-        ) -> list[tuple[VersionNode, VersionNode]]:
+        ) -> list[EdgeKey]:
             if from_version == source and to_version == target:
-                return [(source, target)]
+                return [EdgeKey.from_pair(source, target)]
             return []
 
     def resolve_path(
         catalog: PathCatalog,
         from_version: VersionNode,
         to_version: VersionNode,
-    ) -> list[tuple[VersionNode, VersionNode]]:
-        return catalog.migration_path(from_version, to_version)
+    ) -> list[EdgeKey]:
+        return catalog.edge_path(from_version, to_version)
 
-    assert resolve_path(_RemotePathCatalog(), source, target) == [(source, target)]
+    assert resolve_path(_RemotePathCatalog(), source, target) == [
+        EdgeKey.from_pair(source, target)
+    ]
 
 
 def _noop_migration(data: dict, context: Any = None) -> dict:

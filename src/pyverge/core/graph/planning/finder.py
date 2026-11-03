@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Generic
+from typing import Generic, cast
 
 from pyverge.core.graph.planning.plan import ExtractedEntry, PathPlan, PathPlanEntry
 from pyverge.core.graph.planning.policy import PolicyEngine
 from pyverge.core.graph.planning.targets import TargetCompiler, TargetPolicy
 from pyverge.core.graph.types import PathGraphView
 from pyverge.core.types import ModelHandle, TargetResolver, VersionValue
-from pyverge.core.versioning import EdgeKey, NodeId, VersionNode
+from pyverge.core.versioning import EdgeId, NodeId, VersionNode
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,7 +17,7 @@ class ResolvedPath(Generic[VersionValue]):
     """Cached graph-identity resolution for one source/target pair."""
 
     steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
-    edges: tuple[EdgeKey[VersionValue], ...]
+    edges: tuple[EdgeId[VersionValue], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,11 +68,15 @@ class PathFinder(Generic[VersionValue]):
         cache_key = (entry.node.id, target.id)
         cached = self._cache.get(cache_key)
         if cached is None:
-            steps = tuple(self.graph.migration_path(entry.node, target))
-            edges = tuple(
-                EdgeKey.from_pair(source, step_target)
-                for source, step_target in steps
+            path = tuple(self.graph.edge_path(entry.node, target))
+            steps = tuple(
+                (
+                    cast("VersionNode[VersionValue]", edge.source),
+                    cast("VersionNode[VersionValue]", edge.target),
+                )
+                for edge in path
             )
+            edges = tuple(edge.id for edge in path)
             resolved = ResolvedPath(steps=steps, edges=edges)
             self._cache[cache_key] = resolved
         else:

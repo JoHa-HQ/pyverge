@@ -8,7 +8,7 @@ from types import MappingProxyType
 from typing import Any, Self, cast
 
 from pyverge.core.ids import IdFactory
-from pyverge.core.versioning import EdgeKey, VersionNode
+from pyverge.core.versioning import EdgeId, VersionNode
 
 from .clock import Clock
 
@@ -112,7 +112,7 @@ class StepContext:
     index: int
     source: VersionNode
     target: VersionNode
-    edge: EdgeKey
+    edge: EdgeId
     bindings: MigrationContext
 
     @property

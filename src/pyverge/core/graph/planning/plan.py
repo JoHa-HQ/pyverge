@@ -5,7 +5,7 @@ from typing import Generic
 
 from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import ModelHandle, VersionValue
-from pyverge.core.versioning import EdgeKey, ModelRef, VersionNode
+from pyverge.core.versioning import EdgeId, ModelRef, VersionNode
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +25,7 @@ class PathPlanEntry(Generic[VersionValue]):
     target: VersionNode[VersionValue]
     target_model: ModelRef
     steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
-    edges: tuple[EdgeKey[VersionValue], ...]
+    edges: tuple[EdgeId[VersionValue], ...]
 
 
 @dataclass(frozen=True, slots=True)

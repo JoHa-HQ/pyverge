@@ -62,10 +62,11 @@ class PolicyEngine(Generic[VersionValue]):
                     f"No migration path for {entry.source} -> {entry.target}",
                 )
                 continue
-            if any(
-                not graph.has_migration(EdgeKey.from_pair(source, target))
+            edges = entry.edges or tuple(
+                EdgeKey.from_pair(source, target)
                 for source, target in entry.steps
-            ):
+            )
+            if any(not graph.has_migration(edge) for edge in edges):
                 self._violation(
                     graph,
                     entry,

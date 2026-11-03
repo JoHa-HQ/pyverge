@@ -9,7 +9,6 @@ import anyio
 
 from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import VersionValue
-from pyverge.core.versioning import EdgeKey
 from pyverge.runtime.context import MigrationContext, RunContext, StepContext
 from pyverge.runtime.hooks.state import new_hook_state
 from pyverge.runtime.plan import ExecutionEntry, ExecutionPlan
@@ -103,7 +102,7 @@ class AsyncBackend:
             index=index,
             source=source,
             target=target,
-            edge=EdgeKey.from_pair(source, target),
+            edge=entry.plan.edges[index],
             bindings=MigrationContext.empty(),
         )
 

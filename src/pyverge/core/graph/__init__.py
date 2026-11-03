@@ -1,3 +1,10 @@
+from .backend import (
+    Direction,
+    EdgePredicate,
+    GraphBackend,
+    GraphCycleError,
+    IndexedBackend,
+)
 from .builder import GraphBuilder
 from .graph import MigrationGraph
 from .planning import (
@@ -26,6 +33,7 @@ from .planning import (
     range_target_resolver,
     skip_target_resolver,
 )
+from .state import GraphState
 from .types import (
     GraphExportSource,
     GraphSnapshotSource,
@@ -37,13 +45,19 @@ __all__ = [
     "AnyDirection",
     "BackwardDirection",
     "DefaultTarget",
+    "Direction",
     "DirectionPolicy",
+    "EdgePredicate",
     "FirstMatch",
     "ForwardDirection",
+    "GraphBackend",
     "GraphBuilder",
+    "GraphCycleError",
     "GraphExportSource",
     "GraphSnapshotSource",
+    "GraphState",
     "GraphView",
+    "IndexedBackend",
     "MigrationGraph",
     "Path",
     "PathFinder",
