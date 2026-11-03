@@ -66,6 +66,7 @@ class RuntimeMixin(Generic[VersionValue]):
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
         discriminator: str = "default",
+        plan_cache_size: int = 0,
     ) -> Runtime[VersionValue]:
         options = RunnerOptions(
             backend=backend or runtime or ThreadedBackend(max_workers=0),
@@ -85,6 +86,7 @@ class RuntimeMixin(Generic[VersionValue]):
             discriminator=discriminator,
             middleware=middleware,
             telemetry=telemetry,
+            plan_cache_size=plan_cache_size,
         )
         store = type(self)._default_runtime
         return Runtime(engine=self.engine, bindings=store.bindings).with_runner(options)
@@ -104,6 +106,7 @@ class RuntimeMixin(Generic[VersionValue]):
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
         discriminator: str = "default",
+        plan_cache_size: int = 0,
     ) -> Runner[VersionValue]:
         warnings.warn(
             "Manager.runner() is deprecated; use Manager.runtime().runner",
@@ -123,6 +126,7 @@ class RuntimeMixin(Generic[VersionValue]):
             on_depth_violation=on_depth_violation,
             validation_mode=validation_mode,
             discriminator=discriminator,
+            plan_cache_size=plan_cache_size,
         )
         assert runtime_view.runner is not None
         return runtime_view.runner
