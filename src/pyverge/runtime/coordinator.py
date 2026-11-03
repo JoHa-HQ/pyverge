@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Generic
 
 from pyverge.core.graph.planning.finder import PathFinder
 from pyverge.core.graph.planning.targets import TargetPolicy
 from pyverge.core.types import VersionValue
 from pyverge.runtime.plan import ExecutionPlan, ExtractedEntry
+from pyverge.runtime.plan_cache import PlanCache, PlanKey
 from pyverge.runtime.planner import ExecutionPlanner
 from pyverge.runtime.types import EntryExtractor
 
@@ -18,6 +19,11 @@ class ExecutionCoordinator(Generic[VersionValue]):
     extractor: EntryExtractor[VersionValue]
     finder: PathFinder[VersionValue]
     planner: ExecutionPlanner[VersionValue]
+    cache: PlanCache[VersionValue] = field(
+        default_factory=PlanCache,
+        compare=False,
+        repr=False,
+    )
 
     def extract(
         self,
@@ -48,11 +54,16 @@ class ExecutionCoordinator(Generic[VersionValue]):
             source_model=source_model,
             max_depth=max_depth,
         )
-        path_plan = self.finder.find(
-            entries,
-            target,
-            source_model=source_model,
-        )
+        key = PlanKey.from_entries(target, source_model, entries)
+        path_plan = self.cache.get(key) if key is not None else None
+        if path_plan is None:
+            path_plan = self.finder.find(
+                entries,
+                target,
+                source_model=source_model,
+            )
+            if key is not None:
+                self.cache.put(key, path_plan)
         return self.planner.build(path_plan, payload)
 
 

@@ -27,6 +27,7 @@ from .coordinator import ExecutionCoordinator
 from .extractors import PayloadWalker
 from .middleware import BackendMiddleware
 from .migrations import MigrationBindings
+from .plan_cache import PlanCache
 from .planner import ExecutionPlanner
 from .runner import Runner
 from .telemetry import TelemetryAdapter, TelemetryPublisher
@@ -48,6 +49,7 @@ class RunnerOptions:
     discriminator: str = "default"
     middleware: tuple[BackendMiddleware, ...] = field(default_factory=tuple)
     telemetry: tuple[TelemetryAdapter, ...] = field(default_factory=tuple)
+    plan_cache_size: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +74,7 @@ class RunnerFactory:
         discriminator: str = "default",
         middleware: tuple[BackendMiddleware, ...] = (),
         telemetry: tuple[TelemetryAdapter, ...] = (),
+        plan_cache_size: int = 0,
     ) -> Runner[VersionValue]:
         resolved = options or RunnerOptions(
             backend=backend or ThreadedBackend(max_workers=0),
@@ -91,6 +94,7 @@ class RunnerFactory:
             discriminator=discriminator,
             middleware=middleware,
             telemetry=telemetry,
+            plan_cache_size=plan_cache_size,
         )
         environment = (
             replace(
@@ -119,6 +123,7 @@ class RunnerFactory:
                 ),
             ),
             planner=ExecutionPlanner[VersionValue](bindings=bindings),
+            cache=PlanCache(resolved.plan_cache_size),
         )
         return Runner[VersionValue](
             coordinator=coordinator,

@@ -277,7 +277,11 @@ def runner_factory(
     runtime_environment: ExecutionEnvironment,
     migration_settings: MigrationSettings,
 ) -> Callable[..., Runner[VersionValue]]:
-    def build(*, telemetry: tuple[Any, ...] = ()) -> Runner[VersionValue]:
+    def build(
+        *,
+        telemetry: tuple[Any, ...] = (),
+        plan_cache_size: int = 0,
+    ) -> Runner[VersionValue]:
         bindings = getattr(
             registry, "bindings", MigrationBindings(name=registry.namespace)
         )
@@ -295,6 +299,7 @@ def runner_factory(
             validation_mode=migration_settings.validation_mode,
             middleware=(),
             telemetry=telemetry,
+            plan_cache_size=plan_cache_size,
         )
 
     return build
