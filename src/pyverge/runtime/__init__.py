@@ -26,8 +26,13 @@ from .middleware import (
     TransactionManager,
     TransactionMiddleware,
 )
-from .migrations import MigrationBindings
-from .plan import ExecutionPlan, ExtractedEntry
+from .migrations import (
+    HookBinding,
+    HookRefFactory,
+    MigrationBinding,
+    MigrationBindings,
+)
+from .plan import ExecutionEntry, ExecutionPlan, ExtractedEntry, StepInvoker
 from .planner import ExecutionPlanner
 from .runner import Runner
 from .types import (
@@ -51,14 +56,18 @@ __all__ = [
     "Entry",
     "EntryExtractor",
     "ExecutionCoordinator",
+    "ExecutionEntry",
     "ExecutionError",
     "ExecutionModeError",
     "ExecutionPlan",
     "ExecutionPlanner",
     "ExtractedEntry",
+    "HookBinding",
+    "HookRefFactory",
     "IdempotencyKeyFactory",
     "IdempotencyMiddleware",
     "IdempotencyStore",
+    "MigrationBinding",
     "MigrationBindings",
     "MigrationContext",
     "MigrationHook",
@@ -72,6 +81,7 @@ __all__ = [
     "Runner",
     "RuntimePort",
     "SchemaFieldsExtractor",
+    "StepInvoker",
     "SyncExecutionRequired",
     "SystemClock",
     "TargetValidationError",

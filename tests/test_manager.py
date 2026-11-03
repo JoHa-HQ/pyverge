@@ -34,6 +34,7 @@ from pyverge.runtime.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
 )
+from pyverge.runtime.migrations import HookRefFactory
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.schemas.types import (
     ModelAdapter,
@@ -165,7 +166,7 @@ class TestInstanceFacade:
             return data
 
         instance.store_migration(key, _migrate)
-        assert instance.get_migration(key).func is _migrate
+        assert instance.get_migration(key) is not None
         instance.remove_migration(key)
 
     @pytest.mark.parametrize(
@@ -550,7 +551,7 @@ class TestFluentLookup:
                 cast(Versionable, result).descriptor.ref
             ) in set(models)
         elif kind == "edge":
-            assert cast(Migratable, result).func is not None
+            assert result is not None
         else:
             branch = cast(list[Migratable], result)
             assert len(branch) == len(models) - 1
@@ -688,7 +689,7 @@ class TestSharedEngine:
         instance.add_hook(key, hook)
 
         edge = instance.registry.migrations("User")[0]
-        assert instance.registry.get_hooks(edge) == [hook]
+        assert instance.registry.get_hooks(edge) == [HookRefFactory()(hook)]
         assert manager._default_engine.registry.hooks() == []
 
     @pytest.mark.parametrize(

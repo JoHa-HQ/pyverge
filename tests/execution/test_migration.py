@@ -13,6 +13,7 @@ import pytest
 import semver
 
 from pyverge import types
+from pyverge.core.graph import PathPlanEntry
 from pyverge.core.registry import CompatibilityReport, Registry
 from pyverge.core.versioning import (
     Diff,
@@ -21,11 +22,9 @@ from pyverge.core.versioning import (
     FieldStatus,
     FrozenMap,
     MigrationDescriptor,
-    MigrationRef,
     ModelDescriptor,
     ModelRef,
     NodeRef,
-    VersionEdge,
     VersionKey,
     VersionNode,
     default_content_hasher,
@@ -35,6 +34,8 @@ from pyverge.core.versioning.errors import MigrationApplicationError
 from pyverge.discovery.reflection import JsonPatchRenderer
 from pyverge.migrations import JsonataMigration, JsonPatchMigration
 from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.migrations import MigrationBinding
+from pyverge.runtime.plan import ExecutionEntry
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.types import (
     ModelHandle,
@@ -726,17 +727,22 @@ def test_version_edge_wraps_migration_failure(
         raise RuntimeError("boom")
 
     migration = MigrationDescriptor("callable", "fail")
-    edge = VersionEdge(
+    plan = PathPlanEntry(
+        path=(),
         source=source,
         target=target,
-        ref=MigrationRef(provider_id=migration.strategy, entity_id=migration.identity),
-        diff=model_adapter.diff(source, target),
-        func=fail,
-        migration=migration,
+        target_model=target.descriptor.ref,
+        steps=(),
+        edges=(),
+    )
+    entry = ExecutionEntry(
+        plan=plan,
+        migrations=(MigrationBinding(func=fail, descriptor=migration),),
+        hooks=(),
     )
 
     with pytest.raises(MigrationApplicationError) as error:
-        edge({"kind": "User"})
+        entry.invoke_migration(0, {"kind": "User"})
 
     assert error.value.kind == "User"
     assert error.value.source is source

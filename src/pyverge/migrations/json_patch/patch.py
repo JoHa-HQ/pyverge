@@ -11,7 +11,6 @@ from pyverge.core.versioning import (
     MigrationDescriptor,
     default_canonicalizer,
 )
-from pyverge.runtime.context import MigrationContext
 
 
 class SetDefaultOperation(jsonpatch.PatchOperation):
@@ -166,6 +165,6 @@ class JsonPatch(jsonpatch.JsonPatch):
     def __call__(
         self,
         data: ModelData,
-        context: MigrationContext | None = None,
+        context: Any = None,
     ) -> ModelData:
         return self.apply(data)

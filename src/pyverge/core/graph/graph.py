@@ -28,7 +28,7 @@ class MigrationGraph(Generic[VersionValue]):
     """Immutable graph snapshot compiled from a mutable registry.
 
     The graph stores edge identity only.  Executable migration bindings and
-    hooks live in an execution-side :class:`MigrationResolver`.
+    hooks live in the runtime binding layer.
     """
 
     name: str

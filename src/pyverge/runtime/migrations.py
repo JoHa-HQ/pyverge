@@ -1,54 +1,128 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Generic, cast
+from typing import Generic
 
-from pyverge.core.graph.types import MigrationDefinition
 from pyverge.core.registry.errors import MigrationNotFoundError
-from pyverge.core.registry.types import GraphCatalog
-from pyverge.core.types import Attachable, VersionValue
-from pyverge.core.versioning import EdgeKey
+from pyverge.core.types import Attachable, MigrationFunc, VersionValue
+from pyverge.core.versioning import (
+    EdgeKey,
+    HookRef,
+    MigrationDescriptor,
+)
 
 
 @dataclass(frozen=True, slots=True)
-class MigrationBindings(Generic[VersionValue]):
-    """Immutable execution-side bindings resolved from a mutable catalog."""
+class HookRefFactory:
+    """Callable factory for hook metadata."""
 
-    name: str
-    definitions: Mapping[EdgeKey, MigrationDefinition[VersionValue]]
-    hooks_by_edge: Mapping[EdgeKey, tuple[Attachable, ...]]
-
-    @classmethod
-    def from_catalog(
-        cls, catalog: GraphCatalog[VersionValue]
-    ) -> MigrationBindings[VersionValue]:
-        definitions: dict[EdgeKey, MigrationDefinition[VersionValue]] = {}
-        hooks_by_edge: dict[EdgeKey, tuple[Attachable, ...]] = {}
-        for kind in catalog.kinds:
-            for edge in catalog.migrations(kind):
-                key = EdgeKey.from_pair(edge.source, edge.target)
-                definitions[key] = cast("MigrationDefinition[VersionValue]", edge)
-            for edge in catalog.edges(kind):
-                key = EdgeKey.from_pair(edge.source, edge.target)
-                hooks = catalog.get_hooks(key)
-                if hooks:
-                    hooks_by_edge[key] = tuple(hooks)
-        return cls(
-            name=catalog.namespace,
-            definitions=MappingProxyType(definitions),
-            hooks_by_edge=MappingProxyType(hooks_by_edge),
+    def __call__(self, hook: Attachable) -> HookRef:
+        provider_id = getattr(hook, "provider_id", type(hook).__module__)
+        entity_id = getattr(hook, "entity_id", type(hook).__qualname__)
+        config = getattr(hook, "config", {})
+        if not isinstance(config, Mapping):
+            config = {}
+        return HookRef(
+            provider_id=str(provider_id),
+            entity_id=str(entity_id),
+            config=dict(config),
         )
 
-    def resolve(self, key: EdgeKey[VersionValue]) -> MigrationDefinition[VersionValue]:
+
+@dataclass(frozen=True, slots=True)
+class MigrationBinding:
+    """Runtime callable bound to one migration edge."""
+
+    func: MigrationFunc
+    descriptor: MigrationDescriptor
+
+
+@dataclass(frozen=True, slots=True)
+class HookBinding:
+    """Runtime hook bound to one migration edge."""
+
+    hook: Attachable
+    ref: HookRef
+
+
+@dataclass
+class MigrationBindings(Generic[VersionValue]):
+    """Mutable registration-time bindings owned by the runtime."""
+
+    name: str
+    hook_refs: HookRefFactory = field(default_factory=HookRefFactory)
+    migrations: dict[EdgeKey[VersionValue], MigrationBinding] = field(
+        default_factory=dict
+    )
+    hooks_by_edge: dict[EdgeKey[VersionValue], list[HookBinding]] = field(
+        default_factory=dict
+    )
+
+    def store_migration(
+        self,
+        edge: EdgeKey[VersionValue],
+        func: MigrationFunc,
+        descriptor: MigrationDescriptor,
+    ) -> MigrationBinding:
+        binding = MigrationBinding(func=func, descriptor=descriptor)
+        self.migrations[edge] = binding
+        return binding
+
+    def add_hook(
+        self,
+        edge: EdgeKey[VersionValue],
+        hook: Attachable,
+    ) -> HookBinding:
+        binding = HookBinding(hook=hook, ref=self.hook_refs(hook))
+        self.hooks_by_edge.setdefault(edge, []).append(binding)
+        return binding
+
+    def resolve(self, edge: EdgeKey[VersionValue]) -> MigrationBinding:
         try:
-            return self.definitions[key]
+            return self.migrations[edge]
         except KeyError:
-            raise MigrationNotFoundError(self.name, key.key) from None
+            raise MigrationNotFoundError(self.name, edge.key) from None
 
-    def hooks(self, key: EdgeKey[VersionValue]) -> Sequence[Attachable]:
-        return self.hooks_by_edge.get(key, ())
+    def hooks(self, edge: EdgeKey[VersionValue]) -> Sequence[HookBinding]:
+        return tuple(self.hooks_by_edge.get(edge, ()))
+
+    def remove_migration(self, edge: EdgeKey[VersionValue]) -> None:
+        self.migrations.pop(edge, None)
+        self.hooks_by_edge.pop(edge, None)
+
+    def remove_hook(self, edge: EdgeKey[VersionValue], ref: HookRef) -> None:
+        hooks = self.hooks_by_edge.get(edge)
+        if hooks is None:
+            return
+        self.hooks_by_edge[edge] = [binding for binding in hooks if binding.ref != ref]
+        if not self.hooks_by_edge[edge]:
+            del self.hooks_by_edge[edge]
+
+    def clear_hooks(self, edge: EdgeKey[VersionValue] | None = None) -> None:
+        if edge is None:
+            self.hooks_by_edge.clear()
+        else:
+            self.hooks_by_edge.pop(edge, None)
+
+    def copy(self) -> MigrationBindings[VersionValue]:
+        return MigrationBindings(
+            name=self.name,
+            hook_refs=self.hook_refs,
+            migrations=dict(self.migrations),
+            hooks_by_edge={
+                edge: list(bindings) for edge, bindings in self.hooks_by_edge.items()
+            },
+        )
+
+    def frozen_migrations(self) -> Mapping[EdgeKey[VersionValue], MigrationBinding]:
+        return MappingProxyType(dict(self.migrations))
 
 
-__all__ = ["MigrationBindings"]
+__all__ = [
+    "HookBinding",
+    "HookRefFactory",
+    "MigrationBinding",
+    "MigrationBindings",
+]

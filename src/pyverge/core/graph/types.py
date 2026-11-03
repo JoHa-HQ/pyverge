@@ -4,12 +4,10 @@ from collections.abc import Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
 from pyverge.core.registry.types import ModelCatalog, PathCatalog
-from pyverge.core.types import Attachable, MigrationFunc, ModelKind, VersionValue
+from pyverge.core.types import ModelKind, VersionValue
 from pyverge.core.versioning import (
-    Diffable,
     EdgeEntry,
     EdgeKey,
-    MigrationDescriptor,
     ModelRef,
     NodeEntry,
     Transitional,
@@ -47,37 +45,6 @@ class GraphExportSource(Protocol[VersionValue]):
 
 
 @runtime_checkable
-class MigrationDefinition(Protocol[VersionValue]):
-    """Executable binding attached to one graph edge identity."""
-
-    @property
-    def source(self) -> VersionNode[VersionValue]: ...
-
-    @property
-    def target(self) -> VersionNode[VersionValue]: ...
-
-    @property
-    def diff(self) -> Diffable[VersionValue]: ...
-
-    @property
-    def func(self) -> MigrationFunc: ...
-
-    @property
-    def migration(self) -> MigrationDescriptor: ...
-
-
-@runtime_checkable
-class MigrationResolver(Protocol[VersionValue]):
-    """Resolve executable migration bindings and hooks by edge identity."""
-
-    def resolve(
-        self, key: EdgeKey[VersionValue]
-    ) -> MigrationDefinition[VersionValue]: ...
-
-    def hooks(self, key: EdgeKey[VersionValue]) -> Sequence[Attachable]: ...
-
-
-@runtime_checkable
 class GraphSnapshotSource(Protocol):
     """Read-only source used to compile an immutable migration graph."""
 
@@ -109,7 +76,5 @@ __all__ = [
     "GraphExportSource",
     "GraphSnapshotSource",
     "GraphView",
-    "MigrationDefinition",
-    "MigrationResolver",
     "PathGraphView",
 ]

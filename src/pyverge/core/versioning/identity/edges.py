@@ -4,17 +4,14 @@ from dataclasses import dataclass, field
 from functools import total_ordering
 from typing import TYPE_CHECKING, Any, Generic, Self
 
-from pyverge.core.types import MigrationFunc, ModelData, ModelKind, VersionValue
+from pyverge.core.types import ModelKind, VersionValue
 
 from ..canonical import ContentHasher
-from ..errors import MigrationApplicationError
 from ..types import Diffable
 from .metadata import EdgeRef, MigrationDescriptor, MigrationRef
 from .nodes import NodeId, VersionNode
 
 if TYPE_CHECKING:
-    from pyverge.runtime.context import MigrationContext
-
     from ..jgf import JgfEdge
 
 
@@ -140,7 +137,6 @@ class VersionEdge(EdgeKey[VersionValue]):
     source: VersionNode[VersionValue]
     target: VersionNode[VersionValue]
     diff: Diffable[VersionValue]
-    func: MigrationFunc
     migration: MigrationDescriptor
 
     def __post_init__(self) -> None:
@@ -161,7 +157,6 @@ class VersionEdge(EdgeKey[VersionValue]):
             source=self.source,
             target=self.target,
             diff=diff,
-            func=self.func,
             migration=self.migration,
             ref=self.ref,
         )
@@ -171,7 +166,6 @@ class VersionEdge(EdgeKey[VersionValue]):
             source=self.source,
             target=self.target,
             diff=self.diff,
-            func=self.func,
             migration=migration,
             ref=self.ref,
         )
@@ -195,21 +189,6 @@ class VersionEdge(EdgeKey[VersionValue]):
         from ..jgf import JgfEdge  # noqa: PLC0415
 
         return JgfEdge.from_version_edge(self)
-
-    def __call__(
-        self,
-        data: ModelData,
-        context: MigrationContext | None = None,
-    ) -> ModelData:
-        try:
-            return self.func(data, context)
-        except Exception as e:
-            raise MigrationApplicationError(
-                self.kind,
-                self.source,
-                self.target,
-                f"Failed to apply migration {self}: {e}",
-            ) from e
 
     def __repr__(self) -> str:
         return (

@@ -647,7 +647,7 @@ class TestMigration:
             model_adapter, versioning_settings, models[0], models[1], func=_migrate
         )
         registry.store_migration(edge)
-        assert registry.get_migration(EdgeKey.from_version_edge(edge)).func is edge.func
+        assert registry.get_migration(EdgeKey.from_version_edge(edge)) == edge
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -1711,7 +1711,7 @@ class TestEdgePairLookup:
 
         key = EdgeKey.from_pair(versions[0], versions[1])
         found = registry.get_migration_by_edge(key)
-        assert found.func is edge.func
+        assert found == edge
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -2034,7 +2034,7 @@ class TestMigrationHookGuard:
             registry.remove_migration(key)
 
         # Migration untouched
-        assert registry.get_migration(key).func is edge.func
+        assert registry.get_migration(key) == edge
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -2650,8 +2650,10 @@ def test_register_migration_identical_content_is_idempotent(
         func=migrate,
     )
 
-    assert registry.store_migration(edge) is migrate
-    assert registry.store_migration(edge) is migrate
+    first = registry.store_migration(edge)
+    second = registry.store_migration(edge)
+    assert first == edge
+    assert second == first
 
 
 @pytest.mark.parametrize(

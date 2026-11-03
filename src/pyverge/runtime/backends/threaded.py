@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import inspect
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
@@ -9,9 +8,8 @@ from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import VersionValue
 from pyverge.core.versioning import EdgeKey
 from pyverge.runtime.context import MigrationContext, RunContext, StepContext
-from pyverge.runtime.errors import AsyncExecutionRequired
 from pyverge.runtime.hooks.state import new_hook_state
-from pyverge.runtime.plan import ExecutionPlan, PathPlanEntry
+from pyverge.runtime.plan import ExecutionEntry, ExecutionPlan
 from pyverge.schemas.types import ModelIdentityPort
 
 
@@ -46,9 +44,9 @@ class ThreadedBackend:
                     self._execute_entry(entry, data, run, adapter, hook_state)
         return data
 
-    def _execute_entry(  # noqa: C901, PLR0912
+    def _execute_entry(
         self,
-        entry: PathPlanEntry[VersionValue],
+        entry: ExecutionEntry[VersionValue],
         data: dict[str, Any],
         run: RunContext,
         adapter: ModelIdentityPort,
@@ -56,68 +54,16 @@ class ThreadedBackend:
     ) -> None:
         current = Path(*entry.path).get(data)
         for index, (source, target) in enumerate(entry.steps):
-            func = entry.migrations[index]
-            hooks = entry.hooks[index]
-            name = getattr(func, "__name__", f"{source}->{target}")
-            migration = (
-                entry.migration_descriptors[index]
-                if index < len(entry.migration_descriptors)
-                else None
+            name = getattr(
+                entry.migration_func(index), "__name__", f"{source}->{target}"
             )
-            for hook in hooks:
-                result = hook.before_migrate(
-                    name,
-                    source,
-                    target,
-                    current,
-                    migration=migration,
-                    state=hook_state,
-                )
-                if inspect.isawaitable(result):
-                    if inspect.iscoroutine(result):
-                        result.close()
-                    raise AsyncExecutionRequired("async hook requires async backend")
             step = self._step(entry, index, source, target, run)
-            try:
-                migrated = func(current, step.view)
-                if inspect.isawaitable(migrated):
-                    if inspect.iscoroutine(migrated):
-                        migrated.close()
-                    raise AsyncExecutionRequired(
-                        "coroutine migration requires async backend"
-                    )
-            except Exception as error:
-                for hook in hooks:
-                    result = hook.on_error(
-                        name,
-                        source,
-                        target,
-                        current,
-                        error,
-                        migration=migration,
-                        state=hook_state,
-                    )
-                    if inspect.isawaitable(result):
-                        if inspect.iscoroutine(result):
-                            result.close()
-                        raise AsyncExecutionRequired(
-                            "async hook requires async backend"
-                        )
-                raise
-            for hook in hooks:
-                result = hook.after_migrate(
-                    name,
-                    source,
-                    target,
-                    current,
-                    migrated,
-                    migration=migration,
-                    state=hook_state,
-                )
-                if inspect.isawaitable(result):
-                    if inspect.iscoroutine(result):
-                        result.close()
-                    raise AsyncExecutionRequired("async hook requires async backend")
+            migrated = entry.step(index).run_sync(
+                current,
+                step.view,
+                name=name,
+                hook_state=hook_state,
+            )
             if isinstance(migrated, dict):
                 migrated[adapter.version_property] = str(target.version)
             current = migrated
@@ -125,7 +71,7 @@ class ThreadedBackend:
 
     def _step(
         self,
-        entry: PathPlanEntry[VersionValue],
+        entry: ExecutionEntry[VersionValue],
         index: int,
         source: Any,
         target: Any,

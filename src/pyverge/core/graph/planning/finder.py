@@ -2,23 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Generic
+from typing import Generic
 
-from pyverge.core.graph.planning.plan import PathPlan, PathPlanEntry
+from pyverge.core.graph.planning.plan import ExtractedEntry, PathPlan, PathPlanEntry
 from pyverge.core.graph.planning.policy import PolicyEngine
 from pyverge.core.graph.planning.targets import TargetCompiler, TargetPolicy
-from pyverge.core.graph.types import MigrationResolver, PathGraphView
-from pyverge.core.types import (
-    Attachable,
-    MigrationFunc,
-    ModelHandle,
-    TargetResolver,
-    VersionValue,
-)
-from pyverge.core.versioning import EdgeKey, MigrationDescriptor, NodeId, VersionNode
-
-if TYPE_CHECKING:
-    from pyverge.runtime.plan import ExtractedEntry
+from pyverge.core.graph.types import PathGraphView
+from pyverge.core.types import ModelHandle, TargetResolver, VersionValue
+from pyverge.core.versioning import EdgeKey, NodeId, VersionNode
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,9 +17,7 @@ class ResolvedPath(Generic[VersionValue]):
     """Cached graph-identity resolution for one source/target pair."""
 
     steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
-    hooks: tuple[tuple[Attachable, ...], ...]
-    migrations: tuple[MigrationFunc, ...]
-    descriptors: tuple[MigrationDescriptor, ...]
+    edges: tuple[EdgeKey[VersionValue], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +27,6 @@ class PathFinder(Generic[VersionValue]):
     graph: PathGraphView[VersionValue]
     targets: TargetCompiler[VersionValue]
     policy: PolicyEngine[VersionValue]
-    migrations: MigrationResolver[VersionValue]
     _cache: dict[tuple[NodeId, NodeId], ResolvedPath[VersionValue]] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -81,20 +69,11 @@ class PathFinder(Generic[VersionValue]):
         cached = self._cache.get(cache_key)
         if cached is None:
             steps = tuple(self.graph.migration_path(entry.node, target))
-            hooks = tuple(
-                tuple(self.migrations.hooks(EdgeKey.from_pair(source, step_target)))
+            edges = tuple(
+                EdgeKey.from_pair(source, step_target)
                 for source, step_target in steps
             )
-            definitions = tuple(
-                self.migrations.resolve(EdgeKey.from_pair(source, step_target))
-                for source, step_target in steps
-            )
-            resolved = ResolvedPath(
-                steps=steps,
-                hooks=hooks,
-                migrations=tuple(definition.func for definition in definitions),
-                descriptors=tuple(definition.migration for definition in definitions),
-            )
+            resolved = ResolvedPath(steps=steps, edges=edges)
             self._cache[cache_key] = resolved
         else:
             resolved = cached
@@ -104,9 +83,7 @@ class PathFinder(Generic[VersionValue]):
             target=target,
             target_model=target.descriptor.ref,
             steps=resolved.steps,
-            hooks=resolved.hooks,
-            migrations=resolved.migrations,
-            migration_descriptors=resolved.descriptors,
+            edges=resolved.edges,
         )
 
 

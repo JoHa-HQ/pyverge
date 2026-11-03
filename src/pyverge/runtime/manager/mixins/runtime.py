@@ -80,6 +80,7 @@ class RuntimeMixin(Generic[VersionValue]):
         validation_mode: Literal["strict", "lax", "none"] = "lax",
     ) -> Runner[VersionValue]:
         return self.engine.runner(
+            bindings=self.runtime.bindings,
             backend=backend or runtime or ThreadedBackend(max_workers=0),
             middleware=middleware,
             environment=environment

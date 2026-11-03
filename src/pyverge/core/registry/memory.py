@@ -15,7 +15,6 @@ from pyverge.core.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.core.types import (
-    Attachable,
     MigrationFunc,
     ModelKind,
     VersionValue,
@@ -25,6 +24,7 @@ from pyverge.core.versioning import (
     ContentHasher,
     EdgeEntry,
     EdgeKey,
+    HookRef,
     Identifiable,
     Migratable,
     MigrationRef,
@@ -131,7 +131,7 @@ class Registry(Generic[VersionValue]):
         self._edges_by_version: dict[Comparable[VersionValue], set[EdgeEntry]] = (
             defaultdict(set)
         )
-        self._hooks: dict[Transitional[VersionValue], list[Attachable]] = defaultdict(
+        self._hooks: dict[Transitional[VersionValue], list[HookRef]] = defaultdict(
             list
         )
 
@@ -415,7 +415,7 @@ class Registry(Generic[VersionValue]):
             raise CatalogError(self._namespace, "No versions registered")
         return versions[0]
 
-    def hooks(self: Self, key: Transitional | None = None) -> list[Attachable]:
+    def hooks(self: Self, key: Transitional | None = None) -> list[HookRef]:
         if key is None:
             return list(chain(*self._hooks.values()))
         return self._hooks[key]
@@ -675,7 +675,7 @@ class Registry(Generic[VersionValue]):
     def store_migration(  # noqa: C901, PLR0912, PLR0915
         self: Self,
         entry: MigrationSpec | EdgeEntry,
-    ) -> MigrationFunc | EdgeEntry:
+    ) -> EdgeEntry:
         """Store a migration request or a direct edge entry.
 
         A ``MigrationSpec`` is resolved and reflected into an executable edge.
@@ -735,7 +735,6 @@ class Registry(Generic[VersionValue]):
                     entity_id=migration.entity_id,
                 ),
                 diff=reflection.diff(resolved_from, resolved_to),
-                func=spec.func,
                 migration=migration,
             )
         else:
@@ -770,7 +769,7 @@ class Registry(Generic[VersionValue]):
                             incoming_hash=incoming_hash,
                         )
                 if isinstance(existing, VersionEdge):
-                    return existing.func
+                    return existing
                 return existing
 
         bisect.insort(paths, edge)
@@ -781,7 +780,7 @@ class Registry(Generic[VersionValue]):
                 edge_key = EdgeKey.from_version_edge(edge)
                 self._content_hash_index[edge.content_hash(self._hasher)] = edge_key
             self._refresh_health(self._affected_by_edge_change(edge))
-            return edge.func
+            return edge
 
         self._refresh_health(self._affected_by_edge_change(edge))
         return edge
@@ -930,7 +929,7 @@ class Registry(Generic[VersionValue]):
     def add_hook(
         self: Self,
         key: Transitional[VersionValue],
-        hook: Attachable,
+        hook: HookRef,
     ) -> None:
         self._hooks[key].append(hook)
         self._refresh_health({key})
@@ -938,13 +937,13 @@ class Registry(Generic[VersionValue]):
     def get_hooks(
         self: Self,
         key: Transitional[VersionValue],
-    ) -> list[Attachable]:
+    ) -> list[HookRef]:
         return list(self._hooks.get(key, []))
 
     def remove_hook(
         self: Self,
         key: Transitional[VersionValue],
-        hook: Attachable | None = None,
+        hook: HookRef | None = None,
     ) -> None:
         if key not in self._hooks:
             raise CatalogError(

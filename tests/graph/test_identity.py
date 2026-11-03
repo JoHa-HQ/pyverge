@@ -25,9 +25,6 @@ from pyverge.core.versioning import (
     VersionKey,
     default_content_hasher,
 )
-from pyverge.core.versioning.errors import (
-    MigrationApplicationError,
-)
 from pyverge.schemas import (
     JsonSchemaModelAdapter,
     ModelCodec,
@@ -492,14 +489,6 @@ class TestGraphPrimitives:
             UserV1,
             func=_noop_migration,
         )
-        failing = edge_from_models(
-            adapter,
-            versioning_settings,
-            UserV1,
-            UserV2,
-            func=_raise_migration,
-        )
-
         assert edge.kind == "User"
         assert edge.key == (source, target)
         assert edge.key == (source, target)
@@ -519,9 +508,6 @@ class TestGraphPrimitives:
         ):
             with pytest.raises(NotImplementedError):
                 operation()
-
-        with pytest.raises(MigrationApplicationError, match="bad"):
-            failing({})
 
     def test_frozen_map_hash_repr_and_dict(self) -> None:
         frozen = FrozenMap({"b": 2, "a": 1})

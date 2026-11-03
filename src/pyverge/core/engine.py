@@ -19,7 +19,6 @@ from pyverge.core.registry.errors import (
     ModelNotFoundError,
 )
 from pyverge.core.types import (
-    Attachable,
     DepthViolationStrategy,
     DirectionViolationStrategy,
     MigrationFunc,
@@ -30,7 +29,9 @@ from pyverge.core.types import (
 )
 from pyverge.core.versioning import (
     Comparable,
+    EdgeEntry,
     EdgeKey,
+    HookRef,
     Identifiable,
     Migratable,
     ModelRef,
@@ -122,7 +123,7 @@ class Engine(Generic[VersionValue]):
     def get_model_by_ref(self: Self, ref: ModelRef) -> VersionNode[VersionValue]:
         return self.registry.get_model_by_ref(ref)
 
-    def attach_hooks(self: Self, hooks: Iterable[Attachable]) -> None:
+    def attach_hooks(self: Self, hooks: Iterable[HookRef]) -> None:
         for kind in self.registry.kinds:
             for edge in self.registry.migrations(kind):
                 for hook in hooks:
@@ -131,6 +132,7 @@ class Engine(Generic[VersionValue]):
     def runner(  # noqa: PLR0913
         self: Self,
         *,
+        bindings: MigrationBindings[VersionValue],
         backend: BackendPort[VersionValue],
         environment: ExecutionEnvironment,
         direction: DirectionPolicy,
@@ -142,7 +144,6 @@ class Engine(Generic[VersionValue]):
         middleware: tuple[BackendMiddleware, ...] = (),
     ) -> Runner[VersionValue]:
         graph = self.snapshot()
-        bindings = MigrationBindings[VersionValue].from_catalog(self.registry)
         coordinator = ExecutionCoordinator[VersionValue](
             extractor=PayloadWalker[VersionValue](
                 graph,
@@ -152,7 +153,6 @@ class Engine(Generic[VersionValue]):
             finder=PathFinder[VersionValue](
                 graph=graph,
                 targets=TargetCompiler[VersionValue](graph, self.adapter),
-                migrations=bindings,
                 policy=PolicyEngine[VersionValue](
                     direction=direction,
                     on_direction_violation=on_direction_violation,
@@ -161,7 +161,7 @@ class Engine(Generic[VersionValue]):
                     on_depth_violation=on_depth_violation,
                 ),
             ),
-            planner=ExecutionPlanner[VersionValue](),
+            planner=ExecutionPlanner[VersionValue](bindings=bindings),
         )
         return Runner[VersionValue](
             coordinator=coordinator,
@@ -299,12 +299,9 @@ class Engine(Generic[VersionValue]):
         func: MigrationFunc,
         *,
         backward_compatible: bool = False,
-    ) -> MigrationFunc:
-        return cast(
-            "MigrationFunc",
-            self.registry.store_migration(
-                MigrationSpec(key, func, backward_compatible=backward_compatible)
-            ),
+    ) -> EdgeEntry:
+        return self.registry.store_migration(
+            MigrationSpec(key, func, backward_compatible=backward_compatible)
         )
 
     def reconstruct(
@@ -365,7 +362,7 @@ class Engine(Generic[VersionValue]):
     ) -> list[tuple[VersionNode[VersionValue], VersionNode[VersionValue]]]:
         return self.snapshot().migration_path(from_version, to_version)
 
-    def add_hook(self: Self, key: Transitional[VersionValue], hook: Attachable) -> None:
+    def add_hook(self: Self, key: Transitional[VersionValue], hook: HookRef) -> None:
         registry = self.registry
         edge = registry.get_migration_by_edge(key)
         registry.add_hook(edge, hook)
@@ -373,7 +370,7 @@ class Engine(Generic[VersionValue]):
     def remove_hook(
         self: Self,
         key: Transitional[VersionValue],
-        hook: Attachable | None = None,
+        hook: HookRef | None = None,
     ) -> None:
         registry = self.registry
         edge = registry.get_migration_by_edge(key)

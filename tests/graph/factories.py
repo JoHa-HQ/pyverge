@@ -79,8 +79,7 @@ def make_path_entry(
         target=target,
         target_model=target.descriptor.ref,
         steps=steps,
-        hooks=(),
-        migrations=(),
+        edges=(),
     )
 
 
@@ -161,7 +160,6 @@ class SyntheticGraphFactory:
                 provider_id=migration.strategy, entity_id=migration.identity
             ),
             diff=self._adapter.diff(source, target),
-            func=_noop,
             migration=migration,
         )
 

@@ -30,8 +30,6 @@ from .types import (
     GraphExportSource,
     GraphSnapshotSource,
     GraphView,
-    MigrationDefinition,
-    MigrationResolver,
     PathGraphView,
 )
 
@@ -46,9 +44,7 @@ __all__ = [
     "GraphExportSource",
     "GraphSnapshotSource",
     "GraphView",
-    "MigrationDefinition",
     "MigrationGraph",
-    "MigrationResolver",
     "Path",
     "PathFinder",
     "PathGraphView",

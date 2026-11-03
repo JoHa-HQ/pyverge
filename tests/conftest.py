@@ -193,10 +193,12 @@ def registry(
         ),
         on_missing=migration_settings.on_missing,
     )
+    bindings = MigrationBindings[VersionValue](name=namespace)
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
     if migrations:
-        register_migrations(model_adapter, registry, *migrations)
+        register_migrations(model_adapter, registry, *migrations, bindings=bindings)
+    setattr(registry, "bindings", bindings)
     return registry
 
 
@@ -250,7 +252,6 @@ def coordinator(
         finder=PathFinder(
             graph=graph,
             targets=TargetCompiler(graph, model_adapter),
-            migrations=MigrationBindings.from_catalog(registry),
             policy=PolicyEngine(
                 direction=AnyDirection(),
                 on_direction_violation=on_direction_violation,
@@ -259,19 +260,27 @@ def coordinator(
                 on_depth_violation=on_depth_violation,
             ),
         ),
-        planner=ExecutionPlanner(),
+        planner=ExecutionPlanner(
+            bindings=getattr(
+                registry, "bindings", MigrationBindings(name=registry.namespace)
+            )
+        ),
     )
 
 
 @pytest.fixture
 def runner_factory(
     engine: Engine[VersionValue],
+    registry: Registry[VersionValue],
     runtime_backend: BackendPort,
     runtime_environment: ExecutionEnvironment,
     migration_settings: MigrationSettings,
 ) -> Callable[[], Runner[VersionValue]]:
     def build() -> Runner[VersionValue]:
         return engine.runner(
+            bindings=getattr(
+                registry, "bindings", MigrationBindings(name=registry.namespace)
+            ),
             backend=runtime_backend,
             environment=runtime_environment,
             direction=direction_policy(migration_settings.direction),

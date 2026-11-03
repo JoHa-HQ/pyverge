@@ -280,8 +280,7 @@ def _path_entry(
         target=target,
         target_model=target.descriptor.ref,
         steps=steps,
-        hooks=(),
-        migrations=(),
+        edges=(),
     )
 
 
@@ -298,12 +297,12 @@ def test_execution_planner_builds_levels(
         entries=(parent, child, sibling),
         source_model=None,
     )
-    planner = ExecutionPlanner()
+    planner = ExecutionPlanner(bindings=cast("Any", object()))
 
     execution = planner.build(plan, {})
 
-    assert execution.levels[0] == (child, sibling)
-    assert execution.levels[1] == (parent,)
+    assert tuple(entry.plan for entry in execution.levels[0]) == (child, sibling)
+    assert tuple(entry.plan for entry in execution.levels[1]) == (parent,)
 
 
 def _plus_one(value: int) -> int:
@@ -1090,8 +1089,7 @@ def test_plan_preserves_version_value(
         target=cast("Any", target),
         target_model=target.descriptor.ref,
         steps=(),
-        hooks=(),
-        migrations=(),
+        edges=(),
     )
     plan = PathPlan(
         entries=(entry,),
@@ -1316,7 +1314,10 @@ def test_runner_calls_sync_hooks(
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
     target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
-    engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _Hook()))
+    edge_key = EdgeKey.from_pair(source, target)
+    hook = cast("Any", _Hook())
+    binding = getattr(registry, "bindings").add_hook(edge_key, hook)
+    engine.add_hook(edge_key, binding.ref)
 
     _run(
         runner_factory(),
@@ -1391,7 +1392,10 @@ def test_runner_awaits_async_hooks(
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
     target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
-    engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _AsyncHook()))
+    edge_key = EdgeKey.from_pair(source, target)
+    hook = cast("Any", _AsyncHook())
+    binding = getattr(registry, "bindings").add_hook(edge_key, hook)
+    engine.add_hook(edge_key, binding.ref)
 
     asyncio.run(
         runner_factory().run(

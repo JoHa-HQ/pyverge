@@ -13,8 +13,6 @@ from typing import (
 )
 
 from pyverge.core.types import (
-    MigrationFunc,
-    ModelData,
     ModelKind,
     VersionValue_co,
 )
@@ -25,7 +23,6 @@ from .identity.metadata import KeyRef
 
 if TYPE_CHECKING:
     from pyverge.core.types import Attachable
-    from pyverge.runtime.context import MigrationContext
 
     from .diff import Diff
     from .identity import EdgeKey, VersionEdge, VersionKey, VersionNode
@@ -172,14 +169,7 @@ class Migratable(
     """Executable transition: endpoint identity plus diff and callable."""
 
     @property
-    def func(self) -> MigrationFunc: ...
-    @property
     def diff(self) -> Diffable[VersionValue_co]: ...
-    def __call__(
-        self,
-        data: ModelData,
-        context: MigrationContext | None = None,
-    ) -> ModelData: ...
 
 
 @runtime_checkable

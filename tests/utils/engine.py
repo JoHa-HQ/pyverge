@@ -11,6 +11,7 @@ from pyverge.core import MigrationFunc, VersionValue
 from pyverge.core.registry import Registry
 from pyverge.core.versioning import (
     Diff,
+    EdgeKey,
     MigrationRef,
     NodeRef,
     VersionEdge,
@@ -19,6 +20,7 @@ from pyverge.core.versioning import (
     parse_version,
 )
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
+from pyverge.runtime.migrations import MigrationBindings
 from pyverge.schemas.types import (
     ModelAdapter,
     ModelHandle,
@@ -67,7 +69,6 @@ def edge_from_nodes(
         target=target,
         ref=MigrationRef(provider_id=migration.strategy, entity_id=migration.identity),
         diff=Diff.from_pair(source=source, target=target, adapter=adapter),
-        func=func,
         migration=migration,
     )
 
@@ -125,6 +126,7 @@ def register_migrations(
     adapter: ModelAdapter,
     registry: Registry[VersionValue],
     *migrations: _Migration | _BackwardCompatibleMigration,
+    bindings: MigrationBindings[VersionValue] | None = None,
 ) -> None:
     """Register migration definitions in a registry."""
     for migration in migrations:
@@ -135,16 +137,18 @@ def register_migrations(
             versions[1],
         )
         migration_descriptor = DefaultMigrationIdentityResolver().resolve(func)
-        registry.store_migration(
-            VersionEdge(
-                source=versions[0],
-                target=versions[1],
-                ref=MigrationRef(
-                    provider_id=migration_descriptor.strategy,
-                    entity_id=migration_descriptor.identity,
-                ),
-                diff=diff,
-                func=func,
-                migration=migration_descriptor,
-            )
+        edge = VersionEdge(
+            source=versions[0],
+            target=versions[1],
+            ref=MigrationRef(
+                provider_id=migration_descriptor.strategy,
+                entity_id=migration_descriptor.identity,
+            ),
+            diff=diff,
+            migration=migration_descriptor,
         )
+        registry.store_migration(edge)
+        if bindings is not None:
+            bindings.store_migration(
+                EdgeKey.from_version_edge(edge), func, migration_descriptor
+            )

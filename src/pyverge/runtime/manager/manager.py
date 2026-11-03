@@ -24,6 +24,8 @@ from pyverge.discovery.reflection import (
 )
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
+from pyverge.runtime.facade import Runtime
+from pyverge.runtime.migrations import MigrationBindings
 from pyverge.schemas.types import (
     ModelAdapter,
 )
@@ -58,6 +60,7 @@ class Manager(
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+    _default_runtime: ClassVar[Runtime]
 
     def __class_getitem__(
         cls, strategy: type[VersionValue]
@@ -68,6 +71,7 @@ class Manager(
             {
                 "_strategy": strategy,
                 "_default_engine": None,
+                "_default_runtime": None,
                 "__module__": cls.__module__,
                 "__qualname__": cls.__name__,
             },
@@ -82,6 +86,10 @@ class Manager(
     @property
     def registry(self) -> Registry[VersionValue]:
         return self.engine.registry
+
+    @property
+    def runtime(self) -> Runtime:
+        return type(self)._default_runtime
 
     @classmethod
     def configure(  # noqa: PLR0913
@@ -136,4 +144,8 @@ class Manager(
             )
             engine = Engine[VersionValue](registry=registry, adapter=adapter)
         cls._default_engine = engine
+        bindings = getattr(engine.registry, "bindings", None)
+        if not isinstance(bindings, MigrationBindings):
+            bindings = MigrationBindings(name=engine.namespace)
+        cls._default_runtime = Runtime(engine=engine, bindings=bindings)
         return cls

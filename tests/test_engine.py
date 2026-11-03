@@ -29,6 +29,7 @@ from pyverge.core.versioning import (
     FieldDescriptor,
     NodeRef,
     TypeRef,
+    VersionEdge,
     VersionKey,
 )
 from pyverge.migrations import JsonPatchMigration
@@ -517,7 +518,7 @@ class TestMigrationManagement:
 
         engine.store_migration((versions[0], versions[1]), _migrate)
         edge = EdgeKey.from_pair(versions[0], versions[1])
-        assert engine.get_migration(edge).func is _migrate
+        assert engine.get_migration(edge) is not None
 
     @pytest.mark.parametrize(
         "model_adapter, registry, models",
@@ -592,10 +593,17 @@ class TestMigrationManagement:
             for version in ("0.2.1", "1.0.0")
         ]
 
+        bindings = getattr(engine.registry, "bindings")
         for src, dst in pairwise([real, *keys]):
             target = str(dst.version)
-            engine.store_migration(
-                (src, dst), lambda d, to=target: {**d, "version": to}
+
+            def func(d, to=target):
+                return {**d, "version": to}
+
+            edge = engine.store_migration((src, dst), func)
+            assert isinstance(edge, VersionEdge)
+            bindings.store_migration(
+                EdgeKey.from_version_edge(edge), func, edge.migration
             )
 
         result = runner_factory().run(
@@ -638,10 +646,17 @@ class TestMigrationManagement:
             engine.adapter.version_key(kind="User", version=version)
             for version in ("0.2.0", "0.3.0")
         ]
+        bindings = getattr(engine.registry, "bindings")
         for src, dst in pairwise([real, *keys]):
             target = str(dst.version)
-            engine.store_migration(
-                (src, dst), lambda d, to=target: {**d, "version": to}
+
+            def func(d, to=target):
+                return {**d, "version": to}
+
+            edge = engine.store_migration((src, dst), func)
+            assert isinstance(edge, VersionEdge)
+            bindings.store_migration(
+                EdgeKey.from_version_edge(edge), func, edge.migration
             )
 
         first = engine.get_model(keys[0])
@@ -1079,7 +1094,7 @@ class TestLookupTyped:
     ) -> None:
         versions = [envelope_model(engine.adapter, None, m) for m in models]
         key = EdgeKey.from_pair(versions[0], versions[1])
-        assert engine[key].func is not None
+        assert engine[key] is not None
 
 
 class TestNamespaceGateway:

@@ -27,9 +27,6 @@ if TYPE_CHECKING:
         VersionKey,
         VersionNode,
     )
-    from pyverge.runtime.context import MigrationContext
-else:
-    MigrationContext = Any
 
 # ---------------------------------------------------------------------------
 # Version axis
@@ -70,7 +67,7 @@ ModelData: TypeAlias = dict[str, Any]
 
 #: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
 MIGRATION_PAIR_LEN: int = 2
-MigrationFunc: TypeAlias = Callable[[ModelData, MigrationContext | None], ModelData]
+MigrationFunc: TypeAlias = Callable[[ModelData, Any], ModelData]
 #: How a diff came to be: discovered from a registered migration, or computed
 #: from two concrete schemas.  Selects the reflection strategy when no explicit
 #: setting applies.

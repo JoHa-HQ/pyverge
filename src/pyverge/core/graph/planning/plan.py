@@ -4,13 +4,16 @@ from dataclasses import dataclass
 from typing import Generic
 
 from pyverge.core.graph.planning.path import Path
-from pyverge.core.types import (
-    Attachable,
-    MigrationFunc,
-    ModelHandle,
-    VersionValue,
-)
-from pyverge.core.versioning import MigrationDescriptor, ModelRef, VersionNode
+from pyverge.core.types import ModelHandle, VersionValue
+from pyverge.core.versioning import EdgeKey, ModelRef, VersionNode
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractedEntry(Generic[VersionValue]):
+    """One versioned node found in a payload."""
+
+    path: tuple[str | int, ...]
+    node: VersionNode[VersionValue]
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,9 +25,7 @@ class PathPlanEntry(Generic[VersionValue]):
     target: VersionNode[VersionValue]
     target_model: ModelRef
     steps: tuple[tuple[VersionNode[VersionValue], VersionNode[VersionValue]], ...]
-    hooks: tuple[tuple[Attachable, ...], ...]
-    migrations: tuple[MigrationFunc, ...]
-    migration_descriptors: tuple[MigrationDescriptor, ...] = ()
+    edges: tuple[EdgeKey[VersionValue], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,4 +57,4 @@ class PathPlan(Generic[VersionValue]):
         return tuple(levels)
 
 
-__all__ = ["PathPlan", "PathPlanEntry"]
+__all__ = ["ExtractedEntry", "PathPlan", "PathPlanEntry"]

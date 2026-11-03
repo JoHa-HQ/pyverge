@@ -155,7 +155,6 @@ def test_edge_key_inherits_version_edge_ref() -> None:
         target=_node(_model_ref()),
         ref=ref,
         diff=cast("Any", object()),
-        func=lambda data, context=None: data,
         migration=MigrationDescriptor("callable", "m1"),
     )
 
@@ -195,6 +194,5 @@ def test_version_edge_requires_migration_ref() -> None:
             target=target,
             ref=cast("Any", NodeRef()),
             diff=cast("Any", object()),
-            func=lambda data, context=None: data,
-            migration=MigrationDescriptor("callable", "m1"),
+                migration=MigrationDescriptor("callable", "m1"),
         )

@@ -122,7 +122,9 @@ class PersonContainer(BaseModel):
     document: Person
 
 
-def migrate_person_100_200(data: dict, context: MigrationContext | None = None) -> dict:
+def migrate_person_100_200(
+    data: dict, context: MigrationContext | None = None
+) -> dict:
     data["email"] = None
     data["contacts"] = []
     return data

@@ -52,6 +52,7 @@ if TYPE_CHECKING:
     from pyverge.discovery.reflection import DiffProvider
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
+    from pyverge.runtime.facade import Runtime
 
 
 #: A callable that binds a registry to a :data:`TargetResolver`; the shape of
@@ -70,6 +71,7 @@ class ManagerClassState(Protocol[VersionValue]):
 
     _strategy: ClassVar[type[VersionValue]]  # ty: ignore[invalid-type-form]
     _default_engine: ClassVar[Engine[VersionValue]]  # ty: ignore[invalid-type-form]
+    _default_runtime: ClassVar[Runtime]
 
     @classmethod
     def configure(  # noqa: PLR0913
@@ -120,6 +122,9 @@ class ManagerInstanceState(Protocol[VersionValue]):
 
     @property
     def registry(self) -> Registry[VersionValue]: ...
+
+    @property
+    def runtime(self) -> Runtime: ...
 
     @property
     def adapter(self) -> ModelAdapter: ...
