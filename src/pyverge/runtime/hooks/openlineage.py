@@ -26,44 +26,8 @@ from openlineage.client.facet_v2 import (
 
 from pyverge._version import __version__
 from pyverge.core.types import HookState
-from pyverge.runtime.context import StepContext
+from pyverge.runtime.context import DatasetContext, StepContext
 from pyverge.runtime.hooks.types import HookScope, MigrationHook
-
-
-def _type_name(type_ref: Any) -> str:
-    kind = str(type_ref.kind)
-    if type_ref.name:
-        return f"{kind}[{type_ref.name}]"
-    if type_ref.ref is not None:
-        return str(type_ref.ref)
-    return kind
-
-
-def _schema_fields(node: Any) -> list[schema_dataset.SchemaDatasetFacetFields]:
-    descriptor = getattr(node, "descriptor", None)
-    fields = getattr(descriptor, "fields", None)
-    if fields is None:
-        return []
-    return [
-        schema_dataset.SchemaDatasetFacetFields(
-            name=field.name,
-            type=_type_name(field.type_ref),
-            ordinal_position=index,
-        )
-        for index, (_, field) in enumerate(fields.sorted_items())
-    ]
-
-
-def _dataset_facets(node: Any) -> dict[str, Any]:
-    facets: dict[str, Any] = {
-        "version": dataset_version_dataset.DatasetVersionDatasetFacet(
-            datasetVersion=str(node.version),
-        ),
-    }
-    fields = _schema_fields(node)
-    if fields:
-        facets["schema"] = schema_dataset.SchemaDatasetFacet(fields=fields)
-    return facets
 
 
 @dataclass
@@ -109,18 +73,37 @@ class _LineageScope:
             inputs=[
                 InputDataset(
                     self.namespace,
-                    str(self.step.source),
-                    facets=_dataset_facets(self.step.source),
+                    self.step.source_dataset.name,
+                    facets=self._dataset_facets(self.step.source_dataset),
                 )
             ],
             outputs=[
                 OutputDataset(
                     self.namespace,
-                    str(self.step.target),
-                    facets=_dataset_facets(self.step.target),
+                    self.step.target_dataset.name,
+                    facets=self._dataset_facets(self.step.target_dataset),
                 )
             ],
         )
+
+    def _dataset_facets(self, dataset: DatasetContext) -> dict[str, Any]:
+        facets: dict[str, Any] = {
+            "version": dataset_version_dataset.DatasetVersionDatasetFacet(
+                datasetVersion=dataset.version,
+            ),
+        }
+        if dataset.fields:
+            facets["schema"] = schema_dataset.SchemaDatasetFacet(
+                fields=[
+                    schema_dataset.SchemaDatasetFacetFields(
+                        name=field.name,
+                        type=field.type,
+                        ordinal_position=index,
+                    )
+                    for index, field in enumerate(dataset.fields)
+                ]
+            )
+        return facets
 
     def _job_facets(self) -> dict[str, Any]:
         tags = [
