@@ -204,9 +204,10 @@ def before_migrate(
 - Async hooks are declared with `async def` on the normal callback names.
   `abefore_migrate` / `aafter_migrate` do not exist.
 
-OpenLineage namespace validation moved to `OpenLineageMiddleware`. The middleware
+OpenLineage namespace validation moved to `OpenLineageAdapter`. The adapter
 compares its configured namespace with the graph namespace when the graph has
-one.
+one. A mismatch is logged and the adapter emits nothing, because telemetry is
+best-effort.
 
 Path resolution moved out of the registry. Use `GraphBuilder` plus
 `MigrationGraph.migration_path` or `PathFinder`; `Registry.migration_path`

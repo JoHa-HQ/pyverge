@@ -1,8 +1,8 @@
-# Instrument migrations with hooks
+# Instrument migrations with hooks and telemetry
 
-Migrations are observable. Hooks are read-only observers that run before,
-after, or on error for each migration step — for logging, metrics, auditing, or
-distributed tracing.
+Migrations are observable in two ways. `MigrationHook` callbacks run before,
+after, or on error for custom behavior. Telemetry adapters consume typed runtime
+lifecycle events for tracing and lineage.
 
 ## Prerequisites
 
@@ -34,22 +34,22 @@ class before instantiating if every instance should inherit the hook.
 
 ### Configure OpenTelemetry
 
-`OTELHook` creates a span per migration step. Wire it to your tracer provider:
+`OtelAdapter` creates one run span and one span per migration step. Wire it to
+your tracer provider and pass it to `manager.runtime(telemetry=...)`:
 
 ```python
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, OTLPSpanExporter
 
-from pyverge.types import ManagerMigrationKey
-from pyverge.runtime import OTELHook
+from pyverge.runtime import OtelAdapter
 
 provider = TracerProvider()
 provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
 trace.set_tracer_provider(provider)
 
-hook = OTELHook(tracer=trace.get_tracer("converge"), service="converge")
-manager.add_hook(ManagerMigrationKey("User", "1.0.0", "2.0.0"), hook)
+adapter = OtelAdapter(tracer=trace.get_tracer("converge"), service="converge")
+runner = manager.runtime(telemetry=(adapter,)).runner
 ```
 
 Each step emits `<service>.migrate` with:
@@ -68,35 +68,29 @@ migration.duration_seconds
 
 ### Configure OpenLineage
 
-`OpenLineageHook` emits edge-level START/COMPLETE/FAIL events. Use
-`OpenLineageMiddleware` when you also want run-level lineage and namespace
-validation:
+`OpenLineageAdapter` emits both run-level and step-level START/COMPLETE/FAIL
+events:
 
 ```python
-from pyverge.runtime import OpenLineageHook
-from pyverge.runtime.middleware import OpenLineageMiddleware
+from pyverge.runtime import OpenLineageAdapter
 
-middleware = OpenLineageMiddleware(
+adapter = OpenLineageAdapter(
     client=client,
     namespace="com.acme.orders",
     producer="orders-service",
 )
-hook = OpenLineageHook(
-    client=client,
-    namespace="com.acme.orders",
-    producer="orders-service",
-)
+runner = manager.runtime(telemetry=(adapter,)).runner
 ```
 
-The middleware validates that the OpenLineage namespace matches the graph
-namespace when the graph has one. Dataset names use namespaced `NodeId` values;
-job names identify the edge:
+The adapter checks that the OpenLineage namespace matches the graph namespace
+when the graph has one. Dataset names use namespaced `NodeId` values; job names
+identify the edge:
 
 ```text
 migration.User.1.0.0->2.0.0
 ```
 
-Hook events carry data metadata, not payload values:
+Step events carry data metadata, not payload values:
 
 - dataset version facets for the source and target versions
 - schema facets built from the source and target model fields
@@ -107,11 +101,17 @@ Hook events carry data metadata, not payload values:
 Payload content is never emitted, so lineage stays free of application data and
 PII.
 
+Telemetry is best-effort and isolated: an adapter failure is logged, does not
+fail the migration, and does not prevent other adapters from receiving the
+event.
+
 ## Verify
 
 ```python
 manager.attach_hooks([AuditHook()])
-result = manager.runtime().runner.run(payload, "latest")
+result = manager.runtime(
+    telemetry=(OtelAdapter(tracer=trace.get_tracer("converge")),),
+).runner.run(payload, "latest")
 ```
 
 ## Troubleshooting
@@ -120,8 +120,9 @@ result = manager.runtime().runner.run(payload, "latest")
 - Async hook not awaited: use `AsyncBackend`.
 - `TypeError` about `state`: the hook implements an outdated callback
   signature. Add the keyword-only `state` parameter.
-- OpenLineage namespace error: align the configured namespace with the graph
-  namespace, or remove the graph namespace.
+- OpenLineage namespace mismatch: align the configured namespace with the graph
+  namespace, or remove the graph namespace. The mismatch is logged and the
+  adapter emits nothing because telemetry is best-effort.
 
 ## See also
 

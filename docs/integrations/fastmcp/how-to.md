@@ -171,10 +171,12 @@ The adapter does not validate the graph a second time.
 ### Telemetry
 
 The adapter is free of any tracing library. To trace calls, stack your own
-FastMCP middleware; the per-migration `OTELHook`s open their spans **as
-current**, so each step span nests under the call span you open:
+FastMCP middleware; the `OtelAdapter` opens run and step spans **as current**,
+so each migration span nests under the call span you open:
 
 ```python
+from pyverge.runtime import OtelAdapter
+
 class CallSpanMiddleware(Middleware):
     def __init__(self, tracer, service): ...
     async def on_call_tool(self, context, call_next):
@@ -182,11 +184,14 @@ class CallSpanMiddleware(Middleware):
             return await call_next(context)
 
 server.middleware = [CallSpanMiddleware(tracer, "my-service")]
+runner = manager.runtime(
+    telemetry=(OtelAdapter(tracer=tracer, service="my-service"),)
+).runner
 ```
 
 See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the
-per-step `OTELHook`. Step spans include graph namespace, kind, source/target, and
-migration strategy/identity when available.
+adapter. Step spans include graph namespace, kind, source/target, and migration
+strategy/identity when available.
 
 ### Testing
 

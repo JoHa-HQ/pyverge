@@ -128,8 +128,7 @@ Every version should have a named case, and the snapshot diff should be empty.
   fix the generator before updating snapshots.
 - **Callable is not discoverable:** rewrite it to one of the recognized AST
   shapes.
-- **Missing span:** attach `OTELHook` to the edge and use the async backend for
-  async hooks.
+- **Missing span:** pass `OtelAdapter` to `manager.runtime(telemetry=...)`.
 
 ## See also
 
