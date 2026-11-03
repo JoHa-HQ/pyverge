@@ -267,6 +267,26 @@ class TestLookupHelpers:
         assert manager.list_versions("Missing") == []
 
 
+FLUENT_LOOKUP_REGISTRY = [
+    semver.Version,
+    "test",
+    [UserV1, UserV2, UserV3],
+    [
+        ((UserV1, UserV2), lambda d, _: d),
+        ((UserV2, UserV3), lambda d, _: d),
+    ],
+]
+
+
+def _fluent_context(manager: type[Manager]):
+    instance = manager()
+    node = instance.engine.get_model(
+        instance.engine.adapter.version_key(kind="User", version="1.0.0")
+    )
+    edge = instance.engine.registry.migrations("User")[0]
+    return instance, node, edge
+
+
 class TestFluentLookup:
     """Manager owns the fluent lookup sugar; engine/registry are typed-only."""
 
@@ -299,54 +319,99 @@ class TestFluentLookup:
         assert len(path) == 2  # noqa: PLR2004
 
     @pytest.mark.parametrize(
-        ("model_adapter", "registry", "models"),
-        [
-            (
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2, UserV3],
-                    [
-                        ((UserV1, UserV2), lambda d, _: d),
-                        ((UserV2, UserV3), lambda d, _: d),
-                    ],
-                ],
-                [UserV1, UserV2, UserV3],
-            ),
-        ],
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
         indirect=["model_adapter", "registry"],
     )
-    def test_fluent_lookup_key_forms(
+    @pytest.mark.parametrize(
+        "key_kind",
+        ["model", "model_tuple", "version_node", "edge_tuple", "version_edge"],
+    )
+    def test_fluent_getitem_positive(
         self,
         manager: type[Manager],
-        models: list[ModelHandle],
+        key_kind: str,
     ) -> None:
-        instance = manager()
-        node = instance.engine.get_model(
-            instance.engine.adapter.version_key(kind="User", version="1.0.0")
-        )
-        edge = instance.engine.registry.migrations("User")[0]
+        instance, node, edge = _fluent_context(manager)
+        keys = {
+            "model": UserV1,
+            "model_tuple": ("User", "1.0.0"),
+            "version_node": node,
+            "edge_tuple": (edge.source, edge.target),
+            "version_edge": edge,
+        }
+        expected = edge if key_kind in {"edge_tuple", "version_edge"} else node
 
-        assert instance[UserV1] == node
-        assert instance[("User", "1.0.0")] == node
-        assert instance[node] == node
-        assert instance[(edge.source, edge.target)] == edge
-        assert instance[edge] == edge
+        assert instance[keys[key_kind]] == expected
 
-        assert UserV1 in instance
-        assert ("User", "1.0.0") in instance
-        assert (edge.source, edge.target) in instance
-        assert slice(UserV1, UserV3) in instance
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    @pytest.mark.parametrize(
+        "member_kind",
+        ["model", "model_tuple", "edge_tuple", "slice"],
+    )
+    def test_fluent_contains_positive(
+        self,
+        manager: type[Manager],
+        member_kind: str,
+    ) -> None:
+        instance, _node, edge = _fluent_context(manager)
+        members = {
+            "model": UserV1,
+            "model_tuple": ("User", "1.0.0"),
+            "edge_tuple": (edge.source, edge.target),
+            "slice": slice(UserV1, UserV3),
+        }
 
+        assert members[member_kind] in instance
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_fluent_slice_returns_path(self, manager: type[Manager]) -> None:
+        instance, _node, _edge = _fluent_context(manager)
         path = instance[UserV1:UserV3]
+
         assert isinstance(path, list)
         assert len(path) == 2  # noqa: PLR2004
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    @pytest.mark.parametrize(
+        ("index", "error"),
+        [
+            pytest.param(object(), CatalogError, id="unsupported-type"),
+            pytest.param(int, ModelNotFoundError, id="unregistered-class"),
+        ],
+    )
+    def test_fluent_getitem_negative(
+        self,
+        manager: type[Manager],
+        index: object,
+        error: type[Exception],
+    ) -> None:
+        instance, _node, _edge = _fluent_context(manager)
+
+        with pytest.raises(error):
+            instance[index]
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_fluent_contains_negative(self, manager: type[Manager]) -> None:
+        instance, _node, _edge = _fluent_context(manager)
+
         assert object() not in instance
-        with pytest.raises(CatalogError):
-            instance[object()]
-        with pytest.raises(ModelNotFoundError):
-            instance[int]
 
 
 class TestSharedEngine:
