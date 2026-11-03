@@ -21,7 +21,7 @@ Implement `before_migrate`, `after_migrate`, and `on_error` on a
 ### Register the hook
 
 ```python
-from pyverge.core import ManagerMigrationKey
+from pyverge.types import ManagerMigrationKey
 
 manager.add_hook(
     ManagerMigrationKey("User", "1.0.0", "2.0.0"),
@@ -41,7 +41,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, OTLPSpanExporter
 
-from pyverge.core import ManagerMigrationKey
+from pyverge.types import ManagerMigrationKey
 from pyverge.execution import OTELHook
 
 provider = TracerProvider()

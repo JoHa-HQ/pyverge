@@ -6,12 +6,13 @@ from types import MappingProxyType
 from typing import Generic
 
 from pyverge.core.registry.errors import MigrationNotFoundError
-from pyverge.core.types import Attachable, MigrationFunc, VersionValue
+from pyverge.core.types import MigrationFunc, VersionValue
 from pyverge.core.versioning import (
     EdgeId,
     HookRef,
     MigrationDescriptor,
 )
+from pyverge.runtime.hooks import Attachable
 
 
 @dataclass(frozen=True, slots=True)

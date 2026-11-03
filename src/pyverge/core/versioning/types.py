@@ -22,8 +22,6 @@ from .identity import NodeId
 from .identity.metadata import KeyRef
 
 if TYPE_CHECKING:
-    from pyverge.core.types import Attachable
-
     from .diff import Diff
     from .identity import EdgeId, EdgeKey, VersionEdge, VersionKey, VersionNode
     from .identity.metadata import ModelDescriptor, ModelRef
@@ -259,7 +257,6 @@ class Diffable(Protocol[VersionValue_co]):
 MigrationKey: TypeAlias = tuple[NodeId, NodeId]
 VersionPair = tuple[Comparable[VersionValue_co], Comparable[VersionValue_co]]
 LookupKey = Versionable[VersionValue_co] | Migratable[VersionValue_co]
-MigrationHookMap: TypeAlias = dict[Migratable, list["Attachable"]]
 
 #: Normalized node entries accepted by the engine and registry.
 NodeEntry: TypeAlias = Union["VersionKey", "VersionNode"]
@@ -284,7 +281,6 @@ __all__ = [
     "KeyRef",
     "LookupKey",
     "Migratable",
-    "MigrationHookMap",
     "MigrationKey",
     "ModelRefProvider",
     "Namespaced",

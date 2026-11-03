@@ -1,5 +1,11 @@
 from .openlineage import OpenLineageHook
 from .otel import OTELHook
-from .types import MigrationHook
+from .types import Attachable, MigrationHook, MigrationHookMap
 
-__all__ = ["MigrationHook", "OTELHook", "OpenLineageHook"]
+__all__ = [
+    "Attachable",
+    "MigrationHook",
+    "MigrationHookMap",
+    "OTELHook",
+    "OpenLineageHook",
+]

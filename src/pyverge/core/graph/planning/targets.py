@@ -8,7 +8,6 @@ from pyverge.core.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.core.types import (
     ModelHandle,
     ModelKind,
-    TargetResolver,
     VersionValue,
     VersionValue_co,
 )
@@ -22,6 +21,14 @@ from pyverge.core.versioning import (
 from pyverge.schemas.types import ModelIdentityPort
 
 TargetStrategy = Literal["latest", "earliest", "skip"]
+
+
+class TargetResolver(Protocol[VersionValue]):
+    """Resolve a discovered version to its target node, or skip it."""
+
+    def __call__(
+        self, current: VersionNode[VersionValue]
+    ) -> VersionNode[VersionValue] | None: ...
 
 ContextT_contra = TypeVar("ContextT_contra", contravariant=True)
 

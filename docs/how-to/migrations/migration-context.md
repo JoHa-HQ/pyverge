@@ -26,7 +26,7 @@ that migration to JSONata (declarative + context) or a callable.
 Every runtime callable uses the same contract:
 
 ```python
-from pyverge.core import ManagerMigrationKey
+from pyverge.types import ManagerMigrationKey
 
 def migrate_v1_to_v2(data, context=None):
     data["tenant_id"] = context["tenant_id"]

@@ -109,7 +109,7 @@ Store it in `state` by hook instance key when needed.
 Register a hook on a specific edge:
 
 ```python
-from pyverge.core import ManagerMigrationKey
+from pyverge.types import ManagerMigrationKey
 
 manager.add_hook(
     ManagerMigrationKey("User", "1.0.0", "2.0.0"),

@@ -12,10 +12,8 @@ from fastmcp.server.providers.local_provider.local_provider import DuplicateBeha
 from pyverge.adapters.runtime import ConvergenceRuntime
 from pyverge.core.registry import HealthFailLevel
 from pyverge.core.registry.errors import HealthValidationError
-from pyverge.core.types import (
-    Attachable,
-)
 from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.hooks import Attachable
 from pyverge.runtime.manager import Manager
 
 from .builder import ComponentBuilder
