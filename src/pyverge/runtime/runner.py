@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, TypeAlias
 
@@ -74,6 +75,31 @@ class Runner(Generic[VersionValue]):
         if validate_target:
             self._validate_target(plan, data)
         return data
+
+    def run_many(  # noqa: PLR0913
+        self,
+        payloads: Sequence[dict[str, Any]],
+        target: TargetPolicy,
+        *,
+        source_model: type[Any] | None = None,
+        max_depth: int = -1,
+        context: MigrationContext | None = None,
+        run_id: str | None = None,
+        validate_target: bool = False,
+    ) -> list[RunResult]:
+        """Run one payload at a time with independent run and transaction scope."""
+        return [
+            self.run(
+                payload,
+                target,
+                source_model=source_model,
+                max_depth=max_depth,
+                context=context,
+                run_id=run_id,
+                validate_target=validate_target,
+            )
+            for payload in payloads
+        ]
 
     def execute(
         self,
