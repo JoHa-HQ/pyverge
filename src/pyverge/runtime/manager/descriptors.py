@@ -5,16 +5,16 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, Literal, Protocol, overload
 
 from pyverge.core.types import (
-    Attachable,
-    ManagerMigrationKey,
     MigrationFunc,
-    MigrationKeyInput,
-    ModelPair,
     VersionValue,
 )
 from pyverge.migrations import JsonataMigration, JsonPatchMigration
+from pyverge.runtime.hooks import Attachable
 from pyverge.runtime.manager.types import (
     ManagerClassState,
+    ManagerMigrationKey,
+    MigrationKeyInput,
+    ModelPair,
 )
 from pyverge.schemas.types import (
     ModelHandle,

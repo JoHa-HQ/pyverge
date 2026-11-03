@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from typing import ClassVar
 
@@ -39,6 +40,7 @@ from .mixins import (
     RuntimeMixin,
     TargetResolutionMixin,
 )
+from .types import ManagerConfig
 
 
 class Manager(
@@ -99,7 +101,40 @@ class Manager(
         diff_provider: DiffProvider[VersionValue] | None = None,
         on_missing: str = "raise",
         linters: Sequence[HealthLinter] = (),
+        config: ManagerConfig[VersionValue] | None = None,
     ) -> type[Manager[VersionValue]]:
+        if config is not None:
+            warnings.warn(
+                "Manager.configure(config=...) is deprecated; use "
+                "Manager.configure(adapter, **config.to_kwargs())",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            values = config.to_kwargs()
+            engine = engine if engine is not None else values.get("engine")
+            hasher = hasher if hasher is not None else values.get("hasher")
+            model_materializer = (
+                model_materializer
+                if model_materializer is not None
+                else values.get("model_materializer")
+            )
+            migration_materializer = (
+                migration_materializer
+                if migration_materializer is not None
+                else values.get("migration_materializer")
+            )
+            diff_provider = (
+                diff_provider
+                if diff_provider is not None
+                else values.get("diff_provider")
+            )
+            on_missing = (
+                values.get("on_missing", on_missing)
+                if on_missing == "raise"
+                else on_missing
+            )
+            if not linters:
+                linters = values.get("linters", ())
         codec = getattr(adapter, "model_codec", None)
         if codec is None:
             raise ValueError("Adapter must expose a ModelCodec")

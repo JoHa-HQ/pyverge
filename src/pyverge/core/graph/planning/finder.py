@@ -6,9 +6,13 @@ from typing import Generic, cast
 
 from pyverge.core.graph.planning.plan import ExtractedEntry, PathPlan, PathPlanEntry
 from pyverge.core.graph.planning.policy import PolicyEngine
-from pyverge.core.graph.planning.targets import TargetCompiler, TargetPolicy
+from pyverge.core.graph.planning.targets import (
+    TargetCompiler,
+    TargetPolicy,
+    TargetResolver,
+)
 from pyverge.core.graph.types import PathGraphView
-from pyverge.core.types import ModelHandle, TargetResolver, VersionValue
+from pyverge.core.types import ModelHandle, VersionValue
 from pyverge.core.versioning import EdgeId, NodeId, VersionNode
 
 

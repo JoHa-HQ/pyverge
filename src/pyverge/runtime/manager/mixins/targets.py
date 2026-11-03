@@ -4,10 +4,9 @@ from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
 from pyverge.core.engine import Engine
-from pyverge.core.graph.planning.targets import TargetCompiler
+from pyverge.core.graph.planning.targets import TargetCompiler, TargetResolver
 from pyverge.core.types import (
     ModelKind,
-    TargetResolver,
     VersionValue,
 )
 from pyverge.core.versioning import (

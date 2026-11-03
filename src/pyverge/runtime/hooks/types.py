@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Protocol, runtime_checkable
 
 from pyverge.core.types import HookState
-from pyverge.core.versioning import MigrationDescriptor, NodeId
+from pyverge.core.versioning import Migratable, MigrationDescriptor, NodeId
 
 
 @runtime_checkable
@@ -46,4 +46,10 @@ class MigrationHook(Protocol):
     ) -> None: ...
 
 
-__all__ = ["HookState", "MigrationHook"]
+Attachable = MigrationHook
+"""Backward-compatible alias for the migration hook protocol."""
+
+MigrationHookMap = dict[Migratable, list[Attachable]]
+
+
+__all__ = ["Attachable", "HookState", "MigrationHook", "MigrationHookMap"]

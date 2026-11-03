@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Generic, cast
 
 from pyverge.core.types import (
     ModelData,
-    ModelKey,
     ModelKind,
     VersionValue,
 )
@@ -21,6 +20,7 @@ from pyverge.schemas.types import (
 )
 
 from ..descriptors import hybridmethod
+from ..types import ModelKey
 
 if TYPE_CHECKING:
     from pyverge.core.engine import Engine
@@ -102,17 +102,6 @@ class ModelStoreMixin(Generic[VersionValue]):
     ) -> list[VersionNode[VersionValue]]:
         engine = engine or cls._default_engine
         return engine.list_versions(kind)
-
-    @hybridmethod
-    @classmethod
-    def migration_graph(
-        cls: type[Manager[VersionValue]],
-        *,
-        engine: Engine[VersionValue] | None = None,
-    ):
-        """Expose the immutable migration graph for the current manager."""
-        engine = engine or cls._default_engine
-        return engine.snapshot()
 
     @hybridmethod
     @classmethod

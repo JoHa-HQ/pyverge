@@ -5,9 +5,7 @@ from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
-    Generic,
     Literal,
-    NamedTuple,
     Protocol,
     TypeAlias,
     TypeVar,
@@ -17,10 +15,6 @@ from typing import (
 
 if TYPE_CHECKING:
     from pyverge.core.versioning import (
-        EdgeKey,
-        MigrationDescriptor,
-        NodeId,
-        VersionEdge,
         VersionKey,
         VersionNode,
     )
@@ -96,93 +90,12 @@ ExtraFieldStrategy: TypeAlias = Literal["raise", "ignore"]
 TargetStrategy: TypeAlias = Literal["latest", "earliest", "skip"]
 
 
-class ModelKey(NamedTuple, Generic[VersionValue]):
-    """Typed model key: a model ``kind`` and its ``version`` value."""
-
-    kind: ModelKind
-    version: VersionValue
-
-
-class ManagerMigrationKey(NamedTuple):
-    """Typed manager migration key: ``kind`` plus source/target versions."""
-
-    kind: ModelKind
-    source_version: str
-    target_version: str
-
-
-class ModelPair(NamedTuple):
-    """Typed model-pair key: the ``source`` and ``target`` model handles."""
-
-    source: ModelHandle
-    target: ModelHandle
-
-
 #: How a registration handles an existing graph entry.
 RegistrationMode: TypeAlias = Literal["strict", "reconcile"]
 
 #: Public node inputs accepted by the manager before normalization.
 NodeInput: TypeAlias = Union[ModelHandle, "VersionKey", "VersionNode"]
 
-#: Accepted migration-key shapes for the manager's registration methods.
-MigrationKeyInput: TypeAlias = Union[
-    ModelPair,
-    ManagerMigrationKey,
-    "EdgeKey",
-    "VersionEdge",
-]
-
-ManagerKey: TypeAlias = ModelKey | ManagerMigrationKey | ModelPair
-
-
 # ---------------------------------------------------------------------------
 # Behavior protocols (version protocols live in pyverge.core.versioning)
 # ---------------------------------------------------------------------------
-
-
-@runtime_checkable
-class Attachable(Protocol):
-    """Protocol for migration hook callbacks."""
-
-    def before_migrate(  # noqa: PLR0913
-        self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
-        data: dict[str, Any],
-        *,
-        migration: MigrationDescriptor | None = None,
-        state: HookState,
-    ) -> None: ...
-
-    def after_migrate(  # noqa: PLR0913
-        self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
-        original_data: dict[str, Any],
-        migrated_data: dict[str, Any],
-        *,
-        migration: MigrationDescriptor | None = None,
-        state: HookState,
-    ) -> None: ...
-
-    def on_error(  # noqa: PLR0913
-        self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
-        data: dict[str, Any],
-        error: Exception,
-        *,
-        migration: MigrationDescriptor | None = None,
-        state: HookState,
-    ) -> None: ...
-
-
-class TargetResolver(Protocol[VersionValue]):
-    """Resolve a discovered version to its target node, or skip it."""
-
-    def __call__(
-        self, current: VersionNode[VersionValue]
-    ) -> VersionNode[VersionValue] | None: ...

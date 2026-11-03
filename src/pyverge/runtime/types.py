@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Awaitable, Iterator
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
 
-from pyverge.core.types import TargetResolver, VersionValue
+from pyverge.core.graph.planning.targets import TargetResolver
+from pyverge.core.types import VersionValue
 from pyverge.runtime.context import MigrationContext, RunContext
 from pyverge.runtime.plan import ExecutionPlan
 from pyverge.schemas.types import ModelIdentityPort
