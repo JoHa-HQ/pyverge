@@ -52,15 +52,15 @@ async def migrate(
         elif context is not None:
             runtime_context = json.loads(context)
 
-        async with AsyncBackend(backend="asyncio", backend_options={}) as runtime:
-            runner = mgr.runner(runtime=runtime)
-            result = await runner.run(
-                payload,
-                target,
-                source_model=None,
-                max_depth=-1,
-                context=runtime_context,
-            )
+        runtime = AsyncBackend(backend="asyncio", backend_options={})
+        runner = mgr.runner(runtime=runtime)
+        result = await runner.run(
+            payload,
+            target,
+            source_model=None,
+            max_depth=-1,
+            context=runtime_context,
+        )
 
         if check:
             raise typer.Exit(0)

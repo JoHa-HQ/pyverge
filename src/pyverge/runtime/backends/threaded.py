@@ -4,11 +4,11 @@ import copy
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import VersionValue
-from pyverge.runtime.context import MigrationContext, RunContext, StepContext
+from pyverge.runtime.context import RunContext
 from pyverge.runtime.hooks.state import new_hook_state
-from pyverge.runtime.plan import ExecutionEntry, ExecutionPlan
+from pyverge.runtime.plan import EntryResult, ExecutionEntry, ExecutionPlan
+from pyverge.runtime.strategies import ThreadedStrategy
 from pyverge.schemas.types import ModelIdentityPort
 
 
@@ -17,6 +17,7 @@ class ThreadedBackend:
 
     def __init__(self, max_workers: int) -> None:
         self._max_workers = max_workers
+        self._strategy = ThreadedStrategy()
 
     def execute(
         self,
@@ -30,60 +31,37 @@ class ThreadedBackend:
         for level in plan.levels:
             if self._max_workers > 1:
                 with ThreadPoolExecutor(max_workers=self._max_workers) as pool:
-                    list(
+                    results = tuple(
                         pool.map(
-                            lambda entry: self._execute_entry(
-                                entry, data, run, adapter, hook_state
+                            lambda entry: self._run_entry(
+                                entry, plan, data, run, adapter, hook_state
                             ),
                             level,
                         )
                     )
             else:
-                for entry in level:
-                    self._execute_entry(entry, data, run, adapter, hook_state)
+                results = tuple(
+                    self._run_entry(entry, plan, data, run, adapter, hook_state)
+                    for entry in level
+                )
+            data = plan.apply_results(data, results)
         return data
 
-    def _execute_entry(
+    def _run_entry(  # noqa: PLR0913, PLR0917
         self,
         entry: ExecutionEntry[VersionValue],
+        plan: ExecutionPlan[VersionValue],
         data: dict[str, Any],
         run: RunContext,
         adapter: ModelIdentityPort,
         hook_state: Any,
-    ) -> None:
-        current = Path(*entry.path).get(data)
-        for index, (source, target) in enumerate(entry.steps):
-            name = getattr(
-                entry.migration_func(index), "__name__", f"{source}->{target}"
-            )
-            step = self._step(entry, index, source, target, run)
-            migrated = entry.step(index).run_sync(
-                current,
-                step.view,
-                name=name,
-                hook_state=hook_state,
-            )
-            if isinstance(migrated, dict):
-                migrated[adapter.version_property] = str(target.version)
-            current = migrated
-        Path(*entry.path).set(data, current)
-
-    def _step(
-        self,
-        entry: ExecutionEntry[VersionValue],
-        index: int,
-        source: Any,
-        target: Any,
-        run: RunContext,
-    ) -> StepContext:
-        return StepContext(
+    ) -> EntryResult:
+        return entry.execute_sync(
+            plan.entry_value(data, entry),
             run=run,
-            path=entry.path,
-            index=index,
-            source=source,
-            target=target,
-            edge=entry.plan.edges[index],
-            bindings=MigrationContext.empty(),
+            adapter=adapter,
+            hook_state=hook_state,
+            invoke=self._strategy.invoke,
         )
 
 

@@ -983,6 +983,7 @@ def test_step_context_layers_bindings(execution_environment) -> None:
         target=target,
         edge=EdgeKey.from_pair(source, target),
         bindings=MigrationContext.create({"tenant": "override"}),
+        name="one_to_two",
     )
 
     assert step.view["tenant"] == "override"
@@ -1218,35 +1219,20 @@ def test_runner_calls_sync_hooks(
     calls: list[str] = []
 
     class _Hook:
-        def before_migrate(  # noqa: PLR0913
-            self, name, from_version, to_version, data, *, migration=None, state=None
-        ):
+        def before_migrate(self, step, data, *, state=None):
             calls.append("before")
 
-        def after_migrate(  # noqa: PLR0913
+        def after_migrate(
             self,
-            name,
-            from_version,
-            to_version,
+            step,
             original_data,
             migrated_data,
             *,
-            migration=None,
             state=None,
         ):
             calls.append("after")
 
-        def on_error(  # noqa: PLR0913
-            self,
-            name,
-            from_version,
-            to_version,
-            data,
-            error,
-            *,
-            migration=None,
-            state=None,
-        ):
+        def on_error(self, step, data, error, *, state=None):
             calls.append("error")
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
@@ -1296,35 +1282,20 @@ def test_runner_awaits_async_hooks(
     calls: list[str] = []
 
     class _AsyncHook:
-        async def before_migrate(  # noqa: PLR0913
-            self, name, from_version, to_version, data, *, migration=None, state=None
-        ):
+        async def before_migrate(self, step, data, *, state=None):
             calls.append("before")
 
-        async def after_migrate(  # noqa: PLR0913
+        async def after_migrate(
             self,
-            name,
-            from_version,
-            to_version,
+            step,
             original_data,
             migrated_data,
             *,
-            migration=None,
             state=None,
         ):
             calls.append("after")
 
-        def on_error(  # noqa: PLR0913
-            self,
-            name,
-            from_version,
-            to_version,
-            data,
-            error,
-            *,
-            migration=None,
-            state=None,
-        ):
+        def on_error(self, step, data, error, *, state=None):
             calls.append("error")
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
@@ -1345,3 +1316,70 @@ def test_runner_awaits_async_hooks(
     )
 
     assert calls == ["before", "after"]
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+@pytest.mark.parametrize(
+    "runtime_backend",
+    [(AsyncBackend, {"backend": "asyncio", "backend_options": {}, "max_workers": 0})],
+    indirect=True,
+)
+def test_runner_enters_async_hook_scope(
+    engine: Engine,
+    registry: Registry,
+    runner_factory,
+) -> None:
+    calls: list[str] = []
+
+    class _Scope:
+        async def __aenter__(self):
+            calls.append("enter")
+            return self
+
+        async def __aexit__(self, *exc_info):
+            calls.append("exit")
+
+    class _Hook:
+        async def before_migrate(self, step, data, *, state=None):
+            return _Scope()
+
+        async def after_migrate(
+            self, step, original_data, migrated_data, *, state=None
+        ):
+            return None
+
+        def on_error(self, step, data, error, *, state=None):
+            return None
+
+    source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
+    target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
+    edge_key = EdgeKey.from_pair(source, target)
+    hook = cast("Any", _Hook())
+    binding = getattr(registry, "bindings").add_hook(edge_key, hook)
+    engine.add_hook(edge_key, binding.ref)
+
+    asyncio.run(
+        runner_factory().run(
+            _payload(),
+            latest_target_resolver(registry),
+            source_model=None,
+            max_depth=-1,
+            context=None,
+        )
+    )
+
+    assert calls == ["enter", "exit"]

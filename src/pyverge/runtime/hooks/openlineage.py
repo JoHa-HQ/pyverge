@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from types import TracebackType
 from typing import Any
 from uuid import uuid4
 
@@ -15,15 +16,56 @@ from openlineage.client.event_v2 import (
 )
 
 from pyverge.core.types import HookState
-from pyverge.core.versioning import MigrationDescriptor, NodeId
-from pyverge.runtime.hooks.state import pop_state, push_state
-from pyverge.runtime.hooks.types import MigrationHook
+from pyverge.runtime.context import StepContext
+from pyverge.runtime.hooks.types import HookScope, MigrationHook
 
 
-@dataclass(frozen=True, slots=True)
-class _RunState:
-    run_id: str
-    job_name: str
+@dataclass
+class _LineageScope:
+    """One OpenLineage run event pair for one migration step."""
+
+    client: Any
+    namespace: str
+    producer: str
+    step: StepContext
+    run_id: str = field(default_factory=lambda: uuid4().hex)
+    job_name: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.job_name = self._job_name(self.step)
+
+    def __enter__(self) -> _LineageScope:
+        self.client.emit(self._event(RunState.START))
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        event_type = RunState.FAIL if exc is not None else RunState.COMPLETE
+        self.client.emit(self._event(event_type))
+
+    def _event(self, event_type: RunState) -> RunEvent:
+        return RunEvent(
+            eventTime=datetime.now(UTC).isoformat(),
+            producer=self.producer,
+            eventType=event_type,
+            run=Run(runId=self.run_id),
+            job=Job(namespace=self.namespace, name=self.job_name),
+            inputs=[InputDataset(self.namespace, str(self.step.source))],
+            outputs=[OutputDataset(self.namespace, str(self.step.target))],
+        )
+
+    @staticmethod
+    def _job_name(step: StepContext) -> str:
+        base = (
+            f"migration.{step.source.kind}.{step.source.version}->{step.target.version}"
+        )
+        if step.edge.is_default_discriminator:
+            return base
+        return f"{base}.{step.edge.discriminator}"
 
 
 class OpenLineageHook(MigrationHook):
@@ -40,85 +82,39 @@ class OpenLineageHook(MigrationHook):
         self._namespace = namespace
         self._producer = producer
 
-    def before_migrate(  # noqa: PLR0913
+    def before_migrate(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         data: dict[str, Any],
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
-    ) -> None:
-        job_name = self._job_name(from_version, to_version)
-        run_state = _RunState(run_id=uuid4().hex, job_name=job_name)
-        push_state(state, id(self), run_state)
-        self._client.emit(
-            RunEvent(
-                eventTime=datetime.now(UTC).isoformat(),
-                producer=self._producer,
-                eventType=RunState.START,
-                run=Run(runId=run_state.run_id),
-                job=Job(namespace=self._namespace, name=run_state.job_name),
-                inputs=[InputDataset(self._namespace, str(from_version))],
-                outputs=[OutputDataset(self._namespace, str(to_version))],
-            )
+    ) -> HookScope:
+        return _LineageScope(
+            client=self._client,
+            namespace=self._namespace,
+            producer=self._producer,
+            step=step,
         )
 
-    def after_migrate(  # noqa: PLR0913
+    def after_migrate(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         original_data: dict[str, Any],
         migrated_data: dict[str, Any],
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
     ) -> None:
-        run_state = pop_state(state, id(self))
-        if not isinstance(run_state, _RunState):
-            return
-        self._client.emit(
-            RunEvent(
-                eventTime=datetime.now(UTC).isoformat(),
-                producer=self._producer,
-                eventType=RunState.COMPLETE,
-                run=Run(runId=run_state.run_id),
-                job=Job(namespace=self._namespace, name=run_state.job_name),
-            )
-        )
+        return None
 
-    def on_error(  # noqa: PLR0913
+    def on_error(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         data: dict[str, Any],
         error: Exception,
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
     ) -> None:
-        run_state = pop_state(state, id(self))
-        if not isinstance(run_state, _RunState):
-            return
-        self._client.emit(
-            RunEvent(
-                eventTime=datetime.now(UTC).isoformat(),
-                producer=self._producer,
-                eventType=RunState.FAIL,
-                run=Run(runId=run_state.run_id),
-                job=Job(namespace=self._namespace, name=run_state.job_name),
-            )
-        )
-
-    @staticmethod
-    def _job_name(from_version: NodeId, to_version: NodeId) -> str:
-        return (
-            f"migration.{from_version.kind}."
-            f"{from_version.version}->{to_version.version}"
-        )
+        return None
 
 
 __all__ = ["OpenLineageHook"]
