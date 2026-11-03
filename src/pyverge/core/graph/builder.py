@@ -5,11 +5,11 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, Generic
 
+from pyverge.core.graph.graph import MigrationGraph
+from pyverge.core.graph.types import GraphSnapshotSource
+from pyverge.core.registry.errors import CatalogError
 from pyverge.core.types import ModelKind, VersionValue
 from pyverge.core.versioning import EdgeKey, NodeId
-from pyverge.graph.graph import MigrationGraph
-from pyverge.graph.types import GraphSnapshotSource
-from pyverge.registry.errors import CatalogError
 
 
 def _freeze(values: Mapping[Any, Any]) -> Mapping[Any, Any]:

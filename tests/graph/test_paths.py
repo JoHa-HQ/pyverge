@@ -7,8 +7,8 @@ import pendulum
 import pytest
 import semver
 
+from pyverge.core.registry.errors import MigrationPathError
 from pyverge.core.versioning import EdgeKey, NodeRef, VersionKey
-from pyverge.registry.errors import MigrationPathError
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.settings import VersioningSettings
 from tests.examples.json import USER_V2025_01_01, USER_V2025_03_10

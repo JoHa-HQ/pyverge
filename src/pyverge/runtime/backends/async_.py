@@ -9,9 +9,9 @@ from typing import Any
 
 import anyio
 
+from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import VersionValue
 from pyverge.core.versioning import EdgeKey
-from pyverge.graph.planning.path import Path
 from pyverge.runtime.context import MigrationContext, RunContext, StepContext
 from pyverge.runtime.hooks.state import new_hook_state
 from pyverge.runtime.plan import ExecutionPlan, PathPlanEntry

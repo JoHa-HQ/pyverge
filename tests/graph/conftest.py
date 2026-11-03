@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from pyverge.graph import AnyDirection, PathFinder, PolicyEngine, TargetCompiler
+from pyverge.core.graph import AnyDirection, PathFinder, PolicyEngine, TargetCompiler
 from pyverge.runtime.migrations import MigrationBindings
 from tests.utils import envelope_model
 

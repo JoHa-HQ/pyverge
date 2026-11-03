@@ -65,7 +65,7 @@ from pyverge.core.versioning import (
     VersionNode,
     VersionPair,
 )
-from pyverge.manager.types import (
+from pyverge.runtime.manager.types import (
     ManagerClassState,
     ManagerInstanceState,
     ResolverFactory,

@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, cast
 
+from pyverge.core.registry.types import MigrationWrite, ModelWrite
 from pyverge.core.versioning import JgfGraph
-from pyverge.registry.types import MigrationWrite, ModelWrite
 
 from .types import EdgeResolver, NodeResolver
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
+from pyverge.core.registry.types import ModelCatalog, PathCatalog
 from pyverge.core.types import Attachable, MigrationFunc, ModelKind, VersionValue
 from pyverge.core.versioning import (
     Diffable,
@@ -14,7 +15,6 @@ from pyverge.core.versioning import (
     Transitional,
     VersionNode,
 )
-from pyverge.registry.types import ModelCatalog, PathCatalog
 
 
 @runtime_checkable

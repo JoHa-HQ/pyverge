@@ -3,9 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Generic
 
+from pyverge.core.graph.planning.plan import PathPlan, PathPlanEntry
 from pyverge.core.types import VersionValue
 from pyverge.core.versioning import VersionNode
-from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
 
 
 @dataclass(frozen=True, slots=True)

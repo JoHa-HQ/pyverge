@@ -6,9 +6,9 @@ import json
 from functools import singledispatchmethod
 from typing import Any, cast
 
-from pyverge.graph.planning.targets import DefaultTarget
-from pyverge.graph.planning.targets import FirstMatch as _FirstMatch
-from pyverge.manager.types import TargetPolicy, VersionRange
+from pyverge.core.graph.planning.targets import DefaultTarget
+from pyverge.core.graph.planning.targets import FirstMatch as _FirstMatch
+from pyverge.runtime.manager.types import TargetPolicy, VersionRange
 
 from .domain import (
     MessageHeaders,

@@ -6,8 +6,8 @@ from __future__ import annotations
 import pytest
 import semver
 
+from pyverge.core.registry.errors import CatalogError
 from pyverge.core.versioning import EdgeKey, NodeRef, VersionKey
-from pyverge.registry.errors import CatalogError
 from pyverge.schemas import PydanticModelAdapter
 from pyverge.settings import VersioningSettings
 from tests.examples.migrations import USER_JSONATA_V2_TO_V3, USER_JSONPATCH_V1_TO_V2

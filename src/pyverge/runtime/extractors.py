@@ -5,12 +5,12 @@ from dataclasses import dataclass, replace
 from typing import Any, Generic, Literal
 
 from pyverge.core.errors import MaxDepthExceededError, PayloadValidationError
+from pyverge.core.graph.types import GraphView
 from pyverge.core.types import VersionValue
 from pyverge.core.versioning import (
     VersionKey,
     VersionNode,
 )
-from pyverge.graph.types import GraphView
 from pyverge.runtime.types import (
     Entry,
 )

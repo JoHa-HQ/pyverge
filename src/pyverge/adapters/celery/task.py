@@ -9,7 +9,7 @@ from typing import Any
 from celery import Task
 
 from pyverge.adapters.handlers import HandlerView
-from pyverge.manager.types import TargetPolicy
+from pyverge.runtime.manager.types import TargetPolicy
 
 from .domain import TaskContext
 from .runtime import CeleryRuntime

@@ -9,8 +9,8 @@ from pyverge.runtime.plan import ExecutionPlan
 from pyverge.schemas.types import ModelIdentityPort
 
 if TYPE_CHECKING:
+    from pyverge.core.graph.types import GraphView
     from pyverge.core.versioning import VersionNode
-    from pyverge.graph.types import GraphView
 
 T = TypeVar("T")
 

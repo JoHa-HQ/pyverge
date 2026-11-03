@@ -5,6 +5,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Generic, cast
 
+from pyverge.core.registry.errors import (
+    CatalogError,
+    MigrationNotFoundError,
+    MigrationPathError,
+    ModelNotFoundError,
+)
 from pyverge.core.types import ModelKind, VersionValue
 from pyverge.core.versioning import (
     Comparable,
@@ -14,12 +20,6 @@ from pyverge.core.versioning import (
     NodeId,
     Transitional,
     VersionNode,
-)
-from pyverge.registry.errors import (
-    CatalogError,
-    MigrationNotFoundError,
-    MigrationPathError,
-    ModelNotFoundError,
 )
 
 

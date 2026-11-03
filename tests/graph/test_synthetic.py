@@ -7,7 +7,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from pyverge.registry.errors import MigrationPathError
+from pyverge.core.registry.errors import MigrationPathError
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from tests.examples.json import (
     USER_V2025_01_01,

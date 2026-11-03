@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic, Literal, Protocol, TypeVar, cast
 
+from pyverge.core.graph.types import GraphView
+from pyverge.core.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.core.types import (
     ModelHandle,
     ModelKind,
@@ -17,8 +19,6 @@ from pyverge.core.versioning import (
     VersionNode,
     parse_version,
 )
-from pyverge.graph.types import GraphView
-from pyverge.registry.errors import CatalogError, ModelNotFoundError
 from pyverge.schemas.types import ModelIdentityPort
 
 TargetStrategy = Literal["latest", "earliest", "skip"]

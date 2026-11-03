@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic
 
+from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import (
     Attachable,
     MigrationFunc,
@@ -10,7 +11,6 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import MigrationDescriptor, ModelRef, VersionNode
-from pyverge.graph.planning.path import Path
 
 
 @dataclass(frozen=True, slots=True)

@@ -5,6 +5,15 @@ from itertools import chain
 from types import MappingProxyType
 from typing import Any, Generic, Self, cast
 
+from pyverge.core.registry.errors import (
+    CatalogError,
+    HealthValidationError,
+    MigrationConflictError,
+    MigrationNotFoundError,
+    ModelAlreadyRegisteredError,
+    ModelConflictError,
+    ModelNotFoundError,
+)
 from pyverge.core.types import (
     Attachable,
     MigrationFunc,
@@ -30,15 +39,6 @@ from pyverge.core.versioning.errors import NodeConflictError
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
 from pyverge.migrations.json_patch import JsonPatch
 from pyverge.migrations.spec import MigrationSpec
-from pyverge.registry.errors import (
-    CatalogError,
-    HealthValidationError,
-    MigrationConflictError,
-    MigrationNotFoundError,
-    ModelAlreadyRegisteredError,
-    ModelConflictError,
-    ModelNotFoundError,
-)
 
 from .linters import HealthLinter
 from .types import HealthFailLevel, HealthIssue, ReflectionPort
@@ -54,7 +54,7 @@ class Registry(Generic[VersionValue]):
     >>> from typing import Literal
     >>> import semver
     >>> from pydantic import BaseModel
-    >>> from pyverge.registry import Registry
+    >>> from pyverge.core.registry import Registry
     >>> from pyverge.schemas import ModelCodec
     >>> from pyverge.schemas import PydanticModelAdapter
     >>> from pyverge.core.versioning import default_content_hasher

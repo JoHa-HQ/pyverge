@@ -6,11 +6,11 @@ import inspect
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from pyverge.core.registry import HealthFailLevel
 from pyverge.core.types import ModelData
-from pyverge.manager import Manager
-from pyverge.manager.types import TargetPolicy
-from pyverge.registry import HealthFailLevel
 from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.manager import Manager
+from pyverge.runtime.manager.types import TargetPolicy
 
 if TYPE_CHECKING:
     from pyverge.runtime import Runner

@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from pyverge.runtime import Runner
 
 from pyverge.adapters.runtime import ConvergenceRuntime
-from pyverge.registry.errors import HealthValidationError
+from pyverge.core.registry.errors import HealthValidationError
 
 
 class CeleryRuntime(ConvergenceRuntime):

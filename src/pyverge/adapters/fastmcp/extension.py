@@ -4,7 +4,7 @@ from typing import Any
 
 from fastmcp.server.extensions import ServerExtension
 
-from pyverge.manager import Manager
+from pyverge.runtime.manager import Manager
 
 
 class PyvergeExtension(ServerExtension):

@@ -4,6 +4,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic
 
+from pyverge.core.graph.planning.plan import PathPlan, PathPlanEntry
+from pyverge.core.graph.planning.policy import PolicyEngine
+from pyverge.core.graph.planning.targets import TargetCompiler, TargetPolicy
+from pyverge.core.graph.types import MigrationResolver, PathGraphView
 from pyverge.core.types import (
     Attachable,
     MigrationFunc,
@@ -12,10 +16,6 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import EdgeKey, MigrationDescriptor, NodeId, VersionNode
-from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
-from pyverge.graph.planning.policy import PolicyEngine
-from pyverge.graph.planning.targets import TargetCompiler, TargetPolicy
-from pyverge.graph.types import MigrationResolver, PathGraphView
 
 if TYPE_CHECKING:
     from pyverge.runtime.plan import ExtractedEntry

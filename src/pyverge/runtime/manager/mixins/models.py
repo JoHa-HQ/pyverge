@@ -24,7 +24,7 @@ from ..descriptors import hybridmethod
 
 if TYPE_CHECKING:
     from pyverge.core.engine import Engine
-    from pyverge.manager.manager import Manager
+    from pyverge.runtime.manager.manager import Manager
 
 
 class ModelStoreMixin(Generic[VersionValue]):

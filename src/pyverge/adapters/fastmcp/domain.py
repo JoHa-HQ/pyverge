@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, TypeAlias
 
-from pyverge.manager.types import VersionRange
+from pyverge.runtime.manager.types import VersionRange
 
 PolicyValue: TypeAlias = str | VersionRange
 Policy: TypeAlias = PolicyValue | dict[str, PolicyValue]

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from pyverge.core.engine import Engine
-    from pyverge.manager.manager import Manager
+    from pyverge.runtime.manager.manager import Manager
 
 
 class MigrationStoreMixin(Generic[VersionValue]):

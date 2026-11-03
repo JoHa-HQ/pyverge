@@ -11,7 +11,20 @@ import pytest
 
 from pyverge import Manager
 from pyverge.core.engine import Engine
+from pyverge.core.graph import (
+    AnyDirection,
+    GraphBuilder,
+    PathFinder,
+    PolicyEngine,
+    TargetCompiler,
+    direction_policy,
+)
 from pyverge.core.ids import UuidIdFactory
+from pyverge.core.registry import (
+    DEFAULT_HEALTH_LINTERS,
+    CompatibilityLinter,
+    Registry,
+)
 from pyverge.core.types import (
     VersionValue,
 )
@@ -21,21 +34,8 @@ from pyverge.discovery.reflection import (
     Reflection,
     Reflector,
 )
-from pyverge.graph import (
-    AnyDirection,
-    GraphBuilder,
-    PathFinder,
-    PolicyEngine,
-    TargetCompiler,
-    direction_policy,
-)
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.registry import (
-    DEFAULT_HEALTH_LINTERS,
-    CompatibilityLinter,
-    Registry,
-)
 from pyverge.runtime import (
     ExecutionCoordinator,
     ExecutionPlanner,

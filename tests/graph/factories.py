@@ -9,6 +9,13 @@ from typing import Any
 
 from hypothesis import strategies as st
 
+from pyverge.core.graph import (
+    DirectionPolicy,
+    GraphBuilder,
+    MigrationGraph,
+    PathPlanEntry,
+)
+from pyverge.core.registry import Registry
 from pyverge.core.types import (
     DepthViolationStrategy,
     DirectionViolationStrategy,
@@ -24,13 +31,6 @@ from pyverge.core.versioning import (
     VersionNode,
     default_content_hasher,
 )
-from pyverge.graph import (
-    DirectionPolicy,
-    GraphBuilder,
-    MigrationGraph,
-    PathPlanEntry,
-)
-from pyverge.registry import Registry
 from pyverge.schemas.types import ModelAdapter
 
 

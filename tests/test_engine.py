@@ -14,16 +14,8 @@ import semver
 
 from pyverge import types
 from pyverge.core.engine import Engine
-from pyverge.core.versioning import (
-    EdgeKey,
-    FieldDescriptor,
-    NodeRef,
-    TypeRef,
-    VersionKey,
-)
-from pyverge.graph import fixed_target_resolver, latest_target_resolver
-from pyverge.migrations import JsonPatchMigration
-from pyverge.registry.errors import (
+from pyverge.core.graph import fixed_target_resolver, latest_target_resolver
+from pyverge.core.registry.errors import (
     CatalogError,
     MigrationAlreadyRegisteredError,
     MigrationNotFoundError,
@@ -32,6 +24,14 @@ from pyverge.registry.errors import (
     ModelConflictError,
     ModelNotFoundError,
 )
+from pyverge.core.versioning import (
+    EdgeKey,
+    FieldDescriptor,
+    NodeRef,
+    TypeRef,
+    VersionKey,
+)
+from pyverge.migrations import JsonPatchMigration
 from pyverge.runtime import MigrationHook
 from pyverge.runtime.context import MigrationContext
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter

@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from pyverge.core import MigrationFunc, VersionValue
+from pyverge.core.registry import Registry
 from pyverge.core.versioning import (
     Diff,
     MigrationRef,
@@ -18,7 +19,6 @@ from pyverge.core.versioning import (
     parse_version,
 )
 from pyverge.migrations.identity import DefaultMigrationIdentityResolver
-from pyverge.registry import Registry
 from pyverge.schemas.types import (
     ModelAdapter,
     ModelHandle,

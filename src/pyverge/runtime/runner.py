@@ -4,9 +4,9 @@ import copy
 from dataclasses import dataclass
 from typing import Any, Generic, TypeAlias
 
+from pyverge.core.graph.planning.path import Path
+from pyverge.core.graph.planning.targets import TargetPolicy
 from pyverge.core.types import VersionValue
-from pyverge.graph.planning.path import Path
-from pyverge.graph.planning.targets import TargetPolicy
 from pyverge.runtime.context import ExecutionEnvironment, MigrationContext, RunContext
 from pyverge.runtime.coordinator import ExecutionCoordinator
 from pyverge.runtime.errors import TargetValidationError, UnknownModelError

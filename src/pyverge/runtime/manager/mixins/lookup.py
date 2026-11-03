@@ -3,6 +3,11 @@ from __future__ import annotations
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Any, Generic, cast
 
+from pyverge.core.registry.errors import (
+    CatalogError,
+    MigrationPathError,
+    ModelNotFoundError,
+)
 from pyverge.core.types import (
     MIGRATION_PAIR_LEN,
     VersionValue,
@@ -17,15 +22,10 @@ from pyverge.core.versioning import (
     VersionNode,
 )
 from pyverge.core.versioning.errors import MigrationApplicationError
-from pyverge.registry.errors import (
-    CatalogError,
-    MigrationPathError,
-    ModelNotFoundError,
-)
 
 if TYPE_CHECKING:
     from pyverge.core.engine import Engine
-    from pyverge.manager.manager import Manager
+    from pyverge.runtime.manager.manager import Manager
 
 
 class LookupMixin(Generic[VersionValue]):

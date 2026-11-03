@@ -9,6 +9,27 @@ from typing import (
     TypeAlias,
 )
 
+from pyverge.core.graph.planning.targets import (
+    DefaultTarget as DefaultTarget,  # noqa: PLC0414
+)
+from pyverge.core.graph.planning.targets import (
+    FirstMatch as FirstMatch,  # noqa: PLC0414
+)
+from pyverge.core.graph.planning.targets import (
+    TargetPolicy as TargetPolicy,  # noqa: PLC0414
+)
+from pyverge.core.graph.planning.targets import (
+    TargetSelector as TargetSelector,  # noqa: PLC0414
+)
+from pyverge.core.graph.planning.targets import (
+    TargetSpec as TargetSpec,  # noqa: PLC0414
+)
+from pyverge.core.graph.planning.targets import (
+    TargetStrategy as TargetStrategy,  # noqa: PLC0414
+)
+from pyverge.core.graph.planning.targets import (
+    VersionRange as VersionRange,  # noqa: PLC0414
+)
 from pyverge.core.types import (
     MigrationFunc,
     MigrationKeyInput,
@@ -17,33 +38,13 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import Versionable
-from pyverge.graph.planning.targets import (
-    DefaultTarget as DefaultTarget,  # noqa: PLC0414
-)
-from pyverge.graph.planning.targets import (
-    FirstMatch as FirstMatch,  # noqa: PLC0414
-)
-from pyverge.graph.planning.targets import (
-    TargetPolicy as TargetPolicy,  # noqa: PLC0414
-)
-from pyverge.graph.planning.targets import (
-    TargetSelector as TargetSelector,  # noqa: PLC0414
-)
-from pyverge.graph.planning.targets import (
-    TargetSpec as TargetSpec,  # noqa: PLC0414
-)
-from pyverge.graph.planning.targets import (
-    TargetStrategy as TargetStrategy,  # noqa: PLC0414
-)
-from pyverge.graph.planning.targets import (
-    VersionRange as VersionRange,  # noqa: PLC0414
-)
 from pyverge.schemas.types import (
     ModelAdapter,
 )
 
 if TYPE_CHECKING:
     from pyverge.core.engine import Engine
+    from pyverge.core.registry import Registry
     from pyverge.core.types import (
         Attachable,
     )
@@ -51,7 +52,6 @@ if TYPE_CHECKING:
     from pyverge.discovery.reflection import DiffProvider
     from pyverge.migrations.json_patch import JsonPatchMigration
     from pyverge.migrations.jsonata import JsonataMigration
-    from pyverge.registry import Registry
 
 
 #: A callable that binds a registry to a :data:`TargetResolver`; the shape of

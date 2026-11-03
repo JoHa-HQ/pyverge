@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from functools import singledispatchmethod
 from types import MappingProxyType
@@ -13,24 +13,28 @@ from .clock import Clock
 
 
 class MigrationContext(Mapping[str, Any]):
-    """Read-only view over the migration's runtime bindings."""
+    """Read-only layered view over a migration's runtime bindings."""
 
-    __slots__ = ("_view",)
-    _view: Mapping[str, Any]
+    __slots__ = ("_layers",)
+    _layers: tuple[Mapping[str, Any], ...]
 
-    def __init__(self, view: MappingProxyType[str, Any] | None = None) -> None:
-        self._view = view if view is not None else MappingProxyType({})
+    def __init__(self, *layers: Mapping[str, Any]) -> None:
+        self._layers = tuple(layers)
 
     @classmethod
     def empty(cls) -> Self:
-        return cls(MappingProxyType({}))
+        return cls()
+
+    @classmethod
+    def layered(cls, *layers: Mapping[str, Any]) -> Self:
+        return cls(*layers)
 
     @singledispatchmethod
     @classmethod
     def create(cls, values: Mapping[str, Any] | None = None) -> Self:
         if isinstance(values, MigrationContext):
             return cast(Self, values)
-        return cls(cast(MappingProxyType[str, Any], values))
+        return cls(cast(Mapping[str, Any], values))
 
     @create.register(type(None))
     @classmethod
@@ -44,32 +48,7 @@ class MigrationContext(Mapping[str, Any]):
 
     @property
     def view(self) -> Mapping[str, Any]:
-        return self._view
-
-    def __getitem__(self, key: str) -> Any:
-        return self._view[key]
-
-    def __iter__(self) -> Iterator[str]:
-        return iter(self._view)
-
-    def __len__(self) -> int:
-        return len(self._view)
-
-    # Mapping supplies value equality, so the context is unhashable — like dict.
-    __hash__ = None  # type: ignore[assignment]
-
-    def __repr__(self) -> str:
-        return f"MigrationContext({dict(self._view)!r})"
-
-
-EMPTY_CONTEXT = MigrationContext.empty()
-
-
-class LayeredView(Mapping[str, Any]):
-    """Read-only layered mapping: earlier layers take precedence."""
-
-    def __init__(self, layers: Sequence[Mapping[str, Any]]) -> None:
-        self._layers = tuple(layers)
+        return self
 
     def __getitem__(self, key: str) -> Any:
         for layer in self._layers:
@@ -88,8 +67,14 @@ class LayeredView(Mapping[str, Any]):
     def __len__(self) -> int:
         return sum(1 for _ in self)
 
+    # Mapping supplies value equality, so the context is unhashable — like dict.
+    __hash__ = None  # type: ignore[assignment]
+
     def __repr__(self) -> str:
-        return f"LayeredView({dict(self)!r})"
+        return f"MigrationContext({dict(self)!r})"
+
+
+EMPTY_CONTEXT = MigrationContext.empty()
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,12 +114,11 @@ class StepContext:
 
     @property
     def view(self) -> MigrationContext:
-        return MigrationContext.create(LayeredView((self.bindings, self.run.bindings)))
+        return MigrationContext.layered(self.bindings, self.run.bindings)
 
 
 __all__ = [
     "ExecutionEnvironment",
-    "LayeredView",
     "RunContext",
     "StepContext",
 ]

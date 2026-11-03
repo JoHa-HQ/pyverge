@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from faststream.exceptions import StartupValidationError
 
 from pyverge.adapters.runtime import ConvergenceRuntime
-from pyverge.registry.errors import HealthValidationError
+from pyverge.core.registry.errors import HealthValidationError
 
 if TYPE_CHECKING:
     from pyverge.runtime import Runner

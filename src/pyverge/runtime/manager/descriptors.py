@@ -12,16 +12,16 @@ from pyverge.core.types import (
     ModelPair,
     VersionValue,
 )
-from pyverge.manager.types import (
+from pyverge.migrations import JsonataMigration, JsonPatchMigration
+from pyverge.runtime.manager.types import (
     ManagerClassState,
 )
-from pyverge.migrations import JsonataMigration, JsonPatchMigration
 from pyverge.schemas.types import (
     ModelHandle,
 )
 
 if TYPE_CHECKING:
-    from pyverge.manager.manager import Manager
+    from pyverge.runtime.manager.manager import Manager
 
 
 MigrationSyntax = Literal["jsonata"]

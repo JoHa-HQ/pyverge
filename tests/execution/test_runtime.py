@@ -18,8 +18,7 @@ from hypothesis import strategies as st
 
 from pyverge.core import MaxDepthExceededError, PayloadValidationError
 from pyverge.core.engine import Engine
-from pyverge.core.versioning import EdgeKey, VersionNode
-from pyverge.graph import (
+from pyverge.core.graph import (
     PathPlan,
     PathPlanEntry,
     fixed_target_resolver,
@@ -27,7 +26,8 @@ from pyverge.graph import (
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.registry import Registry
+from pyverge.core.registry import Registry
+from pyverge.core.versioning import EdgeKey, VersionNode
 from pyverge.runtime import (
     ExecutionPlanner,
     PayloadWalker,
@@ -35,7 +35,6 @@ from pyverge.runtime import (
 )
 from pyverge.runtime.backends import AsyncBackend, ProcessBackend, ThreadedBackend
 from pyverge.runtime.context import (
-    LayeredView,
     MigrationContext,
     RunContext,
     StepContext,
@@ -990,13 +989,13 @@ def test_chrono_runner_migrates_to_latest(
     assert result["document"]["version"] == "2025-12-31"
 
 
-def test_layered_view_resolves_precedence() -> None:
-    view = LayeredView(({"a": 1}, {"a": 2, "b": 3}))
+def test_migration_context_layers_resolve_precedence() -> None:
+    context = MigrationContext.layered({"a": 1}, {"a": 2, "b": 3})
 
-    assert view["a"] == 1
-    assert view["b"] == 3  # noqa: PLR2004
-    assert dict(view) == {"a": 1, "b": 3}
-    assert len(view) == len(("a", "b"))
+    assert context["a"] == 1
+    assert context["b"] == 3  # noqa: PLR2004
+    assert dict(context) == {"a": 1, "b": 3}
+    assert len(context) == len(("a", "b"))
 
 
 def test_step_context_layers_bindings(execution_environment) -> None:

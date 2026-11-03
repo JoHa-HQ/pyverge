@@ -3,6 +3,21 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, Generic, Literal, Self, cast, overload
 
+from pyverge.core.graph import (
+    DirectionPolicy,
+    GraphBuilder,
+    MigrationGraph,
+    PathFinder,
+    PolicyEngine,
+    TargetCompiler,
+)
+from pyverge.core.registry import HealthFailLevel, HealthIssue, Registry
+from pyverge.core.registry.errors import (
+    CatalogError,
+    MigrationNotFoundError,
+    MissingReferenceError,
+    ModelNotFoundError,
+)
 from pyverge.core.types import (
     Attachable,
     DepthViolationStrategy,
@@ -26,23 +41,8 @@ from pyverge.core.versioning import (
     VersionNode,
     VersionPair,
 )
-from pyverge.graph import (
-    DirectionPolicy,
-    GraphBuilder,
-    MigrationGraph,
-    PathFinder,
-    PolicyEngine,
-    TargetCompiler,
-)
 from pyverge.migrations import MigrationSpec
 from pyverge.migrations.json_patch import JsonPatch
-from pyverge.registry import HealthFailLevel, HealthIssue, Registry
-from pyverge.registry.errors import (
-    CatalogError,
-    MigrationNotFoundError,
-    MissingReferenceError,
-    ModelNotFoundError,
-)
 from pyverge.runtime import (
     ExecutionCoordinator,
     ExecutionPlanner,
@@ -76,7 +76,7 @@ class Engine(Generic[VersionValue]):
 
     It does not execute migrations; :class:`~pyverge.runtime.Runner` does.
     Migration registration, reflection, identity assignment, and compatibility
-    linting belong to :class:`~pyverge.registry.Registry`.
+    linting belong to :class:`~pyverge.core.registry.Registry`.
 
     Args:
         registry: Mutable registry owned by this Engine.

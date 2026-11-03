@@ -4,7 +4,14 @@ from dataclasses import dataclass
 from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
+from pyverge.core.graph import (
+    AnyDirection,
+    BackwardDirection,
+    DirectionPolicy,
+    ForwardDirection,
+)
 from pyverge.core.ids import UuidIdFactory
+from pyverge.core.registry import HealthFailLevel, HealthIssue
 from pyverge.core.types import (
     DepthViolationStrategy,
     DirectionViolationStrategy,
@@ -18,13 +25,6 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import Diffable, Identifiable
-from pyverge.graph import (
-    AnyDirection,
-    BackwardDirection,
-    DirectionPolicy,
-    ForwardDirection,
-)
-from pyverge.registry import HealthFailLevel, HealthIssue
 from pyverge.runtime import Runner, ThreadedBackend
 from pyverge.runtime.clock import SystemClock
 from pyverge.runtime.context import ExecutionEnvironment
@@ -35,7 +35,7 @@ from ..descriptors import hybridmethod
 
 if TYPE_CHECKING:
     from pyverge.core.engine import Engine
-    from pyverge.manager.manager import Manager
+    from pyverge.runtime.manager.manager import Manager
 
 
 def _direction(strategy: MigrationDirectionStrategy) -> DirectionPolicy:

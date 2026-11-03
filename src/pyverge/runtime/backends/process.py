@@ -5,9 +5,9 @@ import inspect
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any
 
+from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import VersionValue
 from pyverge.core.versioning import EdgeKey
-from pyverge.graph.planning.path import Path
 from pyverge.runtime.context import MigrationContext, RunContext, StepContext
 from pyverge.runtime.errors import AsyncExecutionRequired
 from pyverge.runtime.hooks.state import new_hook_state

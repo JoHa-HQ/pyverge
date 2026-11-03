@@ -13,6 +13,14 @@ import pytest
 import semver
 
 from pyverge import types
+from pyverge.cli.export import (
+    ManifestDiff,
+    ManifestExporter,
+    ManifestSpec,
+    ManifestVersion,
+)
+from pyverge.cli.jgf import JgfExporter
+from pyverge.core.registry import Registry
 from pyverge.core.versioning import (
     ChangeSet,
     ContentHasher,
@@ -24,14 +32,6 @@ from pyverge.core.versioning import (
     default_canonicalizer,
     default_content_hasher,
 )
-from pyverge.export import (
-    ManifestDiff,
-    ManifestExporter,
-    ManifestSpec,
-    ManifestVersion,
-)
-from pyverge.jgf import JgfExporter
-from pyverge.registry import Registry
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
 from pyverge.schemas.types import ModelHandle
 from pyverge.settings import VersioningSettings

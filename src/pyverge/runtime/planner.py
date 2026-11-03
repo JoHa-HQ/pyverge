@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Generic
 
+from pyverge.core.graph.planning.plan import PathPlan
 from pyverge.core.types import VersionValue
-from pyverge.graph.planning.plan import PathPlan
 from pyverge.runtime.plan import ExecutionPlan
 
 

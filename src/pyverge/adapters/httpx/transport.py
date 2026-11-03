@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 import httpx
 
 from pyverge.adapters.runtime import ConvergenceRuntime
-from pyverge.manager.types import TargetPolicy
 from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.manager.types import TargetPolicy
 
 from .policy import HttpPolicy
 

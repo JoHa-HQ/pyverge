@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from json_graph_lite.jgf import Graph as LiteGraph
 
+from pyverge.core.registry import CompatibilityReport
 from pyverge.core.versioning import (
     NO_DEFAULT,
     Canonicalizer,
@@ -35,7 +36,6 @@ from pyverge.core.versioning.errors import (
     BackwardCompatibilityError,
     MigrationApplicationError,
 )
-from pyverge.registry import CompatibilityReport
 from pyverge.schemas import (
     DataclassModelAdapter,
     JsonSchemaModelAdapter,

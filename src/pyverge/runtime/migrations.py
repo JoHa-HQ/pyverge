@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Generic, cast
 
+from pyverge.core.graph.types import MigrationDefinition
+from pyverge.core.registry.errors import MigrationNotFoundError
+from pyverge.core.registry.types import GraphCatalog
 from pyverge.core.types import Attachable, VersionValue
 from pyverge.core.versioning import EdgeKey
-from pyverge.graph.types import MigrationDefinition
-from pyverge.registry.errors import MigrationNotFoundError
-from pyverge.registry.types import GraphCatalog
 
 
 @dataclass(frozen=True, slots=True)

@@ -8,9 +8,7 @@ from itertools import pairwise
 import pytest
 import semver
 
-from pyverge.core.types import MigrationDirectionStrategy
-from pyverge.core.versioning import EdgeKey, parse_version
-from pyverge.graph import (
+from pyverge.core.graph import (
     AnyDirection,
     BackwardDirection,
     ForwardDirection,
@@ -21,7 +19,9 @@ from pyverge.graph import (
     TargetCompiler,
     direction_policy,
 )
-from pyverge.registry.errors import CatalogError
+from pyverge.core.registry.errors import CatalogError
+from pyverge.core.types import MigrationDirectionStrategy
+from pyverge.core.versioning import EdgeKey, parse_version
 from pyverge.runtime.migrations import MigrationBindings
 from pyverge.runtime.plan import ExtractedEntry
 from pyverge.schemas import PydanticModelAdapter

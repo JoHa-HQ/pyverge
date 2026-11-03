@@ -4,6 +4,7 @@ from functools import singledispatchmethod
 from typing import TYPE_CHECKING, Generic, Literal, cast
 
 from pyverge.core.engine import Engine
+from pyverge.core.graph.planning.targets import TargetCompiler
 from pyverge.core.types import (
     ModelKind,
     TargetResolver,
@@ -12,8 +13,7 @@ from pyverge.core.types import (
 from pyverge.core.versioning import (
     VersionNode,
 )
-from pyverge.graph.planning.targets import TargetCompiler
-from pyverge.manager.types import (
+from pyverge.runtime.manager.types import (
     TargetPolicy,
     TargetSpec,
 )
@@ -24,7 +24,7 @@ from pyverge.schemas.types import (
 from ..descriptors import hybridmethod
 
 if TYPE_CHECKING:
-    from pyverge.manager.manager import Manager
+    from pyverge.runtime.manager.manager import Manager
 
 
 class TargetResolutionMixin(Generic[VersionValue]):

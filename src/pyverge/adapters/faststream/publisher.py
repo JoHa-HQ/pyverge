@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from functools import wraps
 from typing import Any, cast
 
-from pyverge.manager.types import TargetPolicy
+from pyverge.runtime.manager.types import TargetPolicy
 from pyverge.schemas.types import ModelHandle
 
 from .handlers import HandlerView

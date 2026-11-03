@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Generic
 
+from pyverge.core.graph.planning.direction import DirectionPolicy
+from pyverge.core.graph.planning.plan import PathPlan, PathPlanEntry
+from pyverge.core.graph.types import GraphView
+from pyverge.core.registry.errors import CatalogError
 from pyverge.core.types import (
     DepthViolationStrategy,
     DirectionViolationStrategy,
@@ -10,10 +14,6 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import EdgeKey
-from pyverge.graph.planning.direction import DirectionPolicy
-from pyverge.graph.planning.plan import PathPlan, PathPlanEntry
-from pyverge.graph.types import GraphView
-from pyverge.registry.errors import CatalogError
 
 
 @dataclass(frozen=True, slots=True)

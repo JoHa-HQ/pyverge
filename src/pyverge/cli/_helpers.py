@@ -138,24 +138,24 @@ manager = "models"
 def create_multi_manager_config(project_dir: Path, use_pyproject: bool) -> None:
     try:
         if use_pyproject:
-            config_content = """[tool.pyverge.managers]
+            config_content = """[tool.pyverge.runtime.managers]
 default = "models"
 api_v1 = "api.v1.models"
 api_v2 = "api.v2.models"
 
 # Optional: Configure specific manager with init args
-# [tool.pyverge.managers.api_v1]
+# [tool.pyverge.runtime.managers.api_v1]
 # manager = "api.v1.models:create_manager"
 # init_args = ["production"]
 """
         else:
-            config_content = """[pyverge.managers]
+            config_content = """[pyverge.runtime.managers]
 default = "models"
 api_v1 = "api.v1.models"
 api_v2 = "api.v2.models"
 
 # Optional: Configure specific manager with init args
-# [pyverge.managers.api_v1]
+# [pyverge.runtime.managers.api_v1]
 # manager = "api.v1.models:create_manager"
 # init_args = ["production"]
 """

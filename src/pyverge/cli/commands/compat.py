@@ -4,8 +4,8 @@ from typing import Annotated
 
 import typer
 
+from pyverge.core.registry import CompatibilityReport
 from pyverge.core.types import ManagerMigrationKey
-from pyverge.registry import CompatibilityReport
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption, dump_json

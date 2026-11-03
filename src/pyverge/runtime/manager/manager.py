@@ -4,6 +4,12 @@ from collections.abc import Sequence
 from typing import ClassVar
 
 from pyverge.core.engine import Engine
+from pyverge.core.registry import (
+    DEFAULT_HEALTH_LINTERS,
+    CompatibilityLinter,
+    HealthLinter,
+    Registry,
+)
 from pyverge.core.types import VersionValue
 from pyverge.core.versioning import (
     ContentHasher,
@@ -18,12 +24,6 @@ from pyverge.discovery.reflection import (
 )
 from pyverge.migrations.backend import MigrationMaterializer
 from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.registry import (
-    DEFAULT_HEALTH_LINTERS,
-    CompatibilityLinter,
-    HealthLinter,
-    Registry,
-)
 from pyverge.schemas.types import (
     ModelAdapter,
 )
