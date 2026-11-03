@@ -14,6 +14,7 @@ import semver
 
 from pyverge.core.versioning import (
     Diff,
+    EdgeId,
     EdgeKey,
     EdgeRef,
     FieldChange,
@@ -245,18 +246,29 @@ class TestNodeIdentity:
         with pytest.raises(ValueError, match="non-empty"):
             NodeId("", "Order", semver.Version.parse("1.0.0"))
 
-    def test_edge_key_id_is_itself(self) -> None:
-        edge = EdgeKey.from_pair(
-            NodeId.parse("orders", "Order", "1.0.0"),
-            NodeId.parse("orders", "Order", "2.0.0"),
-        )
-        same = EdgeKey.from_pair(
-            NodeId.parse("orders", "Order", "1.0.0"),
-            NodeId.parse("orders", "Order", "2.0.0"),
-        )
+    def test_edge_key_id_is_edge_id(self) -> None:
+        source = NodeId.parse("orders", "Order", "1.0.0")
+        target = NodeId.parse("orders", "Order", "2.0.0")
+        edge = EdgeKey.from_pair(source, target)
+        same = EdgeKey.from_pair(source, target)
 
-        assert edge.id is edge
+        assert edge.id == EdgeId.from_pair(source, target)
+        assert edge.id is not edge
         assert edge == same
+
+    def test_edge_id_discriminator_is_identity(self) -> None:
+        source = NodeId.parse("orders", "Order", "1.0.0")
+        target = NodeId.parse("orders", "Order", "2.0.0")
+
+        default = EdgeId.from_pair(source, target)
+        canary = EdgeId.from_pair(source, target, discriminator="canary")
+
+        assert default == EdgeKey.from_pair(source, target)
+        assert default != canary
+        assert str(canary) == f"{source}->{target}#canary"
+        assert sorted([canary, default]) == [canary, default]
+        with pytest.raises(ValueError, match="non-empty"):
+            EdgeId.from_pair(source, target, discriminator="")
 
     def test_version_key_ref_is_not_identity(self) -> None:
         left = VersionKey(

@@ -8,6 +8,7 @@ import semver
 
 from pyverge.core.registry.errors import CatalogError
 from pyverge.core.versioning import EdgeKey, NodeRef, VersionKey
+from pyverge.migrations.spec import MigrationSpec
 from pyverge.schemas import PydanticModelAdapter
 from pyverge.settings import VersioningSettings
 from tests.examples.migrations import USER_JSONATA_V2_TO_V3, USER_JSONPATCH_V1_TO_V2
@@ -193,3 +194,38 @@ def test_graph_accepts_one_nonempty_namespace(
 
     assert snapshot.versions == [node]
     assert snapshot.get_model(node) is node
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [semver.Version, "test", [UserV1, UserV2], []],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_graph_preserves_edge_discriminators(registry, graph) -> None:
+    source, target = registry.kind_versions("User")
+    registry.store_migration(
+        MigrationSpec(
+            (source, target), migrate_v1_to_v2, discriminator="canary"
+        )
+    )
+    registry.store_migration(
+        MigrationSpec(
+            (source, target), migrate_v1_to_v2, discriminator="stable"
+        )
+    )
+
+    snapshot = graph()
+    edges = snapshot.edges("User")
+
+    assert {edge.discriminator for edge in edges} == {"canary", "stable"}
+    default = EdgeKey.from_pair(source, target)
+    canary = EdgeKey.from_pair(source, target, discriminator="canary")
+    assert not snapshot.has_edge(default)
+    assert snapshot.has_edge(canary)
+    assert snapshot.get_edge(canary).discriminator == "canary"
+    assert snapshot.edge_metadata[canary]["strategy"]

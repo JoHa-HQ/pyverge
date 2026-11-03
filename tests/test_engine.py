@@ -602,9 +602,7 @@ class TestMigrationManagement:
 
             edge = engine.store_migration((src, dst), func)
             assert isinstance(edge, VersionEdge)
-            bindings.store_migration(
-                EdgeKey.from_version_edge(edge), func, edge.migration
-            )
+            bindings.store_migration(edge.id, func, edge.migration)
 
         result = runner_factory().run(
             {
@@ -655,9 +653,7 @@ class TestMigrationManagement:
 
             edge = engine.store_migration((src, dst), func)
             assert isinstance(edge, VersionEdge)
-            bindings.store_migration(
-                EdgeKey.from_version_edge(edge), func, edge.migration
-            )
+            bindings.store_migration(edge.id, func, edge.migration)
 
         first = engine.get_model(keys[0])
         second = engine.get_model(keys[1])

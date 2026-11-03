@@ -236,9 +236,15 @@ class Engine(Generic[VersionValue]):
         func: MigrationFunc,
         *,
         backward_compatible: bool = False,
+        discriminator: str = "default",
     ) -> EdgeEntry:
         return self.registry.store_migration(
-            MigrationSpec(key, func, backward_compatible=backward_compatible)
+            MigrationSpec(
+                key,
+                func,
+                backward_compatible=backward_compatible,
+                discriminator=discriminator,
+            )
         )
 
     def reconstruct(

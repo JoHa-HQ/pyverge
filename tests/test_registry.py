@@ -49,6 +49,7 @@ from pyverge.core.versioning import (
     default_content_hasher,
 )
 from pyverge.core.versioning.errors import BackwardCompatibilityError
+from pyverge.migrations.spec import MigrationSpec
 from pyverge.runtime import MigrationHook
 from pyverge.runtime.context import MigrationContext
 from pyverge.runtime.extractors import (
@@ -3216,3 +3217,74 @@ def test_jgf_export_prefixes_namespace() -> None:
 
     document = JgfExporter(default_content_hasher()).export_graph(registry).to_dict()
     assert set(document["graph"]["nodes"]) == {"orders:User@1.0.0"}
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [semver.Version, "test", [UserV1, UserV2], []],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_parallel_migrations_with_discriminators(registry) -> None:
+    source, target = registry.kind_versions("User")
+
+    canary = registry.store_migration(
+        MigrationSpec(
+            (source, target),
+            migrate_v1_to_v2,
+            discriminator="canary",
+        )
+    )
+    stable = registry.store_migration(
+        MigrationSpec(
+            (source, target),
+            migrate_v1_to_v2,
+            discriminator="stable",
+        )
+    )
+
+    assert canary.discriminator == "canary"
+    assert stable.discriminator == "stable"
+    assert len(registry.edges("User")) == 2  # noqa: PLR2004
+    assert registry.get_migration_by_edge(
+        EdgeKey.from_pair(source, target, discriminator="canary")
+    ) is canary
+    assert registry.get_migration_by_edge(
+        EdgeKey.from_pair(source, target, discriminator="stable")
+    ) is stable
+    assert not registry.has_edge(EdgeKey.from_pair(source, target))
+    assert EdgeKey.from_pair(source, target, discriminator="canary") in registry
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [semver.Version, "test", [UserV1, UserV2], []],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_parallel_migration_discriminators_keep_own_content(registry) -> None:
+    source, target = registry.kind_versions("User")
+    registry.store_migration(
+        MigrationSpec(
+            (source, target),
+            migrate_v1_to_v2,
+            discriminator="canary",
+        )
+    )
+
+    with pytest.raises(MigrationConflictError):
+        registry.store_migration(
+            MigrationSpec(
+                (source, target),
+                lambda data, _: data,
+                discriminator="canary",
+            )
+        )

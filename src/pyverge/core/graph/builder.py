@@ -37,7 +37,12 @@ class GraphBuilder(Generic[VersionValue]):
         for kind in kinds:
             edges: list[EdgeKey] = []
             for entry in source.edges(kind):
-                edge = EdgeKey.from_pair(entry.source, entry.target, ref=entry.ref)
+                edge = EdgeKey.from_pair(
+                    entry.source,
+                    entry.target,
+                    discriminator=getattr(entry, "discriminator", "default"),
+                    ref=entry.ref,
+                )
                 edges.append(edge)
                 edges_by_endpoint[entry.source].add(edge)
                 edges_by_endpoint[entry.target].add(edge)

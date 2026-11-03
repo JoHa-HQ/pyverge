@@ -15,18 +15,27 @@ if TYPE_CHECKING:
     from ..jgf import JgfEdge
 
 
+DEFAULT_DISCRIMINATOR = "default"
+"""Discriminator used by legacy pair-keyed edges."""
+
+
 @total_ordering
 @dataclass(frozen=True, slots=True, eq=False)
-class EdgeKey(Generic[VersionValue]):
-    """A directed edge identity plus identity-neutral storage metadata."""
+class EdgeId(Generic[VersionValue]):
+    """Frozen, hashable directed edge identity.
+
+    The identity is ``source + target + discriminator``.  The discriminator
+    distinguishes parallel edges between the same endpoints; it defaults to
+    ``"default"`` so pair-keyed callers keep working.
+    """
 
     source: NodeId[VersionValue]
     target: NodeId[VersionValue]
-    ref: EdgeRef = field(compare=False, hash=False, repr=False)
+    discriminator: str = DEFAULT_DISCRIMINATOR
 
     def __post_init__(self) -> None:
-        if not isinstance(self.ref, EdgeRef):
-            raise TypeError("EdgeKey.ref must be an EdgeRef")
+        if not isinstance(self.discriminator, str) or not self.discriminator:
+            raise ValueError("EdgeId discriminator must be a non-empty string")
         if self.source.namespace != self.target.namespace:
             raise ValueError(
                 "Cross-namespace edges are forbidden: "
@@ -44,25 +53,16 @@ class EdgeKey(Generic[VersionValue]):
         source: NodeId[VersionValue],
         target: NodeId[VersionValue],
         *,
-        ref: EdgeRef | None = None,
-    ) -> Self:
-        return cls(source=source, target=target, ref=ref or EdgeRef())
-
-    @classmethod
-    def from_version_edge(
-        cls,
-        edge: Any,
-        *,
-        ref: EdgeRef | None = None,
+        discriminator: str = DEFAULT_DISCRIMINATOR,
     ) -> Self:
         return cls(
-            source=edge.source,
-            target=edge.target,
-            ref=ref or edge.ref,
+            source=source,
+            target=target,
+            discriminator=discriminator,
         )
 
     @property
-    def id(self) -> Self:
+    def id(self) -> EdgeId[VersionValue]:
         return self
 
     @property
@@ -78,11 +78,20 @@ class EdgeKey(Generic[VersionValue]):
         return self.source, self.target
 
     @property
+    def is_default_discriminator(self) -> bool:
+        return self.discriminator == DEFAULT_DISCRIMINATOR
+
+    @property
     def is_executable(self) -> bool:
         return False
 
-    def _check(self, other: object) -> EdgeKey[Any]:
-        if not isinstance(other, EdgeKey):
+    def identity(
+        self,
+    ) -> tuple[NodeId[VersionValue], NodeId[VersionValue], str]:
+        return self.source, self.target, self.discriminator
+
+    def _check(self, other: object) -> EdgeId[Any]:
+        if not isinstance(other, EdgeId):
             raise NotImplementedError(
                 f"Cannot compare {self.__class__.__name__} with "
                 f"{other.__class__.__name__}"
@@ -91,18 +100,81 @@ class EdgeKey(Generic[VersionValue]):
 
     def __eq__(self, other: object) -> bool:
         candidate = self._check(other)
-        return self.key == candidate.key
+        return self.identity() == candidate.identity()
 
     def __lt__(self, other: object) -> bool:
         candidate = self._check(other)
-        return self.key < candidate.key
+        return self.identity() < candidate.identity()
 
     def __gt__(self, other: object) -> bool:
         candidate = self._check(other)
-        return self.key > candidate.key
+        return self.identity() > candidate.identity()
 
     def __hash__(self) -> int:
-        return hash(self.key)
+        return hash(self.identity())
+
+    def __str__(self) -> str:
+        label = f"{self.source}->{self.target}"
+        if self.is_default_discriminator:
+            return label
+        return f"{label}#{self.discriminator}"
+
+    def __repr__(self) -> str:
+        return (
+            f"{type(self).__name__}[{type(self.source.version).__name__}]("
+            f"{self.source!r}, {self.target!r}, "
+            f"discriminator={self.discriminator!r})"
+        )
+
+
+@dataclass(frozen=True, slots=True, eq=False, kw_only=True)
+class EdgeKey(EdgeId[VersionValue]):
+    """A directed edge identity plus identity-neutral storage metadata."""
+
+    ref: EdgeRef = field(compare=False, hash=False, repr=False)
+
+    def __post_init__(self) -> None:
+        EdgeId.__post_init__(self)
+        if not isinstance(self.ref, EdgeRef):
+            raise TypeError("EdgeKey.ref must be an EdgeRef")
+
+    @classmethod
+    def from_pair(
+        cls,
+        source: NodeId[VersionValue],
+        target: NodeId[VersionValue],
+        *,
+        discriminator: str = DEFAULT_DISCRIMINATOR,
+        ref: EdgeRef | None = None,
+    ) -> Self:
+        return cls(
+            source=source,
+            target=target,
+            discriminator=discriminator,
+            ref=ref or EdgeRef(),
+        )
+
+    @classmethod
+    def from_version_edge(
+        cls,
+        edge: Any,
+        *,
+        ref: EdgeRef | None = None,
+    ) -> Self:
+        return cls(
+            source=edge.source,
+            target=edge.target,
+            discriminator=getattr(edge, "discriminator", DEFAULT_DISCRIMINATOR),
+            ref=ref or edge.ref,
+        )
+
+    @property
+    def id(self) -> EdgeId[VersionValue]:
+        return EdgeId(
+            source=self.source,
+            target=self.target,
+            discriminator=self.discriminator,
+        )
 
     def digest(self, hasher: ContentHasher) -> str:
         return hasher.digest(
@@ -117,16 +189,8 @@ class EdgeKey(Generic[VersionValue]):
                     "kind": self.target.kind,
                     "version": str(self.target.version),
                 },
+                "discriminator": self.discriminator,
             }
-        )
-
-    def __str__(self) -> str:
-        return f"{self.source}->{self.target}"
-
-    def __repr__(self) -> str:
-        return (
-            f"EdgeKey[{type(self.source.version).__name__}]("
-            f"{self.source!r}, {self.target!r})"
         )
 
 
@@ -145,8 +209,12 @@ class VersionEdge(EdgeKey[VersionValue]):
             raise TypeError("VersionEdge.ref must be a MigrationRef")
 
     @property
-    def id(self) -> VersionEdge[VersionValue]:
-        return self
+    def id(self) -> EdgeId[VersionValue]:
+        return EdgeId(
+            source=self.source,
+            target=self.target,
+            discriminator=self.discriminator,
+        )
 
     @property
     def is_executable(self) -> bool:
@@ -156,6 +224,7 @@ class VersionEdge(EdgeKey[VersionValue]):
         return type(self)(
             source=self.source,
             target=self.target,
+            discriminator=self.discriminator,
             diff=diff,
             migration=self.migration,
             ref=self.ref,
@@ -165,6 +234,7 @@ class VersionEdge(EdgeKey[VersionValue]):
         return type(self)(
             source=self.source,
             target=self.target,
+            discriminator=self.discriminator,
             diff=self.diff,
             migration=migration,
             ref=self.ref,
@@ -175,6 +245,7 @@ class VersionEdge(EdgeKey[VersionValue]):
             "id": str(self),
             "source": self.source.content_hash(hasher),
             "target": self.target.content_hash(hasher),
+            "discriminator": self.discriminator,
             "diff": self.diff.fingerprint_payload(),
             "migration": {
                 "strategy": self.migration.strategy,
@@ -190,14 +261,10 @@ class VersionEdge(EdgeKey[VersionValue]):
 
         return JgfEdge.from_version_edge(self)
 
-    def __repr__(self) -> str:
-        return (
-            f"VersionEdge[{type(self.source.version).__name__}]("
-            f"{self.source!r}, {self.target!r})"
-        )
-
 
 __all__ = [
+    "DEFAULT_DISCRIMINATOR",
+    "EdgeId",
     "EdgeKey",
     "VersionEdge",
 ]

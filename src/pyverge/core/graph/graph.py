@@ -13,6 +13,7 @@ from pyverge.core.registry.errors import (
 )
 from pyverge.core.types import ModelKind, VersionValue
 from pyverge.core.versioning import (
+    DEFAULT_DISCRIMINATOR,
     Comparable,
     EdgeKey,
     ModelRef,
@@ -172,24 +173,29 @@ class MigrationGraph(Generic[VersionValue]):
         self,
         kind: ModelKind,
         pair: tuple[NodeId, NodeId],
+        discriminator: str = DEFAULT_DISCRIMINATOR,
     ) -> EdgeKey[VersionValue]:
-        key = EdgeKey.from_pair(*pair)
-        idx = bisect.bisect_left(self.edges_by_kind.get(kind, ()), key)
+        key = EdgeKey.from_pair(*pair, discriminator=discriminator)
         edges = self.edges_by_kind.get(kind, ())
-        if idx < len(edges) and edges[idx].key == pair:
+        idx = bisect.bisect_left(edges, key)
+        if idx < len(edges) and edges[idx] == key:
             return edges[idx]
         raise MigrationNotFoundError(self.name, pair)
 
     def has_migration(self, key: Transitional[VersionValue]) -> bool:
         try:
-            edge = self._find_edge(key.kind, key.key)
+            edge = self._find_edge(
+                key.kind,
+                key.key,
+                getattr(key, "discriminator", DEFAULT_DISCRIMINATOR),
+            )
         except MigrationNotFoundError:
             return False
         return edge in self.executable_edges
 
     def has_edge(self, key: EdgeKey[VersionValue]) -> bool:
         try:
-            self._find_edge(key.kind, key.key)
+            self._find_edge(key.kind, key.key, key.discriminator)
             return True
         except MigrationNotFoundError:
             return False
@@ -198,13 +204,17 @@ class MigrationGraph(Generic[VersionValue]):
         return self.get_migration_by_edge(key)
 
     def get_edge(self, key: EdgeKey[VersionValue]) -> EdgeKey[VersionValue]:
-        return self._find_edge(key.kind, key.key)
+        return self._find_edge(key.kind, key.key, key.discriminator)
 
     def get_migration_by_edge(
         self,
         key: Transitional[VersionValue],
     ) -> EdgeKey[VersionValue]:
-        edge = self._find_edge(key.kind, key.key)
+        edge = self._find_edge(
+            key.kind,
+            key.key,
+            getattr(key, "discriminator", DEFAULT_DISCRIMINATOR),
+        )
         if edge not in self.executable_edges:
             raise MigrationNotFoundError(self.name, key.key)
         return edge

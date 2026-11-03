@@ -15,8 +15,10 @@ from .diff import (
 )
 from .frozen import FrozenMap
 from .identity import (
+    DEFAULT_DISCRIMINATOR,
     NO_DEFAULT,
     DefaultValue,
+    EdgeId,
     EdgeKey,
     EdgeRef,
     FieldDescriptor,
@@ -65,6 +67,7 @@ from .types import (
 )
 
 __all__ = [
+    "DEFAULT_DISCRIMINATOR",
     "NO_DEFAULT",
     "Addressable",
     "Canonicalizable",
@@ -82,6 +85,7 @@ __all__ = [
     "DiffRenderer",
     "Diffable",
     "EdgeEntry",
+    "EdgeId",
     "EdgeKey",
     "EdgeRef",
     "Edged",

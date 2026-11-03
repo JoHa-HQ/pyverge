@@ -8,7 +8,7 @@ from typing import Generic
 from pyverge.core.registry.errors import MigrationNotFoundError
 from pyverge.core.types import Attachable, MigrationFunc, VersionValue
 from pyverge.core.versioning import (
-    EdgeKey,
+    EdgeId,
     HookRef,
     MigrationDescriptor,
 )
@@ -53,16 +53,16 @@ class MigrationBindings(Generic[VersionValue]):
 
     name: str
     hook_refs: HookRefFactory = field(default_factory=HookRefFactory)
-    migrations: dict[EdgeKey[VersionValue], MigrationBinding] = field(
+    migrations: dict[EdgeId[VersionValue], MigrationBinding] = field(
         default_factory=dict
     )
-    hooks_by_edge: dict[EdgeKey[VersionValue], list[HookBinding]] = field(
+    hooks_by_edge: dict[EdgeId[VersionValue], list[HookBinding]] = field(
         default_factory=dict
     )
 
     def store_migration(
         self,
-        edge: EdgeKey[VersionValue],
+        edge: EdgeId[VersionValue],
         func: MigrationFunc,
         descriptor: MigrationDescriptor,
     ) -> MigrationBinding:
@@ -72,27 +72,27 @@ class MigrationBindings(Generic[VersionValue]):
 
     def add_hook(
         self,
-        edge: EdgeKey[VersionValue],
+        edge: EdgeId[VersionValue],
         hook: Attachable,
     ) -> HookBinding:
         binding = HookBinding(hook=hook, ref=self.hook_refs(hook))
         self.hooks_by_edge.setdefault(edge, []).append(binding)
         return binding
 
-    def resolve(self, edge: EdgeKey[VersionValue]) -> MigrationBinding:
+    def resolve(self, edge: EdgeId[VersionValue]) -> MigrationBinding:
         try:
             return self.migrations[edge]
         except KeyError:
             raise MigrationNotFoundError(self.name, edge.key) from None
 
-    def hooks(self, edge: EdgeKey[VersionValue]) -> Sequence[HookBinding]:
+    def hooks(self, edge: EdgeId[VersionValue]) -> Sequence[HookBinding]:
         return tuple(self.hooks_by_edge.get(edge, ()))
 
-    def remove_migration(self, edge: EdgeKey[VersionValue]) -> None:
+    def remove_migration(self, edge: EdgeId[VersionValue]) -> None:
         self.migrations.pop(edge, None)
         self.hooks_by_edge.pop(edge, None)
 
-    def remove_hook(self, edge: EdgeKey[VersionValue], ref: HookRef) -> None:
+    def remove_hook(self, edge: EdgeId[VersionValue], ref: HookRef) -> None:
         hooks = self.hooks_by_edge.get(edge)
         if hooks is None:
             return
@@ -100,7 +100,7 @@ class MigrationBindings(Generic[VersionValue]):
         if not self.hooks_by_edge[edge]:
             del self.hooks_by_edge[edge]
 
-    def clear_hooks(self, edge: EdgeKey[VersionValue] | None = None) -> None:
+    def clear_hooks(self, edge: EdgeId[VersionValue] | None = None) -> None:
         if edge is None:
             self.hooks_by_edge.clear()
         else:
@@ -116,7 +116,7 @@ class MigrationBindings(Generic[VersionValue]):
             },
         )
 
-    def frozen_migrations(self) -> Mapping[EdgeKey[VersionValue], MigrationBinding]:
+    def frozen_migrations(self) -> Mapping[EdgeId[VersionValue], MigrationBinding]:
         return MappingProxyType(dict(self.migrations))
 
 

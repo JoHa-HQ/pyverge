@@ -14,6 +14,7 @@ class MigrationSpec:
     pair: VersionPair[Any]
     func: MigrationFunc
     backward_compatible: bool = False
+    discriminator: str = "default"
 
 
 __all__ = ["MigrationSpec"]

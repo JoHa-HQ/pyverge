@@ -11,7 +11,6 @@ from pyverge.core import MigrationFunc, VersionValue
 from pyverge.core.registry import Registry
 from pyverge.core.versioning import (
     Diff,
-    EdgeKey,
     MigrationRef,
     NodeRef,
     VersionEdge,
@@ -149,6 +148,4 @@ def register_migrations(
         )
         registry.store_migration(edge)
         if bindings is not None:
-            bindings.store_migration(
-                EdgeKey.from_version_edge(edge), func, migration_descriptor
-            )
+            bindings.store_migration(edge.id, func, migration_descriptor)

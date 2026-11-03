@@ -20,6 +20,7 @@ from pyverge.core.types import (
     VersionValue,
 )
 from pyverge.core.versioning import (
+    DEFAULT_DISCRIMINATOR,
     Comparable,
     ContentHasher,
     EdgeEntry,
@@ -140,7 +141,7 @@ class Registry(Generic[VersionValue]):
             if isinstance(index, Comparable):
                 return self.has_entry(index)
             if isinstance(index, Transitional):
-                return self.has_edge(EdgeKey.from_pair(*index.key))
+                return self._has_edge_identity(index)
         except (ModelNotFoundError, MigrationNotFoundError, TypeError):
             return False
         raise CatalogError(self._namespace, f"Unsupported index type: {type(index)}")
@@ -149,7 +150,7 @@ class Registry(Generic[VersionValue]):
         if isinstance(index, Comparable):
             return self.get_entry(index)
         if isinstance(index, Transitional):
-            return self.get_edge(EdgeKey.from_pair(*index.key))
+            return self._get_edge_identity(index)
         raise CatalogError(self._namespace, f"Unsupported index type: {type(index)}")
 
     @property
@@ -371,17 +372,36 @@ class Registry(Generic[VersionValue]):
         self: Self,
         kind: ModelKind,
         pair: tuple[NodeId[VersionValue], NodeId[VersionValue]],
+        discriminator: str = DEFAULT_DISCRIMINATOR,
     ) -> EdgeEntry:
         edges = self._migrations.get(kind, [])
-        key = EdgeKey.from_pair(*pair)
+        key = EdgeKey.from_pair(*pair, discriminator=discriminator)
         idx = bisect.bisect_left(edges, key)
-        if idx < len(edges) and edges[idx].key == pair:
+        if idx < len(edges) and edges[idx] == key:
             return edges[idx]
         raise MigrationNotFoundError(self._namespace, pair)
 
+    def _has_edge_identity(self: Self, key: Transitional[VersionValue]) -> bool:
+        paths = self._migrations.get(key.kind, [])
+        idx = bisect.bisect_left(paths, key)
+        return idx < len(paths) and paths[idx] == key
+
+    def _get_edge_identity(
+        self: Self, key: Transitional[VersionValue]
+    ) -> EdgeEntry:
+        paths = self._migrations.get(key.kind, [])
+        idx = bisect.bisect_left(paths, key)
+        if idx < len(paths) and paths[idx] == key:
+            return paths[idx]
+        raise MigrationNotFoundError(self._namespace, key.key)
+
     def has_migration(self: Self, key: Transitional[VersionValue]) -> bool:
         try:
-            return self._find_edge(key.kind, key.key).is_executable
+            return self._find_edge(
+                key.kind,
+                key.key,
+                getattr(key, "discriminator", DEFAULT_DISCRIMINATOR),
+            ).is_executable
         except MigrationNotFoundError:
             return False
 
@@ -395,7 +415,11 @@ class Registry(Generic[VersionValue]):
         self: Self,
         key: Transitional[VersionValue],
     ) -> Migratable[VersionValue]:
-        edge = self._find_edge(key.kind, key.key)
+        edge = self._find_edge(
+            key.kind,
+            key.key,
+            getattr(key, "discriminator", DEFAULT_DISCRIMINATOR),
+        )
         if not isinstance(edge, VersionEdge):
             raise MigrationNotFoundError(self._namespace, key.key)
         return edge
@@ -559,16 +583,10 @@ class Registry(Generic[VersionValue]):
         self._refresh_health(affected - {entry})
 
     def has_edge(self: Self, key: EdgeKey[VersionValue]) -> bool:
-        paths = self._migrations.get(key.kind, [])
-        idx = bisect.bisect_left(paths, key)
-        return idx < len(paths) and paths[idx] == key
+        return self._has_edge_identity(key)
 
     def get_edge(self: Self, key: EdgeKey[VersionValue]) -> EdgeEntry:
-        paths = self._migrations.get(key.kind, [])
-        idx = bisect.bisect_left(paths, key)
-        if idx < len(paths) and paths[idx] == key:
-            return paths[idx]
-        raise MigrationNotFoundError(self._namespace, key.key)
+        return self._get_edge_identity(key)
 
     def get_model(
         self: Self,
@@ -730,6 +748,7 @@ class Registry(Generic[VersionValue]):
             edge: EdgeEntry = VersionEdge(
                 source=resolved_from,
                 target=resolved_to,
+                discriminator=spec.discriminator,
                 ref=MigrationRef(
                     provider_id=migration.provider_id,
                     entity_id=migration.entity_id,

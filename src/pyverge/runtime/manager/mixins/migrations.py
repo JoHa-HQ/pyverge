@@ -53,7 +53,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
     @hybridmethod
     @singledispatchmethod
     @classmethod
-    def store_migration(
+    def store_migration(  # noqa: PLR0913
         cls: type[Manager[VersionValue]],
         key: MigrationKeyInput,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
@@ -61,12 +61,13 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
         migration_id: str | None = None,
+        discriminator: str = "default",
     ) -> MigrationFunc:
         raise TypeError(f"Unsupported migration key: {key!r}")
 
     @store_migration.register(ModelPair)
     @classmethod
-    def _(
+    def _(  # noqa: PLR0913
         cls: type[Manager[VersionValue]],
         key: ModelPair,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
@@ -74,6 +75,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
         migration_id: str | None = None,
+        discriminator: str = "default",
     ) -> MigrationFunc:
         engine = engine or cls._default_engine
         adapter = engine.adapter
@@ -82,17 +84,20 @@ class MigrationStoreMixin(Generic[VersionValue]):
         if migration_id is not None:
             setattr(func, "__migration_id__", migration_id)
         edge = engine.store_migration(
-            pair, func, backward_compatible=backward_compatible
+            pair,
+            func,
+            backward_compatible=backward_compatible,
+            discriminator=discriminator,
         )
         if isinstance(edge, VersionEdge):
             cls._default_runtime.bindings.store_migration(
-                EdgeKey.from_version_edge(edge), func, edge.migration
+                edge.id, func, edge.migration
             )
         return func
 
     @store_migration.register(ManagerMigrationKey)
     @classmethod
-    def _(
+    def _(  # noqa: PLR0913
         cls: type[Manager[VersionValue]],
         key: ManagerMigrationKey,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
@@ -100,6 +105,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
         migration_id: str | None = None,
+        discriminator: str = "default",
     ) -> MigrationFunc:
         engine = engine or cls._default_engine
         adapter = engine.adapter
@@ -111,17 +117,20 @@ class MigrationStoreMixin(Generic[VersionValue]):
         if migration_id is not None:
             setattr(func, "__migration_id__", migration_id)
         edge = engine.store_migration(
-            pair, func, backward_compatible=backward_compatible
+            pair,
+            func,
+            backward_compatible=backward_compatible,
+            discriminator=discriminator,
         )
         if isinstance(edge, VersionEdge):
             cls._default_runtime.bindings.store_migration(
-                EdgeKey.from_version_edge(edge), func, edge.migration
+                edge.id, func, edge.migration
             )
         return func
 
     @store_migration.register(EdgeKey)
     @classmethod
-    def _(
+    def _(  # noqa: PLR0913
         cls: type[Manager[VersionValue]],
         key: EdgeKey,
         func: MigrationFunc | JsonPatchMigration | JsonataMigration,
@@ -129,17 +138,21 @@ class MigrationStoreMixin(Generic[VersionValue]):
         engine: Engine[VersionValue] | None = None,
         backward_compatible: bool = False,
         migration_id: str | None = None,
+        discriminator: str = "default",
     ) -> MigrationFunc:
         engine = engine or cls._default_engine
         func = cls._resolve_migration(func)
         if migration_id is not None:
             setattr(func, "__migration_id__", migration_id)
         edge = engine.store_migration(
-            key.key, func, backward_compatible=backward_compatible
+            key.key,
+            func,
+            backward_compatible=backward_compatible,
+            discriminator=key.discriminator,
         )
         if isinstance(edge, VersionEdge):
             cls._default_runtime.bindings.store_migration(
-                EdgeKey.from_version_edge(edge), func, edge.migration
+                edge.id, func, edge.migration
             )
         return func
 
@@ -166,7 +179,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
         edge_key = EdgeKey.from_pair(*pair)
-        cls._default_runtime.bindings.remove_migration(edge_key)
+        cls._default_runtime.bindings.remove_migration(edge_key.id)
         engine.remove_migration(edge_key)
 
     @remove_migration.register(ManagerMigrationKey)
@@ -184,7 +197,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.version_key(kind=key.kind, version=key.target_version),
         )
         edge_key = EdgeKey.from_pair(*pair)
-        cls._default_runtime.bindings.remove_migration(edge_key)
+        cls._default_runtime.bindings.remove_migration(edge_key.id)
         engine.remove_migration(edge_key)
 
     @hybridmethod
@@ -252,7 +265,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
         adapter = engine.adapter
         pair = (adapter.versionable(key.source), adapter.versionable(key.target))
         edge_key = EdgeKey.from_pair(*pair)
-        binding = cls._default_runtime.bindings.add_hook(edge_key, hook)
+        binding = cls._default_runtime.bindings.add_hook(edge_key.id, hook)
         engine.add_hook(edge_key, binding.ref)
 
     @add_hook.register(ManagerMigrationKey)
@@ -271,7 +284,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             adapter.version_key(kind=key.kind, version=key.target_version),
         )
         edge_key = EdgeKey.from_pair(*pair)
-        binding = cls._default_runtime.bindings.add_hook(edge_key, hook)
+        binding = cls._default_runtime.bindings.add_hook(edge_key.id, hook)
         engine.add_hook(edge_key, binding.ref)
 
     @hybridmethod
@@ -287,5 +300,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             for kind in engine.registry.kinds:
                 for edge in engine.registry.migrations(kind):
                     edge_key = EdgeKey.from_version_edge(edge)
-                    binding = cls._default_runtime.bindings.add_hook(edge_key, hook)
+                    binding = cls._default_runtime.bindings.add_hook(
+                        edge_key.id, hook
+                    )
                     engine.add_hook(edge_key, binding.ref)

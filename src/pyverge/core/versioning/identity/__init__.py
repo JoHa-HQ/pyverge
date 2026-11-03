@@ -1,7 +1,7 @@
 # nodes must load before edges to avoid a types <-> identity cycle.
 from .nodes import NodeId, VersionKey, VersionNode, parse_version  # noqa: I001
 
-from .edges import EdgeKey, VersionEdge
+from .edges import DEFAULT_DISCRIMINATOR, EdgeId, EdgeKey, VersionEdge
 from .metadata import (
     NO_DEFAULT,
     DefaultValue,
@@ -22,8 +22,10 @@ from .metadata import (
 )
 
 __all__ = [
+    "DEFAULT_DISCRIMINATOR",
     "NO_DEFAULT",
     "DefaultValue",
+    "EdgeId",
     "EdgeKey",
     "EdgeRef",
     "FieldDescriptor",

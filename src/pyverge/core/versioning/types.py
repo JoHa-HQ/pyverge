@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from pyverge.core.types import Attachable
 
     from .diff import Diff
-    from .identity import EdgeKey, VersionEdge, VersionKey, VersionNode
+    from .identity import EdgeId, EdgeKey, VersionEdge, VersionKey, VersionNode
     from .identity.metadata import ModelDescriptor, ModelRef
 
 T_co = TypeVar("T_co", covariant=True)
@@ -38,7 +38,7 @@ class Identifiable(Protocol):
     """Stable identity shared by nodes and edges."""
 
     @property
-    def id(self) -> NodeId[Any] | EdgeKey[Any]: ...
+    def id(self) -> NodeId[Any] | EdgeId[Any]: ...
 
 
 @runtime_checkable
@@ -149,7 +149,7 @@ class Transitional(
     """Directed edge identity: ``source`` -> ``target``."""
 
     @property
-    def id(self) -> EdgeKey[Any]: ...
+    def id(self) -> EdgeId[Any]: ...
 
 
 class DiffProvider(Protocol):
