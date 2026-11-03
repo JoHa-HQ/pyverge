@@ -197,7 +197,6 @@ runner = manager.runtime(
         OtelAdapter(tracer=trace.get_tracer("orders"), service="orders"),
         OpenLineageAdapter(
             client=lineage_client,
-            namespace="com.acme.orders",
             producer="orders-service",
         ),
     )
@@ -205,8 +204,8 @@ runner = manager.runtime(
 ```
 
 `OpenLineageAdapter` emits run-level and step-level events with version, schema,
-job, parent-run, and error facets. A namespace mismatch is logged and the
-adapter emits nothing, because telemetry cannot fail the migration.
+job, parent-run, and error facets. The namespace is inherited from the graph
+through `RunContext`; the adapter does not configure it separately.
 
 ## Middleware
 

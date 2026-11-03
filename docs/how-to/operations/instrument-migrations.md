@@ -76,15 +76,13 @@ from pyverge.runtime import OpenLineageAdapter
 
 adapter = OpenLineageAdapter(
     client=client,
-    namespace="com.acme.orders",
     producer="orders-service",
 )
 runner = manager.runtime(telemetry=(adapter,)).runner
 ```
 
-The adapter checks that the OpenLineage namespace matches the graph namespace
-when the graph has one. Dataset names use namespaced `NodeId` values; job names
-identify the edge:
+The adapter inherits the graph namespace from `RunContext`. Dataset names use
+namespaced `NodeId` values; job names identify the edge:
 
 ```text
 migration.User.1.0.0->2.0.0
@@ -120,9 +118,8 @@ result = manager.runtime(
 - Async hook not awaited: use `AsyncBackend`.
 - `TypeError` about `state`: the hook implements an outdated callback
   signature. Add the keyword-only `state` parameter.
-- OpenLineage namespace mismatch: align the configured namespace with the graph
-  namespace, or remove the graph namespace. The mismatch is logged and the
-  adapter emits nothing because telemetry is best-effort.
+- OpenLineage namespace: the adapter reads it from the graph-backed
+  `RunContext`; no adapter-level namespace setting exists.
 
 ## See also
 

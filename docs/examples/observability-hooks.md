@@ -112,7 +112,6 @@ lineage_result = lineage_manager.runtime(
     telemetry=(
         OpenLineageAdapter(
             client=lineage,
-            namespace="default",
             producer="docs-example",
         ),
     ),
