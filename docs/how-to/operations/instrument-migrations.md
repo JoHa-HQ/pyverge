@@ -96,6 +96,17 @@ job names identify the edge:
 migration.User.1.0.0->2.0.0
 ```
 
+Hook events carry data metadata, not payload values:
+
+- dataset version facets for the source and target versions
+- schema facets built from the source and target model fields
+- job type and migration tags for name, strategy, identity, and discriminator
+- processing engine and parent-run facets linking each step to its run
+- an error facet on failed steps
+
+Payload content is never emitted, so lineage stays free of application data and
+PII.
+
 ## Verify
 
 ```python
