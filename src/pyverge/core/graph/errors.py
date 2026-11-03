@@ -27,4 +27,12 @@ class VersionStrategyMismatchError(PyvergeError):
         )
 
 
-__all__ = ["RevisionMismatchError", "VersionStrategyMismatchError"]
+class RevisionConflictError(PyvergeError):
+    """Raised when a store CAS check rejects a stale revision or generation."""
+
+
+__all__ = [
+    "RevisionConflictError",
+    "RevisionMismatchError",
+    "VersionStrategyMismatchError",
+]

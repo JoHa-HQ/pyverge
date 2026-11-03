@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from types import MappingProxyType
 from typing import Any, Generic
 
-from pyverge.core.graph.backend import IndexedBackend
+from pyverge.core.graph.backend import GraphBackend, IndexedBackend
 from pyverge.core.graph.errors import RevisionMismatchError
 from pyverge.core.graph.graph import MigrationGraph
 from pyverge.core.graph.revision import (
@@ -29,6 +29,12 @@ class GraphBuilder(Generic[VersionValue]):
     Executable bindings are deliberately dropped: graph snapshots contain edge
     identity only.  Callables are resolved later through a migration resolver.
     """
+
+    def __init__(
+        self,
+        backend_factory: Callable[..., GraphBackend[VersionValue]] | None = None,
+    ) -> None:
+        self._backend_factory = backend_factory
 
     def build(
         self,
@@ -80,7 +86,8 @@ class GraphBuilder(Generic[VersionValue]):
                 f"Graph cannot mix namespaces: {sorted(namespaces)}",
             )
 
-        backend = IndexedBackend[VersionValue].build(
+        factory = self._backend_factory or IndexedBackend[VersionValue].build
+        backend = factory(
             nodes,
             edges,
             name=source.namespace,
@@ -96,10 +103,7 @@ class GraphBuilder(Generic[VersionValue]):
                 }
             ),
             digests=_freeze(
-                {
-                    digest: edge.id
-                    for digest, edge in source.digests.items()
-                }
+                {digest: edge.id for digest, edge in source.digests.items()}
             ),
             node_digests=_freeze(node_digests),
             edge_digests=_freeze(edge_digests),

@@ -25,6 +25,10 @@ class GraphCycleError(ValueError):
     """Raised when a backend traversal requires an acyclic graph."""
 
 
+class BackendUnavailableError(ImportError):
+    """Raised when an optional backend dependency is not installed."""
+
+
 @runtime_checkable
 class GraphBackend(Protocol[VersionValue]):
     """Backend-neutral port over a locked graph.
@@ -130,6 +134,7 @@ class GraphBackend(Protocol[VersionValue]):
 
 
 __all__ = [
+    "BackendUnavailableError",
     "Direction",
     "EdgePredicate",
     "GraphBackend",

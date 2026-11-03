@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any, Generic, Self, cast, overload
 
 from pyverge.core.graph import GraphBuilder, MigrationGraph, Revision
@@ -117,8 +117,10 @@ class Engine(Generic[VersionValue]):
     def snapshot(
         self,
         revision: Revision | None = None,
+        *,
+        backend_factory: Callable[..., Any] | None = None,
     ) -> MigrationGraph[VersionValue]:
-        return GraphBuilder[VersionValue]().build(
+        return GraphBuilder[VersionValue](backend_factory).build(
             self.registry,
             revision=revision,
         )

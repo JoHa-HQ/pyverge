@@ -78,6 +78,12 @@ celery = [
 httpx = [
   "httpx>=0.27"
 ]
+rustworkx = [
+  "rustworkx>=0.15"
+]
+igraph = [
+  "igraph>=0.11"
+]
 
 [project.scripts]
 pyverge = "pyverge.cli.main:app"
@@ -151,3 +157,9 @@ style = "pep440"
 pattern = "^v(?P<base>\\d+\\.\\d+\\.\\d+)$"
 bump = true
 format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"
+
+[tool.coverage.run]
+omit = [
+  "src/pyverge/core/graph/backend/rustworkx.py",
+  "src/pyverge/core/graph/backend/igraph.py",
+]

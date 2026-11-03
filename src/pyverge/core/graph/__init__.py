@@ -1,12 +1,19 @@
 from .backend import (
+    BackendUnavailableError,
     Direction,
     EdgePredicate,
     GraphBackend,
     GraphCycleError,
+    IgraphBackend,
     IndexedBackend,
+    RustworkxBackend,
 )
 from .builder import GraphBuilder
-from .errors import RevisionMismatchError, VersionStrategyMismatchError
+from .errors import (
+    RevisionConflictError,
+    RevisionMismatchError,
+    VersionStrategyMismatchError,
+)
 from .graph import MigrationGraph
 from .planning import (
     AnyDirection,
@@ -41,6 +48,7 @@ from .revision import (
     manifest_digest,
     version_strategy,
 )
+from .store import GraphStore, MemoryGraphStore, PublishedRevision
 from .types import (
     GraphSnapshotSource,
     GraphView,
@@ -49,6 +57,7 @@ from .types import (
 
 __all__ = [
     "AnyDirection",
+    "BackendUnavailableError",
     "BackwardDirection",
     "DefaultTarget",
     "Direction",
@@ -60,8 +69,11 @@ __all__ = [
     "GraphBuilder",
     "GraphCycleError",
     "GraphSnapshotSource",
+    "GraphStore",
     "GraphView",
+    "IgraphBackend",
     "IndexedBackend",
+    "MemoryGraphStore",
     "MigrationGraph",
     "Path",
     "PathFinder",
@@ -69,8 +81,11 @@ __all__ = [
     "PathPlan",
     "PathPlanEntry",
     "PolicyEngine",
+    "PublishedRevision",
     "Revision",
+    "RevisionConflictError",
     "RevisionMismatchError",
+    "RustworkxBackend",
     "TargetCompiler",
     "TargetPolicy",
     "TargetSelector",
