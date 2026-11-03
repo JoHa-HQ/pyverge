@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import AsyncExitStack, ExitStack
 from dataclasses import dataclass
 from typing import Any, Generic, cast
 
 from pyverge.core.graph.planning.path import Path
 from pyverge.core.graph.planning.plan import ExtractedEntry, PathPlan, PathPlanEntry
-from pyverge.core.types import ModelData, VersionValue
+from pyverge.core.types import MigrationFunc, ModelData, VersionValue
 from pyverge.core.versioning import MigrationDescriptor, VersionNode
 from pyverge.core.versioning.errors import MigrationApplicationError
 
@@ -85,7 +85,10 @@ class ExecutionEntry(Generic[VersionValue]):
         run: Any,
         adapter: Any,
         hook_state: Any,
-        invoke: Callable[[ExecutionEntry, int, ModelData, StepContext], ModelData],
+        invoke: Callable[
+            [MigrationFunc, ModelData, Mapping[str, object]],
+            ModelData,
+        ],
     ) -> EntryResult:
         current = value
         for index in range(len(self.steps)):
@@ -94,7 +97,11 @@ class ExecutionEntry(Generic[VersionValue]):
                 current,
                 step,
                 hook_state=hook_state,
-                invoke=lambda: invoke(self, index, current, step),
+                invoke=lambda: invoke(
+                    self.migration_func(index),
+                    current,
+                    step.view,
+                ),
             )
             if isinstance(current, dict):
                 current[adapter.version_property] = str(step.target.version)
@@ -108,7 +115,7 @@ class ExecutionEntry(Generic[VersionValue]):
         adapter: Any,
         hook_state: Any,
         invoke: Callable[
-            [ExecutionEntry, int, ModelData, StepContext],
+            [MigrationFunc, ModelData, Mapping[str, object]],
             Any,
         ],
     ) -> EntryResult:
@@ -119,7 +126,11 @@ class ExecutionEntry(Generic[VersionValue]):
                 current,
                 step,
                 hook_state=hook_state,
-                invoke=lambda: invoke(self, index, current, step),
+                invoke=lambda: invoke(
+                    self.migration_func(index),
+                    current,
+                    step.view,
+                ),
             )
             if isinstance(current, dict):
                 current[adapter.version_property] = str(step.target.version)
@@ -334,7 +345,11 @@ class StepInvoker(Generic[VersionValue]):
                 )
             except Exception as error:
                 self.on_error(data, error, step, hook_state)
-                raise
+                if isinstance(
+                    error, (AsyncExecutionRequired, MigrationApplicationError)
+                ):
+                    raise
+                raise self.entry.migration_error(error) from error
             self.after(data, migrated, step, hook_state)
             return migrated
 
@@ -358,7 +373,11 @@ class StepInvoker(Generic[VersionValue]):
                 )
             except Exception as error:
                 await self.on_error_async(data, error, step, hook_state)
-                raise
+                if isinstance(
+                    error, (AsyncExecutionRequired, MigrationApplicationError)
+                ):
+                    raise
+                raise self.entry.migration_error(error) from error
             await self.after_async(data, migrated, step, hook_state)
             return migrated
 
