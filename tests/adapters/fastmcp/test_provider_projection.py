@@ -304,3 +304,28 @@ async def test_context_factory_uses_fastmcp_context(manager) -> None:
         )
 
     assert result.structured_content["age"] == FACTORY_AGE
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "model_adapter, registry", [[PydanticModelAdapter, REGISTRY]], indirect=True
+)
+async def test_sync_and_enrich_are_idempotent(manager) -> None:
+    provider = PyvergeProvider(manager(), virtual_versions=True)
+    server = FastMCP("TestServer", providers=[provider])
+
+    @server.tool(name="User", version="2.0.0", meta={"policy": "latest"})
+    def handler(
+        name: str, email: str, role: str, age: int | None = None
+    ) -> dict[str, Any]:
+        return {"name": name, "email": email, "role": role, "age": age}
+
+    await provider.sync(server)
+    await provider.sync(server)
+    await provider.enrich(server)
+    await provider.enrich(server)
+
+    async with Client(server) as client:
+        tools = await client.list_tools()
+
+    assert _versions(tools) == {"1.0.0", "2.0.0"}
