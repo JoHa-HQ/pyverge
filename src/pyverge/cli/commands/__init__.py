@@ -2,7 +2,6 @@ from .benchmark import benchmark
 from .check import check
 from .compat import compat
 from .diff import diff
-from .discover import discover
 from .doctor import doctor
 from .export import export
 from .info import info
@@ -17,7 +16,6 @@ __all__ = [
     "check",
     "compat",
     "diff",
-    "discover",
     "doctor",
     "export",
     "info",
