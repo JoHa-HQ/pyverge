@@ -103,6 +103,17 @@ Telemetry is best-effort and isolated: an adapter failure is logged, does not
 fail the migration, and does not prevent other adapters from receiving the
 event.
 
+Control event volume with `telemetry_mode`:
+
+```python
+runner = manager.runtime(
+    telemetry=(adapter,),
+    telemetry_mode="errors",   # all | errors | off
+).runner
+```
+
+`errors` emits only failed run and step events. `off` constructs no events.
+
 ## Verify
 
 ```python

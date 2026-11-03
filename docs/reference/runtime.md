@@ -17,6 +17,7 @@ runtime = manager.runtime(
     backend=None,
     middleware=(),
     telemetry=(),
+    telemetry_mode="all",
     environment=None,
     direction="any",
     on_direction_violation="skip",
@@ -25,6 +26,8 @@ runtime = manager.runtime(
     on_depth_violation="skip",
     validation_mode="lax",
     discriminator="default",
+    plan_cache_size=0,
+    copy="deep",
 )
 runner = runtime.runner
 graph = runtime.graph
@@ -52,10 +55,21 @@ runner.run(
     payload,
     target,
     *,
-    container=None,
+    source_model=None,
     max_depth=-1,
     context=None,
     run_id=None,
+    validate_target=False,
+)
+```
+
+`Runner.run_many` runs payloads with independent run and transaction scope:
+
+```python
+results = runner.run_many(
+    payloads,
+    target,
+    context=context,
 )
 ```
 
@@ -81,6 +95,53 @@ def invoke(func, data, context):
 ```
 
 The backend determines whether `run()` returns a result or an awaitable.
+
+`ProcessBackend` is for CLI and offline batch jobs. When a host framework
+already owns worker processes, such as Celery or FastStream workers, run one
+pyverge runtime per worker process and use `ThreadedBackend` or `AsyncBackend`
+instead of nesting another process pool.
+
+## Plan cache
+
+`plan_cache_size` caches payload-independent graph plans:
+
+```python
+runner = manager.runtime(plan_cache_size=128).runner
+```
+
+```text
+0    disable plan caching
+-1   unbounded cache
+N>0  bounded least-recently-used cache
+```
+
+The cache key is the target policy plus the discovered entry signature: entry
+paths and source node identities. Payload values, run context, telemetry, and
+migration outputs are never cached.
+
+## Copy policy
+
+`copy` controls payload ownership:
+
+```text
+deep     deep-copy the payload before execution; default
+shallow  copy only the top-level mapping
+none     execute against the caller-owned payload
+```
+
+Use `none` only for trusted payloads that can be mutated. `ProcessBackend`
+still serializes payloads through pickling.
+
+## Validation
+
+```text
+validation_mode  input-side validation during guided discovery
+validate_target  output-side finalize/validation after execution
+```
+
+Input validation applies only when `source_model` is supplied. `finalize` may
+normalize the target value, so disabling `validate_target` can change output
+shape as well as skip error checking.
 
 ## Hooks
 
@@ -206,6 +267,17 @@ runner = manager.runtime(
 `OpenLineageAdapter` emits run-level and step-level events with version, schema,
 job, parent-run, and error facets. The namespace is inherited from the graph
 through `RunContext`; the adapter does not configure it separately.
+
+`telemetry_mode` controls event construction:
+
+```text
+all     run and step lifecycle events
+errors  only failed run and step events
+off     no telemetry events
+```
+
+Use `errors` or `off` on high-throughput paths. Event objects are not constructed
+when telemetry is disabled.
 
 ## Middleware
 
