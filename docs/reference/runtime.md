@@ -129,8 +129,11 @@ class AuditHook(MigrationHook):
 
 `step` is the execution step context: `name`, source/target nodes, `edge`
 (including `discriminator`), `migration` descriptor, payload `path`, and
-`index`. `state` is a backend-provided `ContextVar`; do not store per-step state
-on the hook instance. Store it in `state` by hook instance key when needed.
+`index`. It also exposes telemetry-ready `source_dataset` and `target_dataset`
+views with namespace, kind, version, name, and field metadata. Hooks should use
+those views instead of inspecting model descriptors. `state` is a
+backend-provided `ContextVar`; do not store per-step state on the hook instance.
+Store it in `state` by hook instance key when needed.
 
 `before_migrate` may return a per-step context manager. Sync scopes implement
 `HookScope` and are entered with `ExitStack`; async scopes implement
