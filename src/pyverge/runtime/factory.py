@@ -30,7 +30,7 @@ from .migrations import MigrationBindings
 from .plan_cache import PlanCache
 from .planner import ExecutionPlanner
 from .runner import Runner
-from .telemetry import TelemetryAdapter, TelemetryPublisher
+from .telemetry import TelemetryAdapter, TelemetryMode, TelemetryPublisher
 from .types import BackendPort, CopyPolicy
 
 
@@ -49,6 +49,7 @@ class RunnerOptions:
     discriminator: str = "default"
     middleware: tuple[BackendMiddleware, ...] = field(default_factory=tuple)
     telemetry: tuple[TelemetryAdapter, ...] = field(default_factory=tuple)
+    telemetry_mode: TelemetryMode = "all"
     plan_cache_size: int = 0
     copy: CopyPolicy = "deep"
 
@@ -75,6 +76,7 @@ class RunnerFactory:
         discriminator: str = "default",
         middleware: tuple[BackendMiddleware, ...] = (),
         telemetry: tuple[TelemetryAdapter, ...] = (),
+        telemetry_mode: TelemetryMode = "all",
         plan_cache_size: int = 0,
         copy: CopyPolicy = "deep",
     ) -> Runner[VersionValue]:
@@ -96,13 +98,17 @@ class RunnerFactory:
             discriminator=discriminator,
             middleware=middleware,
             telemetry=telemetry,
+            telemetry_mode=telemetry_mode,
             plan_cache_size=plan_cache_size,
             copy=copy,
         )
         environment = (
             replace(
                 resolved.environment,
-                telemetry=TelemetryPublisher(adapters=resolved.telemetry),
+                telemetry=TelemetryPublisher(
+                    adapters=resolved.telemetry,
+                    mode=resolved.telemetry_mode,
+                ),
             )
             if resolved.telemetry
             else resolved.environment
