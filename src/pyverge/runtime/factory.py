@@ -31,7 +31,7 @@ from .plan_cache import PlanCache
 from .planner import ExecutionPlanner
 from .runner import Runner
 from .telemetry import TelemetryAdapter, TelemetryPublisher
-from .types import BackendPort
+from .types import BackendPort, CopyPolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +50,7 @@ class RunnerOptions:
     middleware: tuple[BackendMiddleware, ...] = field(default_factory=tuple)
     telemetry: tuple[TelemetryAdapter, ...] = field(default_factory=tuple)
     plan_cache_size: int = 0
+    copy: CopyPolicy = "deep"
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,6 +76,7 @@ class RunnerFactory:
         middleware: tuple[BackendMiddleware, ...] = (),
         telemetry: tuple[TelemetryAdapter, ...] = (),
         plan_cache_size: int = 0,
+        copy: CopyPolicy = "deep",
     ) -> Runner[VersionValue]:
         resolved = options or RunnerOptions(
             backend=backend or ThreadedBackend(max_workers=0),
@@ -95,6 +97,7 @@ class RunnerFactory:
             middleware=middleware,
             telemetry=telemetry,
             plan_cache_size=plan_cache_size,
+            copy=copy,
         )
         environment = (
             replace(
@@ -131,6 +134,7 @@ class RunnerFactory:
             backend=resolved.backend,
             middleware=resolved.middleware,
             environment=environment,
+            copy=resolved.copy,
         )
 
 

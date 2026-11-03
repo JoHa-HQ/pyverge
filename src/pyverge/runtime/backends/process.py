@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any
 
@@ -26,7 +25,7 @@ class ProcessBackend:
         run: RunContext,
         adapter: ModelIdentityPort,
     ) -> dict[str, Any]:
-        data = copy.deepcopy(payload)
+        data = payload
         hook_state = new_hook_state()
         for level in plan.levels:
             results = tuple(
