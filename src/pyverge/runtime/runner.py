@@ -85,6 +85,7 @@ class Runner(Generic[VersionValue]):
         active_run_id = run_id or self.environment.id_factory.new("run_")
         run = RunContext(
             run_id=active_run_id,
+            namespace=self.coordinator.finder.graph.namespace,
             environment=self.environment,
             bindings=MigrationContext.create(context),
         )
