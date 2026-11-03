@@ -7,12 +7,14 @@ from typing import Any
 
 import anyio
 
-from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import VersionValue
-from pyverge.runtime.context import MigrationContext, RunContext, StepContext
+from pyverge.runtime.context import RunContext
 from pyverge.runtime.hooks.state import new_hook_state
-from pyverge.runtime.plan import ExecutionEntry, ExecutionPlan
+from pyverge.runtime.plan import EntryResult, ExecutionEntry, ExecutionPlan
+from pyverge.runtime.strategies import AsyncStrategy
 from pyverge.schemas.types import ModelIdentityPort
+
+_STRATEGY = AsyncStrategy()
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,12 +24,6 @@ class AsyncBackend:
     backend: str
     backend_options: Mapping[str, Any]
     max_workers: int = 0
-
-    async def __aenter__(self) -> AsyncBackend:
-        return self
-
-    async def __aexit__(self, *exc_info: Any) -> None:
-        return None
 
     async def execute(
         self,
@@ -41,69 +37,78 @@ class AsyncBackend:
         for level in plan.levels:
             if self.max_workers > 1:
                 limiter = anyio.CapacityLimiter(self.max_workers)
+                results: list[EntryResult | None] = [None] * len(level)
                 async with anyio.create_task_group() as group:
-                    for entry in level:
+                    for index, entry in enumerate(level):
                         group.start_soon(
                             self._execute_entry_limited,
+                            index,
                             entry,
+                            plan,
                             data,
                             run,
                             adapter,
                             hook_state,
                             limiter,
+                            results,
                         )
+                level_results = tuple(
+                    result for result in results if result is not None
+                )
             else:
-                for entry in level:
-                    await self._execute_entry(entry, data, run, adapter, hook_state)
+                level_results = tuple(
+                    [
+                        await self._execute_entry(
+                            entry,
+                            plan,
+                            data,
+                            run,
+                            adapter,
+                            hook_state,
+                        )
+                        for entry in level
+                    ]
+                )
+            data = plan.apply_results(data, level_results)
         return data
 
     async def _execute_entry_limited(  # noqa: PLR0913, PLR0917
-        self, entry, data, run, adapter, hook_state, limiter
-    ) -> None:
-        async with limiter:
-            await self._execute_entry(entry, data, run, adapter, hook_state)
-
-    async def _execute_entry(
         self,
+        index: int,
         entry: ExecutionEntry[VersionValue],
+        plan: ExecutionPlan[VersionValue],
         data: dict[str, Any],
         run: RunContext,
         adapter: ModelIdentityPort,
         hook_state: Any,
+        limiter: anyio.CapacityLimiter,
+        results: list[EntryResult | None],
     ) -> None:
-        current = Path(*entry.path).get(data)
-        for index, (source, target) in enumerate(entry.steps):
-            name = getattr(
-                entry.migration_func(index), "__name__", f"{source}->{target}"
+        async with limiter:
+            results[index] = await self._execute_entry(
+                entry,
+                plan,
+                data,
+                run,
+                adapter,
+                hook_state,
             )
-            step = self._step(entry, index, source, target, run)
-            migrated = await entry.step(index).run_async(
-                current,
-                step.view,
-                name=name,
-                hook_state=hook_state,
-            )
-            if isinstance(migrated, dict):
-                migrated[adapter.version_property] = str(target.version)
-            current = migrated
-        Path(*entry.path).set(data, current)
 
-    def _step(
+    async def _execute_entry(  # noqa: PLR0913, PLR0917
         self,
         entry: ExecutionEntry[VersionValue],
-        index: int,
-        source: Any,
-        target: Any,
+        plan: ExecutionPlan[VersionValue],
+        data: dict[str, Any],
         run: RunContext,
-    ) -> StepContext:
-        return StepContext(
+        adapter: ModelIdentityPort,
+        hook_state: Any,
+    ) -> EntryResult:
+        return await entry.execute_async(
+            plan.entry_value(data, entry),
             run=run,
-            path=entry.path,
-            index=index,
-            source=source,
-            target=target,
-            edge=entry.plan.edges[index],
-            bindings=MigrationContext.empty(),
+            adapter=adapter,
+            hook_state=hook_state,
+            invoke=_STRATEGY.invoke,
         )
 
 

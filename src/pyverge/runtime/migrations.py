@@ -38,6 +38,7 @@ class MigrationBinding:
 
     func: MigrationFunc
     descriptor: MigrationDescriptor
+    name: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +68,11 @@ class MigrationBindings(Generic[VersionValue]):
         func: MigrationFunc,
         descriptor: MigrationDescriptor,
     ) -> MigrationBinding:
-        binding = MigrationBinding(func=func, descriptor=descriptor)
+        binding = MigrationBinding(
+            func=func,
+            descriptor=descriptor,
+            name=getattr(func, "__name__", descriptor.identity),
+        )
         self.migrations[edge] = binding
         return binding
 

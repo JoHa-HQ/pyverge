@@ -737,7 +737,13 @@ def test_version_edge_wraps_migration_failure(
     )
     entry = ExecutionEntry(
         plan=plan,
-        migrations=(MigrationBinding(func=fail, descriptor=migration),),
+        migrations=(
+            MigrationBinding(
+                func=fail,
+                descriptor=migration,
+                name="fail",
+            ),
+        ),
         hooks=(),
     )
 
