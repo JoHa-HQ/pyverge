@@ -102,6 +102,7 @@ class RunContext:
     """One execution run."""
 
     run_id: str
+    namespace: str
     environment: ExecutionEnvironment
     bindings: MigrationContext
 

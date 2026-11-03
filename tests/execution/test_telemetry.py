@@ -260,11 +260,7 @@ def test_openlineage_adapter_emits_run_and_step_events(
     runner_factory,
 ) -> None:
     client = RecordingLineageClient()
-    adapter = OpenLineageAdapter(
-        client=client,
-        namespace="test",
-        producer="tests",
-    )
+    adapter = OpenLineageAdapter(client=client, producer="tests")
 
     result = _run(runner_factory(telemetry=(adapter,)), registry)
 
@@ -277,8 +273,10 @@ def test_openlineage_adapter_emits_run_and_step_events(
     ]
     run_started, step_started, step_completed, run_completed = client.events
     assert run_started.job.name == "migration.run"
+    assert run_started.job.namespace == "test"
     assert run_completed.job.name == "migration.run"
     assert step_started.job.name == "migration.User.1.0.0->2.0.0"
+    assert step_started.job.namespace == "test"
     assert step_completed.job.name == "migration.User.1.0.0->2.0.0"
     assert step_started.inputs[0].facets["version"].datasetVersion == "1.0.0"
     assert step_started.outputs[0].facets["version"].datasetVersion == "2.0.0"
@@ -286,28 +284,6 @@ def test_openlineage_adapter_emits_run_and_step_events(
     assert tags["pyverge.migration.name"] == "migrate_v1_to_v2"
     assert tags["pyverge.migration.discriminator"] == "default"
     assert step_started.run.facets["parent"].run.runId == run_started.run.runId
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
-)
-def test_openlineage_namespace_mismatch_is_isolated(
-    registry: Registry,
-    runner_factory,
-    caplog,
-) -> None:
-    client = RecordingLineageClient()
-    adapter = OpenLineageAdapter(
-        client=client,
-        namespace="other",
-        producer="tests",
-    )
-
-    result = _run(runner_factory(telemetry=(adapter,)), registry)
-
-    assert result["document"]["version"] == "2.0.0"
-    assert client.events == []
-    assert "does not match graph namespace" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -346,11 +322,7 @@ def test_openlineage_adapter_records_failed_step(
     runner_factory,
 ) -> None:
     client = RecordingLineageClient()
-    adapter = OpenLineageAdapter(
-        client=client,
-        namespace="test",
-        producer="tests",
-    )
+    adapter = OpenLineageAdapter(client=client, producer="tests")
 
     with pytest.raises(Exception, match="boom"):
         _run(runner_factory(telemetry=(adapter,)), registry)

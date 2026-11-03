@@ -954,6 +954,7 @@ def test_migration_context_layers_resolve_precedence() -> None:
 def test_step_context_layers_bindings(execution_environment) -> None:
     run = RunContext(
         run_id="run-1",
+        namespace="test",
         environment=execution_environment,
         bindings=MigrationContext.create({"tenant": "acme", "region": "eu"}),
     )
