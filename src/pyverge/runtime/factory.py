@@ -44,6 +44,7 @@ class RunnerOptions:
     depth_limit: int
     on_depth_violation: DepthViolationStrategy
     validation_mode: Literal["strict", "lax", "none"]
+    discriminator: str = "default"
     middleware: tuple[BackendMiddleware, ...] = field(default_factory=tuple)
 
 
@@ -66,6 +67,7 @@ class RunnerFactory:
         depth_limit: int = -1,
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
+        discriminator: str = "default",
         middleware: tuple[BackendMiddleware, ...] = (),
     ) -> Runner[VersionValue]:
         resolved = options or RunnerOptions(
@@ -83,6 +85,7 @@ class RunnerFactory:
             depth_limit=depth_limit,
             on_depth_violation=on_depth_violation,
             validation_mode=validation_mode,
+            discriminator=discriminator,
             middleware=middleware,
         )
         coordinator = ExecutionCoordinator[VersionValue](
@@ -94,6 +97,7 @@ class RunnerFactory:
             finder=PathFinder[VersionValue](
                 graph=graph,
                 targets=TargetCompiler[VersionValue](graph, adapter),
+                discriminator=resolved.discriminator,
                 policy=PolicyEngine[VersionValue](
                     direction=resolved.direction,
                     on_direction_violation=resolved.on_direction_violation,

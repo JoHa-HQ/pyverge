@@ -868,30 +868,42 @@ def test_manager_stores_key_only_with_namespace(
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_parallel_discriminators_run_default_path(manager: type[Manager]) -> None:
+def test_parallel_discriminators_run_selected_path(
+    manager: type[Manager],
+) -> None:
     instance = manager()
     key = ManagerMigrationKey("User", "1.0.0", "2.0.0")
+
+    def canary_migration(data: dict, _context=None) -> dict:
+        data["name"] = "Canary"
+        data["age"] = None
+        return data
+
     instance.store_migration(key, migrate_v1_to_v2)
-    instance.store_migration(key, migrate_v1_to_v2, discriminator="canary")
+    instance.store_migration(key, canary_migration, discriminator="canary")
 
     edges = instance.registry.edges("User")
     assert {edge.discriminator for edge in edges} == {"default", "canary"}
 
-    runtime = instance.runtime()
-    assert runtime.runner is not None
-    result = runtime.runner.run(
-        {
-            "kind": "User",
-            "version": "1.0.0",
-            "name": "Alice",
-            "email": "alice@example.com",
-            "role": "user",
-        },
-        "2.0.0",
-    )
+    payload = {
+        "kind": "User",
+        "version": "1.0.0",
+        "name": "Alice",
+        "email": "alice@example.com",
+        "role": "user",
+    }
+    default_runtime = instance.runtime()
+    canary_runtime = instance.runtime(discriminator="canary")
+    assert default_runtime.runner is not None
+    assert canary_runtime.runner is not None
 
-    assert result["version"] == "2.0.0"
-    assert result["name"] == "Alice"
+    default_result = default_runtime.runner.run(payload.copy(), "2.0.0")
+    canary_result = canary_runtime.runner.run(payload.copy(), "2.0.0")
+
+    assert default_result["version"] == "2.0.0"
+    assert default_result["name"] == "Alice"
+    assert canary_result["version"] == "2.0.0"
+    assert canary_result["name"] == "Canary"
 
 
 @pytest.mark.parametrize(

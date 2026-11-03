@@ -128,6 +128,8 @@ class PathCatalog(Protocol[VersionValue]):
         self,
         from_version: VersionNode[VersionValue],
         to_version: VersionNode[VersionValue],
+        *,
+        discriminator: str = "default",
     ) -> list[EdgeKey[VersionValue]]: ...
 
 
