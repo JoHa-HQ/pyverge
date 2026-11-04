@@ -90,9 +90,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             discriminator=discriminator,
         )
         if isinstance(edge, VersionEdge):
-            cls._default_runtime.bindings.store_migration(
-                edge.id, func, edge.migration
-            )
+            cls._default_runtime.bindings.store_migration(edge.id, func, edge.migration)
         return func
 
     @store_migration.register(ManagerMigrationKey)
@@ -123,9 +121,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             discriminator=discriminator,
         )
         if isinstance(edge, VersionEdge):
-            cls._default_runtime.bindings.store_migration(
-                edge.id, func, edge.migration
-            )
+            cls._default_runtime.bindings.store_migration(edge.id, func, edge.migration)
         return func
 
     @store_migration.register(EdgeKey)
@@ -151,9 +147,7 @@ class MigrationStoreMixin(Generic[VersionValue]):
             discriminator=key.discriminator,
         )
         if isinstance(edge, VersionEdge):
-            cls._default_runtime.bindings.store_migration(
-                edge.id, func, edge.migration
-            )
+            cls._default_runtime.bindings.store_migration(edge.id, func, edge.migration)
         return func
 
     @hybridmethod
@@ -300,7 +294,5 @@ class MigrationStoreMixin(Generic[VersionValue]):
             for kind in engine.registry.kinds:
                 for edge in engine.registry.migrations(kind):
                     edge_key = EdgeKey.from_version_edge(edge)
-                    binding = cls._default_runtime.bindings.add_hook(
-                        edge_key.id, hook
-                    )
+                    binding = cls._default_runtime.bindings.add_hook(edge_key.id, hook)
                     engine.add_hook(edge_key, binding.ref)

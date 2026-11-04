@@ -132,9 +132,7 @@ class Registry(Generic[VersionValue]):
         self._edges_by_version: dict[Comparable[VersionValue], set[EdgeEntry]] = (
             defaultdict(set)
         )
-        self._hooks: dict[Transitional[VersionValue], list[HookRef]] = defaultdict(
-            list
-        )
+        self._hooks: dict[Transitional[VersionValue], list[HookRef]] = defaultdict(list)
 
     def __contains__(self, index: object) -> bool:
         try:
@@ -390,9 +388,7 @@ class Registry(Generic[VersionValue]):
         idx = bisect.bisect_left(paths, key)
         return idx < len(paths) and paths[idx] == key
 
-    def _get_edge_identity(
-        self: Self, key: Transitional[VersionValue]
-    ) -> EdgeEntry:
+    def _get_edge_identity(self: Self, key: Transitional[VersionValue]) -> EdgeEntry:
         paths = self._migrations.get(key.kind, [])
         idx = bisect.bisect_left(paths, key)
         if idx < len(paths) and paths[idx] == key:
@@ -890,9 +886,7 @@ class Registry(Generic[VersionValue]):
             del self._migrations[key.kind][idx]
             if not self._migrations[key.kind]:
                 del self._migrations[key.kind]
-            if self._digest_index is not None and isinstance(
-                existing, VersionEdge
-            ):
+            if self._digest_index is not None and isinstance(existing, VersionEdge):
                 self._digest_index.pop(existing.digest(self._hasher), None)
             for endpoint in (key.source, key.target):
                 bucket = self._edges_by_version.get(endpoint)

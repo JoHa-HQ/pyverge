@@ -123,18 +123,11 @@ class MigrationGraph(Generic[VersionValue]):
 
     @property
     def kinds(self) -> list[ModelKind]:
-        return sorted(
-            set(self.backend.nodes_by_kind)
-            | set(self.backend.edges_by_kind)
-        )
+        return sorted(set(self.backend.nodes_by_kind) | set(self.backend.edges_by_kind))
 
     @property
     def entities(self) -> list[ModelKind]:
-        return [
-            kind
-            for kind in self.kinds
-            if self.backend.nodes_for_kind(kind)
-        ]
+        return [kind for kind in self.kinds if self.backend.nodes_for_kind(kind)]
 
     def models(self, kind: ModelKind | None) -> frozenset[ModelRef]:
         if kind is None:
@@ -262,9 +255,7 @@ class MigrationGraph(Generic[VersionValue]):
     ) -> tuple[EdgeKey[VersionValue], ...]:
         """Return edge entries filtered by lookup flags."""
         edges = (
-            self.backend.edges
-            if kind is None
-            else self.backend.edges_for_kind(kind)
+            self.backend.edges if kind is None else self.backend.edges_for_kind(kind)
         )
         entries: list[EdgeKey[VersionValue]] = []
         for edge in edges:
@@ -291,10 +282,7 @@ class MigrationGraph(Generic[VersionValue]):
 
     def has_migration(self, key: Transitional[VersionValue]) -> bool:
         edge = self.backend.edges_by_id.get(key.id)
-        return (
-            edge is not None
-            and edge.id in self.backend.executable_edge_ids
-        )
+        return edge is not None and edge.id in self.backend.executable_edge_ids
 
     def has_edge(self, key: EdgeKey[VersionValue]) -> bool:
         return self.backend.has_edge(key)
@@ -356,8 +344,7 @@ class MigrationGraph(Generic[VersionValue]):
             )
         versions = self.kind_versions(from_version.kind)
         positions = {
-            cast("NodeId", node.id): index
-            for index, node in enumerate(versions)
+            cast("NodeId", node.id): index for index, node in enumerate(versions)
         }
         lo = positions.get(from_version.id)
         hi = positions.get(to_version.id)
@@ -414,5 +401,6 @@ class MigrationGraph(Generic[VersionValue]):
 
     def path(self, source: Any, target: Any) -> list[Any]:
         return self.migration_path(source, target)
+
 
 __all__ = ["MigrationGraph"]

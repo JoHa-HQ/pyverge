@@ -109,12 +109,8 @@ class IndexedBackend(Generic[VersionValue]):
             namespace=resolved_namespace,
             nodes=ordered_nodes,
             edges=ordered_edges,
-            nodes_by_id=MappingProxyType(
-                {entry.id: entry for entry in ordered_nodes}
-            ),
-            edges_by_id=MappingProxyType(
-                {edge.id: edge for edge in ordered_edges}
-            ),
+            nodes_by_id=MappingProxyType({entry.id: entry for entry in ordered_nodes}),
+            edges_by_id=MappingProxyType({edge.id: edge for edge in ordered_edges}),
             nodes_by_kind=MappingProxyType(
                 {kind: tuple(bucket) for kind, bucket in nodes_by_kind.items()}
             ),
@@ -128,16 +124,10 @@ class IndexedBackend(Generic[VersionValue]):
                 }
             ),
             outgoing_by_node=MappingProxyType(
-                {
-                    endpoint: frozenset(bucket)
-                    for endpoint, bucket in outgoing.items()
-                }
+                {endpoint: frozenset(bucket) for endpoint, bucket in outgoing.items()}
             ),
             incoming_by_node=MappingProxyType(
-                {
-                    endpoint: frozenset(bucket)
-                    for endpoint, bucket in incoming.items()
-                }
+                {endpoint: frozenset(bucket) for endpoint, bucket in incoming.items()}
             ),
             edges_by_pair=MappingProxyType(
                 {pair: tuple(bucket) for pair, bucket in edges_by_pair.items()}
@@ -150,9 +140,7 @@ class IndexedBackend(Generic[VersionValue]):
             digests=MappingProxyType(dict(digests or {})),
             node_digests=MappingProxyType(dict(node_digests or {})),
             edge_digests=MappingProxyType(dict(edge_digests or {})),
-            hook_specs=MappingProxyType(
-                dict(sorted((hook_specs or {}).items()))
-            ),
+            hook_specs=MappingProxyType(dict(sorted((hook_specs or {}).items()))),
         )
 
     @property

@@ -108,6 +108,12 @@ message_template = "{{change_type}}({{scope}}): {{message}}"
 schema_pattern = "(?s)^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\\(#\\d+\\))!?: .+$"
 schema = "type(#ticket)[!]: message"
 
+[tool.coverage.run]
+omit = [
+  "src/pyverge/core/graph/backend/rustworkx.py",
+  "src/pyverge/core/graph/backend/igraph.py"
+]
+
 [tool.hatch.build.hooks.version]
 path = "src/pyverge/_version.py"
 
@@ -157,9 +163,3 @@ style = "pep440"
 pattern = "^v(?P<base>\\d+\\.\\d+\\.\\d+)$"
 bump = true
 format-jinja = "{% if distance == 0 %}{{ base }}{% else %}{{ serialize_pep440(base, stage, revision, dev=env.get('GITHUB_RUN_NUMBER', distance)) }}{% endif %}"
-
-[tool.coverage.run]
-omit = [
-  "src/pyverge/core/graph/backend/rustworkx.py",
-  "src/pyverge/core/graph/backend/igraph.py",
-]

@@ -5,41 +5,37 @@ policy, and graph-level plans. Execution consumes those services.
 
 ## Identity
 
-::: pyverge.versioning.NodeId
+::: pyverge.core.versioning.NodeId
 
-::: pyverge.versioning.VersionKey
+::: pyverge.core.versioning.VersionKey
 
-::: pyverge.versioning.EdgeKey
+::: pyverge.core.versioning.EdgeKey
 
-::: pyverge.versioning.VersionNode
+::: pyverge.core.versioning.VersionNode
 
-::: pyverge.versioning.VersionEdge
+::: pyverge.core.versioning.VersionEdge
 
 ## Snapshots
 
-::: pyverge.graph.GraphBuilder
+::: pyverge.core.graph.GraphBuilder
 
-::: pyverge.graph.MigrationGraph
+::: pyverge.core.graph.MigrationGraph
 
 ## Planning
 
-::: pyverge.graph.PathFinder
+::: pyverge.core.graph.PathFinder
 
-::: pyverge.graph.PathPlan
+::: pyverge.core.graph.PathPlan
 
-::: pyverge.graph.PathPlanEntry
+::: pyverge.core.graph.PathPlanEntry
 
-::: pyverge.graph.TargetCompiler
+::: pyverge.core.graph.TargetCompiler
 
-::: pyverge.graph.types.MigrationDefinition
+::: pyverge.core.graph.types.GraphView
 
-::: pyverge.graph.types.MigrationResolver
+::: pyverge.core.graph.types.PathGraphView
 
-::: pyverge.graph.types.GraphView
-
-::: pyverge.graph.types.PathGraphView
-
-::: pyverge.graph.PolicyEngine
+::: pyverge.core.graph.PolicyEngine
 
 ## Boundaries
 

@@ -191,8 +191,6 @@ class EdgeKey(EdgeId[VersionValue]):
         )
 
 
-
-
 @dataclass(frozen=True, slots=True, eq=False, kw_only=True)
 class VersionEdge(EdgeKey[VersionValue]):
     """An enriched edge key that binds hydrated endpoints and an executable diff."""

@@ -13,7 +13,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.execution import OTELHook
+from pyverge.runtime import OTELHook
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")))
@@ -67,7 +67,7 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.execution import OpenLineageHook
+from pyverge.runtime import OpenLineageHook
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 LineageUserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")))

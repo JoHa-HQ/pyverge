@@ -194,5 +194,5 @@ def test_version_edge_requires_migration_ref() -> None:
             target=target,
             ref=cast("Any", NodeRef()),
             diff=cast("Any", object()),
-                migration=MigrationDescriptor("callable", "m1"),
+            migration=MigrationDescriptor("callable", "m1"),
         )

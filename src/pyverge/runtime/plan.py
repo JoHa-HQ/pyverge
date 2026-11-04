@@ -134,9 +134,7 @@ class StepInvoker(Generic[VersionValue]):
         ):
             self._raise_on_awaitable(result, "async hook requires async backend")
 
-    async def before_async(
-        self, data: ModelData, name: str, hook_state: Any
-    ) -> None:
+    async def before_async(self, data: ModelData, name: str, hook_state: Any) -> None:
         for result in self.entry.invoke_hook(
             self.index,
             "before_migrate",

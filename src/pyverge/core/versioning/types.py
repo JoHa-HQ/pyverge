@@ -163,9 +163,7 @@ class DiffProvider(Protocol):
 
 
 @runtime_checkable
-class Migratable(
-    Transitional[VersionValue_co], Digestible, Protocol[VersionValue_co]
-):
+class Migratable(Transitional[VersionValue_co], Digestible, Protocol[VersionValue_co]):
     """Executable transition: endpoint identity plus diff and callable."""
 
     @property

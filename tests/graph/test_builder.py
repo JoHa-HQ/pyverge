@@ -209,14 +209,10 @@ def test_graph_accepts_one_nonempty_namespace(
 def test_graph_preserves_edge_discriminators(registry, graph) -> None:
     source, target = registry.kind_versions("User")
     registry.store_migration(
-        MigrationSpec(
-            (source, target), migrate_v1_to_v2, discriminator="canary"
-        )
+        MigrationSpec((source, target), migrate_v1_to_v2, discriminator="canary")
     )
     registry.store_migration(
-        MigrationSpec(
-            (source, target), migrate_v1_to_v2, discriminator="stable"
-        )
+        MigrationSpec((source, target), migrate_v1_to_v2, discriminator="stable")
     )
 
     snapshot = graph()

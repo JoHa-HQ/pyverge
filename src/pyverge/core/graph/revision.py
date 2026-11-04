@@ -51,10 +51,7 @@ class Revision:
             self,
             "versions",
             MappingProxyType(
-                {
-                    kind: tuple(values)
-                    for kind, values in self.versions.items()
-                }
+                {kind: tuple(values) for kind, values in self.versions.items()}
             ),
         )
 
@@ -68,8 +65,7 @@ class Revision:
         return {
             "version_strategy": self.version_strategy,
             "versions": {
-                kind: list(values)
-                for kind, values in sorted(self.versions.items())
+                kind: list(values) for kind, values in sorted(self.versions.items())
             },
             "content_digest": self.content_digest,
         }

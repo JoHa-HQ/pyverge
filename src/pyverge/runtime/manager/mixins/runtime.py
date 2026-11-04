@@ -84,9 +84,7 @@ class RuntimeMixin(Generic[VersionValue]):
             middleware=middleware,
         )
         store = type(self)._default_runtime
-        return Runtime(engine=self.engine, bindings=store.bindings).with_runner(
-            options
-        )
+        return Runtime(engine=self.engine, bindings=store.bindings).with_runner(options)
 
     def runner(  # noqa: PLR0913
         self: Manager[VersionValue],

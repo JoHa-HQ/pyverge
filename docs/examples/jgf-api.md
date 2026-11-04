@@ -7,11 +7,11 @@ import semver
 from pydantic import BaseModel
 
 from pyverge import Manager
-from pyverge.export import ManifestDiff
-from pyverge.graph import GraphBuilder
-from pyverge.jgf import JgfExporter
+from pyverge.cli.export import ManifestDiff
+from pyverge.core.graph import GraphBuilder
+from pyverge.cli.jgf import JgfExporter
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
-from pyverge.versioning import default_content_hasher
+from pyverge.core.versioning import default_content_hasher
 
 UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=ModelCodec(namespace="default", version_property="version", kind_property="kind")))
 
@@ -44,7 +44,7 @@ document = exporter.export_graph(graph).to_dict()
 assert "graph" in document
 assert document["graph"]["nodes"]
 assert document["graph"]["edges"]
-assert exporter.content_hash(graph)
+assert exporter.export_digest(graph)
 
 baseline = exporter.export_graph(graph).to_dict()
 current = exporter.export_graph(graph).to_dict()

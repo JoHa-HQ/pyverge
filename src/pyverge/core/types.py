@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 # Version axis
 # ---------------------------------------------------------------------------
 
+
 @runtime_checkable
 class VersionValueProtocol(Protocol):
     """Ordering and hashing contract for one parsed version value.
@@ -49,9 +50,7 @@ class VersionValueProtocol(Protocol):
 #: Core version value axis: any value satisfying the ordering protocol.
 VersionValue = TypeVar("VersionValue", bound=VersionValueProtocol)
 #: Covariant form for protocols where the version is output-only.
-VersionValue_co = TypeVar(
-    "VersionValue_co", bound=VersionValueProtocol, covariant=True
-)
+VersionValue_co = TypeVar("VersionValue_co", bound=VersionValueProtocol, covariant=True)
 
 #: Per-execution hook state supplied by the execution backend.
 HookState: TypeAlias = ContextVar[dict[int, tuple[Any, ...]]]

@@ -63,8 +63,7 @@ class PolicyEngine(Generic[VersionValue]):
                 )
                 continue
             edges = entry.edges or tuple(
-                EdgeKey.from_pair(source, target)
-                for source, target in entry.steps
+                EdgeKey.from_pair(source, target) for source, target in entry.steps
             )
             if any(not graph.has_migration(edge) for edge in edges):
                 self._violation(
