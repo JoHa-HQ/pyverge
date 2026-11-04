@@ -67,7 +67,7 @@ copy="shallow"  top-level copy only
 copy="none"     caller-owned payload, mutations are visible
 ```
 
-Plan caching keyes on the target policy and entry signature, never payload
+Plan caching keys on the target policy and entry signature, never payload
 values.
 
 ### Batch payloads

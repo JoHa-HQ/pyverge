@@ -279,9 +279,9 @@ off      no telemetry events
 ```
 
 `sampled` uses `telemetry_sample_rate` between `0` and `1`. Sampling is stable
-per run ID: all events for a sampled run are emitted and unsampled runs emit
-nothing. Use `errors`, `sampled`, or `off` on high-throughput paths. Event
-objects are not constructed when telemetry is disabled.
+per run ID: all events for a sampled run are emitted and runs that are not
+sampled emit nothing. Use `errors`, `sampled`, or `off` on high-throughput
+paths. Event objects are not constructed when telemetry is disabled.
 
 ## Middleware
 
