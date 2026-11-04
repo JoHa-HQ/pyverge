@@ -6,10 +6,19 @@ from typing import Generic, cast
 
 from pyverge.core.graph.planning.plan import ExtractedEntry, PathPlan, PathPlanEntry
 from pyverge.core.graph.planning.policy import PolicyEngine
-from pyverge.core.graph.planning.targets import TargetCompiler, TargetPolicy
+from pyverge.core.graph.planning.targets import (
+    TargetCompiler,
+    TargetPolicy,
+    TargetResolver,
+)
 from pyverge.core.graph.types import PathGraphView
-from pyverge.core.types import ModelHandle, TargetResolver, VersionValue
-from pyverge.core.versioning import EdgeId, NodeId, VersionNode
+from pyverge.core.types import ModelHandle, VersionValue
+from pyverge.core.versioning import (
+    DEFAULT_DISCRIMINATOR,
+    EdgeId,
+    NodeId,
+    VersionNode,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +36,7 @@ class PathFinder(Generic[VersionValue]):
     graph: PathGraphView[VersionValue]
     targets: TargetCompiler[VersionValue]
     policy: PolicyEngine[VersionValue]
+    discriminator: str = DEFAULT_DISCRIMINATOR
     _cache: dict[tuple[NodeId, NodeId], ResolvedPath[VersionValue]] = field(
         default_factory=dict, compare=False, repr=False
     )
@@ -68,7 +78,13 @@ class PathFinder(Generic[VersionValue]):
         cache_key = (entry.node.id, target.id)
         cached = self._cache.get(cache_key)
         if cached is None:
-            path = tuple(self.graph.edge_path(entry.node, target))
+            path = tuple(
+                self.graph.edge_path(
+                    entry.node,
+                    target,
+                    discriminator=self.discriminator,
+                )
+            )
             steps = tuple(
                 (
                     cast("VersionNode[VersionValue]", edge.source),

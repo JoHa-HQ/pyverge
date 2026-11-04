@@ -27,11 +27,13 @@ three stages:
 1. **Discovery** — the walker resolves nested kinds against *one* registry. A
    kind missing from that registry is invisible: never discovered, never
    migrated.
-2. **Ordering** — the dependency graph derives parent/child edges from the
-   registry's version list for each kind. A split graph loses the containment
-   edge, so execution order is no longer guaranteed (children before parents).
-3. **Finalize** — the migrated payload is validated against the target model. A
-   nested entry absent from that model is **silently dropped**.
+2. **Coverage** — the plan contains only entries discovered from that one
+   graph. A missing nested kind produces no child plan entry, so the parent may
+   migrate while its children stay stale or never run. Execution order itself
+   comes from payload containment paths, not from a cross-manager edge.
+3. **Finalize** — the migrated payload is validated against the target model.
+   Fields the target model does not accept may be dropped or rejected depending
+   on the adapter's validation mode.
 
 ## What "per source" means
 
@@ -70,15 +72,15 @@ lossy** migrations:
 
 ```python
 # location lives in A, user lives in B, but a user payload embeds a location.
-A().runner().run(user_payload, "latest")   # location converges; parent user left at 1.0.0
-B().runner().run(user_payload, "latest")   # user converges; nested location silently dropped
+A().runtime().runner.run(user_payload, "latest")   # location converges; parent user left at 1.0.0
+B().runtime().runner.run(user_payload, "latest")   # user converges; nested location is not migrated
 ```
 
 | Symptom | Cause |
 | --- | --- |
 | Nested entries never migrate | kind not in the handling manager's registry |
-| Parent migrated but children stale | missing containment edge -> wrong order |
-| Fields vanish after migration | nested entry not in the target model -> dropped at finalize |
+| Parent migrated but children stale | child kind missing, so no child plan entry exists |
+| Fields vanish after migration | target finalize does not accept the nested field, or the child was never migrated |
 
 The FastMCP adapter follows this invariant directly: `PyvergeProvider` binds
 **one** manager, so there is no routing to do — the manager owns the whole graph

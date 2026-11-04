@@ -2,7 +2,7 @@
 
 **Adapter** — provider seam that turns a model or schema into a `VersionNode` and validates payloads. See [Providers](providers.md).
 
-**Backend** — executes a prepared plan. Examples: `ThreadedBackend`, `AsyncBackend`, `ProcessBackend`.
+**Backend** — schedules a prepared plan and invokes migration callables through an execution strategy. Examples: `ThreadedBackend`, `AsyncBackend`, `ProcessBackend`.
 
 **Convergence** — migrating an entry from its current version to a selected target version.
 

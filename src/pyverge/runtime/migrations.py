@@ -6,12 +6,13 @@ from types import MappingProxyType
 from typing import Generic
 
 from pyverge.core.registry.errors import MigrationNotFoundError
-from pyverge.core.types import Attachable, MigrationFunc, VersionValue
+from pyverge.core.types import MigrationFunc, VersionValue
 from pyverge.core.versioning import (
     EdgeId,
     HookRef,
     MigrationDescriptor,
 )
+from pyverge.runtime.hooks import Attachable
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +38,7 @@ class MigrationBinding:
 
     func: MigrationFunc
     descriptor: MigrationDescriptor
+    name: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,7 +68,11 @@ class MigrationBindings(Generic[VersionValue]):
         func: MigrationFunc,
         descriptor: MigrationDescriptor,
     ) -> MigrationBinding:
-        binding = MigrationBinding(func=func, descriptor=descriptor)
+        binding = MigrationBinding(
+            func=func,
+            descriptor=descriptor,
+            name=getattr(func, "__name__", descriptor.identity),
+        )
         self.migrations[edge] = binding
         return binding
 

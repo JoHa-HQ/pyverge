@@ -20,7 +20,7 @@ UserManager = Manager[semver.Version].configure(PydanticModelAdapter(codec=Model
 # constructing the runtime instance.
 manager = UserManager()
 
-migrated = manager.runner().run(
+migrated = manager.runtime().runner.run(
     {
         "document": {
             "kind": "Person",

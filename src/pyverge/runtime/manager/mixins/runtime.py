@@ -15,12 +15,9 @@ from pyverge.core.registry import HealthFailLevel, HealthIssue
 from pyverge.core.types import (
     DepthViolationStrategy,
     DirectionViolationStrategy,
-    ManagerMigrationKey,
     MigrationDirectionStrategy,
     ModelData,
-    ModelKey,
     ModelKind,
-    ModelPair,
     VersionMissingStrategy,
     VersionValue,
 )
@@ -34,6 +31,7 @@ from pyverge.runtime.middleware import BackendMiddleware
 from pyverge.runtime.types import BackendPort
 
 from ..descriptors import hybridmethod
+from ..types import ManagerMigrationKey, ModelKey, ModelPair, warn_model_pair
 
 if TYPE_CHECKING:
     from pyverge.core.engine import Engine
@@ -65,6 +63,7 @@ class RuntimeMixin(Generic[VersionValue]):
         depth_limit: int = -1,
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
+        discriminator: str = "default",
     ) -> Runtime[VersionValue]:
         options = RunnerOptions(
             backend=backend or runtime or ThreadedBackend(max_workers=0),
@@ -81,6 +80,7 @@ class RuntimeMixin(Generic[VersionValue]):
             depth_limit=depth_limit,
             on_depth_violation=on_depth_violation,
             validation_mode=validation_mode,
+            discriminator=discriminator,
             middleware=middleware,
         )
         store = type(self)._default_runtime
@@ -99,6 +99,7 @@ class RuntimeMixin(Generic[VersionValue]):
         depth_limit: int = -1,
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
+        discriminator: str = "default",
     ) -> Runner[VersionValue]:
         warnings.warn(
             "Manager.runner() is deprecated; use Manager.runtime().runner",
@@ -116,6 +117,7 @@ class RuntimeMixin(Generic[VersionValue]):
             depth_limit=depth_limit,
             on_depth_violation=on_depth_violation,
             validation_mode=validation_mode,
+            discriminator=discriminator,
         )
         assert runtime_view.runner is not None
         return runtime_view.runner
@@ -182,6 +184,7 @@ class RuntimeMixin(Generic[VersionValue]):
         *,
         engine: Engine[VersionValue] | None = None,
     ) -> Diffable[VersionValue]:
+        warn_model_pair()
         engine = engine or cls._default_engine
         source = cls.get_model(key.source, engine=engine)
         target = cls.get_model(key.target, engine=engine)

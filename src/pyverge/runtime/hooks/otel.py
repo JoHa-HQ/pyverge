@@ -3,22 +3,75 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from types import TracebackType
 from typing import Any
 
 from opentelemetry.trace import Span, SpanKind, StatusCode, Tracer
 
 from pyverge.core.types import HookState
-from pyverge.core.versioning import MigrationDescriptor, NodeId
-from pyverge.runtime.hooks.state import pop_state, push_state
-from pyverge.runtime.hooks.types import MigrationHook
+from pyverge.runtime.context import StepContext
+from pyverge.runtime.hooks.types import HookScope, MigrationHook
 
 
-@dataclass(frozen=True, slots=True)
-class _SpanState:
-    scope: AbstractContextManager[Span]
-    span: Span
-    start_time: float
+@dataclass
+class _SpanScope:
+    """One OTel span lifetime for one migration step."""
+
+    tracer: Tracer
+    service: str
+    step: StepContext
+    span: Span | None = field(init=False, default=None)
+    scope: AbstractContextManager[Span] | None = field(init=False, default=None)
+    start_time: float = field(init=False, default=0.0)
+
+    def __enter__(self) -> Span:
+        scope = self.tracer.start_as_current_span(
+            f"{self.service}.migrate",
+            kind=SpanKind.INTERNAL,
+            attributes=self._attributes(),
+        )
+        self.scope = scope
+        self.span = scope.__enter__()
+        self.start_time = time.perf_counter()
+        return self.span
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        if self.span is None:
+            return
+        self.span.set_attribute(
+            "migration.duration_seconds",
+            time.perf_counter() - self.start_time,
+        )
+        if exc is not None:
+            self.span.record_exception(exc)
+            self.span.set_status(StatusCode.ERROR, str(exc))
+        else:
+            self.span.set_status(StatusCode.OK)
+        if self.scope is not None:
+            self.scope.__exit__(exc_type, exc, traceback)
+
+    def _attributes(self) -> dict[str, Any]:
+        attributes = {
+            "service.name": self.service,
+            "migration.name": self.step.name,
+            "migration.namespace": self.step.source.namespace,
+            "migration.kind": self.step.source.kind,
+            "migration.source": str(self.step.source),
+            "migration.target": str(self.step.target),
+            "migration.from_version": str(self.step.source),
+            "migration.to_version": str(self.step.target),
+            "migration.discriminator": self.step.edge.discriminator,
+        }
+        if self.step.migration is not None:
+            attributes["migration.strategy"] = self.step.migration.strategy
+            attributes["migration.identity"] = self.step.migration.identity
+        return attributes
 
 
 class OTELHook(MigrationHook):
@@ -28,95 +81,34 @@ class OTELHook(MigrationHook):
         self._tracer = tracer
         self._service = service
 
-    def before_migrate(  # noqa: PLR0913
+    def before_migrate(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         data: Mapping[str, Any],
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
-    ) -> None:
-        scope = self._tracer.start_as_current_span(
-            f"{self._service}.migrate",
-            kind=SpanKind.INTERNAL,
-            attributes=self._attributes(name, from_version, to_version, migration),
-        )
-        push_state(
-            state,
-            id(self),
-            _SpanState(
-                scope=scope,
-                span=scope.__enter__(),
-                start_time=time.perf_counter(),
-            ),
-        )
+    ) -> HookScope:
+        return _SpanScope(self._tracer, self._service, step)
 
-    def after_migrate(  # noqa: PLR0913
+    def after_migrate(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         original_data: Mapping[str, Any],
         migrated_data: Mapping[str, Any],
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
     ) -> None:
-        run_state = pop_state(state, id(self))
-        if not isinstance(run_state, _SpanState):
-            return
-        run_state.span.set_attribute(
-            "migration.duration_seconds",
-            time.perf_counter() - run_state.start_time,
-        )
-        run_state.span.set_status(StatusCode.OK)
-        self._close(run_state)
+        return None
 
-    def on_error(  # noqa: PLR0913
+    def on_error(
         self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
+        step: StepContext,
         data: Mapping[str, Any],
         error: Exception,
         *,
-        migration: MigrationDescriptor | None = None,
         state: HookState,
     ) -> None:
-        run_state = pop_state(state, id(self))
-        if not isinstance(run_state, _SpanState):
-            return
-        run_state.span.record_exception(error)
-        run_state.span.set_status(StatusCode.ERROR, str(error))
-        self._close(run_state)
-
-    def _attributes(
-        self,
-        name: str,
-        from_version: NodeId,
-        to_version: NodeId,
-        migration: MigrationDescriptor | None,
-    ) -> dict[str, Any]:
-        attributes = {
-            "service.name": self._service,
-            "migration.name": str(name),
-            "migration.namespace": from_version.namespace,
-            "migration.kind": from_version.kind,
-            "migration.source": str(from_version),
-            "migration.target": str(to_version),
-            "migration.from_version": str(from_version),
-            "migration.to_version": str(to_version),
-        }
-        if migration is not None:
-            attributes["migration.strategy"] = migration.strategy
-            attributes["migration.identity"] = migration.identity
-        return attributes
-
-    @staticmethod
-    def _close(state: _SpanState) -> None:
-        state.scope.__exit__(None, None, None)
+        return None
 
 
 __all__ = ["OTELHook"]

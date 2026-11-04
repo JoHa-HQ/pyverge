@@ -9,9 +9,11 @@ import asyncio
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
 from opentelemetry.trace import StatusCode
 
-from pyverge.core.versioning import MigrationDescriptor, NodeId
+from pyverge.core.versioning import EdgeId, MigrationDescriptor, NodeId
+from pyverge.runtime.context import MigrationContext, StepContext
 from pyverge.runtime.hooks import OpenLineageHook, OTELHook
 from pyverge.runtime.hooks.state import new_hook_state
 from pyverge.runtime.middleware import OpenLineageMiddleware, OtelMiddleware
@@ -74,22 +76,47 @@ def _node(version: str) -> NodeId:
     return NodeId.parse("com.acme.orders", "User", version)
 
 
+def _step(  # noqa: PLR0913
+    source: NodeId,
+    target: NodeId,
+    *,
+    name: str = "one_to_two",
+    migration: MigrationDescriptor | None = None,
+    discriminator: str = "default",
+    index: int = 0,
+) -> StepContext:
+    return StepContext(
+        run=cast("Any", SimpleNamespace(run_id="run")),
+        path=("document",),
+        index=index,
+        source=cast("Any", source),
+        target=cast("Any", target),
+        edge=EdgeId.from_pair(source, target, discriminator=discriminator),
+        bindings=MigrationContext.empty(),
+        migration=migration,
+        name=name,
+    )
+
+
 def test_otel_hook_keeps_interleaved_step_state_separate() -> None:
     tracer = RecordingTracer()
     hook = OTELHook(tracer=cast("Any", tracer), service="orders")
     state = new_hook_state()
     v1, v2, v3 = _node("1.0.0"), _node("2.0.0"), _node("3.0.0")
 
-    hook.before_migrate("one_to_two", v1, v2, {}, state=state)
-    hook.before_migrate("two_to_three", v2, v3, {}, state=state)
-    hook.after_migrate("two_to_three", v2, v3, {}, {}, state=state)
-    hook.after_migrate("one_to_two", v1, v2, {}, {}, state=state)
+    first_scope = hook.before_migrate(_step(v1, v2), {}, state=state)
+    second_scope = hook.before_migrate(
+        _step(v2, v3, name="two_to_three"), {}, state=state
+    )
+    with first_scope, second_scope:
+        pass
 
     first, second = tracer.spans
     assert first.attributes["migration.source"] == "com.acme.orders:User@1.0.0"
     assert first.attributes["migration.target"] == "com.acme.orders:User@2.0.0"
     assert first.attributes["migration.namespace"] == "com.acme.orders"
     assert first.attributes["migration.kind"] == "User"
+    assert first.attributes["migration.discriminator"] == "default"
     assert second.attributes["migration.source"] == "com.acme.orders:User@2.0.0"
     assert first.ended is True
     assert second.ended is True
@@ -104,23 +131,9 @@ def test_otel_hook_reports_migration_descriptor() -> None:
     v1, v2 = _node("1.0.0"), _node("2.0.0")
     descriptor = MigrationDescriptor("jsonpatch", "docs.user.v1_v2")
 
-    hook.before_migrate(
-        "one_to_two",
-        v1,
-        v2,
-        {},
-        migration=descriptor,
-        state=state,
-    )
-    hook.after_migrate(
-        "one_to_two",
-        v1,
-        v2,
-        {},
-        {},
-        migration=descriptor,
-        state=state,
-    )
+    step = _step(v1, v2, migration=descriptor)
+    with hook.before_migrate(step, {}, state=state):
+        pass
 
     attributes = tracer.spans[0].attributes
     assert attributes["migration.strategy"] == "jsonpatch"
@@ -134,8 +147,9 @@ def test_otel_hook_records_error_for_matching_step() -> None:
     v1, v2 = _node("1.0.0"), _node("2.0.0")
     error = RuntimeError("boom")
 
-    hook.before_migrate("one_to_two", v1, v2, {}, state=state)
-    hook.on_error("one_to_two", v1, v2, {}, error, state=state)
+    with pytest.raises(RuntimeError):
+        with hook.before_migrate(_step(v1, v2), {}, state=state):
+            raise error
 
     span = tracer.spans[0]
     assert span.exceptions == [error]
@@ -153,10 +167,12 @@ def test_openlineage_hook_keeps_interleaved_run_ids_separate() -> None:
     state = new_hook_state()
     v1, v2, v3 = _node("1.0.0"), _node("2.0.0"), _node("3.0.0")
 
-    hook.before_migrate("one_to_two", v1, v2, {}, state=state)
-    hook.before_migrate("two_to_three", v2, v3, {}, state=state)
-    hook.after_migrate("two_to_three", v2, v3, {}, {}, state=state)
-    hook.after_migrate("one_to_two", v1, v2, {}, {}, state=state)
+    first_scope = hook.before_migrate(_step(v1, v2), {}, state=state)
+    second_scope = hook.before_migrate(
+        _step(v2, v3, name="two_to_three"), {}, state=state
+    )
+    with first_scope, second_scope:
+        pass
 
     started = [event for event in client.events if event.eventType.value == "START"]
     completed = [
@@ -216,3 +232,31 @@ def test_otel_middleware_keeps_async_span_open_until_completion() -> None:
     assert result == {"ok": True}
     assert span.ended is True
     assert span.status == (StatusCode.OK, None)
+
+
+def test_otel_hook_reports_discriminator() -> None:
+    tracer = RecordingTracer()
+    hook = OTELHook(tracer=cast("Any", tracer), service="orders")
+    state = new_hook_state()
+    v1, v2 = _node("1.0.0"), _node("2.0.0")
+
+    with hook.before_migrate(_step(v1, v2, discriminator="canary"), {}, state=state):
+        pass
+
+    assert tracer.spans[0].attributes["migration.discriminator"] == "canary"
+
+
+def test_openlineage_hook_includes_discriminator() -> None:
+    client = RecordingLineageClient()
+    hook = OpenLineageHook(
+        client=client,
+        namespace="com.acme.orders",
+        producer="tests",
+    )
+    state = new_hook_state()
+    v1, v2 = _node("1.0.0"), _node("2.0.0")
+
+    with hook.before_migrate(_step(v1, v2, discriminator="canary"), {}, state=state):
+        pass
+
+    assert client.events[0].job.name == "migration.User.1.0.0->2.0.0.canary"

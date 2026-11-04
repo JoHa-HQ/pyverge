@@ -5,8 +5,8 @@ from typing import Annotated
 
 import typer
 
-from pyverge.core.types import ManagerMigrationKey
 from pyverge.discovery.reflection import JsonPatchRenderer
+from pyverge.runtime.manager.types import ManagerMigrationKey
 
 from ..config import ConfigError, resolve_manager
 from ._shared import ManagerOption

@@ -14,9 +14,6 @@ from pydantic import BaseModel
 
 from pyverge import Manager
 from pyverge.core import (
-    ManagerMigrationKey,
-    MigrationKeyInput,
-    ModelPair,
     VersionValue,
 )
 from pyverge.core.engine import Engine
@@ -24,11 +21,18 @@ from pyverge.core.registry import HealthIssue
 from pyverge.core.registry.errors import (
     CatalogError,
     HealthValidationError,
+    MigrationNotFoundError,
     ModelNotFoundError,
 )
 from pyverge.core.versioning import NodeRef, VersionKey
 from pyverge.runtime.backends import AsyncBackend
 from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.manager import ManagerConfig
+from pyverge.runtime.manager.types import (
+    ManagerMigrationKey,
+    MigrationKeyInput,
+    ModelPair,
+)
 from pyverge.runtime.migrations import HookRefFactory
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.types import (
@@ -864,27 +868,85 @@ def test_manager_stores_key_only_with_namespace(
     ],
     indirect=["model_adapter", "registry"],
 )
-def test_parallel_discriminators_run_default_path(manager: type[Manager]) -> None:
+def test_parallel_discriminators_run_selected_path(
+    manager: type[Manager],
+) -> None:
     instance = manager()
     key = ManagerMigrationKey("User", "1.0.0", "2.0.0")
+
+    def canary_migration(data: dict, _context=None) -> dict:
+        data["name"] = "Canary"
+        data["age"] = None
+        return data
+
     instance.store_migration(key, migrate_v1_to_v2)
-    instance.store_migration(key, migrate_v1_to_v2, discriminator="canary")
+    instance.store_migration(key, canary_migration, discriminator="canary")
 
     edges = instance.registry.edges("User")
     assert {edge.discriminator for edge in edges} == {"default", "canary"}
 
-    runtime = instance.runtime()
-    assert runtime.runner is not None
-    result = runtime.runner.run(
-        {
-            "kind": "User",
-            "version": "1.0.0",
-            "name": "Alice",
-            "email": "alice@example.com",
-            "role": "user",
-        },
-        "2.0.0",
-    )
+    payload = {
+        "kind": "User",
+        "version": "1.0.0",
+        "name": "Alice",
+        "email": "alice@example.com",
+        "role": "user",
+    }
+    default_runtime = instance.runtime()
+    canary_runtime = instance.runtime(discriminator="canary")
+    assert default_runtime.runner is not None
+    assert canary_runtime.runner is not None
 
-    assert result["version"] == "2.0.0"
-    assert result["name"] == "Alice"
+    default_result = default_runtime.runner.run(payload.copy(), "2.0.0")
+    canary_result = canary_runtime.runner.run(payload.copy(), "2.0.0")
+
+    assert default_result["version"] == "2.0.0"
+    assert default_result["name"] == "Alice"
+    assert canary_result["version"] == "2.0.0"
+    assert canary_result["name"] == "Canary"
+
+
+@pytest.mark.parametrize(
+    "model_adapter",
+    [PydanticModelAdapter],
+    indirect=True,
+)
+def test_manager_config_is_deprecated_but_supported(model_adapter) -> None:
+    with pytest.warns(DeprecationWarning):
+        config = ManagerConfig(on_missing="raise")
+
+    with pytest.warns(DeprecationWarning):
+        configured = Manager[semver.Version].configure(model_adapter, config=config)
+
+    assert configured._default_engine is not None
+
+
+@pytest.mark.parametrize(
+    ("model_adapter", "registry"),
+    [[PydanticModelAdapter, [semver.Version, "test", [UserV1, UserV2], []]]],
+    indirect=["model_adapter", "registry"],
+)
+def test_manager_migration_key_uses_explicit_discriminator(
+    manager: type[Manager],
+) -> None:
+    instance = manager()
+    key = ManagerMigrationKey("User", "1.0.0", "2.0.0", discriminator="canary")
+
+    instance.store_migration(key, migrate_v1_to_v2)
+
+    assert instance.get_migration(key) is not None
+    with pytest.raises(MigrationNotFoundError):
+        instance.get_migration(ManagerMigrationKey("User", "1.0.0", "2.0.0"))
+    instance.remove_migration(key)
+
+
+@pytest.mark.parametrize(
+    ("model_adapter", "registry"),
+    [[PydanticModelAdapter, [semver.Version, "test", [UserV1, UserV2], []]]],
+    indirect=["model_adapter", "registry"],
+)
+def test_runtime_owns_the_graph(manager: type[Manager]) -> None:
+    runtime = manager().runtime()
+
+    assert runtime.graph is not None
+    assert runtime.graph.revision.version_strategy == "semver"

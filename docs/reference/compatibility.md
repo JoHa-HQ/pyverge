@@ -21,7 +21,7 @@ diff.render()  # RFC 6902 ops
 classifies structural change:
 
 ```python
-from pyverge.versioning import CompatibilityReport
+from pyverge.core.versioning import CompatibilityReport
 
 report = CompatibilityReport.from_diff(
     diff,
@@ -37,7 +37,7 @@ report.modified_fields
 `BackwardCompatibilityGuard` evaluates a diff with a fixed identity-field set:
 
 ```python
-from pyverge.versioning import BackwardCompatibilityGuard
+from pyverge.core.versioning import BackwardCompatibilityGuard
 
 guard = BackwardCompatibilityGuard(frozenset({"kind", "version"}))
 guard.evaluate(diff)

@@ -70,7 +70,7 @@ def add_age(data: dict, context=None) -> dict:
 manager = UserManager()
 
 # Migrate data — converges every versioned entry to the configured target.
-migrated = manager.runner().run(
+migrated = manager.runtime().runner.run(
     {"kind": "User", "version": "1.0.0", "name": "Alice", "email": "a@b.com"},
     "latest",
 )

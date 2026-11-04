@@ -4,16 +4,12 @@ import copy
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any
 
-from pyverge.core.graph.planning.path import Path
 from pyverge.core.types import VersionValue
-from pyverge.runtime.context import MigrationContext, RunContext, StepContext
+from pyverge.runtime.context import RunContext
 from pyverge.runtime.hooks.state import new_hook_state
-from pyverge.runtime.plan import ExecutionEntry, ExecutionPlan
+from pyverge.runtime.plan import ExecutionPlan
+from pyverge.runtime.strategies import ProcessStrategy
 from pyverge.schemas.types import ModelIdentityPort
-
-
-def _invoke(work: Any, data: Any, context: Any) -> Any:
-    return work(data, context)
 
 
 class ProcessBackend:
@@ -21,6 +17,7 @@ class ProcessBackend:
 
     def __init__(self, max_workers: int) -> None:
         self._executor = ProcessPoolExecutor(max_workers=max_workers)
+        self._strategy = ProcessStrategy(self._executor)
 
     def execute(
         self,
@@ -32,56 +29,18 @@ class ProcessBackend:
         data = copy.deepcopy(payload)
         hook_state = new_hook_state()
         for level in plan.levels:
-            for entry in level:
-                self._execute_entry(entry, data, run, adapter, hook_state)
-        return data
-
-    def _execute_entry(
-        self,
-        entry: ExecutionEntry[VersionValue],
-        data: dict[str, Any],
-        run: RunContext,
-        adapter: ModelIdentityPort,
-        hook_state: Any,
-    ) -> None:
-        current = Path(*entry.path).get(data)
-        for index, (source, target) in enumerate(entry.steps):
-            name = getattr(
-                entry.migration_func(index), "__name__", f"{source}->{target}"
+            results = tuple(
+                entry.execute_sync(
+                    plan.entry_value(data, entry),
+                    run=run,
+                    adapter=adapter,
+                    hook_state=hook_state,
+                    invoke=self._strategy.invoke,
+                )
+                for entry in level
             )
-            invoker = entry.step(index)
-            invoker.before(current, name, hook_state)
-            step = self._step(entry, index, source, target, run)
-            try:
-                migrated = self._executor.submit(
-                    _invoke, entry.migration_func(index), current, dict(step.view)
-                ).result()
-            except Exception as error:
-                invoker.on_error(current, error, name, hook_state)
-                raise
-            invoker.after(current, migrated, name, hook_state)
-            if isinstance(migrated, dict):
-                migrated[adapter.version_property] = str(target.version)
-            current = migrated
-        Path(*entry.path).set(data, current)
-
-    def _step(
-        self,
-        entry: ExecutionEntry[VersionValue],
-        index: int,
-        source: Any,
-        target: Any,
-        run: RunContext,
-    ) -> StepContext:
-        return StepContext(
-            run=run,
-            path=entry.path,
-            index=index,
-            source=source,
-            target=target,
-            edge=entry.plan.edges[index],
-            bindings=MigrationContext.empty(),
-        )
+            data = plan.apply_results(data, results)
+        return data
 
     def close(self) -> None:
         self._executor.shutdown()

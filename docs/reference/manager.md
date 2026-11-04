@@ -38,6 +38,9 @@ Manager.health(entity=None, *, fail_level=None)
 `"never"` disables blocking. The registry raises `HealthValidationError` when a
 finding meets the level.
 
+`ManagerConfig` is deprecated. Pass keywords directly to `Manager.configure`,
+or expand `ManagerConfig(...).to_kwargs()` at the call site.
+
 ## Registration decorators
 
 ```python
@@ -54,7 +57,6 @@ Manager.get_latest_model(kind)
 Manager.list_versions(kind=None)
 Manager.get_entities()
 Manager.diff(key)
-Manager.migration_graph()
 ```
 
 ## Registration and lifecycle
@@ -73,10 +75,10 @@ Manager.attach_hooks(hooks)
 Key-only entries are valid placeholders; `VersionNode` hydrates a matching
 placeholder. `reconcile_model` is schema reconciliation, not hydration.
 
-`migration_graph()` returns an immutable graph snapshot built from the current
-engine registry. Class-level calls update the default engine copied by new
-instances. Instance calls update only that instance's engine. Existing
-instances are not affected by later class-level registration.
+`manager.runtime().graph` returns the immutable graph snapshot owned by the
+runtime. Class-level calls update the default engine copied by new instances.
+Instance calls update only that instance's engine. Existing instances are not
+affected by later class-level registration.
 
 ```python
 UserManager.add_hook(key, hook)  # affects new instances
@@ -88,7 +90,7 @@ manager.add_hook(key, hook)      # affects only this instance
 ```python
 manager = Manager()
 manager.validate(data, kind, version)
-runner = manager.runner(
+runtime = manager.runtime(
     *,
     runtime=None,
     direction="any",
@@ -98,6 +100,8 @@ runner = manager.runner(
     on_depth_violation="skip",
     validation_mode="lax",
 )
+runner = runtime.runner
+graph = runtime.graph
 result = runner.run(payload, target, *, container=None, max_depth=-1, context=None)
 ```
 

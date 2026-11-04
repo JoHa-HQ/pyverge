@@ -24,7 +24,7 @@ execution until completed.
 ### Sync
 
 ```python
-runner = manager.runner()
+runner = manager.runtime().runner
 result = runner.run(payload, "latest")
 ```
 
@@ -39,21 +39,21 @@ context=None
 Materialize and validate a container result:
 
 ```python
-result = manager.runner().run(payload, "latest", container=UserEnvelope)
+result = manager.runtime().runner.run(payload, "latest", container=UserEnvelope)
 ```
 
 ### Async
 
 ```python
-from pyverge.execution import AsyncBackend
+from pyverge.runtime import AsyncBackend
 
-runner = manager.runner(
+runner = manager.runtime(
     runtime=AsyncBackend(
         backend="asyncio",
         backend_options={},
         max_workers=4,
     )
-)
+).runner
 result = await runner.run(payload, "latest")
 ```
 
@@ -63,11 +63,11 @@ or when async concurrency is desired.
 ### Process isolation
 
 ```python
-from pyverge.execution import ProcessBackend
+from pyverge.runtime import ProcessBackend
 
 backend = ProcessBackend(max_workers=2)
 try:
-    result = manager.runner(runtime=backend).run(payload, "latest")
+    result = manager.runtime(runtime=backend).runner.run(payload, "latest")
 finally:
     backend.close()
 ```
@@ -75,7 +75,7 @@ finally:
 ### Runtime context
 
 ```python
-result = manager.runner().run(
+result = manager.runtime().runner.run(
     payload,
     "latest",
     context={"tenant_id": "tenant_99", "rates": {"USD": 1.08}},
@@ -95,7 +95,7 @@ JSON Patch does not read context. JSONata reads context as variables.
 ## Verify
 
 ```python
-result = manager.runner().run(payload, "latest")
+result = manager.runtime().runner.run(payload, "latest")
 ```
 
 ## Troubleshooting

@@ -8,7 +8,7 @@ kind, and a parsed version. An edge connects two nodes in the same namespace.
 `NodeId` is the graph identity:
 
 ```python
-from pyverge.versioning import NodeId
+from pyverge.core.versioning import NodeId
 
 node = NodeId.parse("com.acme.users", "User", "1.0.0")
 assert str(node) == "com.acme.users:User@1.0.0"
@@ -17,7 +17,7 @@ assert str(node) == "com.acme.users:User@1.0.0"
 `VersionKey` adds identity-neutral storage metadata:
 
 ```python
-from pyverge.versioning import VersionKey
+from pyverge.core.versioning import VersionKey
 
 key = VersionKey.parse("com.acme.users", "User", "1.0.0")
 ```
@@ -28,7 +28,7 @@ digests.
 `EdgeKey` is a directed pair of node identities:
 
 ```python
-from pyverge.versioning import EdgeKey
+from pyverge.core.versioning import EdgeKey
 
 edge = EdgeKey.from_pair(
     NodeId.parse("com.acme.users", "User", "1.0.0"),
@@ -77,8 +77,8 @@ Key-only entries are valid graph content. They let discovery and routing record
 topology before models are loaded.
 
 ```python
-from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
-from pyverge.versioning import default_content_hasher
+from pyverge.core.registry import DEFAULT_HEALTH_LINTERS, Registry
+from pyverge.core.versioning import default_content_hasher
 
 registry = Registry(
     namespace="com.acme.users",
@@ -99,7 +99,7 @@ Hydration and reconciliation are different operations:
 `GraphBuilder` compiles registry storage into an immutable `MigrationGraph`:
 
 ```python
-from pyverge.graph import GraphBuilder
+from pyverge.core.graph import GraphBuilder
 
 graph = GraphBuilder().build(registry)
 ```
