@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Iterator
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    Protocol,
+    TypeAlias,
+    TypeVar,
+    runtime_checkable,
+)
 
 from pyverge.core.graph.planning.targets import TargetResolver
 from pyverge.core.types import VersionValue
@@ -17,6 +25,9 @@ T = TypeVar("T")
 
 #: A discovered versioned entry: ``(path, depth, source)``.
 Entry = tuple[tuple[str | int, ...], int, "VersionNode[VersionValue]"]
+
+#: Payload ownership policy for one execution.
+CopyPolicy: TypeAlias = Literal["deep", "shallow", "none"]
 
 
 class EntryExtractor(Protocol[VersionValue]):
@@ -79,6 +90,7 @@ class RuntimePort(Protocol[VersionValue]):
 
 __all__ = [
     "BackendPort",
+    "CopyPolicy",
     "Entry",
     "EntryExtractor",
     "RuntimePort",

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from pyverge.core.graph import (
@@ -27,9 +27,11 @@ from .coordinator import ExecutionCoordinator
 from .extractors import PayloadWalker
 from .middleware import BackendMiddleware
 from .migrations import MigrationBindings
+from .plan_cache import PlanCache
 from .planner import ExecutionPlanner
 from .runner import Runner
-from .types import BackendPort
+from .telemetry import TelemetryAdapter, TelemetryMode, TelemetryPublisher
+from .types import BackendPort, CopyPolicy
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +48,11 @@ class RunnerOptions:
     validation_mode: Literal["strict", "lax", "none"]
     discriminator: str = "default"
     middleware: tuple[BackendMiddleware, ...] = field(default_factory=tuple)
+    telemetry: tuple[TelemetryAdapter, ...] = field(default_factory=tuple)
+    telemetry_mode: TelemetryMode = "all"
+    telemetry_sample_rate: float = 1.0
+    plan_cache_size: int = 0
+    copy: CopyPolicy = "deep"
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +76,11 @@ class RunnerFactory:
         validation_mode: Literal["strict", "lax", "none"] = "lax",
         discriminator: str = "default",
         middleware: tuple[BackendMiddleware, ...] = (),
+        telemetry: tuple[TelemetryAdapter, ...] = (),
+        telemetry_mode: TelemetryMode = "all",
+        telemetry_sample_rate: float = 1.0,
+        plan_cache_size: int = 0,
+        copy: CopyPolicy = "deep",
     ) -> Runner[VersionValue]:
         resolved = options or RunnerOptions(
             backend=backend or ThreadedBackend(max_workers=0),
@@ -87,6 +99,23 @@ class RunnerFactory:
             validation_mode=validation_mode,
             discriminator=discriminator,
             middleware=middleware,
+            telemetry=telemetry,
+            telemetry_mode=telemetry_mode,
+            telemetry_sample_rate=telemetry_sample_rate,
+            plan_cache_size=plan_cache_size,
+            copy=copy,
+        )
+        environment = (
+            replace(
+                resolved.environment,
+                telemetry=TelemetryPublisher(
+                    adapters=resolved.telemetry,
+                    mode=resolved.telemetry_mode,
+                    sample_rate=resolved.telemetry_sample_rate,
+                ),
+            )
+            if resolved.telemetry
+            else resolved.environment
         )
         coordinator = ExecutionCoordinator[VersionValue](
             extractor=PayloadWalker[VersionValue](
@@ -107,13 +136,15 @@ class RunnerFactory:
                 ),
             ),
             planner=ExecutionPlanner[VersionValue](bindings=bindings),
+            cache=PlanCache(resolved.plan_cache_size),
         )
         return Runner[VersionValue](
             coordinator=coordinator,
             adapter=adapter,
             backend=resolved.backend,
             middleware=resolved.middleware,
-            environment=resolved.environment,
+            environment=environment,
+            copy=resolved.copy,
         )
 
 

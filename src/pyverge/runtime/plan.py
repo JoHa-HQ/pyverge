@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import time
 from collections.abc import Callable, Mapping
 from contextlib import AsyncExitStack, ExitStack
 from dataclasses import dataclass
@@ -15,6 +16,7 @@ from pyverge.core.versioning.errors import MigrationApplicationError
 from .context import MigrationContext, StepContext
 from .errors import AsyncExecutionRequired
 from .migrations import HookBinding, MigrationBinding
+from .telemetry import StepCompleted, StepFailed, StepStarted
 
 
 @dataclass(frozen=True, slots=True)
@@ -332,26 +334,48 @@ class StepInvoker(Generic[VersionValue]):
         hook_state: Any,
         invoke: Callable[[], ModelData] | None = None,
     ) -> ModelData:
-        with ExitStack() as stack:
-            self.before(data, step, hook_state, stack)
-            try:
-                migrated = (
-                    invoke()
-                    if invoke is not None
-                    else self.entry.invoke_migration(self.index, data, step.view)
+        telemetry = step.run.environment.telemetry
+        started = time.perf_counter()
+        if telemetry.emits_success:
+            telemetry.emit(StepStarted(step=step))
+        try:
+            with ExitStack() as stack:
+                self.before(data, step, hook_state, stack)
+                try:
+                    migrated = (
+                        invoke()
+                        if invoke is not None
+                        else self.entry.invoke_migration(self.index, data, step.view)
+                    )
+                    self._raise_on_awaitable(
+                        migrated, "coroutine migration requires async backend"
+                    )
+                except Exception as error:
+                    self.on_error(data, error, step, hook_state)
+                    if isinstance(
+                        error, (AsyncExecutionRequired, MigrationApplicationError)
+                    ):
+                        raise
+                    raise self.entry.migration_error(error) from error
+                self.after(data, migrated, step, hook_state)
+        except BaseException as error:
+            if telemetry.emits_failure:
+                telemetry.emit(
+                    StepFailed(
+                        step=step,
+                        error=error,
+                        duration_seconds=time.perf_counter() - started,
+                    )
                 )
-                self._raise_on_awaitable(
-                    migrated, "coroutine migration requires async backend"
+            raise
+        if telemetry.emits_success:
+            telemetry.emit(
+                StepCompleted(
+                    step=step,
+                    duration_seconds=time.perf_counter() - started,
                 )
-            except Exception as error:
-                self.on_error(data, error, step, hook_state)
-                if isinstance(
-                    error, (AsyncExecutionRequired, MigrationApplicationError)
-                ):
-                    raise
-                raise self.entry.migration_error(error) from error
-            self.after(data, migrated, step, hook_state)
-            return migrated
+            )
+        return migrated
 
     async def run_async(
         self,
@@ -361,25 +385,47 @@ class StepInvoker(Generic[VersionValue]):
         hook_state: Any,
         invoke: Callable[[], Any] | None = None,
     ) -> ModelData:
-        async with AsyncExitStack() as stack:
-            await self.before_async(data, step, hook_state, stack)
-            try:
-                migrated = (
-                    await invoke()
-                    if invoke is not None
-                    else await self.entry.invoke_migration_async(
-                        self.index, data, step.view
+        telemetry = step.run.environment.telemetry
+        started = time.perf_counter()
+        if telemetry.emits_success:
+            telemetry.emit(StepStarted(step=step))
+        try:
+            async with AsyncExitStack() as stack:
+                await self.before_async(data, step, hook_state, stack)
+                try:
+                    migrated = (
+                        await invoke()
+                        if invoke is not None
+                        else await self.entry.invoke_migration_async(
+                            self.index, data, step.view
+                        )
+                    )
+                except Exception as error:
+                    await self.on_error_async(data, error, step, hook_state)
+                    if isinstance(
+                        error, (AsyncExecutionRequired, MigrationApplicationError)
+                    ):
+                        raise
+                    raise self.entry.migration_error(error) from error
+                await self.after_async(data, migrated, step, hook_state)
+        except BaseException as error:
+            if telemetry.emits_failure:
+                telemetry.emit(
+                    StepFailed(
+                        step=step,
+                        error=error,
+                        duration_seconds=time.perf_counter() - started,
                     )
                 )
-            except Exception as error:
-                await self.on_error_async(data, error, step, hook_state)
-                if isinstance(
-                    error, (AsyncExecutionRequired, MigrationApplicationError)
-                ):
-                    raise
-                raise self.entry.migration_error(error) from error
-            await self.after_async(data, migrated, step, hook_state)
-            return migrated
+            raise
+        if telemetry.emits_success:
+            telemetry.emit(
+                StepCompleted(
+                    step=step,
+                    duration_seconds=time.perf_counter() - started,
+                )
+            )
+        return migrated
 
     @staticmethod
     def _raise_on_awaitable(result: Any, message: str) -> None:

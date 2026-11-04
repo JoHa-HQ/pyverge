@@ -10,7 +10,7 @@ from .errors import (
     TargetValidationError,
 )
 from .extractors import ContainerExtractor, PayloadWalker, SchemaFieldsExtractor
-from .hooks import MigrationHook, OpenLineageHook, OTELHook
+from .hooks import MigrationHook
 from .middleware import (
     AuditEvent,
     AuditMiddleware,
@@ -19,8 +19,6 @@ from .middleware import (
     IdempotencyKeyFactory,
     IdempotencyMiddleware,
     IdempotencyStore,
-    OpenLineageMiddleware,
-    OtelMiddleware,
     RetryMiddleware,
     Transaction,
     TransactionManager,
@@ -35,6 +33,20 @@ from .migrations import (
 from .plan import ExecutionEntry, ExecutionPlan, ExtractedEntry, StepInvoker
 from .planner import ExecutionPlanner
 from .runner import Runner
+from .telemetry import (
+    EMPTY_TELEMETRY,
+    RunCompleted,
+    RunFailed,
+    RunStarted,
+    StepCompleted,
+    StepFailed,
+    StepStarted,
+    TelemetryAdapter,
+    TelemetryEvent,
+    TelemetryPublisher,
+)
+from .telemetry.openlineage import OpenLineageAdapter
+from .telemetry.otel import OtelAdapter
 from .types import (
     BackendPort,
     Entry,
@@ -44,6 +56,7 @@ from .types import (
 
 __all__ = [
     "EMPTY_CONTEXT",
+    "EMPTY_TELEMETRY",
     "AsyncBackend",
     "AsyncExecutionRequired",
     "AuditEvent",
@@ -71,20 +84,27 @@ __all__ = [
     "MigrationBindings",
     "MigrationContext",
     "MigrationHook",
-    "OTELHook",
-    "OpenLineageHook",
-    "OpenLineageMiddleware",
-    "OtelMiddleware",
+    "OpenLineageAdapter",
+    "OtelAdapter",
     "PayloadWalker",
     "ProcessBackend",
     "RetryMiddleware",
+    "RunCompleted",
+    "RunFailed",
+    "RunStarted",
     "Runner",
     "RuntimePort",
     "SchemaFieldsExtractor",
+    "StepCompleted",
+    "StepFailed",
     "StepInvoker",
+    "StepStarted",
     "SyncExecutionRequired",
     "SystemClock",
     "TargetValidationError",
+    "TelemetryAdapter",
+    "TelemetryEvent",
+    "TelemetryPublisher",
     "ThreadedBackend",
     "Transaction",
     "TransactionManager",

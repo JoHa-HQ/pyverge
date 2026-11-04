@@ -142,18 +142,22 @@ plain dicts at runtime. See
 
 The adapter carries no tracing library and emits no spans. FastStream's own
 [OpenTelemetry](https://faststream.airt.ai/latest/getting-started/integrations/)
-middleware opens the consume span; pyverge's per-edge `OTELHook` opens migration
-spans **as current**, so each step nests under the consume span:
+middleware opens the consume span; pyverge's `OtelAdapter` opens run and step
+spans **as current**, so each migration nests under the consume span:
 
 ```python
-from pyverge.runtime import OTELHook
+from pyverge.runtime import OtelAdapter
 
 # FastStream's transport-specific telemetry middleware carries the consume span.
 broker.underlying.add_middleware(telemetry_middleware)
-manager.attach_hooks((OTELHook(tracer=provider.get_tracer("my-service")),))
+runner = manager.runtime(
+    telemetry=(OtelAdapter(tracer=provider.get_tracer("my-service")),)
+).runner
 ```
 
-See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the per-step `OTELHook`. Step spans include graph namespace, kind, source/target, and migration strategy/identity when available.
+See [Telemetry & Hooks](../../how-to/operations/instrument-migrations.md) for the
+adapter. Step spans include graph namespace, kind, source/target, and migration
+strategy/identity when available.
 
 ### Testing
 

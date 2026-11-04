@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import copy
+import inspect
+import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Generic, TypeAlias
 
@@ -12,7 +15,8 @@ from pyverge.runtime.coordinator import ExecutionCoordinator
 from pyverge.runtime.errors import TargetValidationError, UnknownModelError
 from pyverge.runtime.middleware import BackendMiddleware
 from pyverge.runtime.plan import ExecutionPlan
-from pyverge.runtime.types import BackendPort
+from pyverge.runtime.telemetry import RunCompleted, RunFailed, RunStarted
+from pyverge.runtime.types import BackendPort, CopyPolicy
 from pyverge.schemas.types import ModelAdapter
 
 RunResult: TypeAlias = Any
@@ -27,6 +31,7 @@ class Runner(Generic[VersionValue]):
     backend: BackendPort[VersionValue]
     middleware: tuple[BackendMiddleware, ...]
     environment: ExecutionEnvironment
+    copy: CopyPolicy = "deep"
 
     def plan(
         self,
@@ -71,6 +76,31 @@ class Runner(Generic[VersionValue]):
             self._validate_target(plan, data)
         return data
 
+    def run_many(  # noqa: PLR0913
+        self,
+        payloads: Sequence[dict[str, Any]],
+        target: TargetPolicy,
+        *,
+        source_model: type[Any] | None = None,
+        max_depth: int = -1,
+        context: MigrationContext | None = None,
+        run_id: str | None = None,
+        validate_target: bool = False,
+    ) -> list[RunResult]:
+        """Run one payload at a time with independent run and transaction scope."""
+        return [
+            self.run(
+                payload,
+                target,
+                source_model=source_model,
+                max_depth=max_depth,
+                context=context,
+                run_id=run_id,
+                validate_target=validate_target,
+            )
+            for payload in payloads
+        ]
+
     def execute(
         self,
         plan: ExecutionPlan[VersionValue],
@@ -78,17 +108,83 @@ class Runner(Generic[VersionValue]):
         context: MigrationContext | None,
         run_id: str | None = None,
     ) -> RunResult:
-        data = copy.deepcopy(plan.payload)
+        data = self._copy(plan.payload)
         active_run_id = run_id or self.environment.id_factory.new("run_")
         run = RunContext(
             run_id=active_run_id,
+            namespace=self.coordinator.finder.graph.namespace,
             environment=self.environment,
             bindings=MigrationContext.create(context),
         )
-        backend = self.backend
-        for layer in reversed(self.middleware):
-            backend = layer.wrap(backend)
-        return backend.execute(plan, data, run, self.adapter)
+        telemetry = self.environment.telemetry
+        if telemetry.emits_success:
+            telemetry.emit(RunStarted(run=run, plan=plan))
+        started = time.perf_counter()
+        try:
+            backend = self.backend
+            for layer in reversed(self.middleware):
+                backend = layer.wrap(backend)
+            result = backend.execute(plan, data, run, self.adapter)
+        except BaseException as error:
+            if telemetry.emits_failure:
+                telemetry.emit(
+                    RunFailed(
+                        run=run,
+                        plan=plan,
+                        error=error,
+                        duration_seconds=time.perf_counter() - started,
+                    )
+                )
+            raise
+        if inspect.isawaitable(result):
+            return self._await_result(result, run, plan, started)
+        if telemetry.emits_success:
+            telemetry.emit(
+                RunCompleted(
+                    run=run,
+                    plan=plan,
+                    duration_seconds=time.perf_counter() - started,
+                )
+            )
+        return result
+
+    def _copy(self, payload: dict[str, Any]) -> dict[str, Any]:
+        if self.copy == "none":
+            return payload
+        if self.copy == "shallow":
+            return dict(payload)
+        return copy.deepcopy(payload)
+
+    async def _await_result(
+        self,
+        result: Any,
+        run: RunContext,
+        plan: ExecutionPlan[VersionValue],
+        started: float,
+    ) -> Any:
+        telemetry = self.environment.telemetry
+        try:
+            value = await result
+        except BaseException as error:
+            if telemetry.emits_failure:
+                telemetry.emit(
+                    RunFailed(
+                        run=run,
+                        plan=plan,
+                        error=error,
+                        duration_seconds=time.perf_counter() - started,
+                    )
+                )
+            raise
+        if telemetry.emits_success:
+            telemetry.emit(
+                RunCompleted(
+                    run=run,
+                    plan=plan,
+                    duration_seconds=time.perf_counter() - started,
+                )
+            )
+        return value
 
     def _validate_target(
         self, plan: ExecutionPlan[VersionValue], data: dict[str, Any]

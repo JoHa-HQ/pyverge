@@ -1,22 +1,87 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 JoHa-HQ
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Telemetry hook and middleware behaviour."""
+"""Runtime telemetry lifecycle events and adapters."""
 
 from __future__ import annotations
 
 import asyncio
-from types import SimpleNamespace
+import inspect
 from typing import Any, cast
 
 import pytest
+import semver
 from opentelemetry.trace import StatusCode
 
-from pyverge.core.versioning import EdgeId, MigrationDescriptor, NodeId
-from pyverge.runtime.context import MigrationContext, StepContext
-from pyverge.runtime.hooks import OpenLineageHook, OTELHook
-from pyverge.runtime.hooks.state import new_hook_state
-from pyverge.runtime.middleware import OpenLineageMiddleware, OtelMiddleware
+from pyverge.core.graph import latest_target_resolver
+from pyverge.core.registry import Registry
+from pyverge.runtime.backends import AsyncBackend, ProcessBackend, ThreadedBackend
+from pyverge.runtime.telemetry import (
+    RunCompleted,
+    RunStarted,
+    StepCompleted,
+    StepStarted,
+    TelemetryEvent,
+    TelemetryPublisher,
+)
+from pyverge.runtime.telemetry.openlineage import OpenLineageAdapter
+from pyverge.runtime.telemetry.otel import OtelAdapter
+from pyverge.schemas import PydanticModelAdapter
+from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
+
+_BACKENDS = [
+    pytest.param((ThreadedBackend, {"max_workers": 0}), id="threaded"),
+    pytest.param(
+        (
+            AsyncBackend,
+            {"backend": "asyncio", "backend_options": {}, "max_workers": 0},
+        ),
+        id="async",
+    ),
+    pytest.param((ProcessBackend, {"max_workers": 1}), id="process"),
+]
+
+
+def _fail(data: dict[str, Any], context: Any = None) -> dict[str, Any]:
+    raise RuntimeError("boom")
+
+
+_MODELS = [
+    [
+        PydanticModelAdapter,
+        [
+            semver.Version,
+            "test",
+            [UserV1, UserV2],
+            [((UserV1, UserV2), migrate_v1_to_v2)],
+        ],
+    ]
+]
+
+_FAILING_MODELS = [
+    [
+        PydanticModelAdapter,
+        [
+            semver.Version,
+            "test",
+            [UserV1, UserV2],
+            [((UserV1, UserV2), _fail)],
+        ],
+    ]
+]
+
+
+class RecordingTelemetry:
+    def __init__(self) -> None:
+        self.events: list[TelemetryEvent] = []
+
+    def emit(self, event: TelemetryEvent) -> None:
+        self.events.append(event)
+
+
+class FailingTelemetry:
+    def emit(self, event: TelemetryEvent) -> None:
+        raise RuntimeError("telemetry down")
 
 
 class RecordingSpan:
@@ -35,6 +100,9 @@ class RecordingSpan:
 
     def record_exception(self, error: BaseException) -> None:
         self.exceptions.append(error)
+
+    def end(self) -> None:
+        self.ended = True
 
 
 class RecordingScope:
@@ -72,191 +140,297 @@ class RecordingLineageClient:
         self.events.append(event)
 
 
-def _node(version: str) -> NodeId:
-    return NodeId.parse("com.acme.orders", "User", version)
-
-
-def _step(  # noqa: PLR0913
-    source: NodeId,
-    target: NodeId,
-    *,
-    name: str = "one_to_two",
-    migration: MigrationDescriptor | None = None,
-    discriminator: str = "default",
-    index: int = 0,
-) -> StepContext:
-    return StepContext(
-        run=cast("Any", SimpleNamespace(run_id="run")),
-        path=("document",),
-        index=index,
-        source=cast("Any", source),
-        target=cast("Any", target),
-        edge=EdgeId.from_pair(source, target, discriminator=discriminator),
-        bindings=MigrationContext.empty(),
-        migration=migration,
-        name=name,
-    )
-
-
-def test_otel_hook_keeps_interleaved_step_state_separate() -> None:
-    tracer = RecordingTracer()
-    hook = OTELHook(tracer=cast("Any", tracer), service="orders")
-    state = new_hook_state()
-    v1, v2, v3 = _node("1.0.0"), _node("2.0.0"), _node("3.0.0")
-
-    first_scope = hook.before_migrate(_step(v1, v2), {}, state=state)
-    second_scope = hook.before_migrate(
-        _step(v2, v3, name="two_to_three"), {}, state=state
-    )
-    with first_scope, second_scope:
-        pass
-
-    first, second = tracer.spans
-    assert first.attributes["migration.source"] == "com.acme.orders:User@1.0.0"
-    assert first.attributes["migration.target"] == "com.acme.orders:User@2.0.0"
-    assert first.attributes["migration.namespace"] == "com.acme.orders"
-    assert first.attributes["migration.kind"] == "User"
-    assert first.attributes["migration.discriminator"] == "default"
-    assert second.attributes["migration.source"] == "com.acme.orders:User@2.0.0"
-    assert first.ended is True
-    assert second.ended is True
-    assert first.status == (StatusCode.OK, None)
-    assert second.status == (StatusCode.OK, None)
-
-
-def test_otel_hook_reports_migration_descriptor() -> None:
-    tracer = RecordingTracer()
-    hook = OTELHook(tracer=cast("Any", tracer), service="orders")
-    state = new_hook_state()
-    v1, v2 = _node("1.0.0"), _node("2.0.0")
-    descriptor = MigrationDescriptor("jsonpatch", "docs.user.v1_v2")
-
-    step = _step(v1, v2, migration=descriptor)
-    with hook.before_migrate(step, {}, state=state):
-        pass
-
-    attributes = tracer.spans[0].attributes
-    assert attributes["migration.strategy"] == "jsonpatch"
-    assert attributes["migration.identity"] == "docs.user.v1_v2"
-
-
-def test_otel_hook_records_error_for_matching_step() -> None:
-    tracer = RecordingTracer()
-    hook = OTELHook(tracer=cast("Any", tracer), service="orders")
-    state = new_hook_state()
-    v1, v2 = _node("1.0.0"), _node("2.0.0")
-    error = RuntimeError("boom")
-
-    with pytest.raises(RuntimeError):
-        with hook.before_migrate(_step(v1, v2), {}, state=state):
-            raise error
-
-    span = tracer.spans[0]
-    assert span.exceptions == [error]
-    assert span.status == (StatusCode.ERROR, "boom")
-    assert span.ended is True
-
-
-def test_openlineage_hook_keeps_interleaved_run_ids_separate() -> None:
-    client = RecordingLineageClient()
-    hook = OpenLineageHook(
-        client=client,
-        namespace="com.acme.orders",
-        producer="tests",
-    )
-    state = new_hook_state()
-    v1, v2, v3 = _node("1.0.0"), _node("2.0.0"), _node("3.0.0")
-
-    first_scope = hook.before_migrate(_step(v1, v2), {}, state=state)
-    second_scope = hook.before_migrate(
-        _step(v2, v3, name="two_to_three"), {}, state=state
-    )
-    with first_scope, second_scope:
-        pass
-
-    started = [event for event in client.events if event.eventType.value == "START"]
-    completed = [
-        event for event in client.events if event.eventType.value == "COMPLETE"
-    ]
-    assert len(started) == 2  # noqa: PLR2004
-    assert len(completed) == 2  # noqa: PLR2004
-
-    started_by_job = {event.job.name: event for event in started}
-    completed_by_job = {event.job.name: event for event in completed}
-    assert set(started_by_job) == {
-        "migration.User.1.0.0->2.0.0",
-        "migration.User.2.0.0->3.0.0",
+def _payload() -> dict[str, Any]:
+    return {
+        "document": {
+            "kind": "User",
+            "version": "1.0.0",
+            "name": "Alice",
+            "email": "a@b.c",
+            "role": "user",
+        }
     }
-    for job_name, started_event in started_by_job.items():
-        assert completed_by_job[job_name].run.runId == started_event.run.runId
 
 
-def test_openlineage_middleware_validates_graph_namespace() -> None:
-    client = RecordingLineageClient()
-    middleware = OpenLineageMiddleware(
-        client=client,
-        namespace="com.acme.billing",
-        producer="tests",
+def _run(runner, registry: Registry) -> dict[str, Any]:
+    result = runner.run(
+        _payload(),
+        latest_target_resolver(registry),
+        source_model=None,
+        max_depth=-1,
+        context=None,
     )
-    entry = SimpleNamespace(source=_node("1.0.0"), target=_node("2.0.0"))
-    plan = SimpleNamespace(path=SimpleNamespace(entries=(entry,)))
-    wrapped = middleware.wrap(_AsyncInner())
-
-    try:
-        wrapped.execute(plan, {}, SimpleNamespace(run_id="run-1"), None)
-    except ValueError as error:
-        assert "does not match graph namespace" in str(error)
-    else:
-        raise AssertionError("expected namespace validation error")
+    if inspect.isawaitable(result):
+        return asyncio.run(result)
+    return result
 
 
-class _AsyncInner:
-    async def execute(self, plan: Any, payload: Any, run: Any, adapter: Any) -> Any:
-        await asyncio.sleep(0)
-        return {"ok": True}
+def _types(events: list[TelemetryEvent]) -> list[str]:
+    return [type(event).__name__ for event in events]
 
 
-def test_otel_middleware_keeps_async_span_open_until_completion() -> None:
-    tracer = RecordingTracer()
-    middleware = OtelMiddleware(tracer=cast("Any", tracer), service="orders")
-    wrapped = middleware.wrap(_AsyncInner())
-    plan = SimpleNamespace(path=SimpleNamespace(entries=()))
-    run = SimpleNamespace(run_id="run-1")
+@pytest.mark.parametrize(
+    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
+)
+@pytest.mark.parametrize("runtime_backend", _BACKENDS, indirect=True)
+def test_runtime_emits_run_and_step_events(
+    registry: Registry,
+    runner_factory,
+    runtime_backend,
+) -> None:
+    recorder = RecordingTelemetry()
 
-    pending = wrapped.execute(plan, {}, run, None)
-    span = tracer.spans[0]
+    result = _run(runner_factory(telemetry=(recorder,)), registry)
 
-    assert span.ended is False
-    result = asyncio.run(pending)
+    assert result["document"]["version"] == "2.0.0"
+    assert _types(recorder.events) == [
+        "RunStarted",
+        "StepStarted",
+        "StepCompleted",
+        "RunCompleted",
+    ]
+    started = cast("RunStarted", recorder.events[0])
+    assert started.run.run_id
+    assert started.plan.path.entries
+    step = cast("StepStarted", recorder.events[1]).step
+    assert step.name == "migrate_v1_to_v2"
+    assert step.source_dataset.version == "1.0.0"
+    assert step.target_dataset.version == "2.0.0"
+    assert step.target_dataset.fields
+    completed = cast("StepCompleted", recorder.events[2])
+    assert completed.duration_seconds >= 0
+    run_completed = cast("RunCompleted", recorder.events[3])
+    assert run_completed.duration_seconds >= 0
 
-    assert result == {"ok": True}
-    assert span.ended is True
-    assert span.status == (StatusCode.OK, None)
 
+@pytest.mark.parametrize(
+    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
+)
+def test_telemetry_adapter_failures_are_isolated(
+    registry: Registry,
+    runner_factory,
+    caplog,
+) -> None:
+    recorder = RecordingTelemetry()
 
-def test_otel_hook_reports_discriminator() -> None:
-    tracer = RecordingTracer()
-    hook = OTELHook(tracer=cast("Any", tracer), service="orders")
-    state = new_hook_state()
-    v1, v2 = _node("1.0.0"), _node("2.0.0")
-
-    with hook.before_migrate(_step(v1, v2, discriminator="canary"), {}, state=state):
-        pass
-
-    assert tracer.spans[0].attributes["migration.discriminator"] == "canary"
-
-
-def test_openlineage_hook_includes_discriminator() -> None:
-    client = RecordingLineageClient()
-    hook = OpenLineageHook(
-        client=client,
-        namespace="com.acme.orders",
-        producer="tests",
+    result = _run(
+        runner_factory(telemetry=(FailingTelemetry(), recorder)),
+        registry,
     )
-    state = new_hook_state()
-    v1, v2 = _node("1.0.0"), _node("2.0.0")
 
-    with hook.before_migrate(_step(v1, v2, discriminator="canary"), {}, state=state):
-        pass
+    assert result["document"]["version"] == "2.0.0"
+    assert _types(recorder.events) == [
+        "RunStarted",
+        "StepStarted",
+        "StepCompleted",
+        "RunCompleted",
+    ]
+    assert "telemetry adapter FailingTelemetry failed" in caplog.text
 
-    assert client.events[0].job.name == "migration.User.1.0.0->2.0.0.canary"
+
+@pytest.mark.parametrize(
+    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
+)
+def test_otel_adapter_creates_run_and_step_spans(
+    registry: Registry,
+    runner_factory,
+) -> None:
+    tracer = RecordingTracer()
+    adapter = OtelAdapter(tracer=cast("Any", tracer), service="orders")
+
+    result = _run(runner_factory(telemetry=(adapter,)), registry)
+
+    assert result["document"]["version"] == "2.0.0"
+    assert [span.name for span in tracer.spans] == ["orders.run", "orders.migrate"]
+    run_span, step_span = tracer.spans
+    assert run_span.ended is True
+    assert run_span.status == (StatusCode.OK, None)
+    assert run_span.attributes["migration.entries"] == 1
+    assert step_span.ended is True
+    assert step_span.status == (StatusCode.OK, None)
+    assert step_span.attributes["migration.source"] == "test:User@1.0.0"
+    assert step_span.attributes["migration.target"] == "test:User@2.0.0"
+    assert step_span.attributes["migration.duration_seconds"] >= 0
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
+)
+def test_openlineage_adapter_emits_run_and_step_events(
+    registry: Registry,
+    runner_factory,
+) -> None:
+    client = RecordingLineageClient()
+    adapter = OpenLineageAdapter(client=client, producer="tests")
+
+    result = _run(runner_factory(telemetry=(adapter,)), registry)
+
+    assert result["document"]["version"] == "2.0.0"
+    assert [event.eventType.value for event in client.events] == [
+        "START",
+        "START",
+        "COMPLETE",
+        "COMPLETE",
+    ]
+    run_started, step_started, step_completed, run_completed = client.events
+    assert run_started.job.name == "migration.run"
+    assert run_started.job.namespace == "test"
+    assert run_completed.job.name == "migration.run"
+    assert step_started.job.name == "migration.User.1.0.0->2.0.0"
+    assert step_started.job.namespace == "test"
+    assert step_completed.job.name == "migration.User.1.0.0->2.0.0"
+    assert step_started.inputs[0].facets["version"].datasetVersion == "1.0.0"
+    assert step_started.outputs[0].facets["version"].datasetVersion == "2.0.0"
+    tags = {tag.key: tag.value for tag in step_started.job.facets["tags"].tags}
+    assert tags["pyverge.migration.name"] == "migrate_v1_to_v2"
+    assert tags["pyverge.migration.discriminator"] == "default"
+    assert step_started.run.facets["parent"].run.runId == run_started.run.runId
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    _FAILING_MODELS,
+    indirect=["model_adapter", "registry"],
+)
+def test_runtime_emits_failed_events(
+    registry: Registry,
+    runner_factory,
+) -> None:
+    recorder = RecordingTelemetry()
+
+    with pytest.raises(Exception, match="boom"):
+        _run(runner_factory(telemetry=(recorder,)), registry)
+
+    assert _types(recorder.events) == [
+        "RunStarted",
+        "StepStarted",
+        "StepFailed",
+        "RunFailed",
+    ]
+    step_failed = recorder.events[2]
+    run_failed = recorder.events[3]
+    assert getattr(step_failed, "error") is not None
+    assert getattr(run_failed, "error") is not None
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    _FAILING_MODELS,
+    indirect=["model_adapter", "registry"],
+)
+def test_openlineage_adapter_records_failed_step(
+    registry: Registry,
+    runner_factory,
+) -> None:
+    client = RecordingLineageClient()
+    adapter = OpenLineageAdapter(client=client, producer="tests")
+
+    with pytest.raises(Exception, match="boom"):
+        _run(runner_factory(telemetry=(adapter,)), registry)
+
+    assert [event.eventType.value for event in client.events] == [
+        "START",
+        "START",
+        "FAIL",
+        "FAIL",
+    ]
+    step_failed = client.events[2]
+    assert "boom" in step_failed.run.facets["error"].message
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    _FAILING_MODELS,
+    indirect=["model_adapter", "registry"],
+)
+def test_otel_adapter_records_failed_step(
+    registry: Registry,
+    runner_factory,
+) -> None:
+    tracer = RecordingTracer()
+    adapter = OtelAdapter(tracer=cast("Any", tracer), service="orders")
+
+    with pytest.raises(Exception, match="boom"):
+        _run(runner_factory(telemetry=(adapter,)), registry)
+
+    spans = {span.name: span for span in tracer.spans}
+    assert set(spans) == {"orders.run", "orders.migrate"}
+    assert spans["orders.migrate"].status[0] == StatusCode.ERROR
+    assert spans["orders.run"].status[0] == StatusCode.ERROR
+    assert spans["orders.migrate"].exceptions
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
+)
+@pytest.mark.parametrize("mode", ["off", "errors"])
+def test_telemetry_success_can_be_suppressed(
+    registry: Registry,
+    runner_factory,
+    mode: str,
+) -> None:
+    recorder = RecordingTelemetry()
+
+    result = _run(
+        runner_factory(telemetry=(recorder,), telemetry_mode=mode),
+        registry,
+    )
+
+    assert result["document"]["version"] == "2.0.0"
+    assert recorder.events == []
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    _FAILING_MODELS,
+    indirect=["model_adapter", "registry"],
+)
+def test_telemetry_errors_mode_emits_only_failures(
+    registry: Registry,
+    runner_factory,
+) -> None:
+    recorder = RecordingTelemetry()
+
+    with pytest.raises(Exception, match="boom"):
+        _run(
+            runner_factory(
+                telemetry=(recorder,),
+                telemetry_mode="errors",
+            ),
+            registry,
+        )
+
+    assert _types(recorder.events) == ["StepFailed", "RunFailed"]
+
+
+@pytest.mark.parametrize("sample_rate, expected", [(0.0, 0), (1.0, 4)])
+@pytest.mark.parametrize(
+    "model_adapter, registry", _MODELS, indirect=["model_adapter", "registry"]
+)
+def test_telemetry_sampled_mode(
+    registry: Registry,
+    runner_factory,
+    sample_rate: float,
+    expected: int,
+) -> None:
+    recorder = RecordingTelemetry()
+
+    _run(
+        runner_factory(
+            telemetry=(recorder,),
+            telemetry_mode="sampled",
+            telemetry_sample_rate=sample_rate,
+        ),
+        registry,
+    )
+
+    assert len(recorder.events) == expected
+
+
+def test_telemetry_rejects_invalid_sample_rate() -> None:
+    with pytest.raises(ValueError, match="sample_rate"):
+        TelemetryPublisher(
+            adapters=(RecordingTelemetry(),),
+            mode="sampled",
+            sample_rate=1.5,
+        )

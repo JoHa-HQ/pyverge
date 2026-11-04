@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -32,7 +31,7 @@ class AsyncBackend:
         run: RunContext,
         adapter: ModelIdentityPort,
     ) -> dict[str, Any]:
-        data = copy.deepcopy(payload)
+        data = payload
         hook_state = new_hook_state()
         for level in plan.levels:
             if self.max_workers > 1:

@@ -16,6 +16,9 @@ runtime = manager.runtime(
     runtime=None,
     backend=None,
     middleware=(),
+    telemetry=(),
+    telemetry_mode="all",
+    telemetry_sample_rate=1.0,
     environment=None,
     direction="any",
     on_direction_violation="skip",
@@ -24,6 +27,8 @@ runtime = manager.runtime(
     on_depth_violation="skip",
     validation_mode="lax",
     discriminator="default",
+    plan_cache_size=0,
+    copy="deep",
 )
 runner = runtime.runner
 graph = runtime.graph
@@ -51,10 +56,21 @@ runner.run(
     payload,
     target,
     *,
-    container=None,
+    source_model=None,
     max_depth=-1,
     context=None,
     run_id=None,
+    validate_target=False,
+)
+```
+
+`Runner.run_many` runs payloads with independent run and transaction scope:
+
+```python
+results = runner.run_many(
+    payloads,
+    target,
+    context=context,
 )
 ```
 
@@ -70,7 +86,63 @@ Backends own scheduling and callable invocation only. Entry payload read/write,
 step contexts, version stamping, and hook scope lifecycles live in the
 execution plan and step invoker, so every backend behaves the same way.
 
+A strategy receives only the migration callable, the current value, and the
+step context view. It does not read or write payload paths, run hooks, or build
+step metadata:
+
+```python
+def invoke(func, data, context):
+    return func(data, context)
+```
+
 The backend determines whether `run()` returns a result or an awaitable.
+
+`ProcessBackend` is for CLI and offline batch jobs. When a host framework
+already owns worker processes, such as Celery or FastStream workers, run one
+pyverge runtime per worker process and use `ThreadedBackend` or `AsyncBackend`
+instead of nesting another process pool.
+
+## Plan cache
+
+`plan_cache_size` caches payload-independent graph plans:
+
+```python
+runner = manager.runtime(plan_cache_size=128).runner
+```
+
+```text
+0    disable plan caching
+-1   unbounded cache
+N>0  bounded least-recently-used cache
+```
+
+The cache key is the target policy plus the discovered entry signature: entry
+paths and source node identities. Payload values, run context, telemetry, and
+migration outputs are never cached.
+
+## Copy policy
+
+`copy` controls payload ownership:
+
+```text
+deep     deep-copy the payload before execution; default
+shallow  copy only the top-level mapping
+none     execute against the caller-owned payload
+```
+
+Use `none` only for trusted payloads that can be mutated. `ProcessBackend`
+still serializes payloads through pickling.
+
+## Validation
+
+```text
+validation_mode  input-side validation during guided discovery
+validate_target  output-side finalize/validation after execution
+```
+
+Input validation applies only when `source_model` is supplied. `finalize` may
+normalize the target value, so disabling `validate_target` can change output
+shape as well as skip error checking.
 
 ## Hooks
 
@@ -120,14 +192,19 @@ class AuditHook(MigrationHook):
 
 `step` is the execution step context: `name`, source/target nodes, `edge`
 (including `discriminator`), `migration` descriptor, payload `path`, and
-`index`. `state` is a backend-provided `ContextVar`; do not store per-step state
-on the hook instance. Store it in `state` by hook instance key when needed.
+`index`. It also exposes telemetry-ready `source_dataset` and `target_dataset`
+views with namespace, kind, version, name, and field metadata. Hooks should use
+those views instead of inspecting model descriptors. `state` is a
+backend-provided `ContextVar`; do not store per-step state on the hook instance.
+Store it in `state` by hook instance key when needed.
 
 `before_migrate` may return a per-step context manager. Sync scopes implement
 `HookScope` and are entered with `ExitStack`; async scopes implement
 `AsyncHookScope` and are entered with `AsyncExitStack` by the async backend.
-Resources are closed on success, error, or cancellation. `OTELHook` and
-`OpenLineageHook` use this to scope spans and run events.
+Resources are closed on success, error, or cancellation.
+
+Hooks are for custom behavior. Telemetry uses lifecycle adapters instead, so
+hooks no longer need to own run or step telemetry resources.
 
 Register a hook on a specific edge:
 
@@ -148,16 +225,69 @@ is a `before_migrate` / `after_migrate` / `on_error` method declared with
 `async def`; the async backend awaits it. The sync backend rejects awaitable
 hook results with `AsyncExecutionRequired`.
 
+## Telemetry
+
+`manager.runtime(telemetry=(...))` attaches lifecycle adapters. The runtime
+emits six typed events:
+
+```text
+RunStarted
+  StepStarted
+  StepCompleted | StepFailed
+RunCompleted | RunFailed
+```
+
+Run events carry the `RunContext` and `ExecutionPlan`; step events carry the
+`StepContext`. Adapters implement one synchronous method:
+
+```python
+class TelemetryAdapter:
+    def emit(self, event: TelemetryEvent) -> None: ...
+```
+
+Emission is best-effort and isolated. An adapter failure is logged, does not
+fail the migration, and does not prevent other adapters from receiving the
+event. Payload values are never emitted.
+
+Bundled adapters:
+
+```python
+from pyverge.runtime import OpenLineageAdapter, OtelAdapter
+
+runner = manager.runtime(
+    telemetry=(
+        OtelAdapter(tracer=trace.get_tracer("orders"), service="orders"),
+        OpenLineageAdapter(
+            client=lineage_client,
+            producer="orders-service",
+        ),
+    )
+).runner
+```
+
+`OpenLineageAdapter` emits run-level and step-level events with version, schema,
+job, parent-run, and error facets. The namespace is inherited from the graph
+through `RunContext`; the adapter does not configure it separately.
+
+`telemetry_mode` controls event construction:
+
+```text
+all      run and step lifecycle events
+errors   only failed run and step events
+sampled  deterministic run-level sampling
+off      no telemetry events
+```
+
+`sampled` uses `telemetry_sample_rate` between `0` and `1`. Sampling is stable
+per run ID: all events for a sampled run are emitted and runs that are not
+sampled emit nothing. Use `errors`, `sampled`, or `off` on high-throughput
+paths. Event objects are not constructed when telemetry is disabled.
+
 ## Middleware
 
-`manager.runtime(middleware=(...))` accepts backend middleware for retry,
-idempotency, transactions, audit, OpenTelemetry, and OpenLineage. Middleware
-wraps the backend execution seam, not individual migrations.
-
-`OpenLineageMiddleware` validates the configured OpenLineage namespace against
-the graph namespace when the graph has one. Datasets use namespaced `NodeId`
-values; run events identify the complete execution while edge-level hooks emit
-per-migration events.
+`manager.runtime(middleware=(...))` accepts control middleware for retry,
+idempotency, transactions, and audit. Middleware wraps the backend execution
+seam, not individual migrations.
 
 See [Run payloads](../how-to/runtime/run-payloads.md) for examples and
 [Execution flow](../explanation/execution-flow.md) for ordering.

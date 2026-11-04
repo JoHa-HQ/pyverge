@@ -28,7 +28,8 @@ from pyverge.runtime.context import DEFAULT_LOGGER, ExecutionEnvironment
 from pyverge.runtime.facade import Runtime
 from pyverge.runtime.factory import RunnerOptions
 from pyverge.runtime.middleware import BackendMiddleware
-from pyverge.runtime.types import BackendPort
+from pyverge.runtime.telemetry import TelemetryAdapter, TelemetryMode
+from pyverge.runtime.types import BackendPort, CopyPolicy
 
 from ..descriptors import hybridmethod
 from ..types import ManagerMigrationKey, ModelKey, ModelPair, warn_model_pair
@@ -55,6 +56,9 @@ class RuntimeMixin(Generic[VersionValue]):
         *,
         backend: BackendPort | None = None,
         middleware: tuple[BackendMiddleware, ...] = (),
+        telemetry: tuple[TelemetryAdapter, ...] = (),
+        telemetry_mode: TelemetryMode = "all",
+        telemetry_sample_rate: float = 1.0,
         environment: ExecutionEnvironment | None = None,
         runtime: BackendPort | None = None,
         direction: MigrationDirectionStrategy = "any",
@@ -64,6 +68,8 @@ class RuntimeMixin(Generic[VersionValue]):
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
         discriminator: str = "default",
+        plan_cache_size: int = 0,
+        copy: CopyPolicy = "deep",
     ) -> Runtime[VersionValue]:
         options = RunnerOptions(
             backend=backend or runtime or ThreadedBackend(max_workers=0),
@@ -82,6 +88,11 @@ class RuntimeMixin(Generic[VersionValue]):
             validation_mode=validation_mode,
             discriminator=discriminator,
             middleware=middleware,
+            telemetry=telemetry,
+            telemetry_mode=telemetry_mode,
+            telemetry_sample_rate=telemetry_sample_rate,
+            plan_cache_size=plan_cache_size,
+            copy=copy,
         )
         store = type(self)._default_runtime
         return Runtime(engine=self.engine, bindings=store.bindings).with_runner(options)
@@ -91,6 +102,9 @@ class RuntimeMixin(Generic[VersionValue]):
         *,
         backend: BackendPort | None = None,
         middleware: tuple[BackendMiddleware, ...] = (),
+        telemetry: tuple[TelemetryAdapter, ...] = (),
+        telemetry_mode: TelemetryMode = "all",
+        telemetry_sample_rate: float = 1.0,
         environment: ExecutionEnvironment | None = None,
         runtime: BackendPort | None = None,
         direction: MigrationDirectionStrategy = "any",
@@ -100,6 +114,8 @@ class RuntimeMixin(Generic[VersionValue]):
         on_depth_violation: DepthViolationStrategy = "skip",
         validation_mode: Literal["strict", "lax", "none"] = "lax",
         discriminator: str = "default",
+        plan_cache_size: int = 0,
+        copy: CopyPolicy = "deep",
     ) -> Runner[VersionValue]:
         warnings.warn(
             "Manager.runner() is deprecated; use Manager.runtime().runner",
@@ -109,6 +125,9 @@ class RuntimeMixin(Generic[VersionValue]):
         runtime_view = self.runtime(
             backend=backend,
             middleware=middleware,
+            telemetry=telemetry,
+            telemetry_mode=telemetry_mode,
+            telemetry_sample_rate=telemetry_sample_rate,
             environment=environment,
             runtime=runtime,
             direction=direction,
@@ -118,6 +137,8 @@ class RuntimeMixin(Generic[VersionValue]):
             on_depth_violation=on_depth_violation,
             validation_mode=validation_mode,
             discriminator=discriminator,
+            plan_cache_size=plan_cache_size,
+            copy=copy,
         )
         assert runtime_view.runner is not None
         return runtime_view.runner

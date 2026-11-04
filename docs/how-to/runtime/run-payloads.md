@@ -36,11 +36,52 @@ max_depth=-1
 context=None
 ```
 
-Materialize and validate a container result:
+Validate the target schema when required:
 
 ```python
-result = manager.runtime().runner.run(payload, "latest", container=UserEnvelope)
+result = manager.runtime().runner.run(
+    payload,
+    "latest",
+    validate_target=True,
+)
 ```
+
+### Cache plans and control copying
+
+```python
+runner = manager.runtime(
+    plan_cache_size=128,
+    copy="none",
+).runner
+```
+
+```text
+plan_cache_size=0    disable plan caching
+plan_cache_size=-1   unbounded cache
+plan_cache_size=N    bounded LRU
+```
+
+```text
+copy="deep"     safe default
+copy="shallow"  top-level copy only
+copy="none"     caller-owned payload, mutations are visible
+```
+
+Plan caching keys on the target policy and entry signature, never payload
+values.
+
+### Batch payloads
+
+```python
+results = runner.run_many(
+    payloads,
+    "latest",
+    context={"tenant_id": "tenant_99"},
+)
+```
+
+Each payload gets its own run ID, run context, transaction scope, and telemetry
+events. The plan cache is reused across the batch.
 
 ### Async
 
@@ -71,6 +112,10 @@ try:
 finally:
     backend.close()
 ```
+
+Use `ProcessBackend` for CLI and offline batch jobs. In Celery, FastStream, or
+other frameworks that already own worker processes, use one runtime per worker
+with `ThreadedBackend` or `AsyncBackend` to avoid nested process pools.
 
 ### Runtime context
 

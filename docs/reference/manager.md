@@ -93,16 +93,32 @@ manager.validate(data, kind, version)
 runtime = manager.runtime(
     *,
     runtime=None,
+    backend=None,
+    middleware=(),
+    telemetry=(),
+    telemetry_mode="all",
+    telemetry_sample_rate=1.0,
     direction="any",
     on_direction_violation="skip",
     on_missing_path="raise",
     depth_limit=-1,
     on_depth_violation="skip",
     validation_mode="lax",
+    discriminator="default",
+    plan_cache_size=0,
+    copy="deep",
 )
 runner = runtime.runner
 graph = runtime.graph
-result = runner.run(payload, target, *, container=None, max_depth=-1, context=None)
+result = runner.run(
+    payload,
+    target,
+    *,
+    source_model=None,
+    max_depth=-1,
+    context=None,
+    validate_target=False,
+)
 ```
 
 See [Use the manager](../how-to/models/use-manager.md) for task examples.

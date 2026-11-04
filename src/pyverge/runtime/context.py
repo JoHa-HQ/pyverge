@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import singledispatchmethod
 from types import MappingProxyType
 from typing import Any, Self, cast
 
 from pyverge.core.ids import IdFactory
-from pyverge.core.versioning import EdgeId, MigrationDescriptor, VersionNode
+from pyverge.core.versioning import (
+    EdgeId,
+    MigrationDescriptor,
+    TypeRef,
+    VersionNode,
+)
 
 from .clock import Clock
+from .telemetry import EMPTY_TELEMETRY, TelemetryPublisher
 
 DEFAULT_LOGGER = logging.getLogger("pyverge.runtime")
 
@@ -88,6 +94,7 @@ class ExecutionEnvironment:
     id_factory: IdFactory
     logger: Any
     tracer: Any
+    telemetry: TelemetryPublisher = field(default=EMPTY_TELEMETRY)
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,12 +102,59 @@ class RunContext:
     """One execution run."""
 
     run_id: str
+    namespace: str
     environment: ExecutionEnvironment
     bindings: MigrationContext
 
     @property
     def view(self) -> MigrationContext:
         return self.bindings
+
+
+def _type_ref_name(type_ref: TypeRef) -> str:
+    kind = str(type_ref.kind)
+    if type_ref.name:
+        return f"{kind}[{type_ref.name}]"
+    if type_ref.ref is not None:
+        return f"{kind}[{type_ref.ref.entity_id}]"
+    return kind
+
+
+@dataclass(frozen=True, slots=True)
+class FieldContext:
+    """Telemetry-ready description of one model field."""
+
+    name: str
+    type: str
+    required: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetContext:
+    """Telemetry-ready description of one versioned dataset."""
+
+    namespace: str
+    kind: str
+    version: str
+    name: str
+    fields: tuple[FieldContext, ...] = ()
+
+    @classmethod
+    def from_node(cls, node: VersionNode) -> DatasetContext:
+        return cls(
+            namespace=node.namespace,
+            kind=node.kind,
+            version=str(node.version),
+            name=str(node),
+            fields=tuple(
+                FieldContext(
+                    name=descriptor.name,
+                    type=_type_ref_name(descriptor.type_ref),
+                    required=descriptor.required,
+                )
+                for _, descriptor in node.descriptor.fields.sorted_items()
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +170,20 @@ class StepContext:
     bindings: MigrationContext
     name: str
     migration: MigrationDescriptor | None = None
+    source_dataset: DatasetContext = field(init=False)
+    target_dataset: DatasetContext = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "source_dataset",
+            DatasetContext.from_node(self.source),
+        )
+        object.__setattr__(
+            self,
+            "target_dataset",
+            DatasetContext.from_node(self.target),
+        )
 
     @property
     def view(self) -> MigrationContext:
@@ -124,7 +192,9 @@ class StepContext:
 
 __all__ = [
     "DEFAULT_LOGGER",
+    "DatasetContext",
     "ExecutionEnvironment",
+    "FieldContext",
     "RunContext",
     "StepContext",
 ]

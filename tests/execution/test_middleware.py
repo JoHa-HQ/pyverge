@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, cast
 
 import pytest
 
@@ -14,16 +13,12 @@ from pyverge.runtime.context import MigrationContext
 from pyverge.runtime.middleware import (
     AuditMiddleware,
     IdempotencyMiddleware,
-    OpenLineageMiddleware,
-    OtelMiddleware,
     RetryMiddleware,
     TransactionMiddleware,
 )
 from tests.utils.middleware import (
     AsyncScriptedBackend,
     FakeIdempotencyStore,
-    FakeLineageClient,
-    FakeTracer,
     FakeTransactionManager,
     OrderMiddleware,
     RecordingAuditSink,
@@ -195,57 +190,6 @@ def test_idempotency_middleware_releases_on_failure(execution_runner, plan) -> N
         execution_runner.execute(plan, context=MigrationContext.empty())
 
     assert execution_runner.middleware[0].store.released == ["key"]
-
-
-@pytest.mark.parametrize(
-    "execution_runner",
-    [
-        pytest.param(
-            (
-                ScriptedBackend,
-                0,
-                (OtelMiddleware(tracer=cast("Any", FakeTracer()), service="test"),),
-            ),
-            id="otel",
-        )
-    ],
-    indirect=True,
-)
-def test_otel_middleware_creates_run_span(execution_runner, plan) -> None:
-    execution_runner.execute(plan, context=MigrationContext.empty())
-
-    assert execution_runner.middleware[0].tracer.names == ["test.run"]
-
-
-@pytest.mark.parametrize(
-    "execution_runner",
-    [
-        pytest.param(
-            (
-                ScriptedBackend,
-                0,
-                (
-                    OpenLineageMiddleware(
-                        client=FakeLineageClient(),
-                        namespace="test",
-                        producer="test-producer",
-                    ),
-                ),
-            ),
-            id="openlineage",
-        )
-    ],
-    indirect=True,
-)
-def test_openlineage_middleware_emits_run_events(execution_runner, plan) -> None:
-    execution_runner.execute(plan, context=MigrationContext.empty())
-
-    assert [
-        event.eventType.value for event in execution_runner.middleware[0].client.events
-    ] == [
-        "START",
-        "COMPLETE",
-    ]
 
 
 @pytest.mark.parametrize(
