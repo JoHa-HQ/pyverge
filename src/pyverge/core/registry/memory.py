@@ -707,8 +707,7 @@ class Registry(Generic[VersionValue]):
             entry: A registration request or an explicit graph edge.
 
         Returns:
-            MigrationFunc | EdgeEntry: The registered callable for an
-                executable migration, otherwise the stored edge entry.
+            EdgeEntry: The stored edge entry.
 
         Raises:
             CatalogError: The migration is invalid or non-adjacent.
