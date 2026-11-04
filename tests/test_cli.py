@@ -406,7 +406,7 @@ class TestCommands:
         assert graph["edges"][0]["target"] == "test:User@2.0.0"
         assert graph["edges"][0]["metadata"]["strategy"] == "callable"
         assert graph["metadata"]["manifest_version"] == "1.0"
-        assert all(c in "0123456789abcdef" for c in graph["metadata"]["content_hash"])
+        assert all(c in "0123456789abcdef" for c in graph["metadata"]["digest"])
 
     def test_manifest_options_override_identity(
         self,

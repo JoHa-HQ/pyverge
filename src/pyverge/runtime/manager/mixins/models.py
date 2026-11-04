@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+from functools import singledispatchmethod
+from typing import TYPE_CHECKING, Generic, cast
+
+from pyverge.core.types import (
+    ModelData,
+    ModelKey,
+    ModelKind,
+    VersionValue,
+)
+from pyverge.core.versioning import (
+    Comparable,
+    NodeId,
+    Versionable,
+    VersionNode,
+    parse_version,
+)
+from pyverge.schemas.types import (
+    ModelHandle,
+)
+
+from ..descriptors import hybridmethod
+
+if TYPE_CHECKING:
+    from pyverge.core.engine import Engine
+    from pyverge.runtime.manager.manager import Manager
+
+
+class ModelStoreMixin(Generic[VersionValue]):
+    """Store and look up registered model versions."""
+
+    @hybridmethod
+    @singledispatchmethod
+    @classmethod
+    def store_model(
+        cls: type[Manager[VersionValue]],
+        key: ModelHandle,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Versionable[VersionValue]:
+        engine = engine or cls._default_engine
+        return cast(Versionable[VersionValue], engine.store_model(key))
+
+    @store_model.register(VersionNode)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        version: VersionNode[VersionValue],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Versionable[VersionValue]:
+        engine = engine or cls._default_engine
+        return cast(Versionable[VersionValue], engine.store_model(version))
+
+    @hybridmethod
+    @singledispatchmethod
+    @classmethod
+    def reconcile_model(
+        cls: type[Manager[VersionValue]],
+        key: ModelHandle,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Versionable[VersionValue]:
+        engine = engine or cls._default_engine
+        return cast(Versionable[VersionValue], engine.reconcile_model(key))
+
+    @reconcile_model.register(VersionNode)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        version: VersionNode[VersionValue],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Versionable[VersionValue]:
+        engine = engine or cls._default_engine
+        return cast(Versionable[VersionValue], engine.reconcile_model(version))
+
+    def missing_references(
+        self: Manager[VersionValue],
+        version: Versionable[VersionValue],
+    ) -> frozenset[NodeId]:
+        return frozenset(
+            issue.details["reference"]
+            for issue in self.engine.health(version)
+            if issue.code.startswith("reference.missing.")
+        )
+
+    def validate_graph(
+        self: Manager[VersionValue],
+        version: Versionable[VersionValue] | None = None,
+    ) -> None:
+        self.engine.validate(version)
+
+    @hybridmethod
+    @classmethod
+    def list_versions(
+        cls: type[Manager[VersionValue]],
+        kind: ModelKind | None = None,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> list[VersionNode[VersionValue]]:
+        engine = engine or cls._default_engine
+        return engine.list_versions(kind)
+
+    @hybridmethod
+    @classmethod
+    def migration_graph(
+        cls: type[Manager[VersionValue]],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ):
+        """Expose the immutable migration graph for the current manager."""
+        engine = engine or cls._default_engine
+        return engine.snapshot()
+
+    @hybridmethod
+    @classmethod
+    def get_entities(
+        cls: type[Manager[VersionValue]],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> list[ModelKind]:
+        engine = engine or cls._default_engine
+        return engine.get_entities()
+
+    @hybridmethod
+    @classmethod
+    def identifies(
+        cls: type[Manager[VersionValue]],
+        key: ModelHandle,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> bool:
+        engine = engine or cls._default_engine
+        return engine.adapter.identify(key)
+
+    @hybridmethod
+    @classmethod
+    def dump(
+        cls: type[Manager[VersionValue]],
+        value: object,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> ModelData:
+        if isinstance(value, dict):
+            return cast("ModelData", value)
+        engine = engine or cls._default_engine
+        return engine.adapter.dump(value)
+
+    @hybridmethod
+    @classmethod
+    def get_model(
+        cls: type[Manager[VersionValue]],
+        key: ModelHandle | ModelKey,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> VersionNode[VersionValue]:
+        engine = engine or cls._default_engine
+        if isinstance(key, ModelKey):
+            return engine.get_model(
+                engine.adapter.version_key(
+                    kind=key.kind,
+                    version=key.version,
+                )
+            )
+        return engine.get_model_by_class(key)
+
+    @hybridmethod
+    @classmethod
+    def get_latest_model(
+        cls: type[Manager[VersionValue]],
+        key: Comparable[VersionValue] | ModelKind,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> VersionNode[VersionValue]:
+        engine = engine or cls._default_engine
+        if isinstance(key, str):
+            return engine.get_latest_model(key)
+        return engine.get_model(key)
+
+    @hybridmethod
+    @classmethod
+    def get_earliest_model(
+        cls: type[Manager[VersionValue]],
+        key: Comparable[VersionValue] | ModelKind,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> VersionNode[VersionValue]:
+        engine = engine or cls._default_engine
+        if isinstance(key, str):
+            return engine.get_earliest_model(key)
+        return engine.get_model(key)
+
+    @hybridmethod
+    @classmethod
+    def get(
+        cls: type[Manager[VersionValue]],
+        kind: ModelKind,
+        version: str,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> VersionNode[VersionValue]:
+        engine = engine or cls._default_engine
+        key = ModelKey(kind, parse_version(version))
+        return cls.get_model(key, engine=engine)

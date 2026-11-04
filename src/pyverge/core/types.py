@@ -15,13 +15,8 @@ from typing import (
     runtime_checkable,
 )
 
-from pendulum import Date
-from semver import Version as SemVer
-
-from .context import MigrationContext
-
 if TYPE_CHECKING:
-    from pyverge.versioning import (
+    from pyverge.core.versioning import (
         EdgeKey,
         MigrationDescriptor,
         NodeId,
@@ -34,10 +29,28 @@ if TYPE_CHECKING:
 # Version axis
 # ---------------------------------------------------------------------------
 
-#: Core version value axis: semver and ISO dates are parallel strategies.
-VersionValue = TypeVar("VersionValue", SemVer, Date)
+
+@runtime_checkable
+class VersionValueProtocol(Protocol):
+    """Ordering and hashing contract for one parsed version value.
+
+    ``semver.Version`` and ``pendulum.Date`` satisfy this. Custom version
+    strategies must provide a stable string form, total ordering, equality,
+    and hashing before they can occupy the version slot.
+    """
+
+    def __str__(self) -> str: ...
+    def __lt__(self, other: Any, /) -> bool: ...
+    def __gt__(self, other: Any, /) -> bool: ...
+    def __le__(self, other: Any, /) -> bool: ...
+    def __ge__(self, other: Any, /) -> bool: ...
+    def __hash__(self) -> int: ...
+
+
+#: Core version value axis: any value satisfying the ordering protocol.
+VersionValue = TypeVar("VersionValue", bound=VersionValueProtocol)
 #: Covariant form for protocols where the version is output-only.
-VersionValue_co = TypeVar("VersionValue_co", SemVer, Date, covariant=True)
+VersionValue_co = TypeVar("VersionValue_co", bound=VersionValueProtocol, covariant=True)
 
 #: Per-execution hook state supplied by the execution backend.
 HookState: TypeAlias = ContextVar[dict[int, tuple[Any, ...]]]
@@ -69,7 +82,7 @@ ModelData: TypeAlias = dict[str, Any]
 
 #: Length of a migration endpoint-pair key, e.g. ``(source, target)``.
 MIGRATION_PAIR_LEN: int = 2
-MigrationFunc: TypeAlias = Callable[[ModelData, MigrationContext | None], ModelData]
+MigrationFunc: TypeAlias = Callable[[ModelData, Any], ModelData]
 #: How a diff came to be: discovered from a registered migration, or computed
 #: from two concrete schemas.  Selects the reflection strategy when no explicit
 #: setting applies.
@@ -123,7 +136,7 @@ ManagerKey: TypeAlias = ModelKey | ManagerMigrationKey | ModelPair
 
 
 # ---------------------------------------------------------------------------
-# Behavior protocols (version protocols live in pyverge.versioning)
+# Behavior protocols (version protocols live in pyverge.core.versioning)
 # ---------------------------------------------------------------------------
 
 

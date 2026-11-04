@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any, Protocol, TypeVar
 
-from pyverge.graph.planning.targets import TargetSelector
+from pyverge.core.graph.planning.targets import TargetSelector
 
 Fn = TypeVar("Fn", bound=Callable[..., Any])
 

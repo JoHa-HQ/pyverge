@@ -11,10 +11,10 @@ from datamodel_code_generator.format import Formatter
 from pydantic import BaseModel
 
 from pyverge.core.types import ModelData, ModelHandle
+from pyverge.core.versioning import FieldDescriptor, NodeId
 from pyverge.schemas.base import AbstractModelAdapter
 from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.runtime import ModelRuntime
-from pyverge.versioning import FieldDescriptor, NodeId
 
 
 class JsonSchemaModelAdapter(AbstractModelAdapter):

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from pyverge.graph.planning.targets import DefaultTarget, FirstMatch
-from pyverge.manager.types import TargetPolicy
+from pyverge.core.graph.planning.targets import DefaultTarget, FirstMatch
+from pyverge.runtime.manager.types import TargetPolicy
 
 from .domain import TaskContext
 

@@ -18,8 +18,7 @@ from pydantic import BaseModel, TypeAdapter, create_model
 from pydantic_core import PydanticUndefined
 
 from pyverge.core.types import ModelData, ModelHandle, VersionValue
-from pyverge.schemas.codec import ModelCodec
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     NO_DEFAULT,
     Diffable,
     FieldDescriptor,
@@ -29,6 +28,7 @@ from pyverge.versioning import (
     TypeRef,
     default_canonicalizer,
 )
+from pyverge.schemas.codec import ModelCodec
 
 _TUPLE_ELLIPSIS_ARGS = 2
 
@@ -213,8 +213,8 @@ class PythonModelRuntime:
         model_id: str | None = None,
     ) -> ModelRef:
         ref = ModelRef(
-            provider=provider,
-            model_id=model_id or self.model_id(handle),
+            provider_id=provider,
+            entity_id=model_id or self.model_id(handle),
         )
         self._handles.setdefault(ref, handle)
         return ref

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from pyverge.execution.plan import ExecutionPlan, PathPlan
+from pyverge.runtime.plan import ExecutionPlan, PathPlan
 from tests.utils.middleware import AsyncScriptedBackend, ScriptedBackend
 
 

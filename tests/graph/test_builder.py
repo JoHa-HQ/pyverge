@@ -6,10 +6,11 @@ from __future__ import annotations
 import pytest
 import semver
 
-from pyverge.registry.errors import CatalogError
+from pyverge.core.registry.errors import CatalogError
+from pyverge.core.versioning import EdgeKey, NodeRef, VersionKey
+from pyverge.migrations.spec import MigrationSpec
 from pyverge.schemas import PydanticModelAdapter
 from pyverge.settings import VersioningSettings
-from pyverge.versioning import EdgeKey, VersionKey
 from tests.examples.migrations import USER_JSONATA_V2_TO_V3, USER_JSONPATCH_V1_TO_V2
 from tests.examples.pydantic.semver import UserV1, UserV2, UserV3, migrate_v1_to_v2
 from tests.utils import envelope_model
@@ -44,7 +45,9 @@ def test_graph_snapshots_catalog(model_adapter, registry, graph) -> None:
 
 
 def test_graph_snapshots_key_only_entries(registry, graph) -> None:
-    key = VersionKey(namespace="test", kind="User", version=semver.Version(1, 0, 0))
+    key = VersionKey(
+        namespace="test", kind="User", version=semver.Version(1, 0, 0), ref=NodeRef()
+    )
     registry.store(key)
     snapshot = graph()
 
@@ -134,6 +137,7 @@ def test_snapshot_is_immutable_after_registry_mutation(
         namespace=node.namespace,
         kind=node.kind,
         version=node.version,
+        ref=NodeRef(),
     )
 
     target = envelope_model(model_adapter, versioning_settings, UserV2)
@@ -190,3 +194,88 @@ def test_graph_accepts_one_nonempty_namespace(
 
     assert snapshot.versions == [node]
     assert snapshot.get_model(node) is node
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [semver.Version, "test", [UserV1, UserV2], []],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_graph_preserves_edge_discriminators(registry, graph) -> None:
+    source, target = registry.kind_versions("User")
+    registry.store_migration(
+        MigrationSpec((source, target), migrate_v1_to_v2, discriminator="canary")
+    )
+    registry.store_migration(
+        MigrationSpec((source, target), migrate_v1_to_v2, discriminator="stable")
+    )
+
+    snapshot = graph()
+    edges = snapshot.edges("User")
+
+    assert {edge.discriminator for edge in edges} == {"canary", "stable"}
+    default = EdgeKey.from_pair(source, target)
+    canary = EdgeKey.from_pair(source, target, discriminator="canary")
+    assert not snapshot.has_edge(default)
+    assert snapshot.has_edge(canary)
+    assert snapshot.get_edge(canary).discriminator == "canary"
+    assert snapshot.edge_metadata[canary]["strategy"]
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [
+                semver.Version,
+                "test",
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_snapshot_lookup_flags(registry, graph) -> None:
+    snapshot = graph()
+
+    assert len(snapshot.node_entries(full=True)) == 2  # noqa: PLR2004
+    assert len(snapshot.node_entries(connected=True)) == 2  # noqa: PLR2004
+    assert snapshot.node_entries(orphaned=True) == ()
+    assert len(snapshot.edge_entries(executable=True)) == 1
+    assert snapshot.edge_entries(executable=False) == ()
+    assert snapshot.edge_entries(origin="unset") == ()
+
+
+@pytest.mark.parametrize(
+    "model_adapter, registry",
+    [
+        [
+            PydanticModelAdapter,
+            [semver.Version, "test", [], []],
+        ]
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_snapshot_lookup_flags_identify_orphans(registry, graph) -> None:
+    for version in ("1.0.0", "2.0.0"):
+        registry.store(
+            VersionKey(
+                namespace="test",
+                kind="User",
+                version=semver.Version.parse(version),
+                ref=NodeRef(),
+            )
+        )
+
+    snapshot = graph()
+
+    assert len(snapshot.node_entries(full=False)) == 2  # noqa: PLR2004
+    assert len(snapshot.node_entries(orphaned=True)) == 2  # noqa: PLR2004
+    assert len(snapshot.node_entries(connected=False)) == 2  # noqa: PLR2004

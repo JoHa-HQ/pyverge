@@ -1,0 +1,298 @@
+from __future__ import annotations
+
+from functools import singledispatchmethod
+from typing import TYPE_CHECKING, Generic, cast
+
+from pyverge.core.types import (
+    Attachable,
+    ManagerMigrationKey,
+    MigrationFunc,
+    MigrationKeyInput,
+    ModelPair,
+    VersionValue,
+)
+from pyverge.core.versioning import EdgeKey, Migratable, VersionEdge
+from pyverge.migrations import JsonataMigration, JsonPatchMigration
+
+from ..descriptors import hybridmethod
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from pyverge.core.engine import Engine
+    from pyverge.runtime.manager.manager import Manager
+
+
+class MigrationStoreMixin(Generic[VersionValue]):
+    """Store, fetch and remove migrations, and attach hooks."""
+
+    @singledispatchmethod
+    @classmethod
+    def _resolve_migration(
+        cls: type[Manager[VersionValue]],
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
+    ) -> MigrationFunc:
+        return cast(MigrationFunc, func)
+
+    @_resolve_migration.register(JsonPatchMigration)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        func: JsonPatchMigration,
+    ) -> MigrationFunc:
+        return cast(MigrationFunc, func)
+
+    @_resolve_migration.register(JsonataMigration)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        func: JsonataMigration,
+    ) -> MigrationFunc:
+        return cast(MigrationFunc, func)
+
+    @hybridmethod
+    @singledispatchmethod
+    @classmethod
+    def store_migration(  # noqa: PLR0913
+        cls: type[Manager[VersionValue]],
+        key: MigrationKeyInput,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
+        *,
+        engine: Engine[VersionValue] | None = None,
+        backward_compatible: bool = False,
+        migration_id: str | None = None,
+        discriminator: str = "default",
+    ) -> MigrationFunc:
+        raise TypeError(f"Unsupported migration key: {key!r}")
+
+    @store_migration.register(ModelPair)
+    @classmethod
+    def _(  # noqa: PLR0913
+        cls: type[Manager[VersionValue]],
+        key: ModelPair,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
+        *,
+        engine: Engine[VersionValue] | None = None,
+        backward_compatible: bool = False,
+        migration_id: str | None = None,
+        discriminator: str = "default",
+    ) -> MigrationFunc:
+        engine = engine or cls._default_engine
+        adapter = engine.adapter
+        pair = (adapter.versionable(key.source), adapter.versionable(key.target))
+        func = cls._resolve_migration(func)
+        if migration_id is not None:
+            setattr(func, "__migration_id__", migration_id)
+        edge = engine.store_migration(
+            pair,
+            func,
+            backward_compatible=backward_compatible,
+            discriminator=discriminator,
+        )
+        if isinstance(edge, VersionEdge):
+            cls._default_runtime.bindings.store_migration(edge.id, func, edge.migration)
+        return func
+
+    @store_migration.register(ManagerMigrationKey)
+    @classmethod
+    def _(  # noqa: PLR0913
+        cls: type[Manager[VersionValue]],
+        key: ManagerMigrationKey,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
+        *,
+        engine: Engine[VersionValue] | None = None,
+        backward_compatible: bool = False,
+        migration_id: str | None = None,
+        discriminator: str = "default",
+    ) -> MigrationFunc:
+        engine = engine or cls._default_engine
+        adapter = engine.adapter
+        pair = (
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
+        )
+        func = cls._resolve_migration(func)
+        if migration_id is not None:
+            setattr(func, "__migration_id__", migration_id)
+        edge = engine.store_migration(
+            pair,
+            func,
+            backward_compatible=backward_compatible,
+            discriminator=discriminator,
+        )
+        if isinstance(edge, VersionEdge):
+            cls._default_runtime.bindings.store_migration(edge.id, func, edge.migration)
+        return func
+
+    @store_migration.register(EdgeKey)
+    @classmethod
+    def _(  # noqa: PLR0913
+        cls: type[Manager[VersionValue]],
+        key: EdgeKey,
+        func: MigrationFunc | JsonPatchMigration | JsonataMigration,
+        *,
+        engine: Engine[VersionValue] | None = None,
+        backward_compatible: bool = False,
+        migration_id: str | None = None,
+        discriminator: str = "default",
+    ) -> MigrationFunc:
+        engine = engine or cls._default_engine
+        func = cls._resolve_migration(func)
+        if migration_id is not None:
+            setattr(func, "__migration_id__", migration_id)
+        edge = engine.store_migration(
+            key.key,
+            func,
+            backward_compatible=backward_compatible,
+            discriminator=key.discriminator,
+        )
+        if isinstance(edge, VersionEdge):
+            cls._default_runtime.bindings.store_migration(edge.id, func, edge.migration)
+        return func
+
+    @hybridmethod
+    @singledispatchmethod
+    @classmethod
+    def remove_migration(
+        cls: type[Manager[VersionValue]],
+        key: MigrationKeyInput,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None:
+        raise TypeError(f"Unsupported migration key: {key!r}")
+
+    @remove_migration.register(ModelPair)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        key: ModelPair,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None:
+        engine = engine or cls._default_engine
+        adapter = engine.adapter
+        pair = (adapter.versionable(key.source), adapter.versionable(key.target))
+        edge_key = EdgeKey.from_pair(*pair)
+        cls._default_runtime.bindings.remove_migration(edge_key.id)
+        engine.remove_migration(edge_key)
+
+    @remove_migration.register(ManagerMigrationKey)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        key: ManagerMigrationKey,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None:
+        engine = engine or cls._default_engine
+        adapter = engine.adapter
+        pair = (
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
+        )
+        edge_key = EdgeKey.from_pair(*pair)
+        cls._default_runtime.bindings.remove_migration(edge_key.id)
+        engine.remove_migration(edge_key)
+
+    @hybridmethod
+    @singledispatchmethod
+    @classmethod
+    def get_migration(
+        cls: type[Manager[VersionValue]],
+        key: MigrationKeyInput,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Migratable[VersionValue]:
+        raise TypeError(f"Unsupported migration key: {key!r}")
+
+    @get_migration.register(ModelPair)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        key: ModelPair,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Migratable[VersionValue]:
+        engine = engine or cls._default_engine
+        adapter = engine.adapter
+        pair = (adapter.versionable(key.source), adapter.versionable(key.target))
+        return engine.get_migration(EdgeKey.from_pair(*pair))
+
+    @get_migration.register(ManagerMigrationKey)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        key: ManagerMigrationKey,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> Migratable[VersionValue]:
+        engine = engine or cls._default_engine
+        adapter = engine.adapter
+        pair = (
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
+        )
+        return engine.get_migration(EdgeKey.from_pair(*pair))
+
+    @hybridmethod
+    @singledispatchmethod
+    @classmethod
+    def add_hook(
+        cls: type[Manager[VersionValue]],
+        key: MigrationKeyInput,
+        hook: Attachable,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None:
+        raise TypeError(f"Unsupported migration key: {key!r}")
+
+    @add_hook.register(ModelPair)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        key: ModelPair,
+        hook: Attachable,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None:
+        engine = engine or cls._default_engine
+        adapter = engine.adapter
+        pair = (adapter.versionable(key.source), adapter.versionable(key.target))
+        edge_key = EdgeKey.from_pair(*pair)
+        binding = cls._default_runtime.bindings.add_hook(edge_key.id, hook)
+        engine.add_hook(edge_key, binding.ref)
+
+    @add_hook.register(ManagerMigrationKey)
+    @classmethod
+    def _(
+        cls: type[Manager[VersionValue]],
+        key: ManagerMigrationKey,
+        hook: Attachable,
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None:
+        engine = engine or cls._default_engine
+        adapter = engine.adapter
+        pair = (
+            adapter.version_key(kind=key.kind, version=key.source_version),
+            adapter.version_key(kind=key.kind, version=key.target_version),
+        )
+        edge_key = EdgeKey.from_pair(*pair)
+        binding = cls._default_runtime.bindings.add_hook(edge_key.id, hook)
+        engine.add_hook(edge_key, binding.ref)
+
+    @hybridmethod
+    @classmethod
+    def attach_hooks(
+        cls: type[Manager[VersionValue]],
+        hooks: Iterable[Attachable],
+        *,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None:
+        engine = engine or cls._default_engine
+        for hook in hooks:
+            for kind in engine.registry.kinds:
+                for edge in engine.registry.migrations(kind):
+                    edge_key = EdgeKey.from_version_edge(edge)
+                    binding = cls._default_runtime.bindings.add_hook(edge_key.id, hook)
+                    engine.add_hook(edge_key, binding.ref)

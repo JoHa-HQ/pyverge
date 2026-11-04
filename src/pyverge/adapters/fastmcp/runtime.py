@@ -9,10 +9,10 @@ from typing import Any
 from fastmcp.server.dependencies import get_context, resolve_dependencies
 
 from pyverge.adapters.runtime import ConvergenceRuntime
-from pyverge.core import MigrationContext
 from pyverge.core.types import ModelData
-from pyverge.manager import Manager
-from pyverge.manager.types import TargetPolicy
+from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.manager import Manager
+from pyverge.runtime.manager.types import TargetPolicy
 
 
 class Converger:

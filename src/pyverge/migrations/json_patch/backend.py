@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from .migration import JsonPatchMigration
 
 if TYPE_CHECKING:
-    from pyverge.versioning import Diffable
+    from pyverge.core.versioning import Diffable
 
 
 class JsonPatchMigrationBackend:

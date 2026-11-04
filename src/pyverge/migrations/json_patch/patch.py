@@ -4,11 +4,10 @@ from typing import Any
 
 import jsonpatch
 
-from pyverge.core.context import MigrationContext
 from pyverge.core.types import (
     ModelData,
 )
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     MigrationDescriptor,
     default_canonicalizer,
 )
@@ -166,6 +165,6 @@ class JsonPatch(jsonpatch.JsonPatch):
     def __call__(
         self,
         data: ModelData,
-        context: MigrationContext | None = None,
+        context: Any = None,
     ) -> ModelData:
         return self.apply(data)

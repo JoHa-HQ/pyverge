@@ -19,15 +19,15 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Tracer
-
-from pyverge import Manager
-from pyverge.adapters.celery import CeleryLifecycle, CeleryRuntime, task
 from pyverge.execution import (
     OTELHook,
     OtelMiddleware,
     ProcessBackend,
     Runner,
 )
+
+from pyverge import Manager
+from pyverge.adapters.celery import CeleryLifecycle, CeleryRuntime, task
 
 from .domain import build_manager
 

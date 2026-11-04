@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pyverge.execution.middleware import AuditEvent
+from pyverge.runtime.middleware import AuditEvent
 
 
 class ScriptedBackend:

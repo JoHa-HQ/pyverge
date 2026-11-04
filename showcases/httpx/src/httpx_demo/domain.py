@@ -10,9 +10,9 @@ from typing import Any, Literal
 
 import semver
 from pydantic import BaseModel
+from pyverge.core.context import MigrationContext
 
 from pyverge import Manager
-from pyverge.core.context import MigrationContext
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.types import ManagerMigrationKey
 

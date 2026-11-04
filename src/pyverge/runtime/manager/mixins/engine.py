@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Generic
+
+from pyverge.core.types import (
+    VersionValue,
+)
+
+if TYPE_CHECKING:
+    from pyverge.core.engine import Engine
+    from pyverge.runtime.manager.types import (
+        ManagerClassState,
+    )
+
+
+class EngineLifecycleMixin(Generic[VersionValue]):
+    """Construction lifecycle binding each manager to its active engine.
+
+    ``__new__`` resolves the engine — an explicit override, else the class-level
+    default established by :meth:`configure`.  ``__init__`` then re-applies an
+    explicit override.  Kept apart from target resolution and registration so the
+    engine contract can evolve independently of the registration surface.
+    """
+
+    if TYPE_CHECKING:
+        engine: Engine[VersionValue]
+
+    def __new__(
+        cls: type[ManagerClassState[VersionValue]],
+        engine: Engine[VersionValue] | None = None,
+    ):
+        instance = super().__new__(cls)
+        instance.engine = (engine or cls._default_engine).copy()
+        return instance
+
+    def __init__(
+        self,
+        engine: Engine[VersionValue] | None = None,
+    ) -> None:
+        if engine is not None:
+            self.engine = engine

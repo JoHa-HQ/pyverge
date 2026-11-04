@@ -7,8 +7,7 @@ from typing import Any
 
 import pytest
 
-from pyverge.execution.migrations import MigrationBindings
-from pyverge.graph import AnyDirection, PathFinder, PolicyEngine, TargetCompiler
+from pyverge.core.graph import AnyDirection, PathFinder, PolicyEngine, TargetCompiler
 from tests.utils import envelope_model
 
 
@@ -32,7 +31,6 @@ def path_finder(request, engine, graph, model_adapter) -> PathFinder:
     return PathFinder(
         graph=snapshot,
         targets=TargetCompiler(snapshot, model_adapter),
-        migrations=MigrationBindings.from_catalog(engine.registry),
         policy=PolicyEngine(
             direction=options.get("direction", AnyDirection()),
             on_direction_violation=options.get("on_direction_violation", "raise"),

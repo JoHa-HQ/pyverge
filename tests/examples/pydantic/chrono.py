@@ -19,7 +19,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pyverge.core.context import MigrationContext
+from pyverge.runtime.context import MigrationContext
 from tests.examples.pydantic.base import BaseModel, Field, UserBaseModel
 
 

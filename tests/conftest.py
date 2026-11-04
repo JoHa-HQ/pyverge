@@ -10,28 +10,8 @@ from typing import Any, cast
 import pytest
 
 from pyverge import Manager
-from pyverge.core.clock import SystemClock
-from pyverge.core.ids import UuidIdFactory
-from pyverge.core.types import (
-    VersionValue,
-)
-from pyverge.discovery.reflection import (
-    CompositeDiffDiscovery,
-    Reflection,
-    Reflector,
-)
-from pyverge.engine import Engine
-from pyverge.execution import (
-    ExecutionCoordinator,
-    ExecutionPlanner,
-    PayloadWalker,
-    Runner,
-)
-from pyverge.execution.backends import ThreadedBackend
-from pyverge.execution.context import ExecutionEnvironment
-from pyverge.execution.migrations import MigrationBindings
-from pyverge.execution.types import BackendPort
-from pyverge.graph import (
+from pyverge.core.engine import Engine
+from pyverge.core.graph import (
     AnyDirection,
     GraphBuilder,
     PathFinder,
@@ -39,13 +19,35 @@ from pyverge.graph import (
     TargetCompiler,
     direction_policy,
 )
-from pyverge.migrations.backend import MigrationMaterializer
-from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
-from pyverge.registry import (
+from pyverge.core.ids import UuidIdFactory
+from pyverge.core.registry import (
     DEFAULT_HEALTH_LINTERS,
     CompatibilityLinter,
     Registry,
 )
+from pyverge.core.types import (
+    VersionValue,
+)
+from pyverge.core.versioning import default_content_hasher
+from pyverge.discovery.reflection import (
+    CompositeDiffDiscovery,
+    Reflection,
+    Reflector,
+)
+from pyverge.migrations.backend import MigrationMaterializer
+from pyverge.migrations.json_patch.backend import JsonPatchMigrationBackend
+from pyverge.runtime import (
+    ExecutionCoordinator,
+    ExecutionPlanner,
+    PayloadWalker,
+    Runner,
+)
+from pyverge.runtime.backends import ThreadedBackend
+from pyverge.runtime.clock import SystemClock
+from pyverge.runtime.context import ExecutionEnvironment
+from pyverge.runtime.factory import RunnerFactory
+from pyverge.runtime.migrations import MigrationBindings
+from pyverge.runtime.types import BackendPort
 from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.codec import ModelCodec
 from pyverge.schemas.types import (
@@ -60,7 +62,6 @@ from pyverge.settings import (
     without_identity,
 )
 from pyverge.types import VersionEdge
-from pyverge.versioning import default_content_hasher
 from tests.utils import edge_from_nodes, envelope_model, register_models
 from tests.utils.engine import register_migrations
 
@@ -193,10 +194,12 @@ def registry(
         ),
         on_missing=migration_settings.on_missing,
     )
+    bindings = MigrationBindings[VersionValue](name=namespace)
     if models:
         register_models(model_adapter, registry, migration_settings, *models)
     if migrations:
-        register_migrations(model_adapter, registry, *migrations)
+        register_migrations(model_adapter, registry, *migrations, bindings=bindings)
+    setattr(registry, "bindings", bindings)
     return registry
 
 
@@ -250,7 +253,6 @@ def coordinator(
         finder=PathFinder(
             graph=graph,
             targets=TargetCompiler(graph, model_adapter),
-            migrations=MigrationBindings.from_catalog(registry),
             policy=PolicyEngine(
                 direction=AnyDirection(),
                 on_direction_violation=on_direction_violation,
@@ -259,19 +261,30 @@ def coordinator(
                 on_depth_violation=on_depth_violation,
             ),
         ),
-        planner=ExecutionPlanner(),
+        planner=ExecutionPlanner(
+            bindings=getattr(
+                registry, "bindings", MigrationBindings(name=registry.namespace)
+            )
+        ),
     )
 
 
 @pytest.fixture
 def runner_factory(
     engine: Engine[VersionValue],
+    registry: Registry[VersionValue],
     runtime_backend: BackendPort,
     runtime_environment: ExecutionEnvironment,
     migration_settings: MigrationSettings,
 ) -> Callable[[], Runner[VersionValue]]:
     def build() -> Runner[VersionValue]:
-        return engine.runner(
+        bindings = getattr(
+            registry, "bindings", MigrationBindings(name=registry.namespace)
+        )
+        return RunnerFactory().create(
+            engine.snapshot(),
+            bindings,
+            engine.adapter,
             backend=runtime_backend,
             environment=runtime_environment,
             direction=direction_policy(migration_settings.direction),

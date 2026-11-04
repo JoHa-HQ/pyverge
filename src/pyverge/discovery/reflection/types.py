@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol, TypeVar, runtime_checkable
 
 from pyverge.core.types import MigrationFunc, VersionValue
-from pyverge.versioning import Comparable, Diff, Versionable
+from pyverge.core.versioning import Comparable, Diff, Versionable
 
 if TYPE_CHECKING:
     from pyverge.migrations.json_patch import JsonPatch

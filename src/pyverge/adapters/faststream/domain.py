@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pyverge.core.types import ModelHandle
-from pyverge.manager.types import TargetPolicy
+from pyverge.runtime.manager.types import TargetPolicy
 
 
 class NegotiationError(ValueError):

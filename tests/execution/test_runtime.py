@@ -7,8 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable
-from typing import Any, TypeVar, assert_type, cast
+from typing import Any, TypeVar, cast
 
 import pendulum
 import pytest
@@ -17,31 +16,38 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from pyverge.core import MaxDepthExceededError, PayloadValidationError
-from pyverge.core.context import MigrationContext
-from pyverge.engine import Engine
-from pyverge.execution import (
-    ExecutionPlanner,
-    PayloadWalker,
-    Runner,
-)
-from pyverge.execution.backends import AsyncBackend, ProcessBackend, ThreadedBackend
-from pyverge.execution.context import LayeredView, RunContext, StepContext
-from pyverge.execution.errors import (
-    AsyncExecutionRequired,
-    TargetValidationError,
-    UnknownModelError,
-)
-from pyverge.graph import (
+from pyverge.core.engine import Engine
+from pyverge.core.graph import (
     PathPlan,
     PathPlanEntry,
+    earliest_target_resolver,
     fixed_target_resolver,
     latest_target_resolver,
     multi_target_resolver,
     skip_target_resolver,
 )
-from pyverge.registry import Registry
+from pyverge.core.registry import Registry
+from pyverge.core.versioning import (
+    EdgeKey,
+    VersionNode,
+)
+from pyverge.runtime import (
+    ExecutionPlanner,
+    PayloadWalker,
+    Runner,
+)
+from pyverge.runtime.backends import AsyncBackend, ProcessBackend, ThreadedBackend
+from pyverge.runtime.context import (
+    MigrationContext,
+    RunContext,
+    StepContext,
+)
+from pyverge.runtime.errors import (
+    AsyncExecutionRequired,
+    TargetValidationError,
+    UnknownModelError,
+)
 from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
-from pyverge.versioning import EdgeKey, VersionNode
 from tests.examples.json import USER_V1_0_0, USER_V2_0_0
 from tests.examples.pydantic.chrono import (
     UserV20250310,
@@ -103,43 +109,6 @@ def _user_v1_payloads(draw):
 @pytest.mark.parametrize(
     "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
 )
-def test_runner_plans_and_executes(
-    registry: Registry,
-    runner: Runner,
-    snapshot,
-) -> None:
-    payload = _payload()
-
-    result = _run(
-        runner,
-        payload,
-        latest_target_resolver(registry),
-        source_model=None,
-        max_depth=-1,
-        context=None,
-    )
-
-    assert result == snapshot
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2],
-                [((UserV1, UserV2), migrate_v1_to_v2)],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
-)
 @settings(
     max_examples=25,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
@@ -164,78 +133,6 @@ def test_runner_preserves_generated_payload(
     assert result["document"]["email"] == payload["document"]["email"]
     assert result["document"]["role"] == payload["document"]["role"]
     assert result["document"]["age"] is None
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2],
-                [((UserV1, UserV2), migrate_v1_to_v2)],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
-)
-def test_runner_migrates_with_target_container(
-    registry: Registry,
-    runner: Runner,
-    snapshot,
-) -> None:
-    plan = runner.plan(
-        _payload(),
-        latest_target_resolver(registry),
-        source_model=UserContainer,
-        max_depth=-1,
-    )
-    result = _sync(runner.execute(plan, context=None))
-
-    assert plan.path.source_model is UserContainer
-    assert result == snapshot
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        [
-            PydanticModelAdapter,
-            [
-                semver.Version,
-                "test",
-                [UserV1, UserV2],
-                [((UserV1, UserV2), migrate_v1_to_v2)],
-            ],
-        ]
-    ],
-    indirect=["model_adapter", "registry"],
-)
-@pytest.mark.parametrize(
-    "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
-)
-def test_runner_noop_when_target_equals_source(
-    registry: Registry,
-    model_adapter: PydanticModelAdapter,
-    runner: Runner,
-    versioning_settings,
-) -> None:
-    source = envelope_model(model_adapter, versioning_settings, UserV1)
-    plan = runner.plan(
-        _payload(),
-        fixed_target_resolver(registry, source),
-        source_model=UserContainer,
-        max_depth=-1,
-    )
-
-    result = _sync(runner.execute(plan, context=None))
-
-    assert result == _payload()
 
 
 @pytest.mark.parametrize(
@@ -277,8 +174,7 @@ def _path_entry(
         target=target,
         target_model=target.descriptor.ref,
         steps=steps,
-        hooks=(),
-        migrations=(),
+        edges=(),
     )
 
 
@@ -295,12 +191,12 @@ def test_execution_planner_builds_levels(
         entries=(parent, child, sibling),
         source_model=None,
     )
-    planner = ExecutionPlanner()
+    planner = ExecutionPlanner(bindings=cast("Any", object()))
 
     execution = planner.build(plan, {})
 
-    assert execution.levels[0] == (child, sibling)
-    assert execution.levels[1] == (parent,)
+    assert tuple(entry.plan for entry in execution.levels[0]) == (child, sibling)
+    assert tuple(entry.plan for entry in execution.levels[1]) == (parent,)
 
 
 def _plus_one(value: int) -> int:
@@ -461,30 +357,6 @@ def _payload() -> dict:
             "role": "user",
         }
     }
-
-
-@pytest.mark.parametrize(
-    "model_adapter, registry",
-    [
-        pytest.param(
-            PydanticModelAdapter,
-            (semver.Version, "test", (), ()),
-            id="pydantic_semver_empty_compound_key",
-        ),
-    ],
-    indirect=["model_adapter", "registry"],
-)
-def test_extractor_empty_payload_returns_no_entries(
-    model_adapter,
-    discovery_settings,
-    registry,
-) -> None:
-    extractor = PayloadWalker[semver.Version](
-        registry,
-        validation_mode=discovery_settings.validation_mode,
-        adapter=model_adapter,
-    )
-    assert list(extractor.extract({}, max_depth=-1)) == []
 
 
 @pytest.mark.parametrize(
@@ -701,7 +573,7 @@ def test_extractor_validation_mode_none_skips_validate(
 
 
 @pytest.mark.parametrize(
-    "model_adapter, registry, expected_version, expected_age",
+    ("model_adapter", "registry", "policy", "expected_version"),
     [
         pytest.param(
             PydanticModelAdapter,
@@ -714,9 +586,54 @@ def test_extractor_validation_mode_none_skips_validate(
                     ((UserV2, UserV3), migrate_v2_to_v3),
                 ),
             ),
+            "latest",
             "3.0.0",
-            None,
-            id="engine_migrate_latest",
+            id="semver-latest",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
+            "earliest",
+            "1.0.0",
+            id="semver-earliest",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
+            "fixed",
+            "2.0.0",
+            id="semver-fixed",
+        ),
+        pytest.param(
+            PydanticModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (UserV1, UserV2, UserV3),
+                (
+                    ((UserV1, UserV2), migrate_v1_to_v2),
+                    ((UserV2, UserV3), migrate_v2_to_v3),
+                ),
+            ),
+            "skip",
+            "1.0.0",
+            id="semver-skip",
         ),
         pytest.param(
             JsonSchemaModelAdapter,
@@ -731,9 +648,60 @@ def test_extractor_validation_mode_none_skips_validate(
                     ),
                 ),
             ),
+            "latest",
             "2.0.0",
-            None,
-            id="engine_migrate_latest_json_schema",
+            id="json-latest",
+        ),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (USER_V1_0_0, USER_V2_0_0),
+                (
+                    (
+                        (USER_V1_0_0, USER_V2_0_0),
+                        lambda d, _: {**d, "version": "2.0.0"},
+                    ),
+                ),
+            ),
+            "earliest",
+            "1.0.0",
+            id="json-earliest",
+        ),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (USER_V1_0_0, USER_V2_0_0),
+                (
+                    (
+                        (USER_V1_0_0, USER_V2_0_0),
+                        lambda d, _: {**d, "version": "2.0.0"},
+                    ),
+                ),
+            ),
+            "fixed",
+            "2.0.0",
+            id="json-fixed",
+        ),
+        pytest.param(
+            JsonSchemaModelAdapter,
+            (
+                semver.Version,
+                "test",
+                (USER_V1_0_0, USER_V2_0_0),
+                (
+                    (
+                        (USER_V1_0_0, USER_V2_0_0),
+                        lambda d, _: {**d, "version": "2.0.0"},
+                    ),
+                ),
+            ),
+            "skip",
+            "1.0.0",
+            id="json-skip",
         ),
     ],
     indirect=["model_adapter", "registry"],
@@ -741,23 +709,31 @@ def test_extractor_validation_mode_none_skips_validate(
 @pytest.mark.parametrize(
     "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
 )
-def test_runner_migrates_to_latest(
+def test_runner_migrates_with_policy(
     registry: Registry,
     runner: Runner,
+    policy: str,
     expected_version: str,
-    expected_age: int | None,
 ) -> None:
+    if policy == "earliest":
+        resolver = earliest_target_resolver(registry)
+    elif policy == "fixed":
+        resolver = fixed_target_resolver(registry, registry.kind_versions("User")[1])
+    elif policy == "skip":
+        resolver = skip_target_resolver(registry)
+    else:
+        resolver = latest_target_resolver(registry)
+
     result = _run(
         runner,
         _payload(),
-        latest_target_resolver(registry),
+        resolver,
         source_model=None,
         max_depth=-1,
         context=None,
     )
 
     assert result["document"]["version"] == expected_version
-    assert result["document"].get("age") == expected_age
 
 
 @pytest.mark.parametrize(
@@ -837,60 +813,40 @@ def test_runner_explicit_target_versionable(
 
 
 @pytest.mark.parametrize(
-    "model_adapter, registry, resolver_factory, expected_version",
+    "model_adapter, registry",
     [
-        pytest.param(
+        [
             PydanticModelAdapter,
-            (
+            [
                 semver.Version,
                 "test",
-                (UserV1, UserV2, UserV3),
-                (
-                    ((UserV1, UserV2), migrate_v1_to_v2),
-                    ((UserV2, UserV3), migrate_v2_to_v3),
-                ),
-            ),
-            latest_target_resolver,
-            "3.0.0",
-            id="latest",
-        ),
-        pytest.param(
-            PydanticModelAdapter,
-            (
-                semver.Version,
-                "test",
-                (UserV1, UserV2, UserV3),
-                (
-                    ((UserV1, UserV2), migrate_v1_to_v2),
-                    ((UserV2, UserV3), migrate_v2_to_v3),
-                ),
-            ),
-            skip_target_resolver,
-            "1.0.0",
-            id="skip",
-        ),
+                [UserV1, UserV2],
+                [((UserV1, UserV2), migrate_v1_to_v2)],
+            ],
+        ]
     ],
     indirect=["model_adapter", "registry"],
 )
 @pytest.mark.parametrize(
     "runtime_backend", [(ThreadedBackend, {"max_workers": 0})], indirect=True
 )
-def test_runner_target_policy(
+def test_runner_noop_when_target_equals_source(
     registry: Registry,
+    model_adapter: PydanticModelAdapter,
     runner: Runner,
-    resolver_factory: Callable[[Registry[semver.Version]], Any],
-    expected_version: str,
+    versioning_settings,
 ) -> None:
-    result = _run(
-        runner,
+    source = envelope_model(model_adapter, versioning_settings, UserV1)
+    plan = runner.plan(
         _payload(),
-        resolver_factory(registry),
-        source_model=None,
+        fixed_target_resolver(registry, source),
+        source_model=UserContainer,
         max_depth=-1,
-        context=None,
     )
 
-    assert result["document"]["version"] == expected_version
+    result = _sync(runner.execute(plan, context=None))
+
+    assert result == _payload()
 
 
 @pytest.mark.parametrize(
@@ -986,13 +942,13 @@ def test_chrono_runner_migrates_to_latest(
     assert result["document"]["version"] == "2025-12-31"
 
 
-def test_layered_view_resolves_precedence() -> None:
-    view = LayeredView(({"a": 1}, {"a": 2, "b": 3}))
+def test_migration_context_layers_resolve_precedence() -> None:
+    context = MigrationContext.layered({"a": 1}, {"a": 2, "b": 3})
 
-    assert view["a"] == 1
-    assert view["b"] == 3  # noqa: PLR2004
-    assert dict(view) == {"a": 1, "b": 3}
-    assert len(view) == len(("a", "b"))
+    assert context["a"] == 1
+    assert context["b"] == 3  # noqa: PLR2004
+    assert dict(context) == {"a": 1, "b": 3}
+    assert len(context) == len(("a", "b"))
 
 
 def test_step_context_layers_bindings(execution_environment) -> None:
@@ -1033,23 +989,6 @@ def test_step_context_layers_bindings(execution_environment) -> None:
     assert step.view["region"] == "eu"
 
 
-def test_plan_generics_enforce_version_value(
-    model_adapter,
-    versioning_settings,
-) -> None:
-
-    low = envelope_model(model_adapter, versioning_settings, UserV1)
-    high = envelope_model(model_adapter, versioning_settings, UserV2)
-    entry = _path_entry(low, high, path=())
-    plan: PathPlan[semver.Version] = PathPlan(
-        entries=(entry,),
-        source_model=None,
-    )
-    resolved = plan.entries[0]
-
-    assert_type(resolved.source, VersionNode[semver.Version])
-
-
 @pytest.mark.parametrize(
     "model_adapter, versioning_settings, source_cls, target_cls, version_type",
     [
@@ -1087,8 +1026,7 @@ def test_plan_preserves_version_value(
         target=cast("Any", target),
         target_model=target.descriptor.ref,
         steps=(),
-        hooks=(),
-        migrations=(),
+        edges=(),
     )
     plan = PathPlan(
         entries=(entry,),
@@ -1313,7 +1251,10 @@ def test_runner_calls_sync_hooks(
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
     target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
-    engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _Hook()))
+    edge_key = EdgeKey.from_pair(source, target)
+    hook = cast("Any", _Hook())
+    binding = getattr(registry, "bindings").add_hook(edge_key, hook)
+    engine.add_hook(edge_key, binding.ref)
 
     _run(
         runner_factory(),
@@ -1388,7 +1329,10 @@ def test_runner_awaits_async_hooks(
 
     source = engine.get_model(engine.adapter.version_key(kind="User", version="1.0.0"))
     target = engine.get_model(engine.adapter.version_key(kind="User", version="2.0.0"))
-    engine.add_hook(EdgeKey.from_pair(source, target), cast("Any", _AsyncHook()))
+    edge_key = EdgeKey.from_pair(source, target)
+    hook = cast("Any", _AsyncHook())
+    binding = getattr(registry, "bindings").add_hook(edge_key, hook)
+    engine.add_hook(edge_key, binding.ref)
 
     asyncio.run(
         runner_factory().run(

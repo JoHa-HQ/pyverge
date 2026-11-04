@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
-from pyverge.manager import Manager
+from pyverge.runtime.manager import Manager
 
 from .domain import (
     Entrance,
@@ -21,7 +21,7 @@ from .runtime import Converger
 if TYPE_CHECKING:
     from fastmcp import FastMCP
 
-    from pyverge.manager.types import TargetPolicy
+    from pyverge.runtime.manager.types import TargetPolicy
 
 
 class ComponentBuilder:

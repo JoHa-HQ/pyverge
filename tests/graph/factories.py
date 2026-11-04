@@ -9,27 +9,29 @@ from typing import Any
 
 from hypothesis import strategies as st
 
+from pyverge.core.graph import (
+    DirectionPolicy,
+    GraphBuilder,
+    MigrationGraph,
+    PathPlanEntry,
+)
+from pyverge.core.registry import Registry
 from pyverge.core.types import (
     DepthViolationStrategy,
     DirectionViolationStrategy,
     VersionMissingStrategy,
     VersionValue,
 )
-from pyverge.graph import (
-    DirectionPolicy,
-    GraphBuilder,
-    MigrationGraph,
-    PathPlanEntry,
-)
-from pyverge.registry import Registry
-from pyverge.schemas.types import ModelAdapter
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     MigrationDescriptor,
+    MigrationRef,
+    NodeRef,
     VersionEdge,
     VersionKey,
     VersionNode,
     default_content_hasher,
 )
+from pyverge.schemas.types import ModelAdapter
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,8 +79,7 @@ def make_path_entry(
         target=target,
         target_model=target.descriptor.ref,
         steps=steps,
-        hooks=(),
-        migrations=(),
+        edges=(),
     )
 
 
@@ -117,6 +118,7 @@ class SyntheticGraphFactory:
                 namespace=node.namespace,
                 kind=node.kind,
                 version=node.version,
+                ref=NodeRef(),
             )
             for node in nodes
         )
@@ -147,15 +149,18 @@ class SyntheticGraphFactory:
         source: VersionNode[VersionValue],
         target: VersionNode[VersionValue],
     ) -> VersionEdge:
+        migration = MigrationDescriptor(
+            strategy="synthetic",
+            identity=f"{source}->{target}",
+        )
         return VersionEdge(
             source=source,
             target=target,
-            diff=self._adapter.diff(source, target),
-            func=_noop,
-            migration=MigrationDescriptor(
-                strategy="synthetic",
-                identity=f"{source}->{target}",
+            ref=MigrationRef(
+                provider_id=migration.strategy, entity_id=migration.identity
             ),
+            diff=self._adapter.diff(source, target),
+            migration=migration,
         )
 
 

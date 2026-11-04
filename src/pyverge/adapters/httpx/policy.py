@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pyverge.manager.types import TargetPolicy
+from pyverge.runtime.manager.types import TargetPolicy
 
 
 @dataclass(frozen=True, slots=True)

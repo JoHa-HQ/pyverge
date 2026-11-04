@@ -12,7 +12,7 @@ import semver
 from celery.signals import worker_process_init, worker_process_shutdown
 
 from pyverge.adapters.celery import CeleryLifecycle, CeleryRuntime
-from pyverge.core import MigrationContext
+from pyverge.runtime.context import MigrationContext
 from pyverge.schemas import PydanticModelAdapter
 from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
 from tests.examples.pydantic.semver_nested import PersonV1

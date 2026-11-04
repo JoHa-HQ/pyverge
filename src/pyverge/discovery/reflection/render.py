@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Generic
 
 from pyverge.core.types import VersionValue
-from pyverge.versioning import Diffable
+from pyverge.core.versioning import Diffable
 
 
 @dataclass(frozen=True, slots=True)

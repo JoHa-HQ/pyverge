@@ -7,9 +7,8 @@ from typing import Any, Self
 
 from jsonata import Jsonata
 
-from pyverge.core.context import EMPTY_CONTEXT, MigrationContext
 from pyverge.core.types import ModelData
-from pyverge.versioning import MigrationDescriptor
+from pyverge.core.versioning import MigrationDescriptor
 
 
 class JsonataTransform:
@@ -28,9 +27,9 @@ class JsonataTransform:
     def __call__(
         self,
         data: ModelData,
-        context: MigrationContext | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> ModelData:
-        active = context if context is not None else EMPTY_CONTEXT
+        active = context if context is not None else {}
         bindings = dict(active)
         with self._lock:
             result = self._compiled.evaluate(data, bindings=bindings or None)
@@ -104,6 +103,6 @@ class JsonataMigration:
     def __call__(
         self,
         data: ModelData,
-        context: MigrationContext | None = None,
+        context: Mapping[str, Any] | None = None,
     ) -> ModelData:
         return self._migration(data, context)

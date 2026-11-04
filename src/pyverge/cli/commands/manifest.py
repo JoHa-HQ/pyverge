@@ -7,15 +7,15 @@ from typing import Annotated, cast
 import typer
 
 from pyverge import __version__
-from pyverge.export import (
+from pyverge.cli.export import (
     ManifestDiff,
     ManifestExporter,
     ManifestSpec,
     ManifestVersion,
 )
-from pyverge.jgf import JgfExporter
-from pyverge.registry.types import GraphCatalog
-from pyverge.versioning import default_content_hasher
+from pyverge.cli.jgf import JgfExporter
+from pyverge.core.registry.types import GraphCatalog
+from pyverge.core.versioning import default_content_hasher
 
 from .._helpers import write_json_file
 from ..config import ConfigError, resolve_manager

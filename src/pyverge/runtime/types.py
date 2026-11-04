@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+from collections.abc import Awaitable, Iterator
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, runtime_checkable
+
+from pyverge.core.types import TargetResolver, VersionValue
+from pyverge.runtime.context import MigrationContext, RunContext
+from pyverge.runtime.plan import ExecutionPlan
+from pyverge.schemas.types import ModelIdentityPort
+
+if TYPE_CHECKING:
+    from pyverge.core.graph.types import GraphView
+    from pyverge.core.versioning import VersionNode
+
+T = TypeVar("T")
+
+#: A discovered versioned entry: ``(path, depth, source)``.
+Entry = tuple[tuple[str | int, ...], int, "VersionNode[VersionValue]"]
+
+
+class EntryExtractor(Protocol[VersionValue]):
+    """Protocol for schema-aware payload discovery."""
+
+    @property
+    def graph(self) -> GraphView[VersionValue]: ...
+
+    def extract(
+        self,
+        data: dict[str, Any],
+        *,
+        source_model: type[Any] | None = None,
+        max_depth: int = -1,
+    ) -> Iterator[Entry]: ...
+
+
+class BackendPort(Protocol[VersionValue]):
+    """Execution backend seam: plan + payload + run context."""
+
+    def execute(
+        self,
+        plan: ExecutionPlan[VersionValue],
+        payload: dict[str, Any],
+        run: RunContext,
+        adapter: ModelIdentityPort,
+    ) -> dict[str, Any] | Awaitable[dict[str, Any]]: ...
+
+
+@runtime_checkable
+class RuntimePort(Protocol[VersionValue]):
+    """Runtime facade consumed by manager/adapters."""
+
+    def plan(
+        self,
+        payload: dict[str, Any],
+        target_resolver: TargetResolver,
+        *,
+        container: type[Any] | None,
+        max_depth: int,
+    ) -> ExecutionPlan[VersionValue]: ...
+
+    def run(
+        self,
+        payload: dict[str, Any],
+        target_resolver: TargetResolver,
+        *,
+        container: type[Any] | None,
+        max_depth: int,
+        context: MigrationContext | None,
+    ) -> Any: ...
+
+    def execute(
+        self,
+        plan: ExecutionPlan,
+        *,
+        context: MigrationContext | None,
+    ) -> Any: ...
+
+
+__all__ = [
+    "BackendPort",
+    "Entry",
+    "EntryExtractor",
+    "RuntimePort",
+]

@@ -5,7 +5,7 @@ from collections.abc import Callable, Mapping
 from functools import reduce
 from typing import Any, TypeVar
 
-from pyverge.manager.types import TargetPolicy
+from pyverge.runtime.manager.types import TargetPolicy
 
 from .domain import TargetContext, TopicTargets
 from .handlers import HandlerView, SignatureBinder

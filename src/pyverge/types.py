@@ -34,18 +34,7 @@ from pyverge.core.types import (
     VersionValue,
     VersionValue_co,
 )
-from pyverge.execution.types import Entry, EntryExtractor
-from pyverge.manager.types import (
-    ManagerClassState,
-    ManagerInstanceState,
-    ResolverFactory,
-    TargetPolicy,
-    TargetSpec,
-)
-from pyverge.schemas.types import (
-    ModelAdapter,
-)
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     NO_DEFAULT,
     Comparable,
     DefaultValue,
@@ -75,6 +64,17 @@ from pyverge.versioning import (
     VersionKey,
     VersionNode,
     VersionPair,
+)
+from pyverge.runtime.manager.types import (
+    ManagerClassState,
+    ManagerInstanceState,
+    ResolverFactory,
+    TargetPolicy,
+    TargetSpec,
+)
+from pyverge.runtime.types import Entry, EntryExtractor
+from pyverge.schemas.types import (
+    ModelAdapter,
 )
 
 __all__ = [

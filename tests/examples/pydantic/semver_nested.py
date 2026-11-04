@@ -3,7 +3,7 @@
 
 from typing import Annotated, Literal
 
-from pyverge.core.context import MigrationContext
+from pyverge.runtime.context import MigrationContext
 from tests.examples.pydantic.base import (
     AddressBaseModel,
     BaseModel,

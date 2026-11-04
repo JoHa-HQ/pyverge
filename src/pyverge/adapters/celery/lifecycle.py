@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 from celery.signals import worker_process_init, worker_process_shutdown
 
 if TYPE_CHECKING:
-    from pyverge.execution import Runner
+    from pyverge.runtime import Runner
 
 from .runtime import CeleryRuntime
 

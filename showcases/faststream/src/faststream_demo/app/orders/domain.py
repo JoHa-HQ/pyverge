@@ -4,9 +4,9 @@ from typing import Literal, TypedDict, cast
 
 import semver
 from pydantic import BaseModel, Field
+from pyverge.core.context import MigrationContext
 
 from pyverge import Manager
-from pyverge.core.context import MigrationContext
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.settings import MigrationSettings, manager_kwargs
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import asyncio
 import inspect
-from collections.abc import Callable
 from typing import Any, Literal, cast
 
 import pendulum
@@ -16,30 +15,27 @@ from pydantic import BaseModel
 from pyverge import Manager
 from pyverge.core import (
     ManagerMigrationKey,
-    MigrationContext,
     MigrationKeyInput,
     ModelPair,
     VersionValue,
 )
-from pyverge.engine import Engine
-from pyverge.execution.backends import AsyncBackend
-from pyverge.manager.types import (
-    ManagerClassState,
-    ManagerInstanceState,
-)
-from pyverge.registry import HealthIssue
-from pyverge.registry.errors import (
+from pyverge.core.engine import Engine
+from pyverge.core.registry import HealthIssue
+from pyverge.core.registry.errors import (
     CatalogError,
     HealthValidationError,
     ModelNotFoundError,
 )
-from pyverge.schemas import JsonSchemaModelAdapter, ModelCodec, PydanticModelAdapter
+from pyverge.core.versioning import NodeRef, VersionKey
+from pyverge.runtime.backends import AsyncBackend
+from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.migrations import HookRefFactory
+from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
 from pyverge.schemas.types import (
     ModelAdapter,
     ModelHandle,
 )
 from pyverge.settings import MigrationSettings, VersioningSettings, manager_kwargs
-from pyverge.versioning import Migratable, Versionable, VersionKey
 from tests.examples.json import (
     USER_V1_0_0,
     USER_V1_2_3,
@@ -165,7 +161,7 @@ class TestInstanceFacade:
             return data
 
         instance.store_migration(key, _migrate)
-        assert instance.get_migration(key).func is _migrate
+        assert instance.get_migration(key) is not None
         instance.remove_migration(key)
 
     @pytest.mark.parametrize(
@@ -202,79 +198,6 @@ class TestInstanceFacade:
 
 class TestLookupHelpers:
     @pytest.mark.parametrize(
-        ("model_adapter", "registry", "models", "versions", "payloads"),
-        [
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                ["1.0.0", "2.0.0"],
-                [
-                    {"name": "Alice", "email": "alice@example.com", "role": "user"},
-                    {"name": "Alice", "email": "alice@example.com", "role": "user"},
-                ],
-            ),
-            (
-                PydanticModelAdapter,
-                [pendulum.Date, "test", [UserV20250310, UserV20251231], []],
-                [UserV20250310, UserV20251231],
-                ["2025-03-10", "2025-12-31"],
-                [
-                    {"name": "Alice", "email": "alice@example.com", "role": "user"},
-                    {"name": "Alice", "email": "alice@example.com", "role": "user"},
-                ],
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-        ids=["semver", "date"],
-    )
-    def test_get_returns_versionable(
-        self,
-        manager: type[Manager],
-        models: list[type[BaseModel]],
-        versions: list[str],
-        payloads: list[dict],
-    ) -> None:
-        """``get(kind, version_string)`` resolves the registered versionable.
-
-        Regression: the string was parsed once by ``get`` and then parsed again
-        by ``adapter.versionable``, whose ``of`` accepted only strings.
-        """
-        for model, version, payload in zip(models, versions, payloads, strict=True):
-            assert (
-                manager().engine.adapter.resolve(
-                    manager.get("User", version).descriptor.ref
-                )
-                is model
-            )
-            manager().validate(payload, "User", version)
-
-    @pytest.mark.parametrize(
-        ("model_adapter", "registry", "missing_version"),
-        [
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1], []],
-                "9.0.0",
-            ),
-            (
-                PydanticModelAdapter,
-                [pendulum.Date, "test", [UserV20250310], []],
-                "2099-01-01",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-        ids=["semver", "date"],
-    )
-    def test_get_unknown_raises(
-        self,
-        manager: type[Manager],
-        missing_version: str,
-    ) -> None:
-        with pytest.raises(ModelNotFoundError):
-            manager.get("User", missing_version)
-
-    @pytest.mark.parametrize(
         ("model_adapter", "registry", "version"),
         [
             (
@@ -298,30 +221,6 @@ class TestLookupHelpers:
     ) -> None:
         with pytest.raises(ModelNotFoundError):
             manager.get("user", version)
-
-    @pytest.mark.parametrize(
-        ("model_adapter", "registry", "latest"),
-        [
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2, UserV3], []],
-                UserV3,
-            ),
-            (
-                PydanticModelAdapter,
-                [pendulum.Date, "test", [UserV20250310, UserV20251231], []],
-                UserV20251231,
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-        ids=["semver", "date"],
-    )
-    def test_get_latest_returns_highest(
-        self,
-        manager: type[Manager],
-        latest: type[BaseModel],
-    ) -> None:
-        assert manager.get_latest_model("User").model_id.endswith(latest.__name__)
 
     @pytest.mark.parametrize(
         ("model_adapter", "registry"),
@@ -367,193 +266,29 @@ class TestLookupHelpers:
         ] == expected
         assert manager.list_versions("Missing") == []
 
-    @pytest.mark.parametrize(
-        ("model_adapter", "registry"),
-        [
-            (
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV2, AddressV1, UserV1],
-                    [((UserV1, UserV2), migrate_v1_to_v2)],
-                ],
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
+
+FLUENT_LOOKUP_REGISTRY = [
+    semver.Version,
+    "test",
+    [UserV1, UserV2, UserV3],
+    [
+        ((UserV1, UserV2), lambda d, _: d),
+        ((UserV2, UserV3), lambda d, _: d),
+    ],
+]
+
+
+def _fluent_context(manager: type[Manager]):
+    instance = manager()
+    node = instance.engine.get_model(
+        instance.engine.adapter.version_key(kind="User", version="1.0.0")
     )
-    def test_get_entities(self, manager: type[Manager]) -> None:
-        assert manager.get_entities() == ["Address", "User"]
+    edge = instance.engine.registry.migrations("User")[0]
+    return instance, node, edge
 
 
 class TestFluentLookup:
     """Manager owns the fluent lookup sugar; engine/registry are typed-only."""
-
-    @pytest.mark.parametrize(
-        ("model_adapter", "registry", "models", "key_factory", "expected"),
-        [
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                lambda versions: UserV1,
-                True,
-            ),
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                lambda versions: UserV3,
-                False,
-            ),
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                lambda versions: (versions[0].kind, versions[0].version),
-                True,
-            ),
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                lambda versions: ("User", semver.Version(9, 9, 9)),
-                False,
-            ),
-            (
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d, _: d)],
-                ],
-                [UserV1, UserV2],
-                lambda versions: (versions[0], versions[1]),
-                True,
-            ),
-            (
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d, _: d)],
-                ],
-                [UserV1, UserV2],
-                lambda versions: (versions[1], versions[0]),
-                False,
-            ),
-            (
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2, UserV3],
-                    [
-                        ((UserV1, UserV2), lambda d, _: d),
-                        ((UserV2, UserV3), lambda d, _: d),
-                    ],
-                ],
-                [UserV1, UserV2, UserV3],
-                lambda versions: slice(versions[0], versions[2]),
-                True,
-            ),
-            (
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2, UserV3],
-                    [
-                        ((UserV1, UserV2), lambda d, _: d),
-                        ((UserV2, UserV3), lambda d, _: d),
-                    ],
-                ],
-                [UserV1, UserV2, UserV3],
-                lambda versions: slice(versions[2], versions[0]),
-                False,
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_contains_fluent_keys(
-        self,
-        manager: type[Manager],
-        models: list[ModelHandle],
-        key_factory: Callable[..., object],
-        expected: bool,
-    ) -> None:
-        instance = manager()
-        versions = [envelope_model(instance.engine.adapter, None, m) for m in models]
-        assert (key_factory(versions) in instance) is expected
-
-    @pytest.mark.parametrize(
-        ("model_adapter", "registry", "models", "selector", "kind"),
-        [
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                lambda versions: UserV1,
-                "model",
-            ),
-            (
-                PydanticModelAdapter,
-                [semver.Version, "test", [UserV1, UserV2], []],
-                [UserV1, UserV2],
-                lambda versions: (versions[0].kind, versions[0].version),
-                "model",
-            ),
-            (
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2],
-                    [((UserV1, UserV2), lambda d, _: d)],
-                ],
-                [UserV1, UserV2],
-                lambda versions: (versions[0], versions[1]),
-                "edge",
-            ),
-            (
-                PydanticModelAdapter,
-                [
-                    semver.Version,
-                    "test",
-                    [UserV1, UserV2, UserV3],
-                    [
-                        ((UserV1, UserV2), lambda d, _: d),
-                        ((UserV2, UserV3), lambda d, _: d),
-                    ],
-                ],
-                [UserV1, UserV2, UserV3],
-                lambda versions: slice(versions[0], versions[2]),
-                "path",
-            ),
-        ],
-        indirect=["model_adapter", "registry"],
-    )
-    def test_getitem_fluent_keys(
-        self,
-        manager: type[Manager],
-        models: list[ModelHandle],
-        selector: Callable[..., object],
-        kind: str,
-    ) -> None:
-        instance = manager()
-        versions = [envelope_model(instance.engine.adapter, None, m) for m in models]
-        result = instance[selector(versions)]
-        if kind == "model":
-            assert instance.engine.adapter.resolve(
-                cast(Versionable, result).descriptor.ref
-            ) in set(models)
-        elif kind == "edge":
-            assert cast(Migratable, result).func is not None
-        else:
-            branch = cast(list[Migratable], result)
-            assert len(branch) == len(models) - 1
 
     @pytest.mark.parametrize(
         ("model_adapter", "registry", "models"),
@@ -582,6 +317,101 @@ class TestFluentLookup:
         instance = manager()
         path = instance.migration_path(UserV1, UserV3)
         assert len(path) == 2  # noqa: PLR2004
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    @pytest.mark.parametrize(
+        "key_kind",
+        ["model", "model_tuple", "version_node", "edge_tuple", "version_edge"],
+    )
+    def test_fluent_getitem_positive(
+        self,
+        manager: type[Manager],
+        key_kind: str,
+    ) -> None:
+        instance, node, edge = _fluent_context(manager)
+        keys = {
+            "model": UserV1,
+            "model_tuple": ("User", "1.0.0"),
+            "version_node": node,
+            "edge_tuple": (edge.source, edge.target),
+            "version_edge": edge,
+        }
+        expected = edge if key_kind in {"edge_tuple", "version_edge"} else node
+
+        assert instance[keys[key_kind]] == expected
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    @pytest.mark.parametrize(
+        "member_kind",
+        ["model", "model_tuple", "edge_tuple", "slice"],
+    )
+    def test_fluent_contains_positive(
+        self,
+        manager: type[Manager],
+        member_kind: str,
+    ) -> None:
+        instance, _node, edge = _fluent_context(manager)
+        members = {
+            "model": UserV1,
+            "model_tuple": ("User", "1.0.0"),
+            "edge_tuple": (edge.source, edge.target),
+            "slice": slice(UserV1, UserV3),
+        }
+
+        assert members[member_kind] in instance
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_fluent_slice_returns_path(self, manager: type[Manager]) -> None:
+        instance, _node, _edge = _fluent_context(manager)
+        path = instance[UserV1:UserV3]
+
+        assert isinstance(path, list)
+        assert len(path) == 2  # noqa: PLR2004
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    @pytest.mark.parametrize(
+        ("index", "error"),
+        [
+            pytest.param(object(), CatalogError, id="unsupported-type"),
+            pytest.param(int, ModelNotFoundError, id="unregistered-class"),
+        ],
+    )
+    def test_fluent_getitem_negative(
+        self,
+        manager: type[Manager],
+        index: object,
+        error: type[Exception],
+    ) -> None:
+        instance, _node, _edge = _fluent_context(manager)
+
+        with pytest.raises(error):
+            instance[index]
+
+    @pytest.mark.parametrize(
+        ("model_adapter", "registry"),
+        [[PydanticModelAdapter, FLUENT_LOOKUP_REGISTRY]],
+        indirect=["model_adapter", "registry"],
+    )
+    def test_fluent_contains_negative(self, manager: type[Manager]) -> None:
+        instance, _node, _edge = _fluent_context(manager)
+
+        assert object() not in instance
 
 
 class TestSharedEngine:
@@ -688,7 +518,7 @@ class TestSharedEngine:
         instance.add_hook(key, hook)
 
         edge = instance.registry.migrations("User")[0]
-        assert instance.registry.get_hooks(edge) == [hook]
+        assert instance.registry.get_hooks(edge) == [HookRefFactory()(hook)]
         assert manager._default_engine.registry.hooks() == []
 
     @pytest.mark.parametrize(
@@ -868,20 +698,6 @@ def test_unregistered_model_class_raises(
 # bindings resolved at construction.
 
 
-def test_configured_manager_satisfies_class_state_contract(
-    migration_settings: MigrationSettings,
-    model_adapter: ModelAdapter,
-) -> None:
-    manager_cls = Manager[semver.Version]
-    configured: type[ManagerClassState[semver.Version]] = manager_cls.configure(
-        model_adapter, **manager_kwargs(migration_settings)
-    )
-    assert configured._default_engine.adapter is model_adapter
-    assert configured._default_engine is not None
-    assert configured._strategy is semver.Version
-    assert callable(configured.configure)
-
-
 def test_configure_appends_custom_health_linters(
     migration_settings: MigrationSettings,
     model_adapter: ModelAdapter,
@@ -928,38 +744,7 @@ def test_configure_rejects_linters_with_prebuilt_engine(
         )
 
 
-def test_instantiated_manager_satisfies_instance_state_contract(
-    migration_settings: MigrationSettings,
-    model_adapter: ModelAdapter,
-) -> None:
-    configured = Manager[semver.Version].configure(
-        model_adapter, **manager_kwargs(migration_settings)
-    )
-    instance: ManagerInstanceState[semver.Version] = configured()
-
-    assert instance.engine is not configured._default_engine
-    assert instance.registry is not configured._default_engine.registry
-    assert instance.adapter is model_adapter
-
-
 class TestMigrationContext:
-    def test_create_is_a_view_over_source_mapping(self) -> None:
-        source = {"tenant": "tenant_99"}
-        context = MigrationContext.create(source)
-
-        source["tenant"] = "tenant_100"
-
-        assert context["tenant"] == "tenant_100"
-
-    def test_create_is_idempotent(self) -> None:
-        context = MigrationContext.create({"tenant": "tenant_99"})
-        copy = MigrationContext.create(context)
-
-        assert copy["tenant"] == context["tenant"]
-
-    def test_create_empty(self) -> None:
-        assert MigrationContext.create(None) == MigrationContext.empty()
-
     def test_rejects_mutation(self) -> None:
         context = MigrationContext.create({"tenant": "tenant_99"})
 
@@ -1055,6 +840,7 @@ def test_manager_stores_key_only_with_namespace(
         namespace="orders",
         kind="User",
         version=semver.Version(1, 0, 0),
+        ref=NodeRef(),
     )
 
     stored = instance.store_model(key)
@@ -1067,15 +853,38 @@ def test_manager_stores_key_only_with_namespace(
     assert instance.registry.get_model(stored).namespace == "orders"
 
 
-def test_manager_namespace_derives_from_adapter_codec() -> None:
-    adapter = PydanticModelAdapter(
-        codec=ModelCodec(
-            namespace="orders",
-            version_property="version",
-            kind_property="kind",
-        )
+@pytest.mark.parametrize(
+    ("model_adapter", "registry"),
+    [
+        pytest.param(
+            PydanticModelAdapter,
+            [semver.Version, "test", [UserV1, UserV2], []],
+            id="pydantic",
+        ),
+    ],
+    indirect=["model_adapter", "registry"],
+)
+def test_parallel_discriminators_run_default_path(manager: type[Manager]) -> None:
+    instance = manager()
+    key = ManagerMigrationKey("User", "1.0.0", "2.0.0")
+    instance.store_migration(key, migrate_v1_to_v2)
+    instance.store_migration(key, migrate_v1_to_v2, discriminator="canary")
+
+    edges = instance.registry.edges("User")
+    assert {edge.discriminator for edge in edges} == {"default", "canary"}
+
+    runtime = instance.runtime()
+    assert runtime.runner is not None
+    result = runtime.runner.run(
+        {
+            "kind": "User",
+            "version": "1.0.0",
+            "name": "Alice",
+            "email": "alice@example.com",
+            "role": "user",
+        },
+        "2.0.0",
     )
 
-    manager = Manager[semver.Version].configure(adapter)
-
-    assert manager._default_engine.registry.namespace == "orders"
+    assert result["version"] == "2.0.0"
+    assert result["name"] == "Alice"

@@ -8,10 +8,7 @@ from itertools import pairwise
 import pytest
 import semver
 
-from pyverge.core.types import MigrationDirectionStrategy
-from pyverge.execution.migrations import MigrationBindings
-from pyverge.execution.plan import ExtractedEntry
-from pyverge.graph import (
+from pyverge.core.graph import (
     AnyDirection,
     BackwardDirection,
     ForwardDirection,
@@ -22,9 +19,13 @@ from pyverge.graph import (
     TargetCompiler,
     direction_policy,
 )
-from pyverge.registry.errors import CatalogError
+from pyverge.core.registry.errors import CatalogError
+from pyverge.core.types import MigrationDirectionStrategy
+from pyverge.core.versioning import EdgeKey, parse_version
+from pyverge.runtime import ExecutionPlanner
+from pyverge.runtime.migrations import MigrationBindings
+from pyverge.runtime.plan import ExtractedEntry
 from pyverge.schemas import PydanticModelAdapter
-from pyverge.versioning import EdgeKey, parse_version
 from tests.examples.migrations import USER_JSONATA_V2_TO_V3, USER_JSONPATCH_V1_TO_V2
 from tests.examples.pydantic.semver import (
     UserV1,
@@ -88,8 +89,7 @@ def test_path_finder(  # noqa: PLR0913, PLR0917
     resolved = plan.entries[0]
     assert resolved.target.version == parse_version(expected_version)
     assert len(resolved.steps) == expected_steps
-    assert len(resolved.migrations) == expected_migrations
-    assert resolved.hooks == ((),) * (expected_steps or 0)
+    assert len(resolved.edges) == expected_migrations
 
 
 @pytest.mark.parametrize("nodes", [[UserV1, UserV2]], indirect=True)
@@ -204,7 +204,7 @@ def test_path_finder_cache_reuses_resolved_steps(path_finder, nodes) -> None:
     earliest = path_finder.find([entry], "earliest", source_model=None)
 
     assert latest_once.entries[0].steps == latest_twice.entries[0].steps
-    assert latest_once.entries[0].migrations == latest_twice.entries[0].migrations
+    assert latest_once.entries[0].edges == latest_twice.entries[0].edges
     assert latest_once.entries[0].target.version == parse_version("3.0.0")
     assert earliest.entries[0].target.version == parse_version("1.0.0")
 
@@ -247,13 +247,14 @@ def test_path_finder_resolves_hooks_per_step(
     hook = _Hook()
     versions = registry.kind_versions("User")
     for source, target in pairwise(versions):
-        registry.add_hook(EdgeKey.from_pair(source, target), hook)
+        edge_key = EdgeKey.from_pair(source, target)
+        binding = getattr(registry, "bindings").add_hook(edge_key, hook)
+        registry.add_hook(edge_key, binding.ref)
 
     snapshot = graph()
-    finder = PathFinder(
+    finder = PathFinder[semver.Version](
         graph=snapshot,
         targets=TargetCompiler(snapshot, model_adapter),
-        migrations=MigrationBindings.from_catalog(engine.registry),
         policy=PolicyEngine(
             direction=AnyDirection(),
             on_direction_violation="raise",
@@ -267,8 +268,17 @@ def test_path_finder_resolves_hooks_per_step(
         "latest",
         source_model=None,
     )
+    execution = ExecutionPlanner(
+        bindings=getattr(
+            registry,
+            "bindings",
+            MigrationBindings[semver.Version](name=registry.namespace),
+        )
+    ).build(plan, {})
 
-    assert plan.entries[0].hooks == ((hook,), (hook,))
+    bindings = execution.levels[0][0].hooks
+    assert tuple(binding.hook for binding in bindings[0]) == (hook,)
+    assert tuple(binding.hook for binding in bindings[1]) == (hook,)
 
 
 @pytest.mark.parametrize(
@@ -323,10 +333,9 @@ def test_path_finder_resolves_declarative_migrations(  # noqa: PLR0913, PLR0917
     source = model_adapter.versionable(source_model)
     target = model_adapter.versionable(target_model)
     snapshot = GraphBuilder().build(registry)
-    finder = PathFinder(
+    finder = PathFinder[semver.Version](
         graph=snapshot,
         targets=TargetCompiler(snapshot, model_adapter),
-        migrations=MigrationBindings.from_catalog(registry),
         policy=PolicyEngine(
             direction=AnyDirection(),
             on_direction_violation="raise",
@@ -342,11 +351,19 @@ def test_path_finder_resolves_declarative_migrations(  # noqa: PLR0913, PLR0917
         source_model=None,
     )
 
-    assert plan.entries[0].migrations == (migration,)
-    descriptor = plan.entries[0].migration_descriptors[0]
+    execution = ExecutionPlanner(
+        bindings=getattr(
+            registry,
+            "bindings",
+            MigrationBindings[semver.Version](name=registry.namespace),
+        )
+    ).build(plan, {})
+    bound = execution.levels[0][0]
+    assert bound.migrations[0].func == migration
+    descriptor = bound.migration_descriptors[0]
     assert descriptor.strategy == strategy
     assert descriptor.identity
-    assert plan.entries[0].steps[-1][1] == target
+    assert bound.steps[-1][1] == target
     edge = next(iter(snapshot.migrations("User")))
     assert snapshot.edge_metadata[edge]["strategy"] == strategy
 

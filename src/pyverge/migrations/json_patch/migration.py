@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pyverge.versioning import (
+from pyverge.core.versioning import (
     MigrationDescriptor,
     default_canonicalizer,
 )

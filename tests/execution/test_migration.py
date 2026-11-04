@@ -13,17 +13,9 @@ import pytest
 import semver
 
 from pyverge import types
-from pyverge.core import MigrationContext
-from pyverge.discovery.reflection import JsonPatchRenderer
-from pyverge.migrations import JsonataMigration, JsonPatchMigration
-from pyverge.registry import Registry
-from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
-from pyverge.schemas.types import (
-    ModelHandle,
-)
-from pyverge.settings import VersioningSettings
-from pyverge.versioning import (
-    CompatibilityReport,
+from pyverge.core.graph import PathPlanEntry
+from pyverge.core.registry import CompatibilityReport, Registry
+from pyverge.core.versioning import (
     Diff,
     DiffOrigin,
     FieldChange,
@@ -32,13 +24,23 @@ from pyverge.versioning import (
     MigrationDescriptor,
     ModelDescriptor,
     ModelRef,
-    VersionEdge,
+    NodeRef,
     VersionKey,
     VersionNode,
     default_content_hasher,
     parse_version,
 )
-from pyverge.versioning.errors import MigrationApplicationError
+from pyverge.core.versioning.errors import MigrationApplicationError
+from pyverge.discovery.reflection import JsonPatchRenderer
+from pyverge.migrations import JsonataMigration, JsonPatchMigration
+from pyverge.runtime.context import MigrationContext
+from pyverge.runtime.migrations import MigrationBinding
+from pyverge.runtime.plan import ExecutionEntry
+from pyverge.schemas import JsonSchemaModelAdapter, PydanticModelAdapter
+from pyverge.schemas.types import (
+    ModelHandle,
+)
+from pyverge.settings import VersioningSettings
 from tests.examples.json import (
     PERSON_V1_0_0,
     USER_V1_0_0,
@@ -497,7 +499,10 @@ class TestJsonSchemaModelAdapter:
         self, json_model_adapter: JsonSchemaModelAdapter
     ) -> None:
         meta_node = VersionKey(
-            namespace="test", kind="User", version=semver.Version(0, 1, 0)
+            namespace="test",
+            kind="User",
+            version=semver.Version(0, 1, 0),
+            ref=NodeRef(),
         )
         real = json_model_adapter.versionable(
             json_model_adapter.to_pydantic(USER_V1_0_0)
@@ -583,12 +588,14 @@ class TestCompatibilityReport:
         modified: dict[str, dict[str, Any]] | None = None,
         added_info: dict[str, dict[str, Any]] | None = None,
     ) -> CompatibilityReport:
+        model_ref = ModelRef(provider_id="test", entity_id="tests.Model")
         source = VersionNode[semver.Version](
             namespace="test",
             kind="User",
             version=semver.Version.parse("1.0.0"),
+            ref=model_ref,
             descriptor=ModelDescriptor(
-                ref=ModelRef(provider="test", model_id="tests.Model"),
+                ref=model_ref,
                 fields=FrozenMap(),
             ),
         )
@@ -596,6 +603,7 @@ class TestCompatibilityReport:
             namespace="test",
             kind="User",
             version=semver.Version.parse("2.0.0"),
+            ref=NodeRef(),
         )
         fields = {
             **{
@@ -718,16 +726,23 @@ def test_version_edge_wraps_migration_failure(
     def fail(data, context=None):
         raise RuntimeError("boom")
 
-    edge = VersionEdge(
+    migration = MigrationDescriptor("callable", "fail")
+    plan = PathPlanEntry(
+        path=(),
         source=source,
         target=target,
-        diff=model_adapter.diff(source, target),
-        func=fail,
-        migration=MigrationDescriptor("callable", "fail"),
+        target_model=target.descriptor.ref,
+        steps=(),
+        edges=(),
+    )
+    entry = ExecutionEntry(
+        plan=plan,
+        migrations=(MigrationBinding(func=fail, descriptor=migration),),
+        hooks=(),
     )
 
     with pytest.raises(MigrationApplicationError) as error:
-        edge({"kind": "User"})
+        entry.invoke_migration(0, {"kind": "User"})
 
     assert error.value.kind == "User"
     assert error.value.source is source

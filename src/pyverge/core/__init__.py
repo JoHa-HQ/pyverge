@@ -1,5 +1,3 @@
-from .clock import Clock, SystemClock
-from .context import EMPTY_CONTEXT, MigrationContext
 from .errors import (
     CatalogError,
     MaxDepthExceededError,
@@ -31,21 +29,19 @@ from .types import (
     VersionMissingStrategy,
     VersionValue,
     VersionValue_co,
+    VersionValueProtocol,
 )
 
 __all__ = [
-    "EMPTY_CONTEXT",
     "MIGRATION_PAIR_LEN",
     "Attachable",
     "CatalogError",
-    "Clock",
     "DepthViolationStrategy",
     "DirectionViolationStrategy",
     "IdFactory",
     "ManagerKey",
     "ManagerMigrationKey",
     "MaxDepthExceededError",
-    "MigrationContext",
     "MigrationDirectionStrategy",
     "MigrationFunc",
     "MigrationKeyInput",
@@ -59,12 +55,12 @@ __all__ = [
     "PayloadValidationError",
     "PyvergeError",
     "RegistrationMode",
-    "SystemClock",
     "TargetResolver",
     "TargetStrategy",
     "UuidIdFactory",
     "ValidationMode",
     "VersionMissingStrategy",
     "VersionValue",
+    "VersionValueProtocol",
     "VersionValue_co",
 ]

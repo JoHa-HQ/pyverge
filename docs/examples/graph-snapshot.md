@@ -5,10 +5,10 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from pyverge.graph import GraphBuilder
-from pyverge.registry import DEFAULT_HEALTH_LINTERS, Registry
+from pyverge.core.graph import GraphBuilder
+from pyverge.core.registry import DEFAULT_HEALTH_LINTERS, Registry
 from pyverge.schemas import ModelCodec, PydanticModelAdapter
-from pyverge.versioning import VersionKey, default_content_hasher
+from pyverge.core.versioning import VersionKey, default_content_hasher
 
 
 class DocUserV1(BaseModel):

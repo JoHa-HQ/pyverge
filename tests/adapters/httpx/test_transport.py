@@ -15,8 +15,8 @@ import semver
 
 from pyverge.adapters.httpx import HttpPolicy, PyvergeAsyncTransport, PyvergeTransport
 from pyverge.adapters.runtime import ConvergenceRuntime
-from pyverge.core import MigrationContext
-from pyverge.registry.errors import HealthValidationError
+from pyverge.core.registry.errors import HealthValidationError
+from pyverge.runtime.context import MigrationContext
 from pyverge.schemas import PydanticModelAdapter
 from tests.examples.pydantic.semver import UserV1, UserV2, migrate_v1_to_v2
 from tests.examples.pydantic.semver_nested import PersonV1

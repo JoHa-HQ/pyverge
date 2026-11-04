@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from pyverge.execution.backends import AsyncBackend
+from pyverge.runtime.backends import AsyncBackend
 
 from .._helpers import load_json_file, write_json_file
 from ..config import ConfigError, resolve_manager

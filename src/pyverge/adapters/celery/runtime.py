@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING
 from celery.exceptions import CeleryError
 
 if TYPE_CHECKING:
-    from pyverge.execution import Runner
+    from pyverge.runtime import Runner
 
 from pyverge.adapters.runtime import ConvergenceRuntime
-from pyverge.registry.errors import HealthValidationError
+from pyverge.core.registry.errors import HealthValidationError
 
 
 class CeleryRuntime(ConvergenceRuntime):

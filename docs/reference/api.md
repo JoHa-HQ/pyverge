@@ -12,7 +12,7 @@ Generated from the public Python API.
 
 ## Registry
 
-::: pyverge.registry.Registry
+::: pyverge.core.registry.Registry
 
 ## Graph and identity
 
@@ -25,7 +25,7 @@ Generated from the public Python API.
 
 ## Runner
 
-::: pyverge.execution.Runner
+::: pyverge.runtime.Runner
 
 ## Discovery reflection
 
