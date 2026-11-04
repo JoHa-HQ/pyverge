@@ -30,6 +30,7 @@ class TargetResolver(Protocol[VersionValue]):
         self, current: VersionNode[VersionValue]
     ) -> VersionNode[VersionValue] | None: ...
 
+
 ContextT_contra = TypeVar("ContextT_contra", contravariant=True)
 
 
