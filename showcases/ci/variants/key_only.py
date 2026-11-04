@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from pyverge.registry import Registry
-from pyverge.schemas import ModelCodec, PydanticModelAdapter
 from pyverge.versioning import VersionKey, default_content_hasher
+
+from pyverge.schemas import ModelCodec, PydanticModelAdapter
 
 
 def build_key_only_registry() -> tuple[

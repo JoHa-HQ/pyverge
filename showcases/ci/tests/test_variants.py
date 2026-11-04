@@ -1,6 +1,14 @@
 from __future__ import annotations
 
 import pytest
+from pyverge.graph import GraphBuilder
+from pyverge.jgf import JgfExporter
+from pyverge.registry.errors import MigrationPathError
+from pyverge.versioning import (
+    MigrationDescriptor,
+    VersionEdge,
+    default_content_hasher,
+)
 from variants import (
     build_billing_manager,
     build_chain_manager,
@@ -10,15 +18,6 @@ from variants import (
 )
 from variants.key_only import add_size
 from variants.widget_models import WidgetV1, WidgetV2
-
-from pyverge.graph import GraphBuilder
-from pyverge.jgf import JgfExporter
-from pyverge.registry.errors import MigrationPathError
-from pyverge.versioning import (
-    MigrationDescriptor,
-    VersionEdge,
-    default_content_hasher,
-)
 
 
 def test_chain_variant_supports_forward_and_reverse() -> None:
