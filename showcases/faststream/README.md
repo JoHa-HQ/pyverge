@@ -1,194 +1,30 @@
-# FastStream + pyverge showcase
+# FastStream showcase
 
-Versioned message bodies converge to a policy target **before** a FastStream
-subscriber runs. One graph, any broker.
+A showcase demonstrating pyverge's declarative FastStream adapter: message bodies converge upstream through type annotations, with multi-target fan-out and header-based negotiation.
 
-`Order`: v1 `total` → v2 `+currency`. Each event is routed to `orders.legacy`
-(`1.0.0`) and `orders.current` (`2.0.0`).
-
-## What it demonstrates
-
-| Use case | Where |
-| --- | --- |
-| Inbound convergence | every subscriber converges before the handler |
-| Outbound convergence | `publish_to` converges the handler return per route |
-| Multi-channel subscribe | one handler on `orders.v1` and `orders.v2` |
-| Multi-route publish | the same event on `orders.legacy` and `orders.current` |
-| Header negotiation | `accept-version` selects the inbound target |
-| Per-message policy | `--policy latest|earliest|<version>` |
-| Target validation | the shared runtime validates converged entries |
-| Telemetry | per-migration OTEL spans + FastStream middleware |
-| Brokers | Kafka, RabbitMQ, NATS, Redis through one assembly |
-| Microcks | generated AsyncAPI destinations via `--microcks` |
+| Kind | Role | Graph |
+| --- | --- | --- |
+| `Order` | Root entity | v1 `total` → v2 `+currency` (USD/EUR by discriminator) → v3 `total` → `amount` |
+| `Address` | Nested entity | v1 `street, city` → v2 `+country` |
 
 ## Architecture
 
-`build_faststream` creates one `FastStreamRuntime`, binds the manager runner in
-the FastStream lifespan, and wraps the broker in `PyvergeBroker`. Features wire
-their handlers through the facade, so they do not create runtimes or repeat the
-manager:
+- `domain/` — anchor models (`OrderV3`, `AddressV2`) and migration functions. Pure Python, no transport or framework dependencies.
+- `application/` — business logic (invoicing, wholesale discount) and storage interfaces (`InvoiceLedger`, `AuditLog`).
+- `app.py` — FastStream application wiring handlers, subscribers, and publishers via `PyvergeBroker`.
+- `container.py` — `dependency-injector` composition root.
 
-```python
-runtime = FastStreamRuntime(manager, validate_target=True)
-broker = PyvergeBroker(raw_broker, runtime=runtime)
-feature.wire(broker)
-```
+## Channels & routing
 
-`PyvergeBroker` owns the runtime and exposes `subscriber`, `publisher`, and
-`publish_to`. The raw broker remains available as `broker.underlying` for
-FastStream tooling and test brokers.
-
-## Try it
-
-```bash
-cd showcases/faststream
-uv sync
-export MICROCKS_BROKER_BINDING=KAFKA
-export MICROCKS_KAFKA_BOOTSTRAP_SERVER=kafka:29092
-docker compose up -d --profile kafka
-uv run python -m faststream_demo --microcks kafka kafka://localhost:9092 run
-```
-
-`MICROCKS_BROKER_BINDING` and `MICROCKS_KAFKA_BOOTSTRAP_SERVER` are required;
-there is no default binding.
-
-A v1 message is handled at v2 with `currency` filled in. Jaeger:
-<http://localhost:16686>.
-
-## Brokers
-
-```bash
-docker compose up -d --profile kafka      # kafka://localhost:9092
-docker compose up -d --profile rabbitmq   # amqp://guest:guest@localhost:5672/
-docker compose up -d --profile nats       # nats://localhost:4222
-docker compose up -d --profile redis      # redis://localhost:6379
-```
-
-```bash
-uv run python -m faststream_demo kafka kafka://localhost:9092 run
-uv run python -m faststream_demo rabbit amqp://guest:guest@localhost:5672/ run
-uv run python -m faststream_demo nats nats://localhost:4222 run
-uv run python -m faststream_demo redis redis://localhost:6379 run
-```
-
-`--microcks` consumes Microcks-generated destinations
-(`Orders-2.0.0-orders.v1` / `.v2`). `--topic`, `--policy`,
-`--telemetry/--no-telemetry`, `--service-name`, and `--otlp-endpoint` mirror the
-Typer entrypoint; run `--help` for details.
-
-## Use cases
-
-### Subscribe to multiple channels
-
-One handler subscribes to both inputs: `orders.v1` and `orders.v2`.
-
-Start the app and two readers:
-
-```bash
-# terminal 1
-uv run python -m faststream_demo kafka kafka://localhost:9092 run
-
-# terminal 2
-uv run python -m faststream_demo kafka kafka://localhost:9092 \
-  read orders.legacy --count 2 --timeout 60
-
-# terminal 3
-uv run python -m faststream_demo kafka kafka://localhost:9092 \
-  read orders.current --count 2 --timeout 60
-```
-
-Send one event on each input:
-
-```bash
-# terminal 4
-uv run python -m faststream_demo kafka kafka://localhost:9092 \
-  send orders.v1 --example v1
-uv run python -m faststream_demo kafka kafka://localhost:9092 \
-  send orders.v2 --example v2
-```
-
-### Publish to multiple channels
-
-Each input event is routed to both outputs after convergence:
-
-| Input | `orders.legacy` | `orders.current` |
-| --- | --- | --- |
-| v1 | v1, no `currency` | v2, `currency: USD` |
-| v2 | v1, no `currency` | v2, `currency: EUR` |
-
-Both readers should receive messages for both sends. `orders.legacy` and
-`orders.current` are app-defined output topics; they are not Microcks
-destinations.
-
-With `--microcks`, the inputs become `Orders-2.0.0-orders.v1` and
-`Orders-2.0.0-orders.v2`; outputs stay the same.
-
-## Send / read
-
-Publish a built-in event and read the converged result:
-
-```bash
-uv run python -m faststream_demo kafka kafka://localhost:9092 \
-  send Orders-2.0.0-orders.v1 --example v1
-
-uv run python -m faststream_demo kafka kafka://localhost:9092 \
-  read orders.legacy --count 1
-```
-
-`send` accepts `--example v1|v2`, `--payload '<json>'`, `--file event.json`, and
-repeatable `--header key=value`. `read` prints JSON and stops after `--count` or
-`--timeout`.
-
-Negotiate a target per message:
-
-```bash
-uv run python -m faststream_demo kafka kafka://localhost:9092 \
-  send orders.v2 --example v2 --header accept-version=1.0.0
-```
-
-The header name is configurable with `--version-header`.
+- `orders` — input topic with multiple handlers:
+  - `handle_retail` — filters on `type=retail`, migrates via the retail branch (`USD`), records invoice, and fans out.
+  - `handle_wholesale` — filters on `type=wholesale`, migrates via the wholesale branch (`EUR`), records invoice with discount.
+  - `handle_other` — declared with `converge=False`, receives raw unmodeled payloads into the audit log.
+- `orders.legacy` & `orders.current` — fan-out destinations for retail orders, published at `1.0.0` and `3.0.0` respectively.
+- `orders.requests` & `orders.replies` — request-reply flow negotiating response version via the inbound `accept-version` header.
 
 ## Tests
 
 ```bash
-uv run pytest
+uv run pytest showcases/faststream
 ```
-
-All broker cases run in-memory; select one with `--broker`:
-
-```bash
-uv run pytest --broker rabbit
-```
-
-Run the full matrix:
-
-```bash
-for broker in kafka rabbit nats redis; do
-  uv run pytest --broker "$broker"
-done
-```
-
-For a real broker, use the `send` / `read` commands from [Use cases](#use-cases).
-
-## Microcks
-
-Microcks starts globally; the one-shot `microcks-import` service imports
-`asyncapi/orders.yaml` through the REST API using
-`MICROCKS_BROKER_BINDING` as the AsyncAPI binding. Open
-<http://localhost:8080>. Register broker URLs in Microcks: Kafka `kafka:29092`,
-RabbitMQ `amqp://guest:guest@rabbitmq:5672/`, NATS `nats://nats:4222`, Redis
-`redis://redis:6379`.
-
-After changing the spec, re-run the importer:
-
-```bash
-docker compose run --rm microcks-import
-```
-
-## Scope
-
-JSON bodies, one convergence per message. Batching remains out of scope.
-Header negotiation, per-topic/per-route targets, range targets, and explicit
-selectors are supported by the FastStream adapter. The showcase uses header
-negotiation, per-route publishing, and target validation; the adapter reference
-document shows range and selector configuration.

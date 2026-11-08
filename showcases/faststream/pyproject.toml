@@ -15,9 +15,8 @@ description = "FastStream showcase for pyverge"
 requires-python = ">=3.11"
 dependencies = [
   "pyverge",
-  "faststream[kafka,rabbit,nats,redis]>=0.7",
-  "typer>=0.12",
-  "dependency-injector>=4.49.1"
+  "faststream[kafka]>=0.7",
+  "dependency-injector>=4.48.2"
 ]
 
 [tool.hatch.build.targets.wheel]
